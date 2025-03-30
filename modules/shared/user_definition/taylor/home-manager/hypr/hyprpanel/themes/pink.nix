@@ -1,0 +1,66 @@
+{ config, lib, ... }:
+{
+  options = {
+    hyprpanelPink.background = lib.mkOption {
+      type = lib.types.str;
+      default = "#242438";
+    };
+    hyprpanelPink.pink_primary = lib.mkOption {
+      type = lib.types.str;
+      default = "#c4a7e7";
+    };
+    hyprpanelPink.faint_background = lib.mkOption {
+      type = lib.types.str;
+      default = "#636394";
+    };
+  };
+
+  config = {
+    programs.hyprpanel.theme = "rose_pine_split";
+    programs.hyprpanel.settings.theme.bar = {
+      floating = true;
+      transparent = true;
+      buttons = {
+        radius = "4";
+        enableBorders = true;
+        modules.microphone.enableBorder = true;
+      };
+      menus = {
+        card_radius = "15";
+        border.radius = "15";
+        buttons.radius = "15";
+      };
+    };
+    programs.hyprpanel.override = {
+      theme = {
+        bar = {
+          buttons = {
+            monochrome = true;
+            borderColor = config.hyprpanelPink.faint_background;
+            text = config.hyprpanelPink.background;
+            icon_background = config.hyprpanelPink.background;
+            icon = config.hyprpanelPink.pink_primary;
+            background = config.hyprpanelPink.pink_primary;
+            modules = {
+              microphone = {
+                background = config.hyprpanelPink.pink_primary;
+                icon = config.hyprpanelPink.background;
+              };
+              hypridle = {
+                background = config.hyprpanelPink.pink_primary;
+                icon = config.hyprpanelPink.background;
+              };
+            };
+            workspaces = {
+              active = config.hyprpanelPink.background;
+              occupied = config.hyprpanelPink.faint_background;
+            };
+          };
+          menus = {
+            monochrome = true;
+          };
+        };
+      };
+    };
+  };
+}

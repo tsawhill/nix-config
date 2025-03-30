@@ -1,0 +1,8 @@
+{ ... }:
+{
+  imports = [
+    ./hyprland
+    ./hyprpanel
+    ./hypridle
+  ];
+}
