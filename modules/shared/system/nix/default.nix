@@ -6,6 +6,9 @@
   ];
   nix = {
     settings = {
+      # Since config is stored in a git repository and changes are not pushed until a successful build
+      warn-dirty = false;
+
       substituters = [
         "https://walker.cachix.org/"
         "https://hyprland.cachix.org/"
