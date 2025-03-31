@@ -1,11 +1,11 @@
 { pkgs, ... }:
 {
-  home.packages = with pkgs; [
-    starship
-  ];
-
   programs.zsh = {
     enable = true;
+
+    initExtraFirst = "
+    eval \"$(starship init zsh)\"
+    ";
 
     plugins = [
       {
@@ -23,5 +23,9 @@
         file = "zsh-syntax-highlighting.zsh";
       }
     ];
+  };
+  programs.starship = {
+    enable = true;
+    enableZshIntegration = true;
   };
 }
