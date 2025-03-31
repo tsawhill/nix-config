@@ -16,6 +16,7 @@
       {
         name = "zsh-autosuggestions";
         src = "${pkgs.zsh-autosuggestions}/share/zsh-autosuggestions";
+        file = "zsh-autosuggestions.zsh";
       }
       {
         name = "zsh-completions";
@@ -26,6 +27,5 @@
         src = "${pkgs.zsh-syntax-highlighting}/share/zsh-syntax-highlighting";
       }
     ];
-
   };
 }
