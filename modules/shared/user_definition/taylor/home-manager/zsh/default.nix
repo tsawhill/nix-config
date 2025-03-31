@@ -55,6 +55,7 @@
       ))
       {
         add_newline = false;
+        command_timeout = 1500;
       }
     ];
   };
