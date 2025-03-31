@@ -17,7 +17,7 @@
 
       ./hypr
       ./foot
-      # ./fish
+      ./fish
       ./appearance-gtk
     ];
     home.sessionVariables = {
