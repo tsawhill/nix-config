@@ -14,6 +14,8 @@
     initExtra = ''bindkey -e
       bindkey "^[[1;5D" backward-word 
       bindkey "^[[1;5C" forward-word
+      bindkey "^[[1;3D" emacs-backward-word 
+      bindkey "^[[1;3C" emacs-forward-word
       bindkey "\e[3~" delete-char
       '';
     plugins = [
