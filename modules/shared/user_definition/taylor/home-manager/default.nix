@@ -19,6 +19,7 @@
       ./foot
       ./fish
       ./appearance-gtk
+      ./xdg
     ];
     home.sessionVariables = {
       EDITOR = "nvim";
@@ -39,21 +40,6 @@
       ];
     };
 
-
-    xdg = {
-      enable = true;
-      portal.config = {
-        hyprland = {
-          default = [ "hyprland" ];
-        };
-      };
-      userDirs = {
-        enable = true;
-        extraConfig = {
-          XDG_SCREENSHOTS_DIR = "/home/taylor/Pictures/Screenshots";
-        };
-      };
-    };
 
     # The state version is required and should stay at the version you
     # originally installed.
