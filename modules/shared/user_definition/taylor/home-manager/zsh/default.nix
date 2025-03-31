@@ -2,18 +2,18 @@
 {
   programs.zsh = {
     enable = true;
-
-    # initExtraFirst = "
-    # eval \"$(starship init zsh)\"
-    # ";
+    dotDir = "/home/taylor/.config/zsh";
 
     shellAliases = {
       vim = "nvim";
       g = "git";
-      update-system = "cd ~/.config/nixos/ && git add -A && sudo nix flake update && sudo nixos-rebuild switch && git commit -m \"$(hostname) - Generation $(nixos-rebuild list-generations | grep current | awk '{print $1}') Successful Build\" && git push ; cd -";
+      update-system = "cd ~/.config/nixos/ && git add -A && sudo nix flake update && git add -A && sudo nixos-rebuild switch && git commit -m \"$(hostname) - Generation $(nixos-rebuild list-generations | grep current | awk '{print $1}') Successful Build\" && git push ; cd -";
       rebuild-system = "cd ~/.config/nixos/ && git add -A && sudo nixos-rebuild switch && git commit -m \"$(hostname) - Generation $(nixos-rebuild list-generations | grep current | awk '{print $1}') Successful Build (No flake update)\" && git push ; cd -";
     };
 
+    initExtra = ''
+      bindkey "^[[1;5D" backward-word 
+      bindkey "^[[1;5C" forward-word'';
     plugins = [
       {
         name = "zsh-autosuggestions";
@@ -34,8 +34,8 @@
 
   # autosuggestions settings
   home.sessionVariables = {
-      ZSH_AUTOSUGGEST_STRATEGY = "history completion";
-    };
+    ZSH_AUTOSUGGEST_STRATEGY = "history completion";
+  };
 
   programs.starship = {
     enable = true;
