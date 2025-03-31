@@ -25,6 +25,9 @@
       commentary = {
         enable = true;
       };
+      neo-tree = {
+        enable = true;
+      };
     };
   };
 }
