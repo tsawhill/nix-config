@@ -37,9 +37,8 @@
     settings = {
       add_newline = false;
       format = lib.concatStrings [
-        "[](#9A348E)"
-        "$line_break"
-        "$os"
+        "[](#9A348E)\\\n"
+        "$os\\"
         "$line_break"
         "$username"
         "$line_break"
