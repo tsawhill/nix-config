@@ -8,7 +8,12 @@
     uid = 1000;
     isNormalUser = true;
     home = "/home/taylor";
-    shell = pkgs.fish;
+    
+    # Set zsh as default shell
+    # Package installed with home-manager, so skip check
+    ignoreShellProgramCheck = true;
+    shell = pkgs.zsh;
+    
     description = "taylor";
     extraGroups = [
       "wheel"
@@ -20,6 +25,8 @@
       ];
     };
   };
+
+  # Mount samba share for NixOS configuration
   fileSystems."/home/taylor/.config/nixos" = {
     device = "//192.168.2.4/nixos-configs/nixos";
     fsType = "cifs";

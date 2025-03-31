@@ -3,7 +3,7 @@
     enable = true;
     settings = {
       main = {
-        shell = "fish";
+        shell = "zsh";
         font = "GeistMono Nerd Font:size=14";
         pad = "12x12 center";
       };

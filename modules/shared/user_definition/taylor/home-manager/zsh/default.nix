@@ -1,16 +1,11 @@
 { pkgs, ... }:
 {
+  home.packages = with pkgs; [
+    starship
+  ];
+
   programs.zsh = {
     enable = true;
-    oh-my-zsh = {
-      enable = true;
-      plugins = [
-        "git"
-        "ssh"
-        "sudo"
-      ];
-      theme = "frontcube";
-    };
 
     plugins = [
       {
