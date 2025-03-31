@@ -19,9 +19,8 @@
         file = "zsh-autosuggestions.zsh";
       }
       {
-        name = "zsh-completions";
-        src = "${pkgs.zsh-completions}";
-        
+        name = "nix-shell";
+        src = "${pkgs.zsh-nix-shell}/share/zsh-nix-shell";
       }
       {
         name = "zsh-syntax-highlighting";
