@@ -37,10 +37,11 @@
     settings = {
       add_newline = false;
       format = lib.concatStrings [
-        "$line_break"
-        "$package"
-        "$line_break"
-        "$character"
+        "[](#9A348E)"
+        "$os"
+        "$username"
+        "[](bg:#DA627D fg:#9A348E)"
+        "$directory"
       ];
     };
   };
