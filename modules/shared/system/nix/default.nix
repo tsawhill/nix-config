@@ -2,7 +2,9 @@
 {
   imports = [
     ./usbmounts.nix
+    ./polkit.nix
   ];
+
   nix = {
     settings = {
       # Since config is stored in a git repository and changes are not pushed until a successful build
