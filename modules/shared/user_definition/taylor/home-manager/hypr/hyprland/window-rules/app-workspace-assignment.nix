@@ -1,4 +1,3 @@
-{ ... }:
 {
   # Set workspace assignment for apps
   wayland.windowManager.hyprland.settings.windowrulev2 = [

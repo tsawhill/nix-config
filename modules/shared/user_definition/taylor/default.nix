@@ -1,5 +1,7 @@
 {
-  pkgs, inputs,  ...
+  pkgs,
+  inputs,
+  ...
 }:
 {
   users.users.taylor = {
@@ -21,11 +23,13 @@
   fileSystems."/home/taylor/.config/nixos" = {
     device = "//192.168.2.4/nixos-configs/nixos";
     fsType = "cifs";
-    options = let
-      # this line prevents hanging on network split
-      automount_opts = "x-systemd.automount,noauto,x-systemd.idle-timeout=60,x-systemd.device-timeout=5s,x-systemd.mount-timeout=5s";
+    options =
+      let
+        # this line prevents hanging on network split
+        automount_opts = "x-systemd.automount,noauto,x-systemd.idle-timeout=60,x-systemd.device-timeout=5s,x-systemd.mount-timeout=5s";
 
-    in ["${automount_opts},credentials=/home/taylor/.smbsecrets,uid=1000,mfsymlinks"];
+      in
+      [ "${automount_opts},credentials=/home/taylor/.smbsecrets,uid=1000,mfsymlinks" ];
   };
 
   imports = [

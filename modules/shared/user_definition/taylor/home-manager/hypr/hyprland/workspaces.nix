@@ -1,4 +1,3 @@
-{ ... }:
 {
   # Workspace monitor rules
   wayland.windowManager.hyprland.settings.workspace = [

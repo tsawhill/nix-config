@@ -1,4 +1,3 @@
-{ ... }:
 {
   imports = [
     ./themes/pink.nix

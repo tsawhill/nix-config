@@ -21,37 +21,37 @@
   };
 
   environment.systemPackages = with pkgs; [
-      # Terminal emulator
-      foot
+    # Terminal emulator
+    foot
 
-      # File Management
-      nemo-with-extensions
-      filezilla
+    # File Management
+    nemo-with-extensions
+    filezilla
 
-      # Browsers
-      floorp
-      ungoogled-chromium
+    # Browsers
+    floorp
+    ungoogled-chromium
 
-      # Communication
-      vesktop
+    # Communication
+    vesktop
 
-      # Downloading
-      deluge-gtk
-      pyload-ng
+    # Downloading
+    deluge-gtk
+    pyload-ng
 
-      # Multimedia
-      feishin
-      mpv
+    # Multimedia
+    feishin
+    mpv
 
-        #Editors
-      kdePackages.kdenlive
-      gimp
+    #Editors
+    kdePackages.kdenlive
+    gimp
 
-      # Printing and modeling
-      orca-slicer
-      freecad
+    # Printing and modeling
+    orca-slicer
+    freecad
 
-      #Misc
-      monero-gui
+    #Misc
+    monero-gui
   ];
 }

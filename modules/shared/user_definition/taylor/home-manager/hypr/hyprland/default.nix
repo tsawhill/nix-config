@@ -1,4 +1,3 @@
-{ ... }:
 {
   imports = [
     ./input.nix
@@ -17,9 +16,9 @@
         "GDK_SCALE, 1"
         "ELECTRON_OZONE_PLATFORM_HINT,wayland"
       ];
-      
+
       # Default monitor for newly plugged in displays
-      monitor = [" , preferred, auto, 1"];
+      monitor = [ " , preferred, auto, 1" ];
 
       misc = {
         disable_hyprland_logo = true;

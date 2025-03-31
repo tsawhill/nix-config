@@ -1,4 +1,3 @@
-{...}:
 {
   imports = [
     ./app-workspace-assignment.nix

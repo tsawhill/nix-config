@@ -1,4 +1,3 @@
-{...}:
 {
   # Window rules for floating slideout connection editor from taskbar
   wayland.windowManager.hyprland.settings.windowrulev2 = [

@@ -1,4 +1,3 @@
-{ ... }:
 {
   programs.hyprpanel.layout = {
     "bar.layouts" = {

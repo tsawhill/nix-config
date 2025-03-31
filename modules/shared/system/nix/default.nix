@@ -1,5 +1,4 @@
 # Nix settings
-{ ... }:
 {
   imports = [
     ./usbmounts.nix

@@ -1,4 +1,3 @@
-{ ... }:
 {
   # No gaps when only window
   wayland.windowManager.hyprland.settings.workspace = [

@@ -1,4 +1,3 @@
-{...}:
 {
   # Window rules for steam floating windows
   wayland.windowManager.hyprland.settings.windowrulev2 = [

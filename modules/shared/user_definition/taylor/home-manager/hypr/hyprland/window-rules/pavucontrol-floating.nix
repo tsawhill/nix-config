@@ -1,4 +1,3 @@
-{...}:
 {
   # Window rules for floating slideout volume control from taskbar
   wayland.windowManager.hyprland.settings.windowrulev2 = [

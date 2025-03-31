@@ -1,4 +1,3 @@
-{ ... }:
 {
   # Gaming window rules (no idle, tearing)
   wayland.windowManager.hyprland.settings.windowrulev2 = [
