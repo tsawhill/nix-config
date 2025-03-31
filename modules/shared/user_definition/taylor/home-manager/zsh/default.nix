@@ -34,15 +34,13 @@
   programs.starship = {
     enable = true;
     enableZshIntegration = true;
-    settings = {
-      add_newline = false;
-      format = lib.concatStrings [
-        "[](#9A348E)"
-        "$os"
-        "$username"
-        "[](bg:#DA627D fg:#9A348E)"
-        "$directory"
-      ];
-    };
+    settings = lib.mkMerge [
+      (builtins.fromTOML (
+        builtins.readFile "${pkgs.starship}/share/starship/presets/pastel-powerline.toml"
+      ))
+      {
+        add_newline = false;
+      }
+    ];
   };
 }
