@@ -16,6 +16,8 @@
       bindkey "^[[1;5C" forward-word
       bindkey "^[[1;3D" emacs-backward-word 
       bindkey "^[[1;3C" emacs-forward-word
+      bindkey "^H" backward-kill-word
+      bindkey "^[[3;5~" kill-word
       bindkey "\e[3~" delete-char
       '';
     plugins = [
