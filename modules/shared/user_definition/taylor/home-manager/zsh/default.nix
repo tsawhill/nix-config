@@ -13,7 +13,9 @@
 
     initExtra = ''
       bindkey "^[[1;5D" backward-word 
-      bindkey "^[[1;5C" forward-word'';
+      bindkey "^[[1;5C" forward-word
+      bindkey "\e[3~" delete-char
+      bindkey -e'';
     plugins = [
       {
         name = "zsh-autosuggestions";
