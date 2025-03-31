@@ -18,6 +18,7 @@
       ./hypr
       ./foot
       ./fish
+      ./zsh
       ./appearance-gtk
       ./xdg
     ];

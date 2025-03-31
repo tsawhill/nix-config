@@ -18,7 +18,7 @@
       ];
 
       # Default monitor for newly plugged in displays
-      monitor = [ " , preferred, auto, 1" ];
+      monitor = [ " , preferred, auto, 1.5" ];
 
       misc = {
         disable_hyprland_logo = true;
