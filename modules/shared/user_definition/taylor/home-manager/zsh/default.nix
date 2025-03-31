@@ -36,8 +36,8 @@
     enableZshIntegration = true;
     settings = {
       add_newline = false;
-      format = lib.concatStrings [
-        "[](#9A348E)\\\n"
+      format = lib.concatLines [
+        "[](#9A348E)\\"
         "$os\\"
         "$line_break"
         "$username"
