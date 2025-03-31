@@ -19,6 +19,9 @@
       bindkey "^H" backward-kill-word
       bindkey "^[[3;5~" kill-word
       bindkey "\e[3~" delete-char
+
+      autoload -U select-word-style
+      select-word-style bash
       '';
     plugins = [
       {
