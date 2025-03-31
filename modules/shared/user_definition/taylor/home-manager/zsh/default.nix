@@ -34,7 +34,7 @@
 
   # autosuggestions settings
   home.sessionVariables = {
-      ZSH_AUTOSUGGEST_STRATEGY = "(history completion)";
+      ZSH_AUTOSUGGEST_STRATEGY = "history completion";
     };
 
   programs.starship = {
