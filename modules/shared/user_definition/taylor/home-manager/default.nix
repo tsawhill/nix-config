@@ -12,10 +12,15 @@
   home-manager.backupFileExtension = "bak";
   home-manager.users.taylor = {
     imports = [
-      inputs.ags.homeManagerModules.default
-      inputs.hyprpanel.homeManagerModules.hyprpanel
+      # inputs.ags.homeManagerModules.default
+      # ./ags
 
+      inputs.hyprpanel.homeManagerModules.hyprpanel
       ./hypr
+
+      inputs.nixvim.homeManagerModules.nixvim
+      ./nixvim
+
       ./foot
       ./fish
       ./zsh
