@@ -5,6 +5,8 @@
 {
   nixpkgs.config.allowUnfree = true;
   imports = [
+    ./shell
+    ./desktop
     ./gaming.nix
     ./development-tools.nix
     ./configuration-tools.nix
