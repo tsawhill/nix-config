@@ -11,11 +11,11 @@
       rebuild-system = "cd ~/.config/nixos/ && git add -A && sudo nixos-rebuild switch && git commit -m \"$(hostname) - Generation $(nixos-rebuild list-generations | grep current | awk '{print $1}') Successful Build (No flake update)\" && git push ; cd -";
     };
 
-    initExtra = ''
+    initExtra = ''bindkey -e
       bindkey "^[[1;5D" backward-word 
       bindkey "^[[1;5C" forward-word
       bindkey "\e[3~" delete-char
-      bindkey -e'';
+      '';
     plugins = [
       {
         name = "zsh-autosuggestions";
