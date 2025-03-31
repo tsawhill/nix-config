@@ -2,7 +2,7 @@
 {
   programs.zsh = {
     enable = true;
-    dotDir = "/home/taylor/.config/zsh";
+    # dotDir = "/home/taylor/.config/zsh";
 
     shellAliases = {
       vim = "nvim";
