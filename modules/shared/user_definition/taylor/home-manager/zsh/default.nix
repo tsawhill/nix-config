@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, lib, ... }:
 {
   programs.zsh = {
     enable = true;
@@ -34,5 +34,17 @@
   programs.starship = {
     enable = true;
     enableZshIntegration = true;
+    settings = {
+      add_newline = false;
+      format = lib.concatStrings [
+        "[](#9A348E)"
+        "$line_break"
+        "$os"
+        "$line_break"
+        "$username"
+        "$line_break"
+        "$directory"
+      ];
+    };
   };
 }
