@@ -20,11 +20,13 @@
       }
       {
         name = "zsh-completions";
-        src = "${pkgs.zsh-completions}/share/zsh-completions";
+        src = "${pkgs.zsh-completions}";
+        
       }
       {
         name = "zsh-syntax-highlighting";
         src = "${pkgs.zsh-syntax-highlighting}/share/zsh-syntax-highlighting";
+        file = "zsh-syntax-highlighting.zsh";
       }
     ];
   };
