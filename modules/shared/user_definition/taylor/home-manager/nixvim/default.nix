@@ -34,9 +34,9 @@
           marksman.enable = true;
           nil_ls = {
             enable = true;
-            settings = {
-              formatting.command = [ "nixpkgs-fmt" ];
-            };
+            # settings = {
+            #   formatting.command = [ "nixpkgs-fmt" ];
+            # };
           };
           pylsp = {
             enable = true;
