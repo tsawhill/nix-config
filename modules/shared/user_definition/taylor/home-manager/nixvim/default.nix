@@ -34,9 +34,9 @@
       web-devicons = {
         enable = true;
       };
-      harpoon = {
-      	enable = true;
-      };
+      # harpoon = {
+      # 	enable = true;
+      # };
       which-key = {
         enable = true;
       };
