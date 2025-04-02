@@ -65,5 +65,9 @@
         key = "<M-Right>";
       }
     ];
+    opts = {
+      number = true;
+      relativenumber = true;
+    };
   };
 }
