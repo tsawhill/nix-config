@@ -28,9 +28,9 @@
       commentary = {
         enable = true;
       };
-      neo-tree = {
+      nvim-tree = {
         enable = true;
-        closeIfLastWindow = true;
+        autoClose = true;
       };
       web-devicons = {
         enable = true;
