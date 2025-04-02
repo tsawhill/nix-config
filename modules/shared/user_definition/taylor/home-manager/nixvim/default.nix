@@ -88,6 +88,14 @@
         key = "<Leader>q";
       }
       {
+        action = "<cmd>BufferLineCycleNext<CR>";
+        key = "<Leader-Tab>";
+      }
+      {
+        action = "<cmd>BufferLineCyclePrev<CR>";
+        key = "<Leader-S-Tab>";
+      }
+      {
         action = "<cmd>resize +2<CR>";
         key = "<M-S-Up>";
       }
