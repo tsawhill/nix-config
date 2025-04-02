@@ -40,6 +40,9 @@
       # which-key = {
       #   enable = true;
       # };
+      bufferline = {
+        enable = true;
+      };
     };
   };
 }
