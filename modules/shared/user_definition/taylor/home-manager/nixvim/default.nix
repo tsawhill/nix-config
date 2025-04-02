@@ -81,6 +81,10 @@
     };
     keymaps = [
       {
+        action = "<cmd>enew<bar>bd #<CR>";
+        key = "<M-S-Q>";
+      }
+      {
         action = "<cmd>vertical resize +2<CR>";
         key = "<M-S-Right>";
       }

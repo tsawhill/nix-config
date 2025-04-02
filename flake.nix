@@ -10,11 +10,7 @@
         modules = [
           ./modules/shared
           ./modules/desktop
-          {
-            nixpkgs.overlays = [
-              inputs.hyprpanel.overlay
-            ];
-          }
+          { nixpkgs.overlays = [ inputs.hyprpanel.overlay ]; }
         ];
       };
       nixosConfigurations.taylor-nixlaptop = nixpkgs.lib.nixosSystem {
@@ -23,11 +19,7 @@
         modules = [
           ./modules/shared
           ./modules/laptop
-          {
-            nixpkgs.overlays = [
-              inputs.hyprpanel.overlay
-            ];
-          }
+          { nixpkgs.overlays = [ inputs.hyprpanel.overlay ]; }
         ];
       };
     };
@@ -54,5 +46,4 @@
       url = "github:abenz1267/walker";
     };
   };
-
 }
