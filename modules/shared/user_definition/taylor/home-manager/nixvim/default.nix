@@ -49,8 +49,12 @@
     };
     keymaps = [
       {
-        action = "<cmd>resize +3<CR>";
-        key = "<C-Right>";
+        action = "<cmd>vertical resize +2<CR>";
+        key = "<M-S-Right>";
+      }
+      {
+        action = "<cmd>vertical resize -2<CR>";
+        key = "<M-S-Left>";
       }
     ];
   };
