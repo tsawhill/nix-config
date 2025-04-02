@@ -78,6 +78,9 @@
       bufferline = {
         enable = true;
       };
+      vim-bbye = {
+        enable = true;
+      };
     };
     keymaps = [
       {
