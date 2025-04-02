@@ -5,7 +5,7 @@
     colorschemes.catppuccin.enable = true;
     plugins = {
       nix = {
-      	enable = true;
+        enable = true;
       };
       telescope = {
         enable = true;
@@ -20,7 +20,7 @@
         enable = true;
       };
       cmp-nvim-lsp = {
-          enable = true;
+        enable = true;
       };
       lsp = {
         enable = true;
@@ -33,7 +33,9 @@
         closeIfLastWindow = true;
         extraOptions = {
           default_component_configs = {
-            width = "10%";
+            container = {
+              width = "10%";
+            };
           };
         };
       };
