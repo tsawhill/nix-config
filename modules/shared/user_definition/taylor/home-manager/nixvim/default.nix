@@ -25,6 +25,9 @@
       lsp = {
         enable = true;
       };
+      lsp-format = {
+        enable = true;
+      };
       commentary = {
         enable = true;
       };
