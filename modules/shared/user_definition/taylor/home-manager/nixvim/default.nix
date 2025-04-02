@@ -32,10 +32,8 @@
         enable = true;
         closeIfLastWindow = true;
         extraOptions = {
-          default_component_configs = {
-            container = {
-              width = "10%";
-            };
+          window = {
+            width = 15;
           };
         };
       };
