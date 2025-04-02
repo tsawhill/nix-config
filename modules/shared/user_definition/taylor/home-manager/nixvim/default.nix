@@ -20,7 +20,7 @@
         enable = true;
       };
       cmp-nvim-lsp = {
-        enable = true;
+          enable = true;
       };
       lsp = {
         enable = true;
@@ -30,6 +30,7 @@
       };
       neo-tree = {
         enable = true;
+        closeIfLastWindow = true;
       };
       web-devicons = {
         enable = true;
