@@ -37,6 +37,9 @@
       harpoon = {
       	enable = true;
       };
+      which-key = {
+        enable = true;
+      };
     };
   };
 }
