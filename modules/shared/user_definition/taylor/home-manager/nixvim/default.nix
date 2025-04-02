@@ -81,7 +81,7 @@
     };
     keymaps = [
       {
-        action = "<cmd>enew<bar>bd #<CR>";
+        action = "<cmd><C-U>bprevious <bar> bdelete #<CR>";
         key = "<M-S-Q>";
       }
       {
