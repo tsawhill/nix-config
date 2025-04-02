@@ -88,6 +88,14 @@
         key = "<Leader>q";
       }
       {
+        action = "<cmd>resize +2<CR>";
+        key = "<M-S-Up>";
+      }
+      {
+        action = "<cmd>resize -2<CR>";
+        key = "<M-S-Down>";
+      }
+      {
         action = "<cmd>vertical resize +2<CR>";
         key = "<M-S-Right>";
       }
@@ -102,6 +110,14 @@
       {
         action = "<cmd>wincmd l<CR>";
         key = "<M-Right>";
+      }
+      {
+        action = "<cmd>wincmd j<CR>";
+        key = "<M-Down>";
+      }
+      {
+        action = "<cmd>wincmd k<CR>";
+        key = "<M-Up>";
       }
     ];
     opts = {
