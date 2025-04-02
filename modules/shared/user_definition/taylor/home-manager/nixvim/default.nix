@@ -84,8 +84,8 @@
     };
     keymaps = [
       {
-        action = "<cmd><C-U>bprevious <bar> bdelete #<CR>";
-        key = "<M-S-Q>";
+        action = "<cmd>Bdelete<CR>";
+        key = "<Leader>q";
       }
       {
         action = "<cmd>vertical resize +2<CR>";
