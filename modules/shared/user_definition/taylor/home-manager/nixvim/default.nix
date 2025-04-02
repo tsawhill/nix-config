@@ -4,6 +4,9 @@
 
     colorschemes.catppuccin.enable = true;
     plugins = {
+      nix = {
+      	enable = true;
+      };
       telescope = {
         enable = true;
       };
@@ -27,6 +30,12 @@
       };
       neo-tree = {
         enable = true;
+      };
+      web-devicons = {
+        enable = true;
+      };
+      harpoon = {
+      	enable = true;
       };
     };
   };
