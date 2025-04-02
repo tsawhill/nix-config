@@ -36,11 +36,8 @@
             settings.telemetry.enable = false;
           };
           marksman.enable = true;
-          nil_ls = {
+          nixd = {
             enable = true;
-            # settings = {
-            #   formatting.command = [ "nixpkgs-fmt" ];
-            # };
           };
           pylsp = {
             enable = true;
