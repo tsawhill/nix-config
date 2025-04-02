@@ -25,8 +25,34 @@
       lsp = {
         enable = true;
         servers = {
-          nixd = {
+          bashls.enable = true;
+          jsonls.enable = true;
+          lua_ls = {
             enable = true;
+            settings.telemetry.enable = false;
+          };
+          marksman.enable = true;
+          nil_ls = {
+            enable = true;
+            settings = {
+              formatting.command = [ "nixpkgs-fmt" ];
+            };
+          };
+          pylsp = {
+            enable = true;
+            settings.plugins = {
+              black.enabled = true;
+              flake8.enabled = false;
+              isort.enabled = true;
+              jedi.enabled = false;
+              mccabe.enabled = false;
+              pycodestyle.enabled = false;
+              pydocstyle.enabled = true;
+              pyflakes.enabled = false;
+              pylint.enabled = true;
+              rope.enabled = false;
+              yapf.enabled = false;
+            };
           };
         };
       };
