@@ -33,22 +33,25 @@
         closeIfLastWindow = true;
         extraOptions = {
           window = {
-            width = 15;
+            width = 25;
           };
         };
       };
       web-devicons = {
         enable = true;
       };
-      # harpoon = {
-      # 	enable = true;
-      # };
-      # which-key = {
-      #   enable = true;
-      # };
+      which-key = {
+        enable = true;
+      };
       bufferline = {
         enable = true;
       };
     };
+    keymaps = [
+      {
+        action = "<cmd>resize +3<CR>";
+        key = "<C-Right>";
+      }
+    ];
   };
 }
