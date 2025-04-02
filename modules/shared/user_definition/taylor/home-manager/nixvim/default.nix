@@ -28,9 +28,14 @@
       commentary = {
         enable = true;
       };
-      nvim-tree = {
+      neo-tree = {
         enable = true;
-        autoClose = true;
+        closeIfLastWindow = true;
+        extraOptions = {
+          default_component_configs = {
+            width = "50%";
+          };
+        };
       };
       web-devicons = {
         enable = true;
