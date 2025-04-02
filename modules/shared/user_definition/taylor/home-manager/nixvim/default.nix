@@ -56,6 +56,14 @@
         action = "<cmd>vertical resize -2<CR>";
         key = "<M-S-Left>";
       }
+      {
+        action = "<cmd>wincmd h<CR>";
+        key = "<M-Left>";
+      }
+      {
+        action = "<cmd>wincmd l<CR>";
+        key = "<M-Right>";
+      }
     ];
   };
 }
