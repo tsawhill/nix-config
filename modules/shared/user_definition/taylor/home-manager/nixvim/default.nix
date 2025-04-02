@@ -33,7 +33,7 @@
         closeIfLastWindow = true;
         extraOptions = {
           default_component_configs = {
-            width = "50%";
+            width = "10%";
           };
         };
       };
