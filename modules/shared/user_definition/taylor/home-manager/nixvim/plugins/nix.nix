@@ -1,11 +1,13 @@
 {
-  plugins = {
+  programs.nixvim.plugins = {
     nix = {
       enable = true;
     };
     lsp = {
-      nixd = {
-        enable = true;
+      servers = {
+        nixd = {
+          enable = true;
+        };
       };
     };
   };
