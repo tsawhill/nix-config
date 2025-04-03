@@ -5,9 +5,6 @@
 
     colorschemes.catppuccin.enable = true;
     plugins = {
-      nix = {
-        enable = true;
-      };
       telescope = {
         enable = true;
       };
@@ -33,9 +30,6 @@
             settings.telemetry.enable = false;
           };
           marksman.enable = true;
-          nixd = {
-            enable = true;
-          };
           pylsp = {
             enable = true;
             settings.plugins = {
