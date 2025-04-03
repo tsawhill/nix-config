@@ -11,4 +11,11 @@
       }
     ];
   };
+  systemd.services.NetworkManager-dispatcher = {
+    enable = true;
+    path = [
+      pkgs.networkmanager
+    ];
+  };
+
 }
