@@ -10,5 +10,6 @@
     ./treesitter.nix
     ./lualine.nix
     ./web-devicons.nix
+    ./noice.nix
   ];
 }
