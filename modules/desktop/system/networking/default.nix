@@ -6,7 +6,7 @@
     enable = true;
     dispatcherScripts = [
       {
-        source = pkgs.writeText "upHook" ''
+        source = pkgs.writeText "wifi-toggle" ''
           #!/usr/bin/env sh
           LOG_PREFIX="WiFi Auto-Toggle"
           ETHERNET_INTERFACE="eno2"
