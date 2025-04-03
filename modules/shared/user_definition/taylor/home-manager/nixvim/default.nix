@@ -89,11 +89,11 @@
       }
       {
         action = "<cmd>BufferLineCycleNext<CR>";
-        key = "<Leader-Tab>";
+        key = "<M-Tab>";
       }
       {
         action = "<cmd>BufferLineCyclePrev<CR>";
-        key = "<Leader-S-Tab>";
+        key = "<M-S-Tab>";
       }
       {
         action = "<cmd>resize +2<CR>";
