@@ -25,7 +25,7 @@
           elif [ "$(nmcli -g GENERAL.STATE device show $ETHERNET_INTERFACE)" = "20 (unavailable)" ]; then
               echo "$LOG_PREFIX failsafe"
               nmcli radio wifi on
-            fi'';
+            fi '';
         type = "basic";
       }
     ];
