@@ -11,17 +11,17 @@
           LOG_PREFIX="WiFi Auto-Toggle"
           ETHERNET_INTERFACE="eno2"
 
-          if [ "$1" = "$ETHERNET_INTERFACE" ]; then
-              case "$2" in
-                  up)
-                      echo "$LOG_PREFIX ethernet up"
-                      # nmcli radio wifi off
-                      ;;
-                  down)
-                      echo "$LOG_PREFIX ethernet down"
-                      # nmcli radio wifi on
-                      ;;
-              esac
+          # if [ "$1" = "$ETHERNET_INTERFACE" ]; then
+          #     case "$2" in
+          #         up)
+          #             echo "$LOG_PREFIX ethernet up"
+          #             # nmcli radio wifi off
+          #             ;;
+          #         down)
+          #             echo "$LOG_PREFIX ethernet down"
+          #             # nmcli radio wifi on
+          #             ;;
+          #     esac
           # elif [ "$(nmcli -g GENERAL.STATE device show $ETHERNET_INTERFACE)" = "20 (unavailable)" ]; then
           #     echo "$LOG_PREFIX failsafe"
           #     nmcli radio wifi on
