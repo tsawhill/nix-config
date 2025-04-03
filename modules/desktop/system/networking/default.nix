@@ -7,7 +7,8 @@
     dispatcherScripts = [
       {
         source = pkgs.writeText "upHook" ''
-                    LOG_PREFIX="WiFi Auto-Toggle"
+          #!/usr/bin/env bash
+          LOG_PREFIX="WiFi Auto-Toggle"
           ETHERNET_INTERFACE="eno2"
 
           if [ "$1" = "$ETHERNET_INTERFACE" ]; then
