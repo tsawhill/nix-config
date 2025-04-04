@@ -34,5 +34,8 @@
     nerd-fonts.geist-mono
     nerd-fonts.fira-code
     nerd-fonts.sauce-code-pro
+    nerd-fonts.departure-mono
+    nerd-fonts.daddy-time-mono
+    nerd-fonts.victor-mono
   ];
 }
