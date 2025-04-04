@@ -17,20 +17,20 @@
 
   config = {
     programs.hyprpanel.settings = {
-      theme.name = "catppuccin_mocha";
-      theme.bar = {
-        floating = true;
-        transparent = true;
-        buttons = {
-          monochrome = true;
+      theme = {
+        name = "rose_pine_split";
+        bar = {
+          floating = true;
+          transparent = true;
+          buttons = {
+            monochrome = true;
+          };
         };
       };
     };
     programs.hyprpanel.override = {
       theme = {
         bar = {
-          floating = true;
-          transparent = true;
           buttons = {
             radius = "4";
             enableBorders = true;
