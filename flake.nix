@@ -40,7 +40,7 @@
       url = "github:aylur/ags";
     };
     hyprpanel = {
-      url = "github:jas-singhfsu/hyprpanel";
+      url = "github:jas-singhfsu/hyprpanel?rev=3bcd3c4710fc025bbe403948f10c3922a8bf5193";
     };
     walker = {
       url = "github:abenz1267/walker";
