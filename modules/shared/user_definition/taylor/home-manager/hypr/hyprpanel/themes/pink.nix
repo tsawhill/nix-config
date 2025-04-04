@@ -34,6 +34,7 @@
     programs.hyprpanel.override = {
       theme = {
         bar = {
+          floating = true;
           buttons = {
             monochrome = true;
             borderColor = config.hyprpanelPink.faint_background;
