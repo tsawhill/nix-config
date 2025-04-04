@@ -16,5 +16,6 @@
       name = "Tela-pink";
       package = pkgs.tela-icon-theme;
     };
+    font.name = "DaddyTimeMono Nerd Font";
   };
 }
