@@ -2,6 +2,7 @@
 {
   programs.zsh = {
     enable = true;
+    enableCompletion = true;
     # dotDir = "/home/taylor/.config/zsh";
 
     shellAliases = {
@@ -37,11 +38,6 @@
         name = "zsh-syntax-highlighting";
         src = "${pkgs.zsh-syntax-highlighting}/share/zsh-syntax-highlighting";
         file = "zsh-syntax-highlighting.zsh";
-      }
-      {
-        name = "zsh-completions";
-        src = "${pkgs.zsh-completions}";
-        file = "zsh-completions.zsh";
       }
     ];
   };
