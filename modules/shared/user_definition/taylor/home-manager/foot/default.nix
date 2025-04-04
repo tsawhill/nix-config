@@ -5,7 +5,7 @@
       main = {
         shell = "zsh";
         font = "FiraCode Nerd Font:size=14";
-        pad = "25x25 center";
+        pad = "5x5 center";
       };
       colors = {
         alpha = 0.65;
