@@ -16,7 +16,7 @@
   };
 
   config = {
-    programs.hyprpanel.settings.theme.name = "rose_pine_split";
+    # programs.hyprpanel.settings.theme.name = "rose_pine_split";
     programs.hyprpanel.override = {
       theme.bar.buttons.borderColor = config.hyprpanelPink.faint_background;
       theme = {
