@@ -13,7 +13,7 @@
     # Default: false
     overwrite.enable = true;
 
-    override = {
+    settings = {
       notifications.active_monitor = true;
       wallpaper.enable = false;
       scalingPriority = "hyprland";
