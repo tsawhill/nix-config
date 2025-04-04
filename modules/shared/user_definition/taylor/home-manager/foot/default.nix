@@ -4,11 +4,11 @@
     settings = {
       main = {
         shell = "zsh";
-        font = "FiraCode Nerd Font Mono:size=14px";
-        pad = "12x12 center";
+        font = "FiraCode Nerd Font:size=14";
+        pad = "15x15 center";
       };
       colors = {
-        alpha = 0.7;
+        alpha = 0.6;
 
         # Catppuccin-frappe theme - from https://github.com/catppuccin/foot/blob/main/themes/catppuccin-frappe.ini
         # foreground = "c6d0f5";
