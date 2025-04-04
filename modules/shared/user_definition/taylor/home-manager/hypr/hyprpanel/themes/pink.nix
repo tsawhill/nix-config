@@ -17,25 +17,15 @@
 
   config = {
     programs.hyprpanel.settings.theme.name = "rose_pine_split";
-    programs.hyprpanel.settings.theme.bar = {
-      floating = true;
-      transparent = true;
-      buttons = {
-        radius = "4";
-        enableBorders = true;
-        modules.microphone.enableBorder = true;
-      };
-      menus = {
-        card_radius = "15";
-        border.radius = "15";
-        buttons.radius = "15";
-      };
-    };
     programs.hyprpanel.override = {
       theme = {
         bar = {
           floating = true;
+          transparent = true;
           buttons = {
+            radius = "4";
+            enableBorders = true;
+            modules.microphone.enableBorder = true;
             monochrome = true;
             borderColor = config.hyprpanelPink.faint_background;
             text = config.hyprpanelPink.background;
@@ -58,6 +48,9 @@
             };
           };
           menus = {
+            card_radius = "15";
+            border.radius = "15";
+            buttons.radius = "15";
             monochrome = true;
           };
         };
