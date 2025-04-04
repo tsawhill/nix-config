@@ -25,16 +25,6 @@
       '';
     plugins = [
       {
-        name = "zsh-syntax-highlighting";
-        src = "${pkgs.zsh-syntax-highlighting}/share/zsh-syntax-highlighting";
-        file = "zsh-syntax-highlighting.zsh";
-      }
-      {
-        name = "zsh-completions";
-        src = "${pkgs.zsh-completions}/share/zsh-completions";
-        file = "zsh-completions.zsh";
-      }
-      {
         name = "zsh-autosuggestions";
         src = "${pkgs.zsh-autosuggestions}/share/zsh-autosuggestions";
         file = "zsh-autosuggestions.zsh";
@@ -47,6 +37,11 @@
         name = "zsh-syntax-highlighting";
         src = "${pkgs.zsh-syntax-highlighting}/share/zsh-syntax-highlighting";
         file = "zsh-syntax-highlighting.zsh";
+      }
+      {
+        name = "zsh-completions";
+        src = "${pkgs.zsh-completions}/share/zsh-completions";
+        file = "zsh-completions.zsh";
       }
     ];
   };
