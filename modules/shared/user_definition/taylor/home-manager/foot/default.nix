@@ -4,7 +4,7 @@
     settings = {
       main = {
         shell = "zsh";
-        font = "FiraCode Nerd Font:size=14";
+        font = "SauceCodePro NFM,:size=14";
         pad = "12x12 center";
       };
       colors = {
