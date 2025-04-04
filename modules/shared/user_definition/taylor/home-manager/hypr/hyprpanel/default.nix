@@ -14,6 +14,7 @@
     overwrite.enable = true;
 
     settings = {
+      theme.font.name = "GeistMono Nerd Font Propo";
       notifications.active_monitor = true;
       wallpaper.enable = false;
       scalingPriority = "hyprland";
@@ -91,7 +92,7 @@
 
       theme = {
         font = {
-          name = "GeistMono Nerd Font Propo";
+          # name = "GeistMono Nerd Font Propo";
           size = "14px";
         };
         osd = {
