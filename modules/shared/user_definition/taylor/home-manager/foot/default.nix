@@ -4,14 +4,14 @@
     settings = {
       main = {
         shell = "zsh";
-        font = "SauceCodePro NFM,:size=14";
+        font = "DaddyTimeMono Nerd Font Mono,:size=16";
         pad = "12x12 center";
       };
       colors = {
         alpha = 0.65;
 
         # Catppuccin-frappe theme - from https://github.com/catppuccin/foot/blob/main/themes/catppuccin-frappe.ini
-        # foreground = "c6d0f5";
+        foreground = "c6d0f5";
         background = "303446";
 
         regular0 = "51576d";

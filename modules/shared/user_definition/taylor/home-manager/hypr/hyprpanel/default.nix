@@ -91,8 +91,8 @@
 
       theme = {
         font = {
-          name = "GeistMono Nerd Font Propo";
-          size = "14px";
+          name = "DaddyTimeMono Nerd Font";
+          size = "1rem";
         };
         osd = {
           orientation = "horizontal";
