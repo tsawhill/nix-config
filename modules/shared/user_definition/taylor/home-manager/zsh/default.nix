@@ -25,6 +25,11 @@
       '';
     plugins = [
       {
+        name = "zsh-completions";
+        src = "${pkgs.zsh-completions}/share/zsh-completions";
+        file = "zsh-completions.zsh";
+      }
+      {
         name = "zsh-autosuggestions";
         src = "${pkgs.zsh-autosuggestions}/share/zsh-autosuggestions";
         file = "zsh-autosuggestions.zsh";
