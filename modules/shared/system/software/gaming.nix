@@ -1,4 +1,5 @@
 {
+  inputs,
   pkgs,
   ...
 }:
@@ -17,7 +18,6 @@
   environment.systemPackages = with pkgs; [
     vulkan-headers
     gamemode
-    gamescope
     mangohud
     gpu-screen-recorder
     heroic

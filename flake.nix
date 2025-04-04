@@ -2,11 +2,16 @@
   description = "NixOS Configuration";
 
   outputs =
-    { self, nixpkgs, ... }@inputs:
+    { self, nixpkgs, downgradegamescope, ... }@inputs:
     {
       nixosConfigurations.taylor-nix = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
-        specialArgs = { inherit inputs; };
+        specialArgs = { 
+          inherit inputs;
+          pkgs-gamescope = import downgradegamescope {
+            system = "x86_64-linux";
+          };
+        };
         modules = [
           ./modules/shared
           ./modules/desktop
@@ -15,7 +20,12 @@
       };
       nixosConfigurations.taylor-nixlaptop = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
-        specialArgs = { inherit inputs; };
+        specialArgs = { 
+          inherit inputs;
+          pkgs-gamescope = import downgradegamescope {
+            system = "x86_64-linux";
+          };
+        };
         modules = [
           ./modules/shared
           ./modules/laptop
@@ -25,6 +35,7 @@
     };
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    downgradegamescope.url = "github:NixOS/nixpkgs?rev=8fcb6f1c4948305af52d19f887b89011ee2c080d";
     home-manager = {
       url = "github:nix-community/home-manager/master";
       inputs.nixpkgs.follows = "nixpkgs";

@@ -8,6 +8,7 @@
     ./shell
     ./desktop
     ./gaming.nix
+    ./gamescope.nix
     ./development-tools.nix
     ./configuration-tools.nix
     ./shell-utilities.nix
