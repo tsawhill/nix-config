@@ -8,7 +8,7 @@
 
     colorschemes.catppuccin = {
       enable = true;
-      flavour = "frappe";
+      settings.flavour = "frappe";
     };
     opts = {
       number = true;
