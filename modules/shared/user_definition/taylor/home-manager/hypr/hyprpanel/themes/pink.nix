@@ -16,7 +16,16 @@
   };
 
   config = {
-    programs.hyprpanel.settings.theme.name = "rose_pine_split";
+    programs.hyprpanel.settings = {
+      theme.name = "rose_pine_split";
+      theme.bar = {
+        floating = true;
+        transparent = true;
+        buttons = {
+          monochrome = true;
+        };
+      };
+    };
     programs.hyprpanel.override = {
       theme = {
         bar = {
