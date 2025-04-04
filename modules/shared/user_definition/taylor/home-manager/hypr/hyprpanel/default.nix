@@ -93,6 +93,7 @@
         font = {
           name = "DaddyTimeMono Nerd Font";
           size = "1rem";
+          weight = 700;
         };
         osd = {
           orientation = "horizontal";
