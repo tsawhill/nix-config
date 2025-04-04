@@ -44,7 +44,7 @@
   # autosuggestions settings
   home.sessionVariables = {
     ZSH_AUTOSUGGEST_STRATEGY = "history completion";
-    ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE = "fg=54";
+    ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE = "fg=140";
   };
 
   programs.starship = {
