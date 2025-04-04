@@ -17,7 +17,7 @@
 
   config = {
     programs.hyprpanel.settings = {
-      theme.name = "rose_pine_split";
+      theme.name = "catppuccin_mocha";
       theme.bar = {
         floating = true;
         transparent = true;
