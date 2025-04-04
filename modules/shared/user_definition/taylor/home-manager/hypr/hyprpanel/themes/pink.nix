@@ -18,7 +18,6 @@
   config = {
     programs.hyprpanel.settings.theme.name = "rose_pine_split";
     programs.hyprpanel.override = {
-      theme.bar.buttons.borderColor = config.hyprpanelPink.faint_background;
       theme = {
         bar = {
           floating = true;
@@ -29,6 +28,7 @@
             modules.microphone.enableBorder = true;
             monochrome = true;
             text = config.hyprpanelPink.background;
+            borderColor = config.hyprpanelPink.faint_background;
             icon_background = config.hyprpanelPink.background;
             icon = config.hyprpanelPink.pink_primary;
             background = config.hyprpanelPink.pink_primary;
