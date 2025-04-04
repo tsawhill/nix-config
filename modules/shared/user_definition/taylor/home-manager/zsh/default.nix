@@ -40,7 +40,7 @@
       }
       {
         name = "zsh-completions";
-        src = "${pkgs.zsh-completions}/share/zsh-completions";
+        src = "${pkgs.zsh-completions}";
         file = "zsh-completions.zsh";
       }
     ];
