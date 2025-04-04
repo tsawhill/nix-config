@@ -4,7 +4,7 @@
     settings = {
       main = {
         shell = "zsh";
-        font = "JetBrainsMonoNL NFP:size=1rem";
+        font = "JetBrainsMono NF:size=14px";
         pad = "12x12 center";
       };
       colors = {
