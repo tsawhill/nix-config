@@ -11,5 +11,6 @@
     ./lualine.nix
     ./web-devicons.nix
     ./noice.nix
+    ./transparent.nix
   ];
 }
