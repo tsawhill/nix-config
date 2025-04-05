@@ -5,7 +5,7 @@
 {
   environment.systemPackages = with pkgs; [
     vscodium
-    nixfmt-tree
+    nixfmt-classic
     git
     glib
   ];
