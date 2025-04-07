@@ -9,7 +9,7 @@
     "openrgb --startminimized --noautoconnect -p default"
 
     "steam"
-    "heroic"
+    "sleep 15; heroic"
     "sleep 10; vesktop"
     "feishin"
 
