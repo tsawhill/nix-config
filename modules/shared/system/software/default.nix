@@ -1,8 +1,4 @@
-{
-  pkgs,
-  ...
-}:
-{
+{ pkgs, ... }: {
   nixpkgs.config.allowUnfree = true;
   imports = [
     ./shell
@@ -15,9 +11,10 @@
     ./desktop-apps.nix
   ];
 
-
   environment.systemPackages = with pkgs; [
     neovim
+
+    wireguard-tools
 
     # Drivers for amd gpu
     mesa
