@@ -2,6 +2,10 @@
   programs.mangohud = {
     enable = true;
     enableSessionWide = true;
-    settings = { output_folder = /tmp; };
+    settings = {
+      gpu_stats = true;
+      cpu_stats = true;
+      output_folder = /tmp;
+    };
   };
 }
