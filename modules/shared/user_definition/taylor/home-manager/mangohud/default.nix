@@ -7,8 +7,8 @@
       font_file = "${pkgs.nerd-fonts.jetbrains-mono}/share/fonts/truetype/NerdFonts/DaddyTimeMono/DaddyTimeMonoNerdFont-Regular.ttf";
       position = "top-right";
       frame_timing = 0;
-      height = 300;
-      width = 300;
+      height = 200;
+      width = 200;
       gpu_stats = true;
       gpu_temp = true;
       cpu_stats = true;
