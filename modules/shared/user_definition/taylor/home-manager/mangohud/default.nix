@@ -9,11 +9,11 @@
       frame_timing = 0;
       height = 300;
       width = 300;
-      throttling_status = true;
       gpu_stats = true;
       gpu_temp = true;
       cpu_stats = true;
       cpu_temp = true;
+      hud_compact = true;
       output_folder = /tmp;
     };
     settingsPerApplication = {
