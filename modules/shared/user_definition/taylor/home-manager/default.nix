@@ -1,13 +1,5 @@
-{
-  pkgs,
-  inputs,
-  home-manager,
-  ...
-}:
-{
-  imports = [
-    inputs.home-manager.nixosModules.default
-  ];
+{ pkgs, inputs, home-manager, ... }: {
+  imports = [ inputs.home-manager.nixosModules.default ];
 
   home-manager.backupFileExtension = "bak";
   home-manager.users.taylor = {
@@ -21,15 +13,14 @@
       inputs.nixvim.homeManagerModules.nixvim
       ./nixvim
 
+      ./mangohud
       ./foot
       ./fish
       ./zsh
       ./appearance-gtk
       ./xdg
     ];
-    home.sessionVariables = {
-      EDITOR = "nvim";
-    };
+    home.sessionVariables = { EDITOR = "nvim"; };
 
     # The state version is required and should stay at the version you
     # originally installed.
