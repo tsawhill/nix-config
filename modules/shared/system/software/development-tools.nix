@@ -5,7 +5,7 @@
 {
   environment.systemPackages = with pkgs; [
     vscodium
-    nixfmt-classic
+    nixfmt-rfc-style
     git
     glib
   ];
