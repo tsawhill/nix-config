@@ -17,6 +17,9 @@
       output_folder = /tmp;
     };
     settingsPerApplication = {
+      walker = {
+        no_display = true;
+      };
       gamescope = {
         no_display = true;
       };
