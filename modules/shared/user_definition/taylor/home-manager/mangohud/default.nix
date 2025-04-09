@@ -4,7 +4,7 @@
     enable = true;
     enableSessionWide = true;
     settings = {
-      font_file = "${pkgs.nerd-fonts.jetbrains-mono}/share/fonts/truetype/NerdFonts/DaddyTimeMono/DaddyTimeMonoNerdFont-Regular.ttf";
+      font_file = "${pkgs.nerd-fonts.jetbrains-mono}/share/fonts/truetype/NerdFonts/JetBrainsMono/JetBrainsMonoNerdFontMono-Bold.ttf";
       position = "top-right";
       frame_timing = 0;
       height = 200;
