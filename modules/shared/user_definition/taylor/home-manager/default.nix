@@ -1,4 +1,10 @@
-{ pkgs, inputs, home-manager, ... }: {
+{
+  pkgs,
+  inputs,
+  home-manager,
+  ...
+}:
+{
   imports = [ inputs.home-manager.nixosModules.default ];
 
   home-manager.backupFileExtension = "bak";
@@ -20,7 +26,10 @@
       ./appearance-gtk
       ./xdg
     ];
-    home.sessionVariables = { EDITOR = "nvim"; };
+    home.sessionVariables = {
+      EDITOR = "nvim";
+    };
+    programs.bash.enable = true; # Needed for session variables
 
     # The state version is required and should stay at the version you
     # originally installed.
