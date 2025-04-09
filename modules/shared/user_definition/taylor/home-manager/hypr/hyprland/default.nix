@@ -15,6 +15,8 @@
       env = [
         "GDK_SCALE, 1"
         "ELECTRON_OZONE_PLATFORM_HINT,wayland"
+        "MANGOHUD, 1"
+        "EDITOR, nvim"
       ];
 
       # Default monitor for newly plugged in displays
