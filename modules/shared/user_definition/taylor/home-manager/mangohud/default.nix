@@ -9,6 +9,7 @@
       frame_timing = 0;
       height = 200;
       width = 200;
+      blacklist = "walker";
       gpu_stats = true;
       gpu_temp = true;
       cpu_stats = true;
