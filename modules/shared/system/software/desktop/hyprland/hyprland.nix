@@ -30,9 +30,5 @@
     hyprlock
     hyprcursor
     hyprpolkitagent
-
-    # For xembedsniproxy, xwayland applications system tray
-    kdePackages.plasma-workspace
-
   ];
 }
