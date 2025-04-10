@@ -2,11 +2,16 @@
   description = "NixOS Configuration";
 
   outputs =
-    { self, nixpkgs, downgradegamescope, ... }@inputs:
+    {
+      self,
+      nixpkgs,
+      downgradegamescope,
+      ...
+    }@inputs:
     {
       nixosConfigurations.taylor-nix = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
-        specialArgs = { 
+        specialArgs = {
           inherit inputs;
           pkgs-gamescope = import downgradegamescope {
             system = "x86_64-linux";
@@ -20,7 +25,7 @@
       };
       nixosConfigurations.taylor-nixlaptop = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
-        specialArgs = { 
+        specialArgs = {
           inherit inputs;
           pkgs-gamescope = import downgradegamescope {
             system = "x86_64-linux";

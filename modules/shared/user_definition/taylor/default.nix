@@ -8,12 +8,12 @@
     uid = 1000;
     isNormalUser = true;
     home = "/home/taylor";
-    
+
     # Set zsh as default shell
     # Package installed with home-manager, so skip check
     ignoreShellProgramCheck = true;
     shell = pkgs.zsh;
-    
+
     description = "taylor";
     extraGroups = [
       "wheel"

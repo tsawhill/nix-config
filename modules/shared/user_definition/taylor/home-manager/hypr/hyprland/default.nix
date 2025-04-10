@@ -9,6 +9,7 @@
   ];
   wayland.windowManager.hyprland = {
     enable = true;
+    systemd.enable = false; # Using uwsm so disable -- https://wiki.hyprland.org/Useful-Utilities/Systemd-start/
     package = null; # Installed with nixos module from flake
     portalPackage = null; # Installed with the nixos module from flake
     settings = {

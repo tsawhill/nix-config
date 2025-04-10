@@ -12,18 +12,19 @@
       rebuild-system = "cd ~/.config/nixos/ && git add -A && sudo nixos-rebuild switch && git commit -m \"$(hostname) - Generation $(nixos-rebuild list-generations | grep current | awk '{print $1}') Successful Build (No flake update)\" && git push ; cd -";
     };
 
-    initExtra = ''bindkey -e
-      bindkey "^[[1;5D" backward-word 
-      bindkey "^[[1;5C" forward-word
-      bindkey "^[[1;3D" emacs-backward-word 
-      bindkey "^[[1;3C" emacs-forward-word
-      bindkey "^H" backward-kill-word
-      bindkey "^[[3;5~" kill-word
-      bindkey "\e[3~" delete-char
+    initExtra = ''
+      bindkey -e
+            bindkey "^[[1;5D" backward-word 
+            bindkey "^[[1;5C" forward-word
+            bindkey "^[[1;3D" emacs-backward-word 
+            bindkey "^[[1;3C" emacs-forward-word
+            bindkey "^H" backward-kill-word
+            bindkey "^[[3;5~" kill-word
+            bindkey "\e[3~" delete-char
 
-      autoload -U select-word-style
-      select-word-style bash
-      '';
+            autoload -U select-word-style
+            select-word-style bash
+    '';
     plugins = [
       {
         name = "zsh-autosuggestions";
