@@ -18,7 +18,7 @@
     "$mainMod, F, fullscreen"
     "$mainMod, E, exec, nemo"
     "$mainMod, Space, togglefloating, "
-    "$mainMod, D, exec, walker"
+    "$mainMod, D, exec, MANGOHUD=0 walker"
     "$mainMod, P, pseudo, "
     "$mainMod, V, togglesplit, "
 

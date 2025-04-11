@@ -2,7 +2,7 @@
   wayland.windowManager.hyprland.settings.exec-once = [
     "hyprpanel"
     "hyprpolkitagent"
-    "walker --gapplication-service"
+    "MANGOHUD=0 walker --gapplication-service"
     "xrandr --output DP-1 --primary"
 
     "easyeffects --gapplication-service"
