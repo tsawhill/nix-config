@@ -9,7 +9,6 @@
       frame_timing = 0;
       height = 200;
       width = 200;
-      blacklist = "Walker";
       gpu_stats = true;
       gpu_temp = true;
       cpu_stats = true;
@@ -19,6 +18,9 @@
     };
     settingsPerApplication = {
       walker = {
+        no_display = true;
+      };
+      mpv = {
         no_display = true;
       };
       gamescope = {
