@@ -10,6 +10,9 @@
       # Since config is stored in a git repository and changes are not pushed until a successful build
       warn-dirty = false;
 
+      max-jobs = 4;
+      cores = 2;
+
       substituters = [
         "https://walker-git.cachix.org/"
         "https://hyprland.cachix.org/"
