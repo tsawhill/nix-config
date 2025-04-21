@@ -10,6 +10,7 @@
         wallpaperId = "837766287";
         fps = 15;
         audio = {
+          processing = false;
           automute = true;
         };
       }
@@ -19,6 +20,7 @@
         wallpaperId = "1132505365";
         fps = 15;
         audio = {
+          processing = false;
           silent = true;
         };
       }
@@ -28,6 +30,7 @@
         wallpaperId = "1132505365";
         fps = 15;
         audio = {
+          processing = false;
           silent = true;
         };
       }
