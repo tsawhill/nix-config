@@ -1,4 +1,5 @@
 {
+  pkgs,
   ...
 }:
 {
@@ -9,4 +10,9 @@
 
   # Enable power profile daemon
   services.power-profiles-daemon.enable = true;
+
+  # Enable brother laser printer
+  services.printing.drivers = [
+    pkgs.brlaser
+  ];
 }
