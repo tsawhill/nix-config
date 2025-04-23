@@ -14,5 +14,7 @@
   # Enable brother laser printer
   services.printing.drivers = [
     pkgs.brlaser
+    pkgs.brgenml1lpr
+    pkgs.brgenml1cupswrapper
   ];
 }
