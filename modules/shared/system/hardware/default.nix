@@ -12,9 +12,12 @@
   services.power-profiles-daemon.enable = true;
 
   # Enable brother laser printer
-  services.printing.drivers = [
-    pkgs.brlaser
-    pkgs.brgenml1lpr
-    pkgs.brgenml1cupswrapper
-  ];
+  services.printing = {
+    enable = true;
+    drivers = [
+      pkgs.brlaser
+      pkgs.brgenml1lpr
+      pkgs.brgenml1cupswrapper
+    ];
+  };
 }
