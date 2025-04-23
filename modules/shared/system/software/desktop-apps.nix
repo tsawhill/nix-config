@@ -35,6 +35,8 @@
     # Communication
     vesktop
 
+    lingot
+
     # Downloading
     deluge-gtk
     pyload-ng
