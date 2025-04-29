@@ -47,7 +47,7 @@
           "bluez5.enable-msbc" = false;
           "bluez5.enable-hw-volume" = true;
           "bluez5.roles" = [
-            "hfp_ag"
+            "a2dp_sink"
           ];
         };
       };
