@@ -21,7 +21,7 @@
     mesa
     mesa-demos
 
-    wine
+    wineWowPackages.stable
   ];
 
   fonts.packages = with pkgs; [

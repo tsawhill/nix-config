@@ -11,6 +11,7 @@
         fps = 30;
         audio = {
           silent = true;
+          processing = false;
         };
       }
     ];
