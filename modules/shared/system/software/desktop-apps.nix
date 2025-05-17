@@ -19,11 +19,7 @@
       pkgs.obs-studio-plugins.obs-vkcapture
     ];
   };
-  # Feishin electron version, keep until updated
 
-  nixpkgs.config.permittedInsecurePackages = [
-    "electron-33.4.11"
-  ];
   environment.systemPackages = with pkgs; [
     # Terminal emulator
     foot
