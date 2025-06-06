@@ -35,27 +35,8 @@
     # Communication
     vesktop
 
-    lingot
-
-    # Downloading
-    deluge-gtk
-    pyload-ng
-
     # Multimedia
     feishin
     mpv
-
-    #Editors
-    kdePackages.kdenlive
-    gimp
-
-    # Printing and modeling
-    orca-slicer
-    freecad
-
-    #Misc
-    monero-gui
-    
-    gparted
   ];
 }

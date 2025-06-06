@@ -1,0 +1,34 @@
+{
+  pkgs,
+  ...
+}:
+{
+  hardware.amdgpu = {
+    amdvlk = {
+      enable = true;
+      support32Bit.enable = true;
+    };
+
+    initrd.enable = true;
+  };
+
+  hardware.xone.enable = true;
+
+  # Enable Bluetooth
+  hardware.bluetooth.enable = true;
+  hardware.bluetooth.powerOnBoot = true;
+  services.blueman.enable = true;
+
+  # Enable power profile daemon
+  services.power-profiles-daemon.enable = true;
+
+  # Enable brother laser printer
+  services.printing = {
+    enable = true;
+    drivers = [
+      pkgs.brlaser
+      pkgs.brgenml1lpr
+      pkgs.brgenml1cupswrapper
+    ];
+  };
+}
