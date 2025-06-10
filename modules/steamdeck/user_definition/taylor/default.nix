@@ -23,7 +23,7 @@
     ];
     openssh = {
       authorizedKeys.keys = [
-        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHKxZDZJ/yaWX/A9ZhXU8F3CmcJ+jPYkatshJoEqJPZy tdog@arch"
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMBFsmNzZWYPyqHORl40pfN7RXrHlXFjN8EEmAhhlSIE taylor@nixos"
       ];
     };
   };

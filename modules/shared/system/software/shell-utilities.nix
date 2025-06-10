@@ -12,6 +12,7 @@
     tree
     hyfetch
     nix-search
+    nixos-rebuild-ng
 
     # Archive tools
     p7zip

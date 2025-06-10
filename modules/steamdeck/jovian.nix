@@ -28,18 +28,24 @@ in
   # Jovian
   #
   jovian.hardware.has.amd.gpu = true;
-
+  jovian.devices.steamdeck.enable = true;
   jovian.steam.enable = true;
+  jovian.steam.desktopSession = "gnome";
+  jovian.steam.autoStart = true;
+  jovian.steam.user = "taylor";
+  jovian.decky-loader.enable = true;
 
   #
   # SDDM
   #
-  services.displayManager.sddm.settings = {
-    Autologin = {
-      Session = "gamescope-wayland.desktop";
-      User = "taylor";
-    };
-  };
+  # services.displayManager.sddm.enable = true;
+  # services.displayManager.sddm.wayland.enable = true;
+  # services.displayManager.sddm.settings = {
+  #   Autologin = {
+  #     Session = "gamescope-wayland.desktop";
+  #     User = "taylor";
+  #   };
+  # };
 
   programs.steam = {
     enable = true;

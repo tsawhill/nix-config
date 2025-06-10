@@ -6,6 +6,8 @@
       self,
       nixpkgs,
       downgradegamescope,
+      chaotic,
+      jovian,
       ...
     }@inputs:
     {
@@ -23,6 +25,21 @@
           { nixpkgs.overlays = [ inputs.hyprpanel.overlay ]; }
         ];
       };
+      nixosConfigurations.taylor-deck = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+        specialArgs = {
+          inherit inputs;
+          pkgs-gamescope = import downgradegamescope {
+            system = "x86_64-linux";
+          };
+        };
+        modules = [
+          # jovian.nixosModules.default
+          # chaotic.nixosModules.default
+          ./modules/steamdeck
+        ];
+      };
+
       nixosConfigurations.taylor-nixlaptop = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         specialArgs = {
@@ -52,14 +69,13 @@
     hyprland = {
       url = "github:hyprwm/Hyprland";
     };
-    ags = {
-      url = "github:aylur/ags";
-    };
     hyprpanel = {
       url = "github:jas-singhfsu/hyprpanel?rev=3bcd3c4710fc025bbe403948f10c3922a8bf5193";
     };
     walker = {
       url = "github:abenz1267/walker";
     };
+    chaotic.url = "github:chaotic-cx/nyx/nyxpkgs-unstable";
+    jovian.follows = "chaotic/jovian";
   };
 }

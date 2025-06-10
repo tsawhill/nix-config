@@ -12,8 +12,6 @@
     imports = [
       inputs.nixvim.homeManagerModules.nixvim
       ./nixvim
-
-      ./mangohud
       ./foot
       ./fish
       ./zsh

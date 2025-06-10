@@ -28,6 +28,7 @@
     ];
     home.sessionVariables = {
       EDITOR = "nvim";
+      NIX_SSHOPTS = "-i ~/.ssh/id_ed25519";
     };
     programs.bash.enable = true; # Needed for session variables
 

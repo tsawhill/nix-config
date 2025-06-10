@@ -26,6 +26,9 @@
         "nix-command"
         "flakes"
       ];
+      trusted-users = [
+        "taylor"
+      ];
     };
     gc = {
       automatic = true;

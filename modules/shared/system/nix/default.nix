@@ -11,7 +11,7 @@
       warn-dirty = false;
 
       max-jobs = 4;
-      cores = 2;
+      cores = 12;
 
       substituters = [
         "https://walker-git.cachix.org/"
