@@ -34,7 +34,7 @@ in
   jovian.steam.autoStart = true;
   jovian.steam.user = "taylor";
   jovian.decky-loader.enable = true;
-
+  jovian.decky-loader.user = "taylor";
   #
   # SDDM
   #

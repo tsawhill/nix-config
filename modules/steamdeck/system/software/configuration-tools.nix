@@ -7,7 +7,6 @@
     networkmanagerapplet
     easyeffects
     pavucontrol
-    openrgb
 
     #GTK configuration tools
     nwg-look

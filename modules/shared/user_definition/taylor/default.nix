@@ -28,7 +28,7 @@
 
   # Mount samba share for NixOS configuration
   fileSystems."/home/taylor/.config/nixos" = {
-    device = "//192.168.2.4/nix-configs/nixos";
+    device = "//10.73.73.4/nix-configs/nixos";
     fsType = "cifs";
     options =
       let

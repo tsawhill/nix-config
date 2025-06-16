@@ -5,8 +5,6 @@
     ./shell
     ./desktop
     ./gaming.nix
-    ./gamescope.nix
-    ./development-tools.nix
     ./configuration-tools.nix
     ./shell-utilities.nix
     ./desktop-apps.nix
@@ -16,10 +14,6 @@
     neovim
 
     wireguard-tools
-
-    # Drivers for amd gpu
-    mesa
-    mesa-demos
 
     wineWowPackages.stable
   ];

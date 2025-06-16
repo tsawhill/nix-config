@@ -34,8 +34,8 @@
           };
         };
         modules = [
-          # jovian.nixosModules.default
-          # chaotic.nixosModules.default
+          jovian.nixosModules.default
+          chaotic.nixosModules.default
           ./modules/steamdeck
         ];
       };
