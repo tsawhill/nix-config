@@ -5,14 +5,6 @@
   programs.hyprpanel = {
     enable = true;
 
-    # Use overlay from flake.nix
-    overlay.enable = true;
-
-    # Fix the overwrite issue with HyprPanel.
-    # See below for more information.
-    # Default: false
-    overwrite.enable = true;
-
     settings = {
       notifications.active_monitor = true;
       wallpaper.enable = false;

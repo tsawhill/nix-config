@@ -16,26 +16,21 @@
   };
 
   config = {
-    programs.hyprpanel.theme = "rose_pine_split";
-    programs.hyprpanel.settings.theme.bar = {
-      floating = true;
-      transparent = true;
-      buttons = {
-        radius = "4";
-        enableBorders = true;
-        modules.microphone.enableBorder = true;
-      };
-      menus = {
-        card_radius = "15";
-        border.radius = "15";
-        buttons.radius = "15";
-      };
-    };
-    programs.hyprpanel.override = {
+    programs.hyprpanel.settings = {
       theme = {
+        name = "rose_pine_split";
         bar = {
+          floating = true;
+          transparent = true;
+          monochrome = true;
+          menus = {
+            card_radius = "15";
+            border.radius = "15";
+            buttons.radius = "15";
+          };
           buttons = {
-            monochrome = true;
+            radius = "4";
+            enableBorders = true;
             borderColor = config.hyprpanelPink.faint_background;
             text = config.hyprpanelPink.background;
             icon_background = config.hyprpanelPink.background;
@@ -45,6 +40,7 @@
               microphone = {
                 background = config.hyprpanelPink.pink_primary;
                 icon = config.hyprpanelPink.background;
+                enableBorder = true;
               };
               hypridle = {
                 background = config.hyprpanelPink.pink_primary;

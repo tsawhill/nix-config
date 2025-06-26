@@ -13,7 +13,7 @@
       # inputs.ags.homeManagerModules.default
       # ./ags
 
-      inputs.hyprpanel.homeManagerModules.hyprpanel
+      # inputs.hyprpanel.homeManagerModules.hyprpanel
       ./hypr
 
       inputs.nixvim.homeManagerModules.nixvim

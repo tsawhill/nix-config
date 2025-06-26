@@ -22,7 +22,7 @@
         modules = [
           ./modules/shared
           ./modules/desktop
-          { nixpkgs.overlays = [ inputs.hyprpanel.overlay ]; }
+          # { nixpkgs.overlays = [ inputs.hyprpanel.overlay ]; }
         ];
       };
       nixosConfigurations.taylor-deck = nixpkgs.lib.nixosSystem {
@@ -70,7 +70,7 @@
       url = "github:hyprwm/Hyprland";
     };
     hyprpanel = {
-      url = "github:jas-singhfsu/hyprpanel?rev=3bcd3c4710fc025bbe403948f10c3922a8bf5193";
+      url = "github:jas-singhfsu/hyprpanel";
     };
     walker = {
       url = "github:abenz1267/walker";
