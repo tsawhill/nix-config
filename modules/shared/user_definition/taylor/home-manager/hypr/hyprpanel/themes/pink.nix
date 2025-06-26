@@ -22,7 +22,6 @@
         bar = {
           floating = true;
           transparent = true;
-          monochrome = true;
           menus = {
             card_radius = "15";
             border.radius = "15";
@@ -30,6 +29,7 @@
           };
           buttons = {
             radius = "4";
+            monochrome = true;
             enableBorders = true;
             borderColor = config.hyprpanelPink.faint_background;
             text = config.hyprpanelPink.background;
