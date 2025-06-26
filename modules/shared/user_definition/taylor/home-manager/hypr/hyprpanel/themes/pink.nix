@@ -29,12 +29,13 @@
           };
           buttons = {
             radius = "4";
+            style = "split";
             monochrome = true;
             enableBorders = true;
             borderColor = config.hyprpanelPink.faint_background;
             text = config.hyprpanelPink.background;
-            icon_background = config.hyprpanelPink.pink_primary;
-            icon = config.hyprpanelPink.background;
+            icon_background = config.hyprpanelPink.background;
+            icon = config.hyprpanelPink.pink_primary;
             background = config.hyprpanelPink.pink_primary;
             modules = {
               microphone = {
