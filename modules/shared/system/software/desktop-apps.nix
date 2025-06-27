@@ -1,5 +1,6 @@
 {
   pkgs,
+  pkgs-floorp,
   ...
 }:
 {
@@ -29,7 +30,7 @@
     filezilla
 
     # Browsers
-    floorp
+    pkgs-floorp.floorp
     ungoogled-chromium
 
     # Communication
@@ -55,7 +56,7 @@
 
     #Misc
     monero-gui
-    
+
     gparted
   ];
 }

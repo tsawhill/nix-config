@@ -121,6 +121,22 @@
         "type": "github"
       }
     },
+    "downgradefloorp": {
+      "locked": {
+        "lastModified": 1748540119,
+        "narHash": "sha256-A7ge07rGJo7cerXf7d+Ige1G8cFHaZKnPD59tgk7hMw=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "16c2a2eb1772f3d7baa69fedae4fa2aad2d88fcd",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "16c2a2eb1772f3d7baa69fedae4fa2aad2d88fcd",
+        "type": "github"
+      }
+    },
     "downgradegamescope": {
       "locked": {
         "lastModified": 1740963001,
@@ -774,6 +790,7 @@
     "root": {
       "inputs": {
         "chaotic": "chaotic",
+        "downgradefloorp": "downgradefloorp",
         "downgradegamescope": "downgradegamescope",
         "home-manager": "home-manager_2",
         "hyprland": "hyprland",
