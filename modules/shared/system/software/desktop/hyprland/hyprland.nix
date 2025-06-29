@@ -21,7 +21,7 @@
   environment.systemPackages = with pkgs; [
     waybar
     hyprpanel
-    inputs.walker.packages.${system}.default
+    walker
     grimblast
     libnotify
     wl-clipboard
