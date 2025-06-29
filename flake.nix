@@ -77,9 +77,6 @@
     hyprpanel = {
       url = "github:jas-singhfsu/hyprpanel";
     };
-    walker = {
-      url = "github:abenz1267/walker";
-    };
     chaotic.url = "github:chaotic-cx/nyx/nyxpkgs-unstable";
     jovian.follows = "chaotic/jovian";
   };

@@ -23,6 +23,10 @@
       # Default monitor for newly plugged in displays
       monitor = [ " , highrr, auto, 1" ];
 
+      debug = {
+        full_cm_proto=true;
+      };
+
       misc = {
         disable_hyprland_logo = true;
         enable_swallow = true;
