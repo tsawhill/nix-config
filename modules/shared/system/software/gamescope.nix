@@ -1,6 +1,7 @@
 { pkgs-gamescope, pkgs, ... }:
 {
   environment.systemPackages = [
-    pkgs.gamescope
+    pkgs-gamescope.gamescope
+    # pkgs.gamescope
   ];
 }
