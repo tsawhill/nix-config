@@ -45,6 +45,7 @@
     # Multimedia
     feishin
     mpv
+    jellyfin-media-player
 
     #Editors
     kdePackages.kdenlive
