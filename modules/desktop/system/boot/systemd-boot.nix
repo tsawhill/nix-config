@@ -3,5 +3,9 @@
   boot.loader.systemd-boot = {
     enable = true;
     configurationLimit = 6;
+    edk2-uefi-shell.enable = true; 
+    windows = {
+      
+    };
   };
 }
