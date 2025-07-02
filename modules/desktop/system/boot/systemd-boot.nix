@@ -3,9 +3,12 @@
   boot.loader.systemd-boot = {
     enable = true;
     configurationLimit = 6;
-    edk2-uefi-shell.enable = true; 
+    edk2-uefi-shell.enable = true;
     windows = {
-      
+      "10" = {
+        efiDeviceHandle = "ED1b";
+        title = "Windows 10";
+      };
     };
   };
 }
