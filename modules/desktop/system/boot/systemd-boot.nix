@@ -6,7 +6,7 @@
     edk2-uefi-shell.enable = true;
     windows = {
       "10" = {
-        efiDeviceHandle = "ED1b";
+        efiDeviceHandle = "HD1b";
         title = "Windows 10";
       };
     };

@@ -8,6 +8,7 @@
     shellAliases = {
       vim = "nvim";
       g = "git";
+      windows = "systemctl reboot --boot-loader-entry=windows_10.conf";
       update-system = "cd ~/.config/nixos/ && git add -A && sudo nix flake update && git add -A && sudo nixos-rebuild switch --flake path:///home/taylor/.config/nixos && git commit -m \"$(hostname) - Generation $(nixos-rebuild list-generations | grep current | awk '{print $1}') Successful Build\" && git push ; cd -";
       rebuild-system = "cd ~/.config/nixos/ && git add -A && sudo nixos-rebuild switch --flake path:///home/taylor/.config/nixos && git commit -m \"$(hostname) - Generation $(nixos-rebuild list-generations | grep current | awk '{print $1}') Successful Build (No flake update)\" && git push ; cd -";
     };
