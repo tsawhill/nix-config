@@ -27,7 +27,7 @@
       scale=1
     }
     monitorv2 {
-      output=HEADLESS-1
+      output=HEADLESS-2
       mode=3840x2160@60
       position=-3840x0
       scale=1
