@@ -29,7 +29,7 @@
     monitorv2 {
       output=HEADLESS-2
       mode=3840x2160@60
-      position=-3840x0
+      position=0x10000
       scale=1
     }
     workspace = 11,monitor:HEADLESS-2,default:true
