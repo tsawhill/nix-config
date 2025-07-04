@@ -1,3 +1,4 @@
+{ lib, ... }:
 {
   # wayland.windowManager.hyprland.settings.monitor = [
   #   "DP-1,3440x1440@165,0x0,1,vrr,2"
@@ -6,7 +7,7 @@
   # ];
   wayland.windowManager.hyprland.settings.monitorv2 = [
     {
-      output = "DP-1";
+      output = lib.mkBefore "DP-1";
       mode = "3440x1440@165";
       position = "0x0";
       scale = 1;
@@ -19,7 +20,7 @@
       scale = 1;
     }
     {
-      output = "HDMI-A-!";
+      output = "HDMI-A-1";
       mode = "3840x2160@60";
       position = "0x0";
       scale = 1;
