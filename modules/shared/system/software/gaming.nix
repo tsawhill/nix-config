@@ -21,6 +21,7 @@
     mangohud
     gpu-screen-recorder
     heroic
+    lutris
     protonplus
     retroarch
     bolt-launcher
