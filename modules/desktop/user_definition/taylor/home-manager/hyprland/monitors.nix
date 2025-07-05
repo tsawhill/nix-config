@@ -32,7 +32,7 @@
       scale=1
     }
     workspace = 11,monitor:HEADLESS-2,default:true
-    exec=hyprctl output create headless
+    exec=hyprctl output create headless HEADLESS-2
   '';
   # wayland.windowManager.hyprland.settings.monitorv2 = [
   #   {
