@@ -9,6 +9,7 @@
       notifications.active_monitor = true;
       wallpaper.enable = false;
       scalingPriority = "hyprland";
+      tear = true;
 
       bar = {
         customModules = {
