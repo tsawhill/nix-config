@@ -12,7 +12,6 @@
       mode=3440x1440@165
       position=0x0
       scale=1
-      vrr=2
     }
     monitorv2 {
       output=DP-2
