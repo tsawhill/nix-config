@@ -66,7 +66,7 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     nixpkgs-master.url = "github:NixOS/nixpkgs/master";
-    downgradegamescope.url = "github:NixOS/nixpkgs?rev=df8f977f5b323c644528950e9484ac781e4c7fc6";
+    downgradegamescope.url = "github:NixOS/nixpkgs?rev=76a84ecc52b3cfc29a5cf53c2be3205f127517a0";
     downgradefloorp.url = "github:NixOS/nixpkgs?rev=16c2a2eb1772f3d7baa69fedae4fa2aad2d88fcd";
     home-manager = {
       url = "github:nix-community/home-manager/master";
