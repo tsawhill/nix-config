@@ -35,6 +35,7 @@
 
     # Communication
     vesktop
+    goofcord
 
     lingot
 
