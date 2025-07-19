@@ -26,5 +26,6 @@
     retroarch
     bolt-launcher
     boilr
+    moonlight-qt
   ];
 }
