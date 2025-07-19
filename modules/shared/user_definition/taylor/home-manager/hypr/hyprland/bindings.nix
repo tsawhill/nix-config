@@ -45,7 +45,7 @@
     "$mainMod SHIFT, 8, movetoworkspace, 8"
     "$mainMod SHIFT, 9, movetoworkspace, 9"
     "$mainMod SHIFT, 0, movetoworkspace, 10"
-    "$mainMod SHIFT, -, movetoworkspace, 11"
+    "$mainMod SHIFT, _, movetoworkspace, 11"
 
     # Scroll through existing workspaces with mainMod + scroll
     "$mainMod, mouse_down, workspace, e+1"
