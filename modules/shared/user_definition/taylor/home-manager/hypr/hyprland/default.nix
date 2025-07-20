@@ -30,6 +30,11 @@
       render = {
         direct_scanout = 1;
       };
+      
+      cursor = {
+        no_hardware_cursors = 1;
+      };
+      
       misc = {
         disable_hyprland_logo = true;
         enable_swallow = true;

@@ -74,17 +74,17 @@
     },
     "downgradegamescope": {
       "locked": {
-        "lastModified": 1747403947,
-        "narHash": "sha256-cljRKF2lQ06nk4BKwoEzGPMkM8nezGr8tThPw3VzUfU=",
+        "lastModified": 1740963001,
+        "narHash": "sha256-5f2qfjJZDrNhgog+4LNeNz04qhGlSx+JnvWQXTl/uiQ=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "a347e8607a74263d104d8e7c209f55d7e8c9df3c",
+        "rev": "8fcb6f1c4948305af52d19f887b89011ee2c080d",
         "type": "github"
       },
       "original": {
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "a347e8607a74263d104d8e7c209f55d7e8c9df3c",
+        "rev": "8fcb6f1c4948305af52d19f887b89011ee2c080d",
         "type": "github"
       }
     },
