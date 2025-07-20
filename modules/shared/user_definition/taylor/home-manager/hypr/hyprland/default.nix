@@ -27,6 +27,9 @@
         full_cm_proto=true;
       };
 
+      render = {
+        direct_scanout = 1;
+      };
       misc = {
         disable_hyprland_logo = true;
         enable_swallow = true;

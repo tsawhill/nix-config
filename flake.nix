@@ -55,6 +55,9 @@
           pkgs-gamescope = import downgradegamescope {
             system = "x86_64-linux";
           };
+          pkgs-floorp = import downgradefloorp {
+            system = "x86_64-linux";
+          };
         };
         modules = [
           ./modules/shared

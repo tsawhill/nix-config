@@ -1,5 +1,5 @@
 {
-  programs.hyprpanel.layout = {
+  programs.hyprpanel.settings = {
     "bar.layouts" = {
       "*" = {
         left = [
