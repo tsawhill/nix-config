@@ -29,6 +29,5 @@ in
   boot.kernelPackages = latestKernelPackage;
 
  
-  services.desktopManager.gnome.enable = true;
  boot.zfs.package = pkgs.zfs_unstable;
 }

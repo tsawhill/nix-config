@@ -24,17 +24,13 @@
       monitor = [ " , highrr, auto, 1" ];
 
       debug = {
-        full_cm_proto=true;
+        full_cm_proto = true;
       };
 
       render = {
-        direct_scanout = 1;
+        direct_scanout = 0;
       };
-      
-      cursor = {
-        no_hardware_cursors = 1;
-      };
-      
+
       misc = {
         disable_hyprland_logo = true;
         enable_swallow = true;
