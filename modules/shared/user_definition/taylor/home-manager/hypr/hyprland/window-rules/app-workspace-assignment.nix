@@ -6,6 +6,7 @@
     "workspace 5 silent,class:^(Steam)$"
     "workspace 5 silent,class:^(steam)$"
     "workspace 6 silent,class:^(gamescope)$"
+    "workspace 6 silent,class:^(.gamescope-wrapped)$"
     # "workspace 11 silent, tag:stream"
     "workspace 6 silent,class:^(cs2)$"
     "workspace 10 silent,class:^(vesktop)$"
