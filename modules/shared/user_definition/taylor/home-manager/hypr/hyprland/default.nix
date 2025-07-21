@@ -33,7 +33,7 @@
 
       misc = {
         disable_hyprland_logo = true;
-        enable_swallow = true;
+        enable_swallow = false;
         swallow_regex = "^(foot)$";
         enable_anr_dialog = false;
       };
