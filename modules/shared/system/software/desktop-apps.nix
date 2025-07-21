@@ -50,7 +50,7 @@
 
     #Editors
     kdePackages.kdenlive
-    # gimp
+    gimp
 
     # Printing and modeling
     orca-slicer
