@@ -27,5 +27,6 @@
     bolt-launcher
     boilr
     moonlight-qt
+    rpcs3
   ];
 }
