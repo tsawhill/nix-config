@@ -20,7 +20,7 @@
     gamemode
     mangohud
     gpu-screen-recorder
-    heroic
+    # heroic
     lutris
     protonplus
     retroarch

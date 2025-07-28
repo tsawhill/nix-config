@@ -35,7 +35,6 @@
 
     # Communication
     vesktop
-    goofcord
 
     lingot
 
@@ -53,7 +52,7 @@
     gimp
 
     # Printing and modeling
-    orca-slicer
+    # orca-slicer
     freecad
 
     #Misc

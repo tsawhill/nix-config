@@ -12,6 +12,7 @@
   imports = [
     (modulesPath + "/installer/scan/not-detected.nix")
   ];
+  boot.kernelParams = [ "amd_pstate=active" ];
 
   boot.initrd.availableKernelModules = [
     "nvme"
