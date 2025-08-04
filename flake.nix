@@ -10,6 +10,7 @@
       downgradefloorp,
       chaotic,
       jovian,
+      nur,
       ...
     }@inputs:
     {

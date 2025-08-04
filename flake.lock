@@ -610,6 +610,24 @@
         "type": "github"
       }
     },
+    "mic92": {
+      "inputs": {
+        "nixpkgs": "nixpkgs_4"
+      },
+      "locked": {
+        "lastModified": 1754266220,
+        "narHash": "sha256-9eJCNenkN0fyQhkaHZ49rvKldOoagOrd1pIfgCBYh2o=",
+        "owner": "Mic92",
+        "repo": "nur-packages",
+        "rev": "05b69b9e2f010c203242c1025455db0d4248d808",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Mic92",
+        "repo": "nur-packages",
+        "type": "github"
+      }
+    },
     "nix-github-actions": {
       "inputs": {
         "nixpkgs": [
@@ -698,6 +716,22 @@
       }
     },
     "nixpkgs_4": {
+      "locked": {
+        "lastModified": 1754194279,
+        "narHash": "sha256-cqnud5X+b+VCcsTheEnhAhbpAXbH9GwpQITv990ckbM=",
+        "ref": "refs/heads/main",
+        "rev": "b9fcba0bf371b8ebac6f522c4d97454fafeaaf5c",
+        "shallow": true,
+        "type": "git",
+        "url": "https://github.com/Mic92/nixpkgs"
+      },
+      "original": {
+        "shallow": true,
+        "type": "git",
+        "url": "https://github.com/Mic92/nixpkgs"
+      }
+    },
+    "nixpkgs_5": {
       "locked": {
         "lastModified": 1753694789,
         "narHash": "sha256-cKgvtz6fKuK1Xr5LQW/zOUiAC0oSQoA9nOISB0pJZqM=",
@@ -815,7 +849,8 @@
           "chaotic",
           "jovian"
         ],
-        "nixpkgs": "nixpkgs_4",
+        "mic92": "mic92",
+        "nixpkgs": "nixpkgs_5",
         "nixpkgs-master": "nixpkgs-master",
         "nixvim": "nixvim",
         "nur": "nur"
