@@ -60,6 +60,7 @@
 
     waydroid
     waydroid-helper
+    nur.repos.ataraxiasjel.waydroid-script
 
     gparted
   ];
