@@ -63,4 +63,8 @@
 
     gparted
   ];
+  
+  virtualisation.waydroid.enable = true;
+
+
 }
