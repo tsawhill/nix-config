@@ -31,7 +31,7 @@
         modules = [
           ./modules/shared
           ./modules/desktop
-          # { nixpkgs.overlays = [ inputs.hyprpanel.overlay ]; }
+          { nixpkgs.overlays = [ nur.overlay ];}
         ];
       };
       nixosConfigurations.taylor-deck = nixpkgs.lib.nixosSystem {
