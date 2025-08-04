@@ -58,14 +58,10 @@
     #Misc
     monero-gui
 
-    waydroid
-    waydroid-helper
-    nur.repos.ataraxiasjel.waydroid-script
-
+    audacity
     gparted
   ];
-  
-  virtualisation.waydroid.enable = true;
 
+  virtualisation.waydroid.enable = true;
 
 }
