@@ -71,6 +71,7 @@
     nixpkgs-master.url = "github:NixOS/nixpkgs/master";
     downgradegamescope.url = "github:NixOS/nixpkgs?rev=8fcb6f1c4948305af52d19f887b89011ee2c080d";
     downgradefloorp.url = "github:NixOS/nixpkgs?rev=16c2a2eb1772f3d7baa69fedae4fa2aad2d88fcd";
+    mic92.url = "github:Mic92/nur-packages";
     home-manager = {
       url = "github:nix-community/home-manager/master";
       inputs.nixpkgs.follows = "nixpkgs";
