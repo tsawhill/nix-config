@@ -58,6 +58,9 @@
     #Misc
     monero-gui
 
+    waydroid
+    waydroid-helper
+
     gparted
   ];
 }
