@@ -14,9 +14,9 @@
       "92-low-latency" = {
         "context.properties" = {
           "default.clock.rate" = 48000;
-          "default.clock.quantum" = 32;
-          "default.clock.min-quantum" = 32;
-          "default.clock.max-quantum" = 32;
+          "default.clock.quantum" = 48;
+          "default.clock.min-quantum" = 48;
+          "default.clock.max-quantum" = 48;
         };
       };
     };
@@ -30,14 +30,14 @@
           }
         ];
         "pulse.properties" = {
-          "pulse.min.req" = "32/48000";
-          "pulse.default.req" = "32/48000";
-          "pulse.max.req" = "32/48000";
-          "pulse.min.quantum" = "32/48000";
-          "pulse.max.quantum" = "32/48000";
+          "pulse.min.req" = "48/48000";
+          "pulse.default.req" = "48/48000";
+          "pulse.max.req" = "48/48000";
+          "pulse.min.quantum" = "48/48000";
+          "pulse.max.quantum" = "48/48000";
         };
         "stream.properties" = {
-          "node.latency" = "32/48000";
+          "node.latency" = "48/48000";
           "resample.quality" = 1;
         };
       };
