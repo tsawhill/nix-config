@@ -13,7 +13,7 @@
     extraConfig.pipewire = {
       "92-low-latency" = {
         "context.properties" = {
-          "default.clock.rate" = 48000;
+          "default.clock.rate" = 44100;
           "default.clock.quantum" = 96;
           "default.clock.min-quantum" = 96;
           "default.clock.max-quantum" = 96;
@@ -30,14 +30,14 @@
           }
         ];
         "pulse.properties" = {
-          "pulse.min.req" = "96/48000";
-          "pulse.default.req" = "96/48000";
-          "pulse.max.req" = "96/48000";
-          "pulse.min.quantum" = "96/48000";
-          "pulse.max.quantum" = "96/48000";
+          "pulse.min.req" = "96/44100";
+          "pulse.default.req" = "96/44100";
+          "pulse.max.req" = "96/44100";
+          "pulse.min.quantum" = "96/44100";
+          "pulse.max.quantum" = "96/44100";
         };
         "stream.properties" = {
-          "node.latency" = "96/48000";
+          "node.latency" = "96/44100";
           "resample.quality" = 1;
         };
       };
