@@ -17,7 +17,7 @@
   };
 
   environment.systemPackages = with pkgs; [
-    pkgs-mesa.vulkan-headers
+    vulkan-headers
     gamemode
     mangohud
     gpu-screen-recorder
