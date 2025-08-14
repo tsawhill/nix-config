@@ -19,7 +19,7 @@
 
     # Drivers for amd gpu
     pkgs-mesa.mesa
-    mesa-demos
+    pkgs-mesa.mesa-demos
 
     wineWowPackages.stable
   ];

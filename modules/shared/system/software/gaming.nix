@@ -1,6 +1,7 @@
 {
   inputs,
   pkgs,
+  pkgs-mesa,
   ...
 }:
 {
@@ -16,7 +17,7 @@
   };
 
   environment.systemPackages = with pkgs; [
-    vulkan-headers
+    pkgs-mesa.vulkan-headers
     gamemode
     mangohud
     gpu-screen-recorder
