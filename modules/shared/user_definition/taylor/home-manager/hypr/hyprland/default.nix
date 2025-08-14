@@ -28,7 +28,7 @@
       };
 
       render = {
-        direct_scanout = 0;
+        direct_scanout = 1;
       };
 
       misc = {
