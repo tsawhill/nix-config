@@ -2,7 +2,7 @@
   services.linux-wallpaperengine = {
     enable = true;
     clamping = "clamp";
-    assetsPath = "/home/taylor/.steam/steam/steamapps/common/wallpaper_engine/assets";
+    # assetsPath = "/home/taylor/.steam/steam/steamapps/common/wallpaper_engine/assets";
     wallpapers = [
       {
         monitor = "DP-1";
