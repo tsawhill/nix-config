@@ -32,6 +32,7 @@
           };
         };
         modules = [
+          chaotic.nixosModules.default
           ./modules/shared
           ./modules/desktop
         ];

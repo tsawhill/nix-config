@@ -2,6 +2,6 @@
 {
   environment.systemPackages = [
     # pkgs-gamescope.gamescope
-    pkgs.gamescope
+    pkgs.gamescope_git
   ];
 }
