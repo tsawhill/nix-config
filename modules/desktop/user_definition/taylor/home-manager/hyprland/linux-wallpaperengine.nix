@@ -1,7 +1,7 @@
 {
   services.linux-wallpaperengine = {
     enable = true;
-    clamping = "clamp";
+    # clamping = "clamp";
     # assetsPath = "/home/taylor/.steam/steam/steamapps/common/wallpaper_engine/assets";
     wallpapers = [
       {
