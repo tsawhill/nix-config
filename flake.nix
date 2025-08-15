@@ -6,9 +6,7 @@
       self,
       nixpkgs,
       nixpkgs-master,
-      downgradegamescope,
       downgradefloorp,
-      downgrademesa,
       chaotic,
       jovian,
       ...
@@ -21,13 +19,7 @@
           pkgs-master = import nixpkgs-master {
             system = "x86_64-linux";
           };
-          pkgs-gamescope = import downgradegamescope {
-            system = "x86_64-linux";
-          };
           pkgs-floorp = import downgradefloorp {
-            system = "x86_64-linux";
-          };
-          pkgs-mesa = import downgrademesa {
             system = "x86_64-linux";
           };
         };
@@ -41,9 +33,6 @@
         system = "x86_64-linux";
         specialArgs = {
           inherit inputs;
-          pkgs-gamescope = import downgradegamescope {
-            system = "x86_64-linux";
-          };
         };
         modules = [
           jovian.nixosModules.default
@@ -56,9 +45,6 @@
         system = "x86_64-linux";
         specialArgs = {
           inherit inputs;
-          pkgs-gamescope = import downgradegamescope {
-            system = "x86_64-linux";
-          };
           pkgs-floorp = import downgradefloorp {
             system = "x86_64-linux";
           };
@@ -73,8 +59,6 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     nixpkgs-master.url = "github:NixOS/nixpkgs/master";
-    downgradegamescope.url = "github:NixOS/nixpkgs?rev=8fcb6f1c4948305af52d19f887b89011ee2c080d";
-    downgrademesa.url = "github:NixOS/nixpkgs?rev=ca3d8cc5c4f3132f5515787507bcf91fd46cd2de";
     downgradefloorp.url = "github:NixOS/nixpkgs?rev=16c2a2eb1772f3d7baa69fedae4fa2aad2d88fcd";
     home-manager = {
       url = "github:nix-community/home-manager/master";

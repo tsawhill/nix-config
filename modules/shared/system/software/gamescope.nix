@@ -1,9 +1,5 @@
-{ pkgs-gamescope, pkgs, ... }:
+{ pkgs, ... }:
 {
-  # environment.systemPackages = [
-  #   # pkgs-gamescope.gamescope
-  #   pkgs.gamescope_git
-  # ];
   programs.gamescope = {
     enable = true;
     package = pkgs.gamescope_git.overrideAttrs (_: {
