@@ -28,5 +28,6 @@
     boilr
     moonlight-qt
     rpcs3
+    pcsx2
   ];
 }
