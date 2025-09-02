@@ -52,7 +52,7 @@
     gimp
 
     # Printing and modeling
-    # orca-slicer
+    orca-slicer
     freecad
 
     #Misc
