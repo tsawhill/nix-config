@@ -29,5 +29,6 @@
     moonlight-qt
     rpcs3
     pcsx2
+    yarg
   ];
 }
