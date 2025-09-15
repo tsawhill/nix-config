@@ -24,7 +24,7 @@
     lutris
     protonplus
     retroarch
-    # bolt-launcher
+    bolt-launcher
     boilr
     moonlight-qt
     rpcs3
