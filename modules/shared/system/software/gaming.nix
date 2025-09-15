@@ -25,6 +25,8 @@
     protonplus
     retroarch
     bolt-launcher
+    gtk2
+    gtk2-x11
     boilr
     moonlight-qt
     rpcs3
