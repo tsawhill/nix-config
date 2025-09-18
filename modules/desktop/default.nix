@@ -26,7 +26,7 @@ in
   ];
   system.stateVersion = "24.11";
 
-  boot.kernelPackages = latestKernelPackage;
+  # boot.kernelPackages = latestKernelPackage;
 
  
  boot.zfs.package = pkgs.zfs_unstable;
