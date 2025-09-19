@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, pkgs-floorp, ... }:
 {
   nixpkgs.config.allowUnfree = true;
   imports = [
@@ -18,7 +18,7 @@
     wireguard-tools
 
     # Drivers for amd gpu
-    mesa
+    pkgs-floorp.mesa
     mesa-demos
 
     wineWowPackages.stable
