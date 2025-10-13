@@ -31,7 +31,7 @@
 
     # Browsers
     pkgs-floorp.floorp
-    ungoogled-chromium
+    # ungoogled-chromium
 
     # Communication
     vesktop

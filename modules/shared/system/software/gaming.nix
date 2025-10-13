@@ -23,7 +23,7 @@
     heroic
     lutris
     protonplus
-    retroarch
+    # retroarch
     bolt-launcher
     gtk2
     gtk2-x11
