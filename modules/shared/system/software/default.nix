@@ -18,7 +18,7 @@
     wireguard-tools
 
     # Drivers for amd gpu
-    pkgs-floorp.mesa
+    mesa
     mesa-demos
 
     wineWowPackages.stable
