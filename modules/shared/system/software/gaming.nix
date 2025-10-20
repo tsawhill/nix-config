@@ -3,6 +3,13 @@
   pkgs,
   ...
 }:
+let
+  myUdevRule = pkgs.writeTextFile {
+    name = "yarg-udev";
+    text = ''KERNEL=="hidraw*", TAG+="uaccess"'';
+    destination = "/etc/udev/rules.d/69-hid.rules"; # The destination path within the generated package
+  };
+in
 {
   programs.steam = {
     enable = true;
@@ -15,9 +22,8 @@
     enable = true;
   };
 
-  services.udev.extraRules = ''
-    KERNEL=="hidraw*", TAG+="uaccess"
-  '';
+
+  services.udev.packages = [ myUdevRule ];
 
   environment.systemPackages = with pkgs; [
     vulkan-headers
