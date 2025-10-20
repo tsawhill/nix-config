@@ -15,6 +15,10 @@
     enable = true;
   };
 
+  services.udev.extraRules = ''
+    KERNEL=="hidraw*", TAG+="uaccess"
+  '';
+
   environment.systemPackages = with pkgs; [
     vulkan-headers
     gamemode
