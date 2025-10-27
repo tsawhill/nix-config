@@ -39,7 +39,7 @@ in
     gtk2-x11
     boilr
     moonlight-qt
-    rpcs3
+    # rpcs3
     pcsx2
     yarg
   ];

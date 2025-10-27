@@ -56,6 +56,11 @@
     "$mainMod, right, movefocus, r"
     "$mainMod, up, movefocus, u"
     "$mainMod, down, movefocus, d"
+
+    # Volume keys
+    ", xf86audioraisevolume, exec, pactl set-sink-volume @DEFAULT_SINK@ +5%"
+    ", xf86audiolowervolume, exec, pactl set-sink-volume @DEFAULT_SINK@ -5%"
+
   ];
 
   ################################
@@ -80,4 +85,10 @@
     "$mainMod, mouse:272, movewindow"
     "$mainMod, mouse:273, resizeactive"
   ];
+
+  ################################
+  #                              #
+  #         Volume keys          #
+  #                              #
+  ################################
 }
