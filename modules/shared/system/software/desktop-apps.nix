@@ -30,7 +30,7 @@
     filezilla
 
     # Browsers
-    pkgs-floorp.floorp
+    floorp-bin
     # ungoogled-chromium
 
     # Communication
