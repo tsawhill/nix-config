@@ -1,6 +1,7 @@
 {
   inputs,
   pkgs,
+  pkgs-floorp,
   ...
 }:
 let
@@ -41,6 +42,6 @@ in
     moonlight-qt
     # rpcs3
     pcsx2
-    yarg
+    pkgs-floorp.yarg
   ];
 }
