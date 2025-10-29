@@ -1,13 +1,14 @@
 {
   inputs,
   pkgs,
-  pkgs-floorp,
   ...
 }:
 let
   myUdevRule = pkgs.writeTextFile {
     name = "yarg-udev";
-    text = ''KERNEL=="hidraw*", TAG+="uaccess"'';
+    text = ''
+      KERNEL=="hidraw*", TAG+="uaccess"
+    '';
     destination = "/etc/udev/rules.d/69-hid.rules"; # The destination path within the generated package
   };
 in
@@ -22,7 +23,6 @@ in
   programs.gpu-screen-recorder = {
     enable = true;
   };
-
 
   services.udev.packages = [ myUdevRule ];
 
@@ -42,6 +42,6 @@ in
     moonlight-qt
     # rpcs3
     pcsx2
-    pkgs-floorp.yarg
+    yarg
   ];
 }
