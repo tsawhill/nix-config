@@ -7,7 +7,7 @@ let
   myUdevRule = pkgs.writeTextFile {
     name = "yarg-udev";
     text = "KERNEL==\"hidraw*\", TAG+=\"uaccess\"";
-    destination = "/etc/udev/rules.d/59-hid.rules"; # The destination path within the generated package
+    destination = "/etc/udev/rules.d/81-hid.rules"; # The destination path within the generated package
   };
 in
 {
@@ -34,8 +34,8 @@ in
     protonplus
     # retroarch
     bolt-launcher
-    gtk2
-    gtk2-x11
+    # gtk2
+    # gtk2-x11
     boilr
     moonlight-qt
     # rpcs3
