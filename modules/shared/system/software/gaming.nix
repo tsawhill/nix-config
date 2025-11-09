@@ -41,5 +41,6 @@ in
     # rpcs3
     pcsx2
     yarg
+    hidapi
   ];
 }
