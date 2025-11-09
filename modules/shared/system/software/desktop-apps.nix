@@ -1,6 +1,5 @@
 {
   pkgs,
-  pkgs-floorp,
   ...
 }:
 {
@@ -43,7 +42,7 @@
     pyload-ng
 
     # Multimedia
-    feishin
+    # feishin
     mpv
     # jellyfin-media-player
     delfin
@@ -62,7 +61,5 @@
     audacity
     gparted
   ];
-
-  virtualisation.waydroid.enable = true;
 
 }

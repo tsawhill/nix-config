@@ -7,7 +7,7 @@ let
   myUdevRule = pkgs.writeTextFile {
     name = "yarg-udev";
     text = "KERNEL==\"hidraw*\", TAG+=\"uaccess\"";
-    destination = "/etc/udev/rules.d/81-hid.rules"; # The destination path within the generated package
+    destination = "/etc/udev/rules.d/79-hid.rules"; # The destination path within the generated package
   };
 in
 {
