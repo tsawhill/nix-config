@@ -9,14 +9,14 @@
   wayland.windowManager.hyprland.extraConfig = ''
     monitorv2 {
       output=DP-1
-      mode=3440x1440@165
+      mode=3440x1440@164.90Hz
       position=0x0
       scale=1
       vrr=1
     }
     monitorv2 {
       output=DP-2
-      mode=2560x1440@165
+      mode=2560x1440@165.08Hz
       position=3440x0
       scale=1
       vrr=1
