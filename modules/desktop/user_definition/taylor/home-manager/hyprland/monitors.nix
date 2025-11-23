@@ -8,7 +8,7 @@
   # ];
   wayland.windowManager.hyprland.extraConfig = ''
     monitorv2 {
-      description=Dell Inc. AW3423DWF 3D442S3
+      output=desc:Dell Inc. AW3423DWF 3D442S3
       mode=3440x1440@164.90Hz
       position=0x0
       scale=1
