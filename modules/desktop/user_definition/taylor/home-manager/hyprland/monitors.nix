@@ -15,8 +15,8 @@
       vrr=1
     }
     monitorv2 {
-      output=DP-2
-      mode=2560x1440@165.08Hz
+      output=desc:Dell Inc. DELL S2721DGF 98T9623
+      mode=2560x1440@60.00Hz
       position=3440x0
       scale=1
       vrr=1
