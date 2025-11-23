@@ -1,5 +1,6 @@
 {
   pkgs,
+  pkgs-floorp,
   ...
 }:
 {
@@ -29,7 +30,7 @@
     filezilla
 
     # Browsers
-    floorp-bin
+    pkgs-floorp.floorp-bin
     # ungoogled-chromium
 
     # Communication
