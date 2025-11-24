@@ -13,6 +13,7 @@
       position=auto
       scale=1
       vrr=1
+      bitdepth=10
       supports_hdr=true
       supports_wide_color=true
     }
