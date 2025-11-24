@@ -14,7 +14,7 @@
     "feishin"
 
     # Wallpapers
-    ''mpvpaper -o "no-audio --loop-playlist shuffle --framedrop=vo=5" DP-1 /home/taylor/.config/wallpapers/2560x1440''
+    ''mpvpaper -o "no-audio --loop-playlist shuffle --ab-loop-a=00:05 --ab-loop-b=5" DP-1 /home/taylor/.config/wallpapers/2560x1440''
 
     # Bluetooth does not consistently start on boot because the device is not detected until after networking starts.
     "rfkill unblock 0;sleep 15; rfkill unblock 0"
