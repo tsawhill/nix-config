@@ -15,6 +15,8 @@
       vrr=1
       bitdepth=10
       supports_hdr=true
+      sdr_min_luminance=0.005
+      sdr_max_luminance=300
       supports_wide_color=true
     }
     monitorv2 {
