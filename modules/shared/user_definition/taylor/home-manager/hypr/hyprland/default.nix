@@ -23,7 +23,7 @@
       # Default monitor for newly plugged in displays
       monitor = [ " , highrr, auto, 1" ];
 
-      experimental.xx_color_management_4 = true;
+      experimental.xx_color_management_v4 = true;
       debug = {
         full_cm_proto = true;
       };
