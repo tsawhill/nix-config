@@ -37,7 +37,7 @@
             icon_background = config.hyprpanelPink.background;
             icon = config.hyprpanelPink.pink_primary;
             background = config.hyprpanelPink.pink_primary;
-            background_opacity = "60";
+            background_opacity = "80";
             modules = {
               microphone = {
                 background = config.hyprpanelPink.pink_primary;
