@@ -10,7 +10,7 @@
     monitorv2 {
       output=desc:Dell Inc. AW2725DF CJ56ZZ3
       mode=2560x1440@360Hz
-      position=0x0
+      position=auto
       scale=1
       vrr=1
       supports_hdr=true
@@ -19,14 +19,14 @@
     monitorv2 {
       output=desc:Dell Inc. AW3423DWF 3D442S3
       mode=3440x1440@164.90Hz
-      position=0x0
+      position=auto-right
       scale=1
       vrr=1
     }
     monitorv2 {
       output=desc:Dell Inc. DELL S2721DGF 98T9623
       mode=2560x1440@60.00Hz
-      position=3440x0
+      position=auto-right
       scale=1
       vrr=1
     }
