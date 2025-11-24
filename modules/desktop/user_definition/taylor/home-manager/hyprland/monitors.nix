@@ -8,11 +8,13 @@
   # ];
   wayland.windowManager.hyprland.extraConfig = ''
     monitorv2 {
-      output=DP-1
+      output=desc:Dell Inc. AW2725DF CJ56ZZ3
       mode=2560x1440@360Hz
       position=0x0
       scale=1
       vrr=1
+      supports_hdr=true
+      supports_wide_color=true
     }
     monitorv2 {
       output=desc:Dell Inc. AW3423DWF 3D442S3
