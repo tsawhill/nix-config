@@ -33,7 +33,7 @@
     monitorv2 {
       output=HDMI-A-1
       mode=3840x2160@60
-      position=0x0
+      position=auto
       scale=1
     }
     monitorv2 {
