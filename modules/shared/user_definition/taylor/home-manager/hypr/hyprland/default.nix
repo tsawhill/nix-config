@@ -29,6 +29,7 @@
       };
 
       render = {
+        cm_fs_passthrough = 1;
         direct_scanout = 1;
       };
 
