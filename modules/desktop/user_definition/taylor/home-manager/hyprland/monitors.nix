@@ -16,7 +16,7 @@
       bitdepth=10
       supports_hdr=true
       sdr_min_luminance=0.005
-      sdr_max_luminance=300
+      sdr_max_luminance=200
       cm=hdr
       supports_wide_color=true
     }
