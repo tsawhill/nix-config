@@ -17,17 +17,15 @@
         "GDK_SCALE, 1"
         "ELECTRON_OZONE_PLATFORM_HINT,wayland"
         "MANGOHUD, 1"
+        "OBS_VKCAPTURE, 1"
         "EDITOR, nvim"
       ];
 
       # Default monitor for newly plugged in displays
       monitor = [ " , highrr, auto, 1" ];
 
+      # HDR and direct scanout
       experimental.xx_color_management_v4 = true;
-      debug = {
-        full_cm_proto = true;
-      };
-
       render = {
         cm_fs_passthrough = 1;
         direct_scanout = 1;
