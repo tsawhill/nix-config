@@ -2,13 +2,13 @@
   imports = [
     ./lsp
     ./tree.nix
-    ./cmp.nix
+    # ./cmp.nix
     ./telescope.nix
     ./commentary.nix
     ./buffer.nix
     ./which-key.nix
     ./treesitter.nix
-    ./lualine.nix
+    # ./lualine.nix
     ./web-devicons.nix
     ./noice.nix
     ./transparent.nix
