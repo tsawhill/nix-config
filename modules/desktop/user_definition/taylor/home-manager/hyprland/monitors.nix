@@ -9,7 +9,7 @@
   wayland.windowManager.hyprland.extraConfig = ''
     monitorv2 {
       output=desc:Dell Inc. AW2725DF CJ56ZZ3
-      mode=2560x1440@360Hz
+      mode=modeline 1640.39 2560 2568 2600 2640 1440 1712 1720 1726 +hsync -vsync
       position=auto
       scale=1
       vrr=1
