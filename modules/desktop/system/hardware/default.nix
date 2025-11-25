@@ -16,5 +16,8 @@
       "nofail"
     ];
   };
+  services.lact = {
+    enable = true;
+  };
 
 }
