@@ -12,7 +12,7 @@
       mode=modeline 1640.30 2560 2568 2600 2640 1440 1712 1720 1726 +hsync -vsync
       position=auto
       scale=1
-      vrr=1
+      # vrr=1
       bitdepth=10
       supports_hdr=true
       cm=hdr
@@ -27,7 +27,7 @@
       mode=modeline 312.63 3440 3448 3480 3520 1440 1467 1475 1481 +hsync -vsync
       position=auto-right
       scale=1
-      vrr=1
+      # vrr=1
       bitdepth=10
       supports_hdr=true
       cm=hdr
