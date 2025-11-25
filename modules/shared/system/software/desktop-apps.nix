@@ -43,7 +43,7 @@
     pyload-ng
 
     # Multimedia
-    # feishin
+    feishin
     mpv
     # jellyfin-media-player
     delfin
