@@ -9,7 +9,7 @@
   wayland.windowManager.hyprland.extraConfig = ''
     monitorv2 {
       output=desc:Dell Inc. AW2725DF CJ56ZZ3
-      mode=modeline 1640.39 2560 2568 2600 2640 1440 1712 1720 1726 +hsync -vsync
+      mode=modeline 1640.30 2560 2568 2600 2640 1440 1712 1720 1726 +hsync -vsync
       position=auto
       scale=1
       vrr=1
@@ -21,7 +21,7 @@
     }
     monitorv2 {
       output=desc:Dell Inc. AW3423DWF 3D442S3
-      mode=modeline 644.16 3440 3448 3480 3520 1440 1511 1519 1525 +hsync -vsync
+      mode=modeline 312.63 3440 3448 3480 3520 1440 1467 1475 1481 +hsync -vsync
       position=auto-right
       scale=1
       vrr=1
