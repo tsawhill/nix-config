@@ -21,7 +21,7 @@
     }
     monitorv2 {
       output=desc:Dell Inc. AW3423DWF 3D442S3
-      mode=3440x1440@59.97Hz
+      mode=modeline 644.16  3440 3448 3480 3520  1440 1511 1519 1525 +hsync -vsync
       position=auto-right
       scale=1
       vrr=1
