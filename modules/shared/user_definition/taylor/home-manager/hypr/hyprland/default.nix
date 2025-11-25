@@ -28,7 +28,7 @@
       experimental.xx_color_management_v4 = true;
       render = {
         cm_fs_passthrough = 1;
-        direct_scanout = 0;
+        direct_scanout = 2;
       };
 
       misc = {
