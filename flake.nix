@@ -69,7 +69,8 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     hyprland = {
-      url = "github:hyprwm/Hyprland";
+      url = "github:njdom24/Hyprland/hdr-sdr-no-scanout";
+      # url = "github:hyprwm/Hyprland";
     };
     hyprpanel = {
       url = "github:jas-singhfsu/hyprpanel";
