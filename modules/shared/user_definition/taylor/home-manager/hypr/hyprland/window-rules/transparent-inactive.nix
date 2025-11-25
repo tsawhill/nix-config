@@ -5,6 +5,7 @@
     "opacity 1.0 1.0, title:^(.*- YouTube — Ablaze Floorp)$"
     "opacity 1.0 1.0, title:^(.*-Twitch.tv — Ablaze Floorp)$"
     "opacity 1.0 0.8, class:^(foot)$"
+    "opacity 1.0 0.8, class:^(vesktop)$"
     "opacity 1.0 1.0, class:^(cafe.avery.Delfin)$"
   ];
 }
