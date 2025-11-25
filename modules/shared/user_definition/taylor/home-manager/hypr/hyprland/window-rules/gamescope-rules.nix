@@ -3,6 +3,6 @@
   wayland.windowManager.hyprland.settings.windowrulev2 = [
     "idleinhibit focus,class:^(gamescope)$"
     "immediate, class:^(gamescope)$"
-    "immediate, focus:1"
+    # "immediate, focus:1"
   ];
 }
