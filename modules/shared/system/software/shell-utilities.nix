@@ -20,7 +20,7 @@
 
     # Resource Management
     htop
-    # nvtopPackages.full
+    nvtopPackages.amd
 
     # Multimedia
     ffmpeg
