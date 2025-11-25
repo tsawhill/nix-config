@@ -15,6 +15,9 @@
       vrr=1
       bitdepth=10
       supports_hdr=true
+      cm=hdr
+      sdrbrightness=1.2
+      sdrsaturation=0.98
       sdr_min_luminance=0.005
       sdr_max_luminance=250
       supports_wide_color=true
@@ -25,6 +28,14 @@
       position=auto-right
       scale=1
       vrr=1
+      bitdepth=10
+      supports_hdr=true
+      cm=hdr
+      sdrbrightness=1.2
+      sdrsaturation=0.98
+      sdr_min_luminance=0.005
+      sdr_max_luminance=250
+      supports_wide_color=true
     }
     monitorv2 {
       output=desc:Dell Inc. DELL S2721DGF 98T9623
