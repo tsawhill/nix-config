@@ -36,6 +36,7 @@
         enable_swallow = false;
         swallow_regex = "^(foot)$";
         enable_anr_dialog = false;
+        screencopy_force_8b = true;
       };
       general = {
         layout = "dwindle";
