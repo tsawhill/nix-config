@@ -10,7 +10,7 @@
     monitorv2 {
       output=desc:Dell Inc. AW2725DF CJ56ZZ3
       # mode=modeline 586.59 2560 2568 2600 2640 1440 1529 1537 1543 +hsync -vsync
-      mode=2560x1440@359Hz
+      mode=2560x1440@360Hz
       position=auto
       scale=1
       # vrr=1
