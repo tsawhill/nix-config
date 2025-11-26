@@ -32,9 +32,9 @@
           pmfw_options = {
             zero_rpm = true;
           };
-          power_cap = 257.0;
+          power_cap = 290.0;
           performance_level = "manual";
-          max_core_clock = 2589;
+          max_core_clock = 2535;
           voltage_offset = -50;
           power_profile_mode_index = 1;
         };
