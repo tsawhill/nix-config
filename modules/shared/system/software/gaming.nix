@@ -32,6 +32,7 @@ in
     heroic
     lutris
     protonplus
+    prismlauncher
     # retroarch
     bolt-launcher
     # gtk2
