@@ -17,8 +17,8 @@
       bitdepth=10
       supports_hdr=true
       cm=hdr
-      # sdrbrightness=1.0
-      # sdrsaturation=0.98
+      sdrbrightness=0.96
+      sdrsaturation=0.98
       sdr_min_luminance=0.005
       sdr_max_luminance=220
       supports_wide_color=true
@@ -33,8 +33,8 @@
       bitdepth=10
       supports_hdr=true
       cm=hdr
-      # sdrbrightness=1.0
-      # sdrsaturation=0.98
+      sdrbrightness=0.96
+      sdrsaturation=0.98
       sdr_min_luminance=0.005
       sdr_max_luminance=220
       supports_wide_color=true
