@@ -31,6 +31,8 @@
         direct_scanout = 2;
       };
 
+      cursor.no_hardware_cursors = 1;
+
       misc = {
         disable_hyprland_logo = true;
         enable_swallow = false;
