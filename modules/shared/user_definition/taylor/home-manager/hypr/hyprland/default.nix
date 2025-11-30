@@ -46,6 +46,7 @@
         layout = "dwindle";
         allow_tearing = true;
       };
+      "$mainMod" = "SUPER";
     };
   };
 }
