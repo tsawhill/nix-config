@@ -29,6 +29,7 @@
       render = {
         cm_fs_passthrough = 1;
         direct_scanout = 2;
+        cm_sdr_eotf = 2;
       };
 
       cursor.no_hardware_cursors = 1;

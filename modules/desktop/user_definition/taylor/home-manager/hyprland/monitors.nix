@@ -17,10 +17,13 @@
       bitdepth=10
       supports_hdr=true
       cm=hdr
-      sdrbrightness=0.96
-      sdrsaturation=0.98
+      # sdrbrightness=1.0
+      # sdrsaturation=0.98
       sdr_min_luminance=0.005
       sdr_max_luminance=170
+      min_luminance = 0
+      max_luminance = 268
+      max_avg_luminance = 150
       supports_wide_color=true
     }
     monitorv2 {
@@ -33,8 +36,8 @@
       bitdepth=10
       supports_hdr=true
       cm=hdr
-      sdrbrightness=0.96
-      sdrsaturation=0.98
+      # sdrbrightness=0.96
+      # sdrsaturation=0.98
       sdr_min_luminance=0.005
       sdr_max_luminance=170
       supports_wide_color=true
