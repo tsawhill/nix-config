@@ -6,6 +6,7 @@
     ./bindings.nix
     ./workspaces.nix
     ./window-rules
+    ./dwindle.nix
   ];
   wayland.windowManager.hyprland = {
     enable = true;
@@ -45,12 +46,6 @@
         layout = "dwindle";
         allow_tearing = true;
       };
-      dwindle = {
-        pseudotile = "yes";
-        preserve_split = "yes";
-        force_split = 2;
-      };
-      "$mainMod" = "SUPER";
     };
   };
 }
