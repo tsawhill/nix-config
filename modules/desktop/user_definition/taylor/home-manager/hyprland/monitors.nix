@@ -22,8 +22,8 @@
       sdr_min_luminance=0.005
       sdr_max_luminance=170
       min_luminance = 0
-      max_luminance = 268
-      max_avg_luminance = 150
+      max_luminance = 1000
+      max_avg_luminance = 450
       supports_wide_color=true
     }
     monitorv2 {
