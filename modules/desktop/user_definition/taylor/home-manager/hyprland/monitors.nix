@@ -20,7 +20,7 @@
       # sdrbrightness=1.0
       # sdrsaturation=0.98
       sdr_min_luminance=0.005
-      sdr_max_luminance=175
+      sdr_max_luminance=210
       min_luminance = 0
       max_luminance = 1000
       max_avg_luminance = 450
@@ -39,7 +39,7 @@
       # sdrbrightness=0.96
       # sdrsaturation=0.98
       sdr_min_luminance=0.005
-      sdr_max_luminance=170
+      sdr_max_luminance=210
       supports_wide_color=true
     }
     monitorv2 {
