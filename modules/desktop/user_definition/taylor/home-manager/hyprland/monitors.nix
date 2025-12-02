@@ -28,21 +28,14 @@
     }
     monitorv2 {
       output=desc:Dell Inc. AW3423DWF 3D442S3
-      # mode=modeline 531.41 3440 3448 3480 3520 1440 1496 1504 1510 +hsync -vsync
       mode=3440x1440@165Hz
       position=auto-right
       scale=1
-      # vrr=1
       bitdepth=10
       supports_hdr=true
       cm=hdr
-      # sdrbrightness=0.96
-      # sdrsaturation=0.98
       sdr_min_luminance=0.005
       sdr_max_luminance=190
-      # min_luminance = 0
-      # max_luminance = 1000
-      # max_avg_luminance = 450
       supports_wide_color=true
     }
     monitorv2 {
