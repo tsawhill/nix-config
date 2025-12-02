@@ -20,7 +20,7 @@
       # sdrbrightness=1.0
       # sdrsaturation=0.98
       sdr_min_luminance=0.005
-      sdr_max_luminance=225
+      sdr_max_luminance=240
       min_luminance = 0
       max_luminance = 1000
       max_avg_luminance = 450
@@ -39,7 +39,7 @@
       # sdrbrightness=0.96
       # sdrsaturation=0.98
       sdr_min_luminance=0.005
-      sdr_max_luminance=210
+      sdr_max_luminance=190
       min_luminance = 0
       max_luminance = 1000
       max_avg_luminance = 450
@@ -65,7 +65,7 @@
       scale=1
     }
     workspace = 11,monitor:HEADLESS-2,default:true
-    exec=hyprctl output create headless HEADLESS-2
+    # exec=hyprctl output create headless HEADLESS-2
   '';
   # wayland.windowManager.hyprland.settings.monitorv2 = [
   #   {
