@@ -35,7 +35,7 @@
       supports_hdr=true
       cm=hdr
       sdr_min_luminance=0.005
-      sdr_max_luminance=190
+      sdr_max_luminance=240
       supports_wide_color=true
     }
     monitorv2 {
