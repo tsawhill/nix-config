@@ -11,7 +11,7 @@
       output=desc:Dell Inc. AW2725DF CJ56ZZ3
       # mode=modeline 586.59 2560 2568 2600 2640 1440 1529 1537 1543 +hsync -vsync
       mode=2560x1440@360Hz
-      position=auto
+      position=auto-left
       scale=1
       # vrr=1
       bitdepth=10
@@ -20,7 +20,7 @@
       # sdrbrightness=1.0
       # sdrsaturation=0.98
       sdr_min_luminance=0.005
-      sdr_max_luminance=210
+      sdr_max_luminance=225
       min_luminance = 0
       max_luminance = 1000
       max_avg_luminance = 450
@@ -40,6 +40,9 @@
       # sdrsaturation=0.98
       sdr_min_luminance=0.005
       sdr_max_luminance=210
+      min_luminance = 0
+      max_luminance = 1000
+      max_avg_luminance = 450
       supports_wide_color=true
     }
     monitorv2 {
