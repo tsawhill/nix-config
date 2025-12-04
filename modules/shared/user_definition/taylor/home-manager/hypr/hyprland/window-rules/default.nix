@@ -7,6 +7,6 @@
     ./blueman-floating.nix
     ./nm-connection-editor-floating.nix
     ./transparent-inactive.nix
-    ./steam-floating.nix
+    # ./steam-floating.nix
   ];
 }
