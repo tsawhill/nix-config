@@ -17,7 +17,7 @@
     ];
   };
   services.lact = {
-    enable = true;
+    enable = false;
     settings = {
       version = 5;
       daemon = {
