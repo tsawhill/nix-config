@@ -29,7 +29,7 @@
         };
         workspaces = {
           show_icons = false;
-          persistent_workspaces = 0;
+          workspaces = 0;
           show_numbered = false;
           showApplicationIcons = false;
           showWsIcons = false;
