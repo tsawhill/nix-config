@@ -3,6 +3,6 @@
     pseudotile = "yes";
     preserve_split = "yes";
     force_split = 2;
-    default_split_ratio = 1.6;
+    default_split_ratio = 1.35;
   };
 }

@@ -4,7 +4,7 @@
     "pseudo,class:^(vesktop)$"
     "size 1920 1080,class:^(vesktop)$"
 
-    "pseudo,class:^(vesktop)$"
-    "size 1000 1000,class:^(vesktop)$"
+    "pseudo,class:^(feishin)$"
+    "size 1000 1000,class:^(feishin)$"
   ];
 }

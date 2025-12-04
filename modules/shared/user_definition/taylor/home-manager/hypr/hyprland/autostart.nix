@@ -11,7 +11,7 @@
     "steam"
     "sleep 15; heroic"
     "sleep 10; vesktop"
-    "sleep 20; feishin"
+    "sleep 15; feishin"
 
     # Wallpapers
     ''mpvpaper -o "no-audio --loop-playlist shuffle" DP-1 /home/taylor/.config/wallpapers/2560x1440''
