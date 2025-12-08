@@ -43,6 +43,6 @@
       auto_switch_profiles = false;
     };
   };
-  hardware.amdgpu.overdrive.enable = true;
+  hardware.amdgpu.overdrive.enable = false;
 
 }
