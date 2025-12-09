@@ -1,6 +1,6 @@
 {
   # Set workspace assignment for apps
-  wayland.windowManager.hyprland.settings.windowrulev2 = [
+  wayland.windowManager.hyprland.settings.windowrule = [
     "workspace 3 silent,class:^(code-oss)$"
     "workspace 3 silent,class:^(insomnia)$"
     "workspace 4 silent,class:^(Steam)$"

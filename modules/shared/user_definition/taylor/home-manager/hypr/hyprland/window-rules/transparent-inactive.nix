@@ -1,6 +1,6 @@
 {
   # window rules for floating inactive window
-  wayland.windowManager.hyprland.settings.windowrulev2 = [
+  wayland.windowManager.hyprland.settings.windowrule = [
     "opacity 1.0 0.90, class:.+"
     "opacity 1.0 1.0, title:^(.*- YouTube — Ablaze Floorp)$"
     "opacity 1.0 1.0, title:^(.*tv — Ablaze Floorp)$"

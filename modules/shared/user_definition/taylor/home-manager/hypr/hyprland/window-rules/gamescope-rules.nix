@@ -1,6 +1,6 @@
 {
   # Gaming window rules (no idle, tearing)
-  wayland.windowManager.hyprland.settings.windowrulev2 = [
+  wayland.windowManager.hyprland.settings.windowrule = [
     "idleinhibit focus,class:^(gamescope)$"
     "content game, class:^(gamescope)$"
     "immediate, class:^(gamescope)$"
