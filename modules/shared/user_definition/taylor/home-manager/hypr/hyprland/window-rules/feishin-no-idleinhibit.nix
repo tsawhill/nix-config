@@ -1,6 +1,6 @@
 {
   # Feishin window rules (no idleinhibit)
   wayland.windowManager.hyprland.settings.windowrule = [
-    "idleinhibit none,match:class gamescope"
+    "idle_inhibit none,match:class gamescope"
   ];
 }
