@@ -1,7 +1,7 @@
 {
   # Set workspace assignment for apps
   wayland.windowManager.hyprland.settings.windowrule = [
-    "match: class codium, workspace 3 silent"
+    "match:class codium, workspace 3 silent"
     "workspace 3 silent,class:^(insomnia)$"
     "workspace 4 silent,class:^(Steam)$"
     "workspace 4 silent,class:^(steam)$"
