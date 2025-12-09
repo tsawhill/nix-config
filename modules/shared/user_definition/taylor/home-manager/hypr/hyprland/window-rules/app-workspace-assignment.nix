@@ -2,15 +2,15 @@
   # Set workspace assignment for apps
   wayland.windowManager.hyprland.settings.windowrule = [
     "match:class codium, workspace 3 silent"
-    "workspace 3 silent,class:^(insomnia)$"
-    "workspace 4 silent,class:^(Steam)$"
-    "workspace 4 silent,class:^(steam)$"
-    "workspace 5 silent,class:^(gamescope)$"
-    "workspace 5 silent,class:^(.gamescope-wrapped)$"
+    "workspace 3 silent,match:class insomnia"
+    "workspace 4 silent,match:class Steam"
+    "workspace 4 silent,match:class steam"
+    "workspace 5 silent,match:class gamescope"
+    "workspace 5 silent,match:class .gamescope-wrapped"
     # "workspace 11 silent, tag:stream"
-    "workspace 2 silent,class:^(cs2)$"
-    "workspace 6 silent,class:^(vesktop)$"
-    "workspace 6 silent,class:^(feishin)$"
-    "workspace 6 silent,class:^(com.obsproject.Studio)$"
+    "workspace 2 silent,match:class cs2"
+    "workspace 6 silent,match:class vesktop"
+    "workspace 6 silent,match:class feishin"
+    "workspace 6 silent,match:class com.obsproject.Studio"
   ];
 }
