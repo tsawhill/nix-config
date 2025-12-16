@@ -14,6 +14,9 @@
     package = null; # Installed with nixos module from flake
     portalPackage = null; # Installed with the nixos module from flake
     settings = {
+      debug = {
+        damage_blink = 1;
+      };
       env = [
         "GDK_SCALE, 1"
         "ELECTRON_OZONE_PLATFORM_HINT,wayland"
