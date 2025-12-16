@@ -27,19 +27,19 @@
 
       # HDR and direct scanout
       experimental.xx_color_management_v4 = true;
-      render = {
-        cm_fs_passthrough = 1;
-        direct_scanout = 2;
-        cm_sdr_eotf = 2;
-      };
-
+      # render = {
+      #   cm_fs_passthrough = 1;
+      #   direct_scanout = 2;
+      #   cm_sdr_eotf = 2;
+      # };
 
       misc = {
+        vfr = true;
         disable_hyprland_logo = true;
         enable_swallow = false;
         swallow_regex = "^(foot)$";
         enable_anr_dialog = false;
-        screencopy_force_8b = true;
+        # screencopy_force_8b = true;
       };
       general = {
         layout = "dwindle";
