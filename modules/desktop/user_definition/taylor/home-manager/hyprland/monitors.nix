@@ -8,7 +8,7 @@
   # ];
   wayland.windowManager.hyprland.settings.env = [
     "DRI_PRIME,  pci-0000_03_00_0"
-    "AQ_DRM_DEVICES, /dev/dri/amd-igpu:/dev/dri/amd-dgpu"
+    "AQ_DRM_DEVICES, /dev/dri/amd-dgpu:/dev/dri/amd-igpu"
   ];
   wayland.windowManager.hyprland.extraConfig = ''
     monitorv2 {
