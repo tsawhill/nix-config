@@ -6,7 +6,10 @@
   #   "HDMI-A-1,3840x2160@60,0x0,1"
   #   "HEADLESS-1, 3840x2160@60, -3840x0, 1"
   # ];
-  wayland.windowManager.hyprland.settings.env = [ "DRI_PRIME,  pci-0000_03_00_0" ];
+  wayland.windowManager.hyprland.settings.env = [
+    "DRI_PRIME,  pci-0000_03_00_0"
+    "AQ_DRM_DEVICES, /dev/dri/amd-dgpu:/dev/dri/amd-igpu"
+  ];
   wayland.windowManager.hyprland.extraConfig = ''
     monitorv2 {
       output=desc:Dell Inc. AW2725DF CJ56ZZ3
