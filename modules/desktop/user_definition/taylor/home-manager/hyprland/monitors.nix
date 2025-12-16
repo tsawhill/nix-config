@@ -32,7 +32,7 @@
     }
     monitorv2 {
       output=desc:Dell Inc. AW3423DWF 3D442S3
-      mode=3440x1440@165Hz
+      mode=3440x1440@120Hz
       position=auto-right
       scale=1
       bitdepth=10
