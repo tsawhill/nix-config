@@ -16,7 +16,7 @@
 
   # Animation settings
   wayland.windowManager.hyprland.settings.animations = {
-    enabled = "yes";
+    enabled = "no";
     bezier = [
       "linear, 0.5, 0.5, 0.5, 0.5"
       "myBezier, 0.05, 0.9, 0.1, 1.05"
@@ -34,7 +34,7 @@
     gaps_in = 8;
     gaps_out = 20;
     border_size = 3;
-    # "col.active_border" = "rgba(ffcce6d9) rgba(9778D0FF) 45deg";
+    "col.active_border" = "rgba(ffcce6d9) rgba(9778D0FF) 45deg";
     "col.inactive_border" = "rgba(595959aa)";
   };
 }
