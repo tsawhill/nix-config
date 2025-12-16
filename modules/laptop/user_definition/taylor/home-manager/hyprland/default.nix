@@ -5,7 +5,8 @@
   imports = [
     ./monitors.nix
     # ./hyprpaper.nix
-    ./linux-wallpaperengine.nix
+    # ./linux-wallpaperengine.nix
+    ./mpvpaper.nix
   ];
 
   wayland.windowManager.hyprland.settings.device = {

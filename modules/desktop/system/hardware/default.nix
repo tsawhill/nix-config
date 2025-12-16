@@ -2,6 +2,8 @@
   ...
 }:
 {
+  imports = [ ./monitor-udev.nix ];
+
   # For Logitech G923 Racing Wheel
   # hardware.new-lg4ff.enable = true;
 

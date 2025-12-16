@@ -12,7 +12,9 @@
 
       max-jobs = 4;
       cores = 12;
-
+      trusted-users = [
+        "taylor"
+      ];
       substituters = [
         "https://walker-git.cachix.org/"
         "https://hyprland.cachix.org/"

@@ -51,6 +51,7 @@
         };
         modules = [
           ./modules/shared
+          chaotic.nixosModules.default
           ./modules/laptop
           { nixpkgs.overlays = [ inputs.hyprpanel.overlay ]; }
         ];

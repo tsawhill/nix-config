@@ -21,7 +21,9 @@
     ];
     openssh = {
       authorizedKeys.keys = [
-        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHKxZDZJ/yaWX/A9ZhXU8F3CmcJ+jPYkatshJoEqJPZy tdog@arch"
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMBFsmNzZWYPyqHORl40pfN7RXrHlXFjN8EEmAhhlSIE taylor@nixos"
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHlvVCxPlxJUJ5xZKNbry8XKxUZBA1RRbE3dgwxRDf7o taylor@pixel9pro"
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAhCihzQsgE8Q6eM18c2BnUIaDgek0Mh9n1X9DPaLI4c taylor@taylor-nixlaptop"
       ];
     };
   };
