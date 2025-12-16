@@ -15,21 +15,21 @@
   };
 
   # Animation settings
-  wayland.windowManager.hyprland.settings.animations = {
-    enabled = "no";
-    bezier = [
-      "linear, 0.5, 0.5, 0.5, 0.5"
-      "myBezier, 0.05, 0.9, 0.1, 1.05"
-    ];
-    animation = [
-      "windows, 1, 7, myBezier, popin 80%"
-      "windowsOut, 1, 7, default, popin 80%"
-      "border, 1, 10, default"
-      "borderangle, 1, 50, linear, loop"
-      "fade, 1, 7, default"
-      "workspaces, 1, 6, default, slidefade 20%"
-    ];
-  };
+  # wayland.windowManager.hyprland.settings.animations = {
+  #   enabled = "no";
+  #   bezier = [
+  #     "linear, 0.5, 0.5, 0.5, 0.5"
+  #     "myBezier, 0.05, 0.9, 0.1, 1.05"
+  #   ];
+  #   animation = [
+  #     "windows, 1, 7, myBezier, popin 80%"
+  #     "windowsOut, 1, 7, default, popin 80%"
+  #     "border, 1, 10, default"
+  #     "borderangle, 1, 50, linear, loop"
+  #     "fade, 1, 7, default"
+  #     "workspaces, 1, 6, default, slidefade 20%"
+  #   ];
+  # };
   wayland.windowManager.hyprland.settings.general = {
     gaps_in = 8;
     gaps_out = 20;
