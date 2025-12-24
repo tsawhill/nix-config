@@ -37,14 +37,14 @@
           }
         ];
         "pulse.properties" = {
-          "pulse.min.req" = "128/48000";
-          "pulse.default.req" = "128/48000";
-          "pulse.max.req" = "128/48000";
-          "pulse.min.quantum" = "128/48000";
-          "pulse.max.quantum" = "128/48000";
+          "pulse.min.req" = "256/48000";
+          "pulse.default.req" = "256/48000";
+          "pulse.max.req" = "256/48000";
+          "pulse.min.quantum" = "256/48000";
+          "pulse.max.quantum" = "256/48000";
         };
         "stream.properties" = {
-          "node.latency" = "128/48000";
+          "node.latency" = "256/48000";
           "resample.quality" = 1;
         };
       };
