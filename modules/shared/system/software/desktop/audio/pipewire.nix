@@ -19,7 +19,7 @@
           88200
           96000
         ];
-          "default.clock.rate" = 44100;
+          "default.clock.rate" = 48000;
           "default.clock.quantum" = 128;
           # "default.clock.quantum-limit" = 128;
           "default.clock.min-quantum" = 128;
@@ -37,14 +37,14 @@
           }
         ];
         "pulse.properties" = {
-          "pulse.min.req" = "128/44100";
-          "pulse.default.req" = "128/44100";
-          "pulse.max.req" = "128/44100";
-          "pulse.min.quantum" = "128/44100";
-          "pulse.max.quantum" = "128/44100";
+          "pulse.min.req" = "128/48000";
+          "pulse.default.req" = "128/48000";
+          "pulse.max.req" = "128/48000";
+          "pulse.min.quantum" = "128/48000";
+          "pulse.max.quantum" = "128/48000";
         };
         "stream.properties" = {
-          "node.latency" = "128/44100";
+          "node.latency" = "128/48000";
           "resample.quality" = 1;
         };
       };
