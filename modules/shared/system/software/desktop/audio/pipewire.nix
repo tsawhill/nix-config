@@ -20,10 +20,10 @@
           96000
         ];
           "default.clock.rate" = 44100;
-          "default.clock.quantum" = 64;
-          "default.clock.quantum-limit" = 64;
-          "default.clock.min-quantum" = 64;
-          "default.clock.max-quantum" = 64;
+          "default.clock.quantum" = 128;
+          "default.clock.quantum-limit" = 128;
+          "default.clock.min-quantum" = 128;
+          "default.clock.max-quantum" = 128;
         };
       };
     };
@@ -37,14 +37,14 @@
           }
         ];
         "pulse.properties" = {
-          "pulse.min.req" = "64/44100";
-          "pulse.default.req" = "64/44100";
-          "pulse.max.req" = "64/44100";
-          "pulse.min.quantum" = "64/44100";
-          "pulse.max.quantum" = "64/44100";
+          "pulse.min.req" = "128/44100";
+          "pulse.default.req" = "128/44100";
+          "pulse.max.req" = "128/44100";
+          "pulse.min.quantum" = "128/44100";
+          "pulse.max.quantum" = "128/44100";
         };
         "stream.properties" = {
-          "node.latency" = "64/44100";
+          "node.latency" = "128/44100";
           "resample.quality" = 1;
         };
       };
