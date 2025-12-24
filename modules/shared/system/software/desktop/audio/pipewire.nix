@@ -10,38 +10,45 @@
   services.pipewire = {
     enable = true;
     pulse.enable = true;
-    # extraConfig.pipewire = {
-    #   "92-low-latency" = {
-    #     "context.properties" = {
-    #       "default.clock.rate" = 48000;
-    #       "default.clock.quantum" = 128;
-    #       "default.clock.quantum-limit" = 128;
-    #       "default.clock.min-quantum" = 64;
-    #       "default.clock.max-quantum" = 128;
-    #     };
-    #   };
-    # };
+    extraConfig.pipewire = {
+      "92-low-latency" = {
+        "context.properties" = {
+          "default.clock.allowed-rates" = [
+          44100
+          48000
+          88200
+          96000
+        ];
+          "default.clock.rate" = 44100;
+          "default.clock.quantum" = 32;
+          "default.clock.quantum-limit" = 32;
+          "default.clock.min-quantum" = 32;
+          "default.clock.max-quantum" = 32;
+        };
+      };
+    };
 
-    # extraConfig.pipewire-pulse = {
-    #   "92-low-latency" = {
-    #     "context.properties" = [
-    #       {
-    #         name = "libpipewire-module-protocol-pulse";
-    #         args = { };
-    #       }
-    #     ];
-    #     "pulse.properties" = {
-    #       "pulse.min.req" = "64/48000";
-    #       "pulse.default.req" = "128/48000";
-    #       "pulse.max.req" = "128/48000";
-    #       "pulse.min.quantum" = "64/48000";
-    #       "pulse.max.quantum" = "128/48000";
-    #     };
-    #     "stream.properties" = {
-    #       "node.latency" = "128/48000";
-    #       "resample.quality" = 1;
-    #     };
-    #   };
+    extraConfig.pipewire-pulse = {
+      "92-low-latency" = {
+        "context.properties" = [
+          {
+            name = "libpipewire-module-protocol-pulse";
+            args = { };
+          }
+        ];
+        "pulse.properties" = {
+          "pulse.min.req" = "32/44100";
+          "pulse.default.req" = "32/44100";
+          "pulse.max.req" = "32/44100";
+          "pulse.min.quantum" = "32/44100";
+          "pulse.max.quantum" = "32/44100";
+        };
+        "stream.properties" = {
+          "node.latency" = "32/44100";
+          "resample.quality" = 1;
+        };
+      };
+    };
 
     wireplumber.extraConfig = {
       "10-bluez" = {
