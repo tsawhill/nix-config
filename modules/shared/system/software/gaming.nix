@@ -31,6 +31,7 @@ in
     gpu-screen-recorder
     heroic
     lutris
+    faugus-launcher
     protonplus
     prismlauncher
     # retroarch
