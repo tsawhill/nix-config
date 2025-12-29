@@ -20,35 +20,35 @@
           96000
         ];
           "default.clock.rate" = 48000;
-          # "default.clock.quantum" = 128;
-          # # "default.clock.quantum-limit" = 128;
-          # "default.clock.min-quantum" = 128;
-          # "default.clock.max-quantum" = 128;
+          "default.clock.quantum" = 128;
+          # "default.clock.quantum-limit" = 128;
+          "default.clock.min-quantum" = 128;
+          "default.clock.max-quantum" = 128;
         };
       };
     };
 
-    # extraConfig.pipewire-pulse = {
-    #   "92-low-latency" = {
-    #     "context.properties" = [
-    #       {
-    #         name = "libpipewire-module-protocol-pulse";
-    #         args = { };
-    #       }
-    #     ];
-    #     "pulse.properties" = {
-    #       "pulse.min.req" = "256/48000";
-    #       "pulse.default.req" = "256/48000";
-    #       "pulse.max.req" = "256/48000";
-    #       "pulse.min.quantum" = "256/48000";
-    #       "pulse.max.quantum" = "256/48000";
-    #     };
-    #     "stream.properties" = {
-    #       "node.latency" = "256/48000";
-    #       "resample.quality" = 1;
-    #     };
-    #   };
-    # };
+    extraConfig.pipewire-pulse = {
+      "92-low-latency" = {
+        "context.properties" = [
+          {
+            name = "libpipewire-module-protocol-pulse";
+            args = { };
+          }
+        ];
+        "pulse.properties" = {
+          "pulse.min.req" = "256/48000";
+          "pulse.default.req" = "256/48000";
+          "pulse.max.req" = "256/48000";
+          "pulse.min.quantum" = "256/48000";
+          "pulse.max.quantum" = "256/48000";
+        };
+        "stream.properties" = {
+          "node.latency" = "256/48000";
+          "resample.quality" = 1;
+        };
+      };
+    };
 
     wireplumber.extraConfig = {
       "10-bluez" = {
