@@ -14,11 +14,11 @@
       "92-low-latency" = {
         "context.properties" = {
           "default.clock.allowed-rates" = [
-          44100
-          48000
-          88200
-          96000
-        ];
+            44100
+            48000
+            88200
+            96000
+          ];
           "default.clock.rate" = 48000;
           "default.clock.quantum" = 128;
           # "default.clock.quantum-limit" = 128;
@@ -64,6 +64,11 @@
       "11-bluetooth-policy" = {
         "wireplumber.settings" = {
           "bluetooth.autoswitch-to-headset-profile" = false;
+        };
+      };
+      "12-no-timeout" = {
+        "wireplumber.settings" = {
+          "session.suspend-timeout-seconds" = 0;
         };
       };
     };
