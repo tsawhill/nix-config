@@ -8,6 +8,7 @@
     ./nm-connection-editor-floating.nix
     ./transparent-inactive.nix
     # ./steam-floating.nix
+    ./steam-focus.nix
     ./runelite-pseudotile.nix
   ];
 }
