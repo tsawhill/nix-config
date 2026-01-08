@@ -29,7 +29,7 @@
       monitor = [ " , highrr, auto, 1" ];
 
       # HDR and direct scanout
-      experimental.xx_color_management_v4 = true;
+      # experimental.xx_color_management_v4 = true;
       # render = {
       #   cm_fs_passthrough = 1;
       #   direct_scanout = 2;
