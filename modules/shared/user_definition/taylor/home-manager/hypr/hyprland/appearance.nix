@@ -1,7 +1,7 @@
 {
   # Decoration settings
   wayland.windowManager.hyprland.settings.decoration = {
-    rounding = 2;
+    rounding = 5;
     blur = {
       enabled = "true";
       size = 10;
@@ -31,9 +31,9 @@
     ];
   };
   wayland.windowManager.hyprland.settings.general = {
-    gaps_in = 8;
+    gaps_in = 4;
     gaps_out = 12;
-    border_size = 4;
+    border_size = 2;
     "col.active_border" = "rgba(ffcce6d9) rgba(9778D0FF) 45deg";
     "col.inactive_border" = "rgba(595959aa)";
   };
