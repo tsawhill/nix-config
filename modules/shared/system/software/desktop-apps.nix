@@ -33,6 +33,9 @@
     pkgs-floorp.floorp-bin
     # ungoogled-chromium
 
+    # Security
+    bitwarden-desktop
+
     # Communication
     vesktop
 
