@@ -41,7 +41,6 @@
       min_luminance = 0
       max_luminance = 1000
       max_avg_luminance = 450
-      #supports_wide_color=true
     }
     monitorv2 {
       output=desc:Dell Inc. DELL S2721DGF 98T9623
