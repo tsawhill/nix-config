@@ -37,7 +37,7 @@
       sdrbrightness=1
       sdrsaturation=1
       sdr_min_luminance = 0.005
-      sdr_max_luminance = 150
+      sdr_max_luminance = 320
       min_luminance = 0
       max_luminance = 400
       max_avg_luminance = 300
