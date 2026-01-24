@@ -13,13 +13,12 @@
   wayland.windowManager.hyprland.extraConfig = ''
     monitorv2 {
       output=desc:Dell Inc. AW2725DF CJ56ZZ3
-      # mode=modeline 586.59 2560 2568 2600 2640 1440 1529 1537 1543 +hsync -vsync
       mode=2560x1440@360Hz
       position=0x0
       scale=1
       bitdepth=10
       supports_hdr=true
-      cm=hdr
+      cm=hdredid
       sdr_min_luminance=0.005
       sdr_max_luminance=240
       min_luminance = 0
@@ -34,9 +33,9 @@
       scale=1
       bitdepth=10
       supports_hdr=true
-      cm=hdr
-      sdr_min_luminance=0
-      sdr_max_luminance=240
+      cm=hdredid
+      sdr_min_luminance=5
+      sdr_max_luminance=200
       min_luminance = 0
       max_luminance = 1000
       max_avg_luminance = 450
