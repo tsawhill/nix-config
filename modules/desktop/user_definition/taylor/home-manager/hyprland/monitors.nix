@@ -17,12 +17,9 @@
       mode=2560x1440@360Hz
       position=0x0
       scale=1
-      # vrr=1
       bitdepth=10
       supports_hdr=true
       cm=hdr
-      # sdrbrightness=1.0
-      # sdrsaturation=0.98
       sdr_min_luminance=0.005
       sdr_max_luminance=240
       min_luminance = 0
@@ -38,12 +35,13 @@
       bitdepth=10
       supports_hdr=true
       cm=hdr
+      sdr_brightness 0.9
       sdr_min_luminance=0.005
       sdr_max_luminance=240
       min_luminance = 0
       max_luminance = 1000
       max_avg_luminance = 450
-      supports_wide_color=true
+      #supports_wide_color=true
     }
     monitorv2 {
       output=desc:Dell Inc. DELL S2721DGF 98T9623
