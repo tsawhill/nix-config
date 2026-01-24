@@ -19,12 +19,12 @@
       bitdepth=10
       supports_hdr=true
       cm=hdredid
-      sdr_min_luminance=0.005
-      sdr_max_luminance=240
+      sdr_min_luminance = 0.005
+      sdr_max_luminance = 240
       min_luminance = 0
-      max_luminance = 1000
-      max_avg_luminance = 450
-      supports_wide_color=true
+      max_luminance = 400
+      max_avg_luminance = 300
+      supports_wide_color = true
     }
     monitorv2 {
       output=desc:Dell Inc. AW3423DWF 3D442S3
@@ -35,12 +35,13 @@
       supports_hdr=true
       cm=hdredid
       sdrbrightness=1
-      sdrsaturation=1.5
-      sdr_min_luminance=0
-      sdr_max_luminance=280
+      sdrsaturation=1
+      sdr_min_luminance = 0.005
+      sdr_max_luminance = 150
       min_luminance = 0
-      max_luminance = 1000
-      max_avg_luminance = 450
+      max_luminance = 400
+      max_avg_luminance = 300
+      supports_wide_color = true
     }
     monitorv2 {
       output=desc:Dell Inc. DELL S2721DGF 98T9623
