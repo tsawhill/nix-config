@@ -35,7 +35,7 @@
       bitdepth=10
       supports_hdr=true
       cm=hdr
-      sdr_min_luminance=0.005
+      sdr_min_luminance=0
       sdr_max_luminance=240
       min_luminance = 0
       max_luminance = 1000
