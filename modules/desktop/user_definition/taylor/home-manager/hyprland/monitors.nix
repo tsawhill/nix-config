@@ -35,7 +35,7 @@
       supports_hdr=true
       cm=hdredid
       sdrbrightness=1
-      sdrcontrast=1.5
+      sdrsaturation=1.5
       sdr_min_luminance=0
       sdr_max_luminance=250
       min_luminance = 0
