@@ -52,6 +52,11 @@ in
     enable = true;
   };
 
+  proxy.authentik = {
+    enable = true;
+    domain = "auth.tsawhill.org";
+  };
+
   proxy.vaultwarden = {
     enable = true;
     domain = "vault.tsawhill.org";
@@ -86,7 +91,8 @@ in
   proxy.sonarr = {
     enable = true;
     domain = "son.tsawhill.org";
-    mTLSCert = "mTLS-CA";
+    # mTLSCert = "mTLS-CA";
+    authentikHost = "auth.tsawhill.org";
   };
   proxy.lidarr = {
     enable = true;
@@ -101,6 +107,7 @@ in
   proxy.seerr = {
     enable = true;
     domain = "request.tsawhill.org";
+
     mTLSCert = "mTLS-CA";
   };
   proxy.unifi = {

@@ -11,6 +11,10 @@ in
     "${self}/modules/software/services/nginx/proxies"
     "${self}/modules/software/services/nginx/streams/minecraft.nix"
   ];
+  proxy.authentik = {
+    enable = true;
+    domain = "auth.tsawhill.org";
+  };
   proxy.vaultwarden = {
     enable = true;
     domain = "vault.tsawhill.org";
@@ -42,6 +46,7 @@ in
   proxy.sonarr = {
     enable = true;
     domain = "son.tsawhill.org";
+    enableAuthentik = true;
   };
   proxy.lidarr = {
     enable = true;

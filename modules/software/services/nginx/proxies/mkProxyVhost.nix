@@ -6,17 +6,59 @@
       proxyWebsockets ? false,
       cfg,
       extraExtraConfig ? "",
+      # Allow passing a different outpost URL, but default to main one
+      authentikOutpost ? "http://authentik-nix.lan:9000",
     }:
-    {
-      # Pull the domain from the cfg object passed in
-      # This is used as the 'key' in the virtualHosts attribute set
-      # but since this function returns the 'value' part,
-      # we just define the configuration here.
+    let
+      # --- Define Authentik Configuration Blocks Locally ---
 
+      # The configuration injected into the main "/" location
+      authentikRootConfig = ''
+        auth_request /outpost.goauthentik.io/auth/nginx;
+        error_page 401 = @goauthentik_proxy_signin;
+        auth_request_set $auth_cookie $upstream_http_set_cookie;
+        add_header Set-Cookie $auth_cookie;
+        auth_request_set $authentik_username $upstream_http_x_authentik_username;
+        proxy_set_header X-authentik-username $authentik_username;
+      '';
+
+      # The extra locations required for the outpost to work
+      authentikLocations = {
+        "/outpost.goauthentik.io" = {
+          extraConfig = ''
+            proxy_pass ${authentikOutpost}/outpost.goauthentik.io;
+            proxy_set_header Host $host;
+            proxy_set_header X-Original-URL $scheme://$http_host$request_uri;
+            add_header Set-Cookie $auth_cookie;
+            auth_request_set $auth_cookie $upstream_http_set_cookie;
+            proxy_pass_request_body off;
+            proxy_set_header Content-Length "";
+          '';
+        };
+        "/outpost.goauthentik.io/auth/nginx" = {
+          extraConfig = ''
+            proxy_pass ${authentikOutpost}/outpost.goauthentik.io/auth/nginx;
+            proxy_set_header Host $host;
+            proxy_set_header X-Original-URL $scheme://$http_host$request_uri;
+            add_header Set-Cookie $auth_cookie;
+            auth_request_set $auth_cookie $upstream_http_set_cookie;
+            proxy_pass_request_body off;
+            proxy_set_header Content-Length "";
+          '';
+        };
+        "@goauthentik_proxy_signin" = {
+          extraConfig = ''
+            internal;
+            add_header Set-Cookie $auth_cookie;
+            return 302 /outpost.goauthentik.io/start?rd=$request_uri;
+          '';
+        };
+      };
+    in
+    {
       forceSSL = true;
       sslCertificate = "/Certs/fullchain.pem";
       sslCertificateKey = "/Certs/key.pem";
-      # This forces Nginx to only listen on IPv4 + port 443
       listen = [
         {
           addr = "0.0.0.0";
@@ -25,10 +67,18 @@
         }
       ];
 
-      locations."/" = {
-        inherit proxyPass;
-        inherit proxyWebsockets;
-      };
+      # Logic:
+      # 1. Start with the standard root location.
+      # 2. If enableAuthentik is true, append the extraRootConfig.
+      # 3. If enableAuthentik is true, merge the authentikLocations set.
+      locations = {
+        "/" = {
+          inherit proxyPass proxyWebsockets;
+          # Conditionally add the auth_request lines
+          extraConfig = lib.optionalString cfg.enableAuthentik authentikRootConfig;
+        };
+      }
+      // (if cfg.enableAuthentik then authentikLocations else { });
 
       extraConfig = lib.concatStringsSep "\n" [
         (lib.optionalString (cfg.mTLSCert != null) ''

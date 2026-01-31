@@ -29,7 +29,7 @@ let
   ];
   noPushHosts = [ ];
 
-  flakePath = "path:///mnt/zpool/nixosconfigs/new";
+  flakePath = "path:///mnt/zpool/nixosconfigs";
 
   # --- 2. UNIFIED LOGIC SCRIPT ---
   rebuildManager = pkgs.writeShellApplication {
