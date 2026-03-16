@@ -4,7 +4,6 @@ let
   alertEmail = "me@tsawhill.org";
 in
 {
-
   programs.msmtp = {
     enable = true;
     accounts.default = {
@@ -18,8 +17,6 @@ in
       passwordeval = "cat /run/secrets/smtp_password";
     };
   };
-
-  environment.systemPackages = with pkgs; [ curl ];
 
   services.smartd = {
     enable = true;
@@ -35,8 +32,8 @@ in
               SUBJECT="SMART Alert"
           fi
 
-          BODY=$(cat)
-          GOTIFY_KEY=$(cat /run/secrets/gotify_key)
+          BODY=$(${pkgs.coreutils}/bin/cat)
+          GOTIFY_KEY=$(${pkgs.coreutils}/bin/cat /run/secrets/gotify_key)
 
           # 1. Gotify Push (Priority 8 for hardware issues)
           ${pkgs.curl}/bin/curl -s -X POST "https://gotify.tsawhill.org/message" \

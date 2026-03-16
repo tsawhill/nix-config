@@ -1,0 +1,10 @@
+keys:
+  - &desktop age1vveuej3d8caxg7ujud55uxhg4k5vj5ra7dj4cn3pp9xmhznjfgkq8jzk6c
+  - &server age1xugzv5l3ks4srsnj0deysuy485wjrpzpjclzjl9qvfd934pw3ycq33sffv
+
+creation_rules:
+  - path_regex: hosts/server-nix/secrets\.yaml$
+    key_groups:
+      - age:
+          - *desktop
+          - *server

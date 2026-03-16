@@ -25,8 +25,12 @@ in
     ./system/boot.nix
     # NVIDIA gpu
     ./hardware/nvidia.nix
-    # Disks
+    # Disks and alerts
     ./system/disks.nix
+    ./system/smart-alerts.nix
+    ./system/zfs-alerts.nix
+    ./system/zfs-scrub-trim.nix
+
     # Locale
     "${self}/modules/locale/enUS-pacific.nix"
     # Network

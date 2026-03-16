@@ -4,7 +4,6 @@ let
   alertEmail = "me@tsawhill.org";
 in
 {
-
   programs.msmtp = {
     enable = true;
     accounts.default = {
@@ -29,8 +28,8 @@ in
 
       ZED_EMAIL_PROG = "${pkgs.writeShellScript "zed-notify" ''
         SUBJECT="$1"
-        BODY=$(cat)
-        GOTIFY_KEY=$(cat /run/secrets/gotify_key)
+        BODY=$(${pkgs.coreutils}/bin/cat)
+        GOTIFY_KEY=$(${pkgs.coreutils}/bin/cat /run/secrets/gotify_key)
 
         # 1. Gotify Push
         ${pkgs.curl}/bin/curl -s -X POST "https://gotify.tsawhill.org/message" \
