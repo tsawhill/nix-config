@@ -113,5 +113,16 @@
     # │ Catch-all for USB tethering                                           │
     # └───────────────────────────────────────────────────────────────────────┘
 
+    networks."50-usb-tether" = {
+      # Match standard USB network interface names
+      # With net.ifnames=0, this is usually "usb0"
+      matchConfig.Name = "usb*";
+
+      networkConfig = {
+        DHCP = "yes";
+        # Optional: Set a metric if you want to prioritize this over LAN/WAN
+        # RouteMetric = 10;
+      };
+    };
   };
 }

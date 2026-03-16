@@ -55,6 +55,19 @@ inputs@{ self, nixpkgs-stable, ... }:
     };
 
     ##########################################################################
+    #                          syncthing-nix config                          #
+    ##########################################################################
+    syncthing-nix = nixpkgs-stable.lib.nixosSystem {
+      system = "x86_64-linux";
+      specialArgs = {
+        inherit inputs;
+        self = self;
+        nixvim-input = inputs.nixvim-stable;
+      };
+      modules = [ "${self}/hosts/server-nix/LXCs/syncthing.nix" ];
+    };
+
+    ##########################################################################
     #                        unbound-vpn-na-nix config                       #
     ##########################################################################
     unbound-vpn-na-nix = nixpkgs-stable.lib.nixosSystem {
@@ -91,6 +104,19 @@ inputs@{ self, nixpkgs-stable, ... }:
         nixvim-input = inputs.nixvim-stable;
       };
       modules = [ "${self}/hosts/server-nix/LXCs/pufferpanel.nix" ];
+    };
+
+    ##########################################################################
+    #                           sunshine-nix config                          #
+    ##########################################################################
+    sunshine-nix = nixpkgs-stable.lib.nixosSystem {
+      system = "x86_64-linux";
+      specialArgs = {
+        inherit inputs;
+        self = self;
+        nixvim-input = inputs.nixvim-stable;
+      };
+      modules = [ "${self}/hosts/server-nix/LXCs/sunshine.nix" ];
     };
 
     ##########################################################################
@@ -220,6 +246,19 @@ inputs@{ self, nixpkgs-stable, ... }:
         nixvim-input = inputs.nixvim-stable;
       };
       modules = [ "${self}/hosts/server-nix/LXCs/jellyfin.nix" ];
+    };
+
+    ##########################################################################
+    #                            romm-nix config                             #
+    ##########################################################################
+    romm-nix = nixpkgs-stable.lib.nixosSystem {
+      system = "x86_64-linux";
+      specialArgs = {
+        inherit inputs;
+        self = self;
+        nixvim-input = inputs.nixvim-stable;
+      };
+      modules = [ "${self}/hosts/server-nix/LXCs/romm.nix" ];
     };
 
     ##########################################################################

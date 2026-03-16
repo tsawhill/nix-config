@@ -20,6 +20,7 @@ in
       default = true;
       description = "Whether to enable automatic garbage collection and generation pruning.";
     };
+
     generations = lib.mkOption {
       type = lib.types.int;
       default = 5;
@@ -37,19 +38,20 @@ in
       default = "daily";
       description = "How often to run the pruning (systemd calendar format).";
     };
-
   };
 
-  config = {
+  config = lib.mkIf cfg.enable {
     nix.gc = {
       automatic = true;
       dates = cfg.gcFrequency;
-      options = "";
+      options = "--delete-older-than 7d";
+      randomizedDelaySec = "6h";
     };
 
     systemd.services.prune-nixos-generations = {
       description = "Prune NixOS system profile to keep last ${toString cfg.generations} generations";
       startAt = cfg.pruneFrequency;
+      before = [ "nix-gc.service" ];
       serviceConfig = {
         Type = "oneshot";
         ExecStart = "${pkgs.nix}/bin/nix-env -p /nix/var/nix/profiles/system --delete-generations +${toString cfg.generations}";

@@ -1,10 +1,19 @@
-{ self, modulesPath, ... }:
+{
+  self,
+  modulesPath,
+  pkgs,
+  ...
+}:
 
 let
   desktopSSHUsers = [ "root" ];
   laptopSSHUsers = [ "root" ];
   buildSSHUsers = [ "root" ];
   phoneSSHUsers = [ "root" ];
+  acmeSSHUsers = [
+    "nginx"
+    "root"
+  ];
 in
 {
   networking.hostName = "remote-nginx-nix";
@@ -36,6 +45,7 @@ in
     (import "${self}/modules/ssh/keys/laptop.nix" laptopSSHUsers)
     (import "${self}/modules/ssh/keys/build.nix" buildSSHUsers)
     (import "${self}/modules/ssh/keys/phone.nix" phoneSSHUsers)
+    (import "${self}/modules/ssh/keys/acme.nix" acmeSSHUsers)
 
     # Software
     "${self}/modules/software/bundles/all.nix"
@@ -50,6 +60,10 @@ in
   ];
   my.users.root = {
     enable = true;
+  };
+  users.users.nginx = {
+    # This tells NixOS not to use the 'nologin' shell
+    shell = pkgs.zsh;
   };
 
   proxy.authentik = {
@@ -71,7 +85,7 @@ in
   };
   proxy.nextcloud = {
     enable = true;
-    domain = "nextc.tsawhill.org";
+    domain = "nc.tsawhill.org";
   };
   proxy.open-webui = {
     enable = true;
@@ -92,7 +106,7 @@ in
     enable = true;
     domain = "son.tsawhill.org";
     # mTLSCert = "mTLS-CA";
-    authentikHost = "auth.tsawhill.org";
+    enableAuthentik = true;
   };
   proxy.lidarr = {
     enable = true;
@@ -107,8 +121,6 @@ in
   proxy.seerr = {
     enable = true;
     domain = "request.tsawhill.org";
-
-    mTLSCert = "mTLS-CA";
   };
   proxy.unifi = {
     enable = true;

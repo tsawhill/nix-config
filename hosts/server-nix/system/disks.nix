@@ -32,6 +32,12 @@
       ];
     };
 
+    "/mnt/nix-stores" = {
+      device = "downloadHDD/nix-stores";
+      fsType = "zfs";
+      options = [ "nofail" ];
+    };
+
     "/mnt/zpool" = {
       device = "zpool";
       fsType = "zfs";

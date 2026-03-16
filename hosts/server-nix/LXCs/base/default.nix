@@ -9,6 +9,8 @@ in
 {
   imports = [
     "${modulesPath}/virtualisation/lxc-container.nix"
+    # Locale
+    "${self}/modules/locale/enUS-pacific.nix"
 
     # Nix settings
     "${self}/modules/nix/nixpkgs.nix"
@@ -39,6 +41,7 @@ in
   my.users.root = {
     enable = true;
   };
+  my.garbage.collection.generations = 2;
 
   # This enables the tmpfs (RAM) mount for /tmp
   boot.tmp.useTmpfs = true;

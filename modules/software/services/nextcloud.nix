@@ -3,17 +3,20 @@
   services.nextcloud = {
     enable = true;
     hostName = "nextcloud-nix.lan";
+    home = "/mnt/zpool/nextcloud";
     settings = {
       trusted_domains = [
-        "nextc.tsawhill.org"
+        "nc.tsawhill.org"
         "nextcloud-nix.lan"
       ];
-      overwritehost = "nextc.tsawhill.org";
+      allow_local_remote_servers = true;
+      overwritehost = "nc.tsawhill.org";
       overwriteprotocol = "https";
     };
     package = pkgs.nextcloud32;
     config.adminpassFile = "/etc/nextcloud-admin-pass";
     config.dbtype = "sqlite";
+    appstoreEnable = false;
     extraApps = {
       inherit (config.services.nextcloud.package.packages.apps)
         news
@@ -21,7 +24,9 @@
         calendar
         cookbook
         notes
-        # tasks
+        user_oidc
+        richdocuments
+        tasks
         ;
     };
     extraAppsEnable = true;

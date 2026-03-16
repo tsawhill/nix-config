@@ -13,7 +13,7 @@
 
     enableAuthentik = lib.mkOption {
       type = lib.types.bool;
-      default = true;
+      default = false;
       description = "Hostname for authentik authentication. If not specified, authentik is disabled";
     };
 

@@ -12,25 +12,14 @@ let
   phoneSSHUsers = [ "taylor" ];
 in
 {
-  networking.hostName = "server-nix";
+  networking.hostName = "pi-backup-nix";
   system.stateVersion = "25.11";
   imports = [
-    # Secrets (SOPS)
-    inputs.sops-nix-stable.nixosModules.sops
-    ./secrets.nix
 
     # Home Manager
     ./home-manager.nix
-    # Boot
-    ./system/boot.nix
-    # NVIDIA gpu
-    ./hardware/nvidia.nix
-    # Disks
-    ./system/disks.nix
     # Locale
     "${self}/modules/locale/enUS-pacific.nix"
-    # Network
-    ./system/networking.nix
 
     # NixOS Settings
     "${self}/modules/nix/nixpkgs.nix"
@@ -41,8 +30,6 @@ in
     "${self}/modules/users"
     # Groups
     "${self}/modules/groups"
-    # User and group mapping for containers
-    ./system/id-mappings.nix
 
     # SSH Access
     "${self}/modules/ssh/openssh.nix"
@@ -52,11 +39,13 @@ in
     (import "${self}/modules/ssh/keys/phone.nix" phoneSSHUsers)
 
     # Software
-    "${self}/modules/software/bundles/all.nix"
-    "${self}/modules/software/services/incus.nix"
-    "${self}/modules/software/packages/create-nix-lxc.nix"
+    # "${self}/modules/software/bundles/all.nix"
+    "${self}/modules/software/packages/zsh.nix"
+    # "${self}/modules/software/services/incus.nix"
 
   ];
+  raspberry-pi-nix.board = "bcm2712"; # BCM2712 is the Pi 5 SoC
+
   my.users.taylor = {
     enable = true;
     sudoer = true;
@@ -101,14 +90,6 @@ in
         "taylor"
       ];
       gid = 1004;
-    };
-    games = {
-      enable = true;
-      members = [
-        "root"
-        "taylor"
-      ];
-      gid = 1005;
     };
   };
 }

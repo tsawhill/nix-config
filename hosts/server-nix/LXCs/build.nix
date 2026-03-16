@@ -13,5 +13,6 @@
       gid = 1003;
     };
   };
+  boot.binfmt.emulatedSystems = [ "aarch64-linux" ];
   networking.hostName = "build-nix";
 }

@@ -1,6 +1,9 @@
-{ self, ... }:
+{ self, pkgs, ... }:
 let
-  acmeSSHUsers = [ "nginx" ];
+  acmeSSHUsers = [
+    "nginx"
+    "root"
+  ];
 in
 {
   imports = [
@@ -11,6 +14,10 @@ in
     "${self}/modules/software/services/nginx/proxies"
     "${self}/modules/software/services/nginx/streams/minecraft.nix"
   ];
+  users.users.nginx = {
+    # This tells NixOS not to use the 'nologin' shell
+    shell = pkgs.zsh;
+  };
   proxy.authentik = {
     enable = true;
     domain = "auth.tsawhill.org";
@@ -29,7 +36,7 @@ in
   };
   proxy.nextcloud = {
     enable = true;
-    domain = "nextc.tsawhill.org";
+    domain = "nc.tsawhill.org";
   };
   proxy.open-webui = {
     enable = true;

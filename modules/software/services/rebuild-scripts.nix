@@ -300,6 +300,7 @@ let
       timerConfig = {
         OnCalendar = interval;
         Persistent = true;
+        Unit = "rebuild-build-${name}.service";
       };
     };
   };

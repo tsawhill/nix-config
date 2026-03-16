@@ -19,6 +19,7 @@ in
     services.nginx.virtualHosts."${cfg.domain}" = mkProxyVhost {
       inherit cfg;
       proxyPass = "http://immich-nix.lan:2283";
+      proxyWebsockets = true;
 
       # Specific immich config
       extraExtraConfig = lib.concatStringsSep "\n" [
