@@ -23,4 +23,3 @@
       [ "${automount_opts},credentials=/run/secrets/smb-nix-config-credentials,uid=1000,mfsymlinks" ];
   };
 }
-(
