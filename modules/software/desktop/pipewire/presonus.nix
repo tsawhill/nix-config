@@ -31,51 +31,25 @@ in
                 nodes = [
                   # Gate (threshold -27dB, reduction -40dB, attack 5ms, release 100ms)
                   {
-                    factory = "ladspa";
+                    factory = "lv2";
                     plugin = "http://calf.sourceforge.net/plugins/Gate";
-                    label = "Gate";
-                    control = {
-                      "Threshold" = -27.0;
-                      "Ratio" = 10.0;
-                      "Attack" = 5.0;
-                      "Release" = 100.0;
-                      "Makeup Gain" = 0.0;
-                    };
                   }
                   # Deesser (de-esser for sibilance control)
                   {
-                    factory = "ladspa";
+                    factory = "lv2";
                     plugin = "http://calf.sourceforge.net/plugins/Deesser";
-                    label = "Deesser";
-                  }
-                  # Reverb
-                  {
-                    factory = "ladspa";
-                    plugin = "http://calf.sourceforge.net/plugins/Reverb";
-                    label = "Reverb";
-                  }
-                  # Loudness (loudness compensation)
-                  {
-                    factory = "ladspa";
-                    plugin = "http://calf.sourceforge.net/plugins/Loudness";
-                    label = "Loudness";
                   }
                   # Compressor (dynamic range compression)
                   {
-                    factory = "ladspa";
+                    factory = "lv2";
                     plugin = "http://calf.sourceforge.net/plugins/Compressor";
-                    label = "Compressor";
                   }
                 ];
                 links = [
-                  { output = "Gate:Out L"; input = "Deesser:In L"; }
-                  { output = "Gate:Out R"; input = "Deesser:In R"; }
-                  { output = "Deesser:Out L"; input = "Reverb:In L"; }
-                  { output = "Deesser:Out R"; input = "Reverb:In R"; }
-                  { output = "Reverb:Out L"; input = "Loudness:In L"; }
-                  { output = "Reverb:Out R"; input = "Loudness:In R"; }
-                  { output = "Loudness:Out L"; input = "Compressor:In L"; }
-                  { output = "Loudness:Out R"; input = "Compressor:In R"; }
+                  { output = "Gate:audio_out_1"; input = "Deesser:audio_in_1"; }
+                  { output = "Gate:audio_out_2"; input = "Deesser:audio_in_2"; }
+                  { output = "Deesser:audio_out_1"; input = "Compressor:audio_in_1"; }
+                  { output = "Deesser:audio_out_2"; input = "Compressor:audio_in_2"; }
                 ];
               };
               "capture.props" = {
@@ -88,23 +62,15 @@ in
         ];
       };
 
-      # Route PreSonus hardware input → effects filter → mic sink
+      # Route PreSonus hardware input through the effects filter chain
       wireplumber.extraConfig."95-presonus-routing" = {
         "stream.rules" = [
           {
             matches = [
-              { "node.name" = "alsa_input.usb-PreSonus_Studio_24c_SC1E21081241-00.analog-stereo"; }
+              { "node.name" = "~alsa_input.*PreSonus.*"; }
             ];
             actions.update-props = {
               "node.target.object" = "presonus_mic_effects";
-            };
-          }
-          {
-            matches = [
-              { "node.name" = "presonus_mic_input"; }
-            ];
-            actions.update-props = {
-              "node.target.object" = "mic_input";
             };
           }
         ];
