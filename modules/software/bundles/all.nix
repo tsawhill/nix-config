@@ -1,4 +1,9 @@
-{ pkgs, lib, config, ... }:
+{
+  pkgs,
+  lib,
+  config,
+  ...
+}:
 {
   options.software.all.enable = lib.mkOption {
     type = lib.types.bool;
@@ -58,6 +63,7 @@
       ffmpeg
 
       # Dev
+      colmena
       git
       gotify-cli
     ];

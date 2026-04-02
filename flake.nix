@@ -52,10 +52,13 @@
       piOutputs = import ./flake-outputs/pi-backup.nix inputs;
       # Load OCI server outputs
       ociOutputs = import ./flake-outputs/oci-proxy.nix inputs;
+      # Colmena deployment hive (LXC hosts)
+      colmenaOutputs = import ./flake-outputs/colmena.nix inputs;
     in
     # Merge them together. // merges the top level,
     # but we specifically need to merge the nixosConfigurations sets.
     mainOutputs
+    // colmenaOutputs
     // {
       nixosConfigurations =
         (mainOutputs.nixosConfigurations or { })
