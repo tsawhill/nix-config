@@ -31,7 +31,7 @@ in
 {
   colmena = {
     meta = {
-      nixpkgs = import nixpkgs-stable { system = "x86_64-linux"; };
+      nixpkgs = import nixpkgs-stable { localSystem = "x86_64-linux"; };
       specialArgs = sharedArgs;
     };
 
