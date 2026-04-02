@@ -19,7 +19,7 @@ in
     ];
 
     services.pipewire = {
-      # Create loopback: PreSonus hardware input → mic_input sink
+      # Create loopback: PreSonus hardware input → mic_input sink via routing
       extraConfig.pipewire."94-presonus-loopback" = {
         "context.modules" = [
           {
@@ -33,15 +33,20 @@ in
               };
               "playback.props" = {
                 "node.name" = "presonus_to_mic_out";
-                "media.class" = "Audio/Source";
-                "audio.position" = [ "FL" "FR" ];
-                "node.target.object" = "mic_input";
                 "node.passive" = true;
               };
             };
           }
         ];
       };
+
+      # Route PreSonus loopback output to mic_input sink
+      wireplumber.extraConfig."95-presonus-routing"."stream.rules" = [
+        {
+          matches = [{ "node.name" = "presonus_to_mic_out"; }];
+          actions.update-props."node.target" = "mic_input";
+        }
+      ];
     };
   };
 }
