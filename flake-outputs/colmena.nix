@@ -1,4 +1,9 @@
-inputs@{ self, nixpkgs-stable, ... }:
+inputs@{
+  self,
+  nixpkgs-stable,
+  nixpkgs-unstable,
+  ...
+}:
 let
   sharedArgs = {
     inherit inputs;
@@ -24,6 +29,31 @@ let
         { inherit targetHost; }
     )
     // (if tag != null then { tags = [ tag ]; } else { });
+    imports = [ modulePath ];
+  };
+
+  # For hosts using nixpkgs-unstable (desktop, laptop)
+  mkUnstableHost = tag: targetHost: modulePath: {
+    deployment = {
+      targetUser = "root";
+      nixpkgs = import nixpkgs-unstable { localSystem = "x86_64-linux"; };
+    }
+    // (
+      if targetHost == null then
+        {
+          allowLocalDeployment = true;
+          targetHost = null;
+        }
+      else
+        { inherit targetHost; }
+    )
+    // (if tag != null then { tags = [ tag ]; } else { });
+    _module.args = {
+      home-manager-input = inputs.home-manager-unstable;
+      nixvim-input = inputs.nixvim-unstable;
+      sops-input = inputs.sops-nix-unstable;
+      zen-input = inputs.zen-browser-unstable;
+    };
     imports = [ modulePath ];
   };
 
@@ -64,6 +94,7 @@ in
       mkHost "weekly" "socks5-vpn-eu-nix.lan"
         "${self}/hosts/server-nix/LXCs/socks5-vpn-eu.nix";
     "acme-nix" = mkHost "weekly" "acme-nix.lan" "${self}/hosts/server-nix/LXCs/acme.nix";
+    "sunshine-nix" = mkHost "weekly" "sunshine-nix.lan" "${self}/hosts/server-nix/LXCs/sunshine.nix";
 
     # --- monthly ---
     "unifi-nix" = mkHost "monthly" "unifi-nix.lan" "${self}/hosts/server-nix/LXCs/unifi.nix";
@@ -73,11 +104,17 @@ in
       mkHost "monthly" "pufferpanel-nix.lan"
         "${self}/hosts/server-nix/LXCs/pufferpanel.nix";
     "deluge-nix" = mkHost "monthly" "deluge-nix.lan" "${self}/hosts/server-nix/LXCs/deluge.nix";
+    "authentik-nix" =
+      mkHost "monthly" "authentik-nix.lan"
+        "${self}/hosts/server-nix/LXCs/authentik.nix";
+    "romm-nix" = mkHost "monthly" "romm-nix.lan" "${self}/hosts/server-nix/LXCs/romm.nix";
+    "syncthing-nix" =
+      mkHost "monthly" "syncthing-nix.lan"
+        "${self}/hosts/server-nix/LXCs/syncthing.nix";
 
-    # --- manual-only (no schedule tag, deploy with: colmena apply --on <name>) ---
-    "authentik-nix" = mkHost null "authentik-nix.lan" "${self}/hosts/server-nix/LXCs/authentik.nix";
-    "romm-nix" = mkHost null "romm-nix.lan" "${self}/hosts/server-nix/LXCs/romm.nix";
-    "sunshine-nix" = mkHost null "sunshine-nix.lan" "${self}/hosts/server-nix/LXCs/sunshine.nix";
-    "syncthing-nix" = mkHost null "syncthing-nix.lan" "${self}/hosts/server-nix/LXCs/syncthing.nix";
-  };
+    # --- personal machines (unstable, manual-only) ---
+    "desktop-nix" = mkUnstableHost "weekly" "taylor-desktop-nix.lan" "${self}/hosts/desktop-nix";
+    "laptop-nix" = mkUnstableHost "weekly" "taylor-laptop-nix.lan" "${self}/hosts/laptop-nix";
+    # --- main server ---
+    "server-nix" = mkHost "weekly" "server-nix.lan" "${self}/hosts/server-nix";  };
 }
