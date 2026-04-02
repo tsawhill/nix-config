@@ -32,6 +32,10 @@ in
       package = pkgs.openrgb-with-all-plugins;
     };
 
+    # Disable the system service — it runs sandboxed and can't access HID devices.
+    # OpenRGB is managed as a user-level systemd service instead.
+    systemd.services.openrgb.wantedBy = lib.mkForce [ ];
+
     services.udev.packages = [ pkgs.openrgb-with-all-plugins ];
 
     # i2c is required for most RGB controllers

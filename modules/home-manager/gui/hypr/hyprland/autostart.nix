@@ -60,7 +60,7 @@
         PartOf = [ "wayland-session@hyprland.desktop.target" ];
       };
       Service = {
-        ExecStart = "${pkgs.openrgb}/bin/openrgb --startminimized --noautoconnect -p default";
+        ExecStart = "${pkgs.openrgb}/bin/openrgb --startminimized -p default";
         Restart = "on-failure";
         RestartSec = "3s";
       };
