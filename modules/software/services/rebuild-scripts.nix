@@ -71,7 +71,7 @@ let
               fi
             done
             KEEP=${toString keepRoots}
-            ls -1t "$HOST_DIR" 2>/dev/null | tail -n +$((KEEP+1)) | while read f; do
+            ls -1 "$HOST_DIR" 2>/dev/null | sort -r | tail -n +$((KEEP+1)) | while read f; do
               rm -f "$HOST_DIR/$f" || true
             done || true
           done
@@ -79,8 +79,8 @@ let
           KNOWN_HOSTS=$(find "${repoPath}/hosts" -mindepth 1 -maxdepth 1 -printf '%f\n' 2>/dev/null || true)
           for d in "$BASE_GCROOT_DIR"/*; do
             [ -d "$d" ] || continue
-            name=$(basename "$d")
-            if ! echo "$KNOWN_HOSTS" | grep -xq "$name"; then
+            host_dir_name=$(basename "$d")
+            if ! echo "$KNOWN_HOSTS" | grep -xq "$host_dir_name"; then
               rm -rf "$d" || true
             fi
           done || true
@@ -133,52 +133,63 @@ let
       ${pkgs.git}/bin/git -C "${repoPath}" commit -m "auto: Self pre-deploy $(date '+%Y-%m-%d %H:%M')" || true
 
       echo "--- Deploying Self (build-nix) ---"
-      LOG=$(mktemp)
-      cd "${repoPath}"
-      if ${pkgs.colmena}/bin/colmena apply-local switch 2>&1 | tee "$LOG"; then
-        WARNINGS=$(grep -E '\[WARN\]|warning:' "$LOG" || true)
-        if [ -n "$WARNINGS" ]; then
-          MSG="Warnings:\n$WARNINGS"
-          ${pkgs.gotify-cli}/bin/gotify push \
-            -t "\u26a0\ufe0f Self deploy succeeded (with warnings)" \
-            -p 4 \
-            "$MSG"
-        else
-          ${pkgs.gotify-cli}/bin/gotify push \
-            -t "\u2705 Self deploy succeeded" \
-            -p 3 \
-            "build-nix deployed successfully."
-        fi
-        VER=$(nixos-version 2>/dev/null || echo "unknown")
-        COMMIT_MSG=$(printf 'auto: Self deploy %s\n\nbuild-nix: %s' "$(date '+%Y-%m-%d %H:%M')" "$VER")
-        ${pkgs.git}/bin/git -C "${repoPath}" add flake.lock
-        ${pkgs.git}/bin/git -C "${repoPath}" commit -m "$COMMIT_MSG" || true
-        # Keep GC roots for build outputs created during self deploy
-        TIMESTAMP=$(date -u +%Y%m%d%H%M%S)
-        BASE_GCROOT_DIR=/nix/var/nix/gcroots/colmena-hosts
-        mkdir -p "$BASE_GCROOT_DIR/self"
-        STORE_PATHS=$(grep -oE '/nix/store/[a-z0-9]+[^[:space:]]*' "$LOG" | sort -u || true)
-        for p in $STORE_PATHS; do
-          if [ -e "$p" ]; then
-            ROOT_FILE="$BASE_GCROOT_DIR/self/$TIMESTAMP-$(basename "$p")"
-            ${pkgs.nix}/bin/nix-store --add-root "$ROOT_FILE" --indirect "$p" || true
+      RETRY_DELAY=300
+      MAX_RETRIES=3
+      for attempt in $(seq 1 $MAX_RETRIES); do
+        echo "Attempt $attempt/$MAX_RETRIES..."
+        LOG=$(mktemp)
+        cd "${repoPath}"
+        if ${pkgs.colmena}/bin/colmena apply-local switch 2>&1 | tee "$LOG"; then
+          WARNINGS=$(grep -E '\[WARN\]|warning:' "$LOG" || true)
+          if [ -n "$WARNINGS" ]; then
+            MSG="Warnings:\n$WARNINGS"
+            ${pkgs.gotify-cli}/bin/gotify push \
+              -t "\u26a0\ufe0f Self deploy succeeded (with warnings)" \
+              -p 4 \
+              "$MSG"
+          else
+            ${pkgs.gotify-cli}/bin/gotify push \
+              -t "\u2705 Self deploy succeeded" \
+              -p 3 \
+              "build-nix deployed successfully."
           fi
-        done
-        KEEP=${toString keepRoots}
-        ls -1t "$BASE_GCROOT_DIR/self" 2>/dev/null | tail -n +$((KEEP+1)) | while read f; do
-          rm -f "$BASE_GCROOT_DIR/self/$f" || true
-        done || true
-      else
-        ERROR_SUMMARY=$(tail -n 20 "$LOG")
-        MSG="Last 20 lines of log:\n$ERROR_SUMMARY"
-        ${pkgs.gotify-cli}/bin/gotify push \
-          -t "\u274c Self deploy FAILED" \
-          -p 10 \
-          "$MSG"
-        rm "$LOG"
-        exit 1
-      fi
-      rm "$LOG"
+          VER=$(nixos-version 2>/dev/null || echo "unknown")
+          COMMIT_MSG=$(printf 'auto: Self deploy %s\n\nbuild-nix: %s' "$(date '+%Y-%m-%d %H:%M')" "$VER")
+          ${pkgs.git}/bin/git -C "${repoPath}" add flake.lock
+          ${pkgs.git}/bin/git -C "${repoPath}" commit -m "$COMMIT_MSG" || true
+          # Keep GC roots for build outputs created during self deploy
+          TIMESTAMP=$(date -u +%Y%m%d%H%M%S)
+          BASE_GCROOT_DIR=/nix/var/nix/gcroots/colmena-hosts
+          mkdir -p "$BASE_GCROOT_DIR/self"
+          STORE_PATHS=$(grep -oE '/nix/store/[a-z0-9]+[^[:space:]]*' "$LOG" | sort -u || true)
+          for p in $STORE_PATHS; do
+            if [ -e "$p" ]; then
+              ROOT_FILE="$BASE_GCROOT_DIR/self/$TIMESTAMP-$(basename "$p")"
+              ${pkgs.nix}/bin/nix-store --add-root "$ROOT_FILE" --indirect "$p" || true
+            fi
+          done
+          KEEP=${toString keepRoots}
+          ls -1 "$BASE_GCROOT_DIR/self" 2>/dev/null | sort -r | tail -n +$((KEEP+1)) | while read f; do
+            rm -f "$BASE_GCROOT_DIR/self/$f" || true
+          done || true
+          rm "$LOG"
+          break
+        else
+          ERROR_SUMMARY=$(tail -n 20 "$LOG")
+          rm "$LOG"
+          if [ $attempt -lt $MAX_RETRIES ]; then
+            echo "Deploy failed, retrying in $((RETRY_DELAY / 60)) minutes (attempt $attempt/$MAX_RETRIES)..."
+            sleep $RETRY_DELAY
+          else
+            MSG="Last 20 lines of log:\n$ERROR_SUMMARY"
+            ${pkgs.gotify-cli}/bin/gotify push \
+              -t "\u274c Self deploy FAILED" \
+              -p 10 \
+              "$MSG"
+            exit 1
+          fi
+        fi
+      done
     '';
   };
 
@@ -210,7 +221,7 @@ let
       ${pkgs.colmena}/bin/colmena apply-local "$GOAL"
     else
       echo "--- Deploying $TARGET ($GOAL) ---"
-      ${pkgs.colmena}/bin/colmena apply --on "$TARGET" "$GOAL"
+      ${pkgs.colmena}/bin/colmena apply --on "$TARGET" --parallel 4 "$GOAL"
     fi
   '';
 
@@ -234,8 +245,9 @@ let
     if [ -d "$GCROOT_DIR" ]; then
       # copy available closures from build host to target to reduce rebuilds
       echo "Copying available closures to $HOST..."
-      for f in $(find "$GCROOT_DIR" -type f -printf '%f\n' 2>/dev/null || true); do
-        PATH_TO_COPY="/nix/store/$f"
+      for lnk in "$GCROOT_DIR"/*; do
+        [ -L "$lnk" ] || continue
+        PATH_TO_COPY=$(readlink -f "$lnk")
         if [ -e "$PATH_TO_COPY" ]; then
           ${pkgs.nix}/bin/nix copy --to ssh://root@$HOST "$PATH_TO_COPY" || true
         fi
@@ -243,7 +255,7 @@ let
     fi
 
     # determine target generation on remote
-    GEN=$(${pkgs.openssh}/bin/ssh -o BatchMode=yes root@"$HOST" "nix-env -p /nix/var/nix/profiles/system --list-generations --no-name | tail -n \"$OFFSET\" | head -n 1" || echo "")
+    GEN=$(${pkgs.openssh}/bin/ssh -o BatchMode=yes root@"$HOST" "nix-env -p /nix/var/nix/profiles/system --list-generations | tail -n \"$OFFSET\" | head -n 1 | awk '{print \$1}'" || echo "")
     if [ -z "$GEN" ]; then
       echo "Unable to determine target generation on $HOST"
       exit 1
