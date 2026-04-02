@@ -17,7 +17,7 @@ in
   imports = [
     # Secrets (SOPS)
     inputs.sops-nix-stable.nixosModules.sops
-    ./secrets.nix
+    "${self}/modules/secrets"
 
     # Home Manager
     ./home-manager.nix
@@ -56,11 +56,15 @@ in
     (import "${self}/modules/ssh/keys/phone.nix" phoneSSHUsers)
 
     # Software
-    "${self}/modules/software/bundles/all.nix"
+    "${self}/modules/software/bundles"
     "${self}/modules/software/services/incus.nix"
     "${self}/modules/software/packages/create-nix-lxc.nix"
 
   ];
+  my.secrets = {
+    gotify_token_zfs.enable = true;
+    smtp_password_server.enable = true;
+  };
   my.users.taylor = {
     enable = true;
     sudoer = true;

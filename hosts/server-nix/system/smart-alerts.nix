@@ -10,21 +10,20 @@ in
       auth = true;
       tls = true;
       host = "smtp.purelymail.com";
-      port = 465;
-      tls_starttls = false;
+      port = 587;
+      tls_starttls = true;
       user = "server@tsawhill.org";
       from = "server@tsawhill.org";
-      passwordeval = "cat /run/secrets/smtp_password";
+      passwordeval = "cat /run/secrets/smtp_password_server";
     };
   };
 
   services.smartd = {
     enable = true;
     notifications = {
-      test = true; # Triggers an alert on rebuild/restart
       mail = {
         enable = true;
-        recipient = "root";
+        recipient = "me@tsawhill.org";
         mailer = "${pkgs.writeShellScript "smartd-notify" ''
           if [ "$1" = "-s" ]; then
               SUBJECT="$2"
@@ -33,7 +32,7 @@ in
           fi
 
           BODY=$(${pkgs.coreutils}/bin/cat)
-          GOTIFY_KEY=$(${pkgs.coreutils}/bin/cat /run/secrets/gotify_key)
+          GOTIFY_KEY=$(${pkgs.coreutils}/bin/cat /run/secrets/gotify_token_zfs)
 
           # 1. Gotify Push (Priority 8 for hardware issues)
           ${pkgs.curl}/bin/curl -s -X POST "https://gotify.tsawhill.org/message" \

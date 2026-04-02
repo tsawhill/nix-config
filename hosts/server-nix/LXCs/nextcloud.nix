@@ -4,6 +4,7 @@
     ./base
     "${self}/modules/software/services/nextcloud.nix"
   ];
+  my.secrets.nextcloud_admin_pass.enable = true;
   my.groups = {
     media = {
       enable = true;

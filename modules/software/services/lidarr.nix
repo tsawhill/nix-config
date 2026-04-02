@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, config, ... }:
 {
 
   systemd.services.lidarr = {
@@ -12,9 +12,10 @@
     };
 
     serviceConfig = {
-      type = "simple";
+      Type = "simple";
       UMask = "007";
-      ExecStart = "/usr/bin/env Lidarr -nobrowser";
+      EnvironmentFile = config.sops.secrets.lidarr_api_key.path;
+      ExecStart = "${pkgs.lidarr}/bin/Lidarr -nobrowser";
       Restart = "on-failure";
       TimeoutStopSec = "20";
       User = "root";

@@ -10,7 +10,9 @@ inputs@{ self, nixpkgs-stable, ... }:
       specialArgs = {
         inherit inputs;
         self = self;
+        home-manager-input = inputs.home-manager-stable;
         nixvim-input = inputs.nixvim-stable;
+        sops-input = inputs.sops-nix-stable;
       };
       modules = [ "${self}/hosts/server-nix" ];
     };
@@ -23,7 +25,9 @@ inputs@{ self, nixpkgs-stable, ... }:
       specialArgs = {
         inherit inputs;
         self = self;
+        home-manager-input = inputs.home-manager-stable;
         nixvim-input = inputs.nixvim-stable;
+        sops-input = inputs.sops-nix-stable;
       };
       modules = [ "${self}/hosts/server-nix/LXCs/authentik.nix" ];
     };
@@ -36,7 +40,9 @@ inputs@{ self, nixpkgs-stable, ... }:
       specialArgs = {
         inherit inputs;
         self = self;
+        home-manager-input = inputs.home-manager-stable;
         nixvim-input = inputs.nixvim-stable;
+        sops-input = inputs.sops-nix-stable;
       };
       modules = [ "${self}/hosts/server-nix/LXCs/unifi.nix" ];
     };
@@ -49,7 +55,9 @@ inputs@{ self, nixpkgs-stable, ... }:
       specialArgs = {
         inherit inputs;
         self = self;
+        home-manager-input = inputs.home-manager-stable;
         nixvim-input = inputs.nixvim-stable;
+        sops-input = inputs.sops-nix-stable;
       };
       modules = [ "${self}/hosts/server-nix/LXCs/samba.nix" ];
     };
@@ -62,7 +70,9 @@ inputs@{ self, nixpkgs-stable, ... }:
       specialArgs = {
         inherit inputs;
         self = self;
+        home-manager-input = inputs.home-manager-stable;
         nixvim-input = inputs.nixvim-stable;
+        sops-input = inputs.sops-nix-stable;
       };
       modules = [ "${self}/hosts/server-nix/LXCs/syncthing.nix" ];
     };
@@ -75,7 +85,9 @@ inputs@{ self, nixpkgs-stable, ... }:
       specialArgs = {
         inherit inputs;
         self = self;
+        home-manager-input = inputs.home-manager-stable;
         nixvim-input = inputs.nixvim-stable;
+        sops-input = inputs.sops-nix-stable;
       };
       modules = [ "${self}/hosts/server-nix/LXCs/unbound-vpn-na.nix" ];
     };
@@ -88,7 +100,9 @@ inputs@{ self, nixpkgs-stable, ... }:
       specialArgs = {
         inherit inputs;
         self = self;
+        home-manager-input = inputs.home-manager-stable;
         nixvim-input = inputs.nixvim-stable;
+        sops-input = inputs.sops-nix-stable;
       };
       modules = [ "${self}/hosts/server-nix/LXCs/adguard.nix" ];
     };
@@ -101,7 +115,9 @@ inputs@{ self, nixpkgs-stable, ... }:
       specialArgs = {
         inherit inputs;
         self = self;
+        home-manager-input = inputs.home-manager-stable;
         nixvim-input = inputs.nixvim-stable;
+        sops-input = inputs.sops-nix-stable;
       };
       modules = [ "${self}/hosts/server-nix/LXCs/pufferpanel.nix" ];
     };
@@ -114,7 +130,9 @@ inputs@{ self, nixpkgs-stable, ... }:
       specialArgs = {
         inherit inputs;
         self = self;
+        home-manager-input = inputs.home-manager-stable;
         nixvim-input = inputs.nixvim-stable;
+        sops-input = inputs.sops-nix-stable;
       };
       modules = [ "${self}/hosts/server-nix/LXCs/sunshine.nix" ];
     };
@@ -127,7 +145,9 @@ inputs@{ self, nixpkgs-stable, ... }:
       specialArgs = {
         inherit inputs;
         self = self;
+        home-manager-input = inputs.home-manager-stable;
         nixvim-input = inputs.nixvim-stable;
+        sops-input = inputs.sops-nix-stable;
       };
       modules = [ "${self}/hosts/server-nix/LXCs/socks5-vpn-eu.nix" ];
     };
@@ -140,7 +160,9 @@ inputs@{ self, nixpkgs-stable, ... }:
       specialArgs = {
         inherit inputs;
         self = self;
+        home-manager-input = inputs.home-manager-stable;
         nixvim-input = inputs.nixvim-stable;
+        sops-input = inputs.sops-nix-stable;
       };
       modules = [ "${self}/hosts/server-nix/LXCs/build.nix" ];
     };
@@ -153,7 +175,9 @@ inputs@{ self, nixpkgs-stable, ... }:
       specialArgs = {
         inherit inputs;
         self = self;
+        home-manager-input = inputs.home-manager-stable;
         nixvim-input = inputs.nixvim-stable;
+        sops-input = inputs.sops-nix-stable;
       };
       modules = [ "${self}/hosts/server-nix/LXCs/acme.nix" ];
     };
@@ -166,6 +190,9 @@ inputs@{ self, nixpkgs-stable, ... }:
       specialArgs = {
         inherit inputs;
         self = self;
+        home-manager-input = inputs.home-manager-stable;
+        nixvim-input = inputs.nixvim-stable;
+        sops-input = inputs.sops-nix-stable;
       };
       modules = [ "${self}/hosts/server-nix/LXCs/local-nginx.nix" ];
     };
@@ -178,7 +205,9 @@ inputs@{ self, nixpkgs-stable, ... }:
       specialArgs = {
         inherit inputs;
         self = self;
+        home-manager-input = inputs.home-manager-stable;
         nixvim-input = inputs.nixvim-stable;
+        sops-input = inputs.sops-nix-stable;
       };
       modules = [ "${self}/hosts/server-nix/LXCs/vaultwarden.nix" ];
     };
@@ -191,7 +220,9 @@ inputs@{ self, nixpkgs-stable, ... }:
       specialArgs = {
         inherit inputs;
         self = self;
+        home-manager-input = inputs.home-manager-stable;
         nixvim-input = inputs.nixvim-stable;
+        sops-input = inputs.sops-nix-stable;
       };
       modules = [ "${self}/hosts/server-nix/LXCs/nextcloud.nix" ];
     };
@@ -204,7 +235,9 @@ inputs@{ self, nixpkgs-stable, ... }:
       specialArgs = {
         inherit inputs;
         self = self;
+        home-manager-input = inputs.home-manager-stable;
         nixvim-input = inputs.nixvim-stable;
+        sops-input = inputs.sops-nix-stable;
       };
       modules = [ "${self}/hosts/server-nix/LXCs/gotify.nix" ];
     };
@@ -217,7 +250,9 @@ inputs@{ self, nixpkgs-stable, ... }:
       specialArgs = {
         inherit inputs;
         self = self;
+        home-manager-input = inputs.home-manager-stable;
         nixvim-input = inputs.nixvim-stable;
+        sops-input = inputs.sops-nix-stable;
       };
       modules = [ "${self}/hosts/server-nix/LXCs/llm.nix" ];
     };
@@ -230,7 +265,9 @@ inputs@{ self, nixpkgs-stable, ... }:
       specialArgs = {
         inherit inputs;
         self = self;
+        home-manager-input = inputs.home-manager-stable;
         nixvim-input = inputs.nixvim-stable;
+        sops-input = inputs.sops-nix-stable;
       };
       modules = [ "${self}/hosts/server-nix/LXCs/immich.nix" ];
     };
@@ -243,7 +280,9 @@ inputs@{ self, nixpkgs-stable, ... }:
       specialArgs = {
         inherit inputs;
         self = self;
+        home-manager-input = inputs.home-manager-stable;
         nixvim-input = inputs.nixvim-stable;
+        sops-input = inputs.sops-nix-stable;
       };
       modules = [ "${self}/hosts/server-nix/LXCs/jellyfin.nix" ];
     };
@@ -256,7 +295,9 @@ inputs@{ self, nixpkgs-stable, ... }:
       specialArgs = {
         inherit inputs;
         self = self;
+        home-manager-input = inputs.home-manager-stable;
         nixvim-input = inputs.nixvim-stable;
+        sops-input = inputs.sops-nix-stable;
       };
       modules = [ "${self}/hosts/server-nix/LXCs/romm.nix" ];
     };
@@ -269,7 +310,9 @@ inputs@{ self, nixpkgs-stable, ... }:
       specialArgs = {
         inherit inputs;
         self = self;
+        home-manager-input = inputs.home-manager-stable;
         nixvim-input = inputs.nixvim-stable;
+        sops-input = inputs.sops-nix-stable;
       };
       modules = [ "${self}/hosts/server-nix/LXCs/jellyseerr.nix" ];
     };
@@ -282,7 +325,9 @@ inputs@{ self, nixpkgs-stable, ... }:
       specialArgs = {
         inherit inputs;
         self = self;
+        home-manager-input = inputs.home-manager-stable;
         nixvim-input = inputs.nixvim-stable;
+        sops-input = inputs.sops-nix-stable;
       };
       modules = [ "${self}/hosts/server-nix/LXCs/arrs.nix" ];
     };
@@ -295,7 +340,9 @@ inputs@{ self, nixpkgs-stable, ... }:
       specialArgs = {
         inherit inputs;
         self = self;
+        home-manager-input = inputs.home-manager-stable;
         nixvim-input = inputs.nixvim-stable;
+        sops-input = inputs.sops-nix-stable;
       };
       modules = [ "${self}/hosts/server-nix/LXCs/deluge.nix" ];
     };

@@ -1,23 +1,65 @@
+{ pkgs, lib, config, ... }:
 {
-  imports = [
-    ../packages/linux-firmware.nix
-    ../packages/rsync.nix
-    ../packages/dnsutils.nix
-    ../packages/file.nix
-    ../packages/htop.nix
-    ../packages/iputils.nix
-    ../packages/lsof.nix
-    ../packages/mtr.nix
-    ../packages/nmap.nix
-    ../packages/nvim.nix
-    ../packages/p7zip.nix
-    ../packages/socat.nix
-    ../packages/tmux.nix
-    ../packages/unar.nix
-    ../packages/unrar.nix
-    ../packages/unzip.nix
-    ../packages/wget.nix
-    ../packages/zsh.nix
+  options.software.all.enable = lib.mkOption {
+    type = lib.types.bool;
+    default = true;
+    description = "Enable core CLI and system tools.";
+  };
 
-  ];
+  config = lib.mkIf config.software.all.enable {
+    # AppImage support
+    programs.appimage = {
+      enable = true;
+      binfmt = true;
+    };
+
+    programs.mtr.enable = true;
+    programs.zsh.enable = true;
+
+    environment.systemPackages = with pkgs; [
+      # System
+      linux-firmware
+      wireguard-tools
+      mesa
+      mesa-demos
+
+      # File tools
+      rsync
+      file
+      p7zip
+      unar
+      unrar
+      unzip
+      sshfs
+      lsof
+
+      # Network tools
+      dnsutils
+      iputils
+      mtr
+      nmap
+      socat
+      curl
+      wget
+
+      # Monitoring
+      htop
+      nvtopPackages.amd
+
+      # Editors / shell
+      neovim
+      tmux
+      tree
+      hyfetch
+      nix-search
+      nixos-rebuild-ng
+
+      # Multimedia CLI
+      ffmpeg
+
+      # Dev
+      git
+      gotify-cli
+    ];
+  };
 }

@@ -14,7 +14,7 @@
       overwriteprotocol = "https";
     };
     package = pkgs.nextcloud32;
-    config.adminpassFile = "/etc/nextcloud-admin-pass";
+    config.adminpassFile = config.sops.secrets.nextcloud_admin_pass.path;
     config.dbtype = "sqlite";
     appstoreEnable = false;
     extraApps = {

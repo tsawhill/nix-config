@@ -1,4 +1,9 @@
-{ config, lib, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   cfg = config.my.shares;
@@ -12,6 +17,10 @@ in
         lib.types.submodule {
           options = {
             enable = lib.mkEnableOption "Samba user account";
+            passwordSecretPath = lib.mkOption {
+              type = lib.types.path;
+              description = "Path to the decrypted SOPS secret containing the plaintext password";
+            };
             extraGroups = lib.mkOption {
               type = lib.types.listOf lib.types.str;
               default = [ ];
@@ -44,14 +53,14 @@ in
   };
 
   config = {
-    # 1. Create System Users
+    # Create System Users
     users.users = lib.mapAttrs (name: ucfg: {
       isNormalUser = true;
       description = "Samba user - ${name}";
       inherit (ucfg) extraGroups;
     }) (lib.filterAttrs (n: v: v.enable) cfg.users);
 
-    # 2. Configure Samba
+    # Configure Samba
     services.samba.settings = lib.mapAttrs (name: scfg: {
       "path" = scfg.path;
       "browseable" = "yes";
@@ -61,5 +70,32 @@ in
       "create mask" = "0644";
       "directory mask" = "0755";
     }) (lib.filterAttrs (n: v: v.enable) cfg.definitions);
+
+    # Dynamically Generate Password Sync Services
+    systemd.services = lib.mapAttrs' (
+      name: ucfg:
+      lib.nameValuePair "sync-samba-pass-${name}" {
+        description = "Sync plaintext SOPS password to Linux and Samba for ${name}";
+        wantedBy = [ "multi-user.target" ];
+
+        # We removed the 'after' and 'requires' lines here
+
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+        };
+
+        script = ''
+          # Read plaintext password
+          PASS=$(cat ${ucfg.passwordSecretPath})
+
+          # Sync to Linux Shadow
+          echo "${name}:$PASS" | ${pkgs.shadow}/bin/chpasswd
+
+          # Sync to Samba DB
+          (echo "$PASS"; echo "$PASS") | ${pkgs.samba}/bin/smbpasswd -s -a ${name}
+        '';
+      }
+    ) (lib.filterAttrs (n: v: v.enable) cfg.users);
   };
 }

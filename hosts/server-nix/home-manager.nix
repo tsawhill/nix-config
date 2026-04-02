@@ -1,13 +1,23 @@
-{ inputs, self, ... }:
+{
+  inputs,
+  self,
+  home-manager-input,
+  nixvim-input,
+  ...
+}:
 {
   imports = [
-    inputs.home-manager-stable.nixosModules.default
+    home-manager-input.nixosModules.default
   ];
 
   home-manager = {
     extraSpecialArgs = {
-      inherit inputs self;
-      nixvim-input = inputs.nixvim-stable;
+      inherit
+        inputs
+        self
+        home-manager-input
+        nixvim-input
+        ;
     };
 
     users.root = {

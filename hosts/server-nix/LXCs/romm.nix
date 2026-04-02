@@ -4,6 +4,7 @@
     ./base
     "${self}/modules/software/services/romm.nix"
   ];
+  my.secrets.romm_env.enable = true;
   my.groups = {
     games = {
       enable = true;

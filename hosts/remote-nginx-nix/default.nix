@@ -48,7 +48,7 @@ in
     (import "${self}/modules/ssh/keys/acme.nix" acmeSSHUsers)
 
     # Software
-    "${self}/modules/software/bundles/all.nix"
+    "${self}/modules/software/bundles"
 
     # Nginx
     "${self}/modules/software/services/nginx/nginx.nix"

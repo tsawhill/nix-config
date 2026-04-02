@@ -9,6 +9,12 @@
     "${self}/modules/software/services/yt-dlp.nix"
 
   ];
+  my.secrets = {
+    radarr_api_key.enable = true;
+    sonarr_api_key.enable = true;
+    lidarr_api_key.enable = true;
+    prowlarr_api_key.enable = true;
+  };
   my.groups = {
     media = {
       enable = true;

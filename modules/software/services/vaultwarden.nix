@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, config, ... }:
 {
   networking.firewall.allowedTCPPorts = [ 8000 ];
   networking.firewall.allowedUDPPorts = [ 8000 ];
@@ -15,7 +15,7 @@
     serviceConfig = {
       ExecStart = "${pkgs.vaultwarden}/bin/vaultwarden";
       WorkingDirectory = "/var/lib/vaultwarden";
-      EnvironmentFile = "/var/lib/vaultwarden/.env";
+      EnvironmentFile = config.sops.secrets.vaultwarden_env.path;
       Environment = [
         "WEB_VAULT_FOLDER=${pkgs.vaultwarden.webvault}/share/vaultwarden/vault"
       ];

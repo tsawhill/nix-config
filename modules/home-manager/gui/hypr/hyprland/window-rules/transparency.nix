@@ -1,0 +1,37 @@
+{ config, lib, ... }:
+# All windows default to 90% inactive opacity.
+# Add classes to dimApps for 80% inactive opacity.
+# Add raw match strings to opaqueApps to exempt windows from dimming (full inactive opacity).
+# Both lists are additive — definitions across modules are concatenated.
+{
+  options.my.hypr.transparency = {
+    dimApps = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [];
+      description = "Window classes to dim to 80% opacity when inactive.";
+    };
+    opaqueApps = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [];
+      description = "Raw match strings (e.g. \"title .*YouTube\", \"class foo\") to keep at full inactive opacity.";
+    };
+  };
+
+  config = {
+    my.hypr.transparency = {
+      dimApps = [ "foot" "vesktop" "feishin" ];
+      opaqueApps = [
+        "title .*- YouTube — Zen Browser"
+        "title .*tv — Zen Browser"
+        "title .*Kick — Zen Browser"
+        "title .*'s Stream"
+        "class cafe.avery.Delfin"
+      ];
+    };
+
+    wayland.windowManager.hyprland.settings.windowrule =
+      [ "opacity 1.0 0.90, match:class .+" ]
+      ++ map (m: "opacity 1.0 1.0, match:${m}") config.my.hypr.transparency.opaqueApps
+      ++ map (c: "opacity 1.0 0.8, match:class ${c}") config.my.hypr.transparency.dimApps;
+  };
+}

@@ -1,4 +1,5 @@
-{ pkgs, ... }: {
+{ pkgs, config, ... }:
+{
   environment.systemPackages = [ pkgs.prowlarr ];
 
   systemd.services.prowlarr = {
@@ -12,10 +13,11 @@
     };
 
     serviceConfig = {
-      type = "simple";
+      Type = "simple";
       UMask = "007";
-      ExecStart = "/usr/bin/env Prowlarr -nobrowser";
-      Restart = "on-failure";
+      EnvironmentFile = config.sops.secrets.prowlarr_api_key.path;
+      ExecStart = "${pkgs.prowlarr}/bin/Prowlarr -nobrowser";
+      Restart = "always";
       TimeoutStopSec = "20";
       User = "root";
       Group = "root";

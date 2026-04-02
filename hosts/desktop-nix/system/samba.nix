@@ -1,0 +1,23 @@
+{ config, ... }:
+{
+  my.secrets.immobile0783-pass.enable = true;
+
+  sops.templates."smb-nix-config-credentials" = {
+    content = ''
+      username=immobile0783
+      password=${config.sops.placeholder."immobile0783-pass"}
+    '';
+    path = "/run/secrets/smb-nix-config-credentials";
+    mode = "0400";
+  };
+
+  fileSystems."/mnt/nix-config" = {
+    device = "//10.73.73.4/nix-configs";
+    fsType = "cifs";
+    options =
+      let
+        automount_opts = "x-systemd.automount,noauto,x-systemd.idle-timeout=60,x-systemd.device-timeout=5s,x-systemd.mount-timeout=5s";
+      in
+      [ "${automount_opts},credentials=/run/secrets/smb-nix-config-credentials,uid=1000,mfsymlinks" ];
+  };
+}

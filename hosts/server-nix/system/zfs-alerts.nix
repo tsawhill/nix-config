@@ -10,18 +10,18 @@ in
       auth = true;
       tls = true;
       host = "smtp.purelymail.com";
-      port = 465;
-      tls_starttls = false;
+      port = 587;
+      tls_starttls = true;
       user = "server@tsawhill.org";
       from = "server@tsawhill.org";
-      passwordeval = "cat /run/secrets/smtp_password";
+      passwordeval = "cat /run/secrets/smtp_password_server";
     };
   };
 
   services.zfs.zed = {
     enableMail = true;
     settings = {
-      ZED_EMAIL_ADDR = [ "root" ];
+      ZED_EMAIL_ADDR = [ "server@tsawhill.org" ];
       ZED_EMAIL_OPTS = "'@SUBJECT@'";
       ZED_NOTIFY_VERBOSE = true;
       ZED_NOTIFY_DATA = true;
@@ -29,7 +29,7 @@ in
       ZED_EMAIL_PROG = "${pkgs.writeShellScript "zed-notify" ''
         SUBJECT="$1"
         BODY=$(${pkgs.coreutils}/bin/cat)
-        GOTIFY_KEY=$(${pkgs.coreutils}/bin/cat /run/secrets/gotify_key)
+        GOTIFY_KEY=$(${pkgs.coreutils}/bin/cat /run/secrets/gotify_token_zfs)
 
         # 1. Gotify Push
         ${pkgs.curl}/bin/curl -s -X POST "https://gotify.tsawhill.org/message" \

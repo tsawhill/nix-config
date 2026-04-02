@@ -1,8 +1,23 @@
+{ pkgs, ... }:
 {
   # Enable ZFS support
   boot.supportedFilesystems = [ "zfs" ];
   # Set a unique Host ID (Required for ZFS)
   networking.hostId = "42526202";
+
+  systemd.services.configure-zfs-datasets = {
+    description = "Ensure ZFS datasets have correct mountpoints";
+    wantedBy = [ "zfs.target" ];
+    after = [ "zfs-import.target" ];
+    serviceConfig.Type = "oneshot";
+    script = ''
+      ${pkgs.zfs}/bin/zfs set mountpoint=/mnt/nix-stores downloadHDD/nix-stores
+      ${pkgs.zfs}/bin/zfs set mountpoint=/mnt/zpool zpool
+      ${pkgs.zfs}/bin/zfs set mountpoint=/mnt/downloadHDD downloadHDD
+      ${pkgs.zfs}/bin/zfs set mountpoint=/mnt/downloadSSD downloadSSD
+    '';
+  };
+  boot.zfs.forceImportRoot = true; # Import root even if booting from the mirrored boot drive.
 
   boot.kernelParams = [
     # Limit ZFS dirty data to 512MB (prevents massive I/O spikes)
@@ -29,13 +44,26 @@
       options = [
         "fmask=0077"
         "dmask=0077"
+        "nofail"
+      ];
+    };
+
+    "/boot-fallback" = {
+      device = "/dev/disk/by-uuid/4FA1-BC07";
+      fsType = "vfat";
+      options = [
+        "fmask=0077"
+        "dmask=0077"
+        "nofail"
       ];
     };
 
     "/mnt/nix-stores" = {
       device = "downloadHDD/nix-stores";
       fsType = "zfs";
-      options = [ "nofail" ];
+      options = [
+        "nofail"
+      ]; # Still boot if the zpool is not available.
     };
 
     "/mnt/zpool" = {
@@ -46,92 +74,12 @@
       ]; # Still boot if the zpool is not available.
     };
 
-    "/mnt/zpool/documents" = {
-      device = "zpool/documents";
-      fsType = "zfs";
-      options = [
-        "nofail"
-      ];
-    };
-
-    "/mnt/zpool/gamesaves" = {
-      device = "zpool/gamesaves";
-      fsType = "zfs";
-      options = [
-        "nofail"
-      ];
-    };
-
-    "/mnt/zpool/gameservers" = {
-      device = "zpool/gameservers";
-      fsType = "zfs";
-      options = [
-        "nofail"
-      ];
-    };
-
-    "/mnt/zpool/immich" = {
-      device = "zpool/immich";
-      fsType = "zfs";
-      options = [
-        "nofail"
-      ];
-    };
-
-    "/mnt/zpool/media" = {
-      device = "zpool/media";
-      fsType = "zfs";
-      options = [
-        "nofail"
-      ];
-    };
-
-    "/mnt/zpool/nextcloud" = {
-      device = "zpool/nextcloud";
-      fsType = "zfs";
-      options = [
-        "nofail"
-      ];
-    };
-
-    "/mnt/zpool/nixosconfigs" = {
-      device = "zpool/nixosconfigs";
-      fsType = "zfs";
-      options = [
-        "nofail"
-      ];
-    };
-
-    "/mnt/zpool/nixoslxcconfigs" = {
-      device = "zpool/nixoslxcconfigs";
-      fsType = "zfs";
-      options = [
-        "nofail"
-      ];
-    };
-
-    "/mnt/zpool/roms" = {
-      device = "zpool/roms";
-      fsType = "zfs";
-      options = [
-        "nofail"
-      ];
-    };
-
-    "/mnt/zpool/shadowplay" = {
-      device = "zpool/shadowplay";
-      fsType = "zfs";
-      options = [
-        "nofail"
-      ];
-    };
-
     "/mnt/downloadHDD" = {
       device = "downloadHDD";
       fsType = "zfs";
       options = [
         "nofail"
-      ];
+      ]; # Still boot if the zpool is not available.
     };
 
     "/mnt/downloadSSD" = {
@@ -139,7 +87,7 @@
       fsType = "zfs";
       options = [
         "nofail"
-      ];
+      ]; # Still boot if the zpool is not available.
     };
   };
   swapDevices = [

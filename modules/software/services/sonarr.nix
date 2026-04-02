@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, config, ... }:
 {
   environment.systemPackages = [ pkgs.sonarr ];
 
@@ -13,10 +13,11 @@
     };
 
     serviceConfig = {
-      type = "simple";
-      UMask = "002";
-      ExecStart = "/usr/bin/env Sonarr -nobrowser";
-      Restart = "on-failure";
+      Type = "simple";
+      UMask = "007";
+      EnvironmentFile = config.sops.secrets.sonarr_api_key.path;
+      ExecStart = "${pkgs.sonarr}/bin/Sonarr -nobrowser";
+      Restart = "always";
       TimeoutStopSec = "20";
       User = "root";
       Group = "root";

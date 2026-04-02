@@ -1,7 +1,7 @@
 { config, pkgs, ... }:
 
 let
-  # --- 1. HOST DEFINITIONS ---
+  # --- HOST DEFINITIONS ---
   dailyHosts = [
     "local-nginx-nix"
     "remote-nginx-nix"
@@ -29,9 +29,9 @@ let
   ];
   noPushHosts = [ ];
 
-  flakePath = "path:///mnt/zpool/nixosconfigs";
+  flakePath = "path:///mnt/zpool/code/nix-config";
 
-  # --- 2. UNIFIED LOGIC SCRIPT ---
+  # --- UNIFIED LOGIC SCRIPT ---
   rebuildManager = pkgs.writeShellApplication {
     name = "rebuild-manager";
     runtimeInputs = [
@@ -96,7 +96,21 @@ let
 
       update_flake() {
         echo "--- Updating Flake ---"
-        if nix flake update --flake "$FLAKE_URI"; then
+        # claude-code-bin and vscode-extensions are excluded: they track external
+        # versioned packages that can be yanked from npm/marketplaces. Update manually.
+        if nix flake update --flake "$FLAKE_URI" \
+          authentik-nix \
+          raspberry-pi-nix \
+          nixpkgs-stable \
+          home-manager-stable \
+          nixvim-stable \
+          sops-nix-stable \
+          zen-browser-stable \
+          nixpkgs-unstable \
+          home-manager-unstable \
+          nixvim-unstable \
+          sops-nix-unstable \
+          zen-browser-unstable; then
           echo "✅ Flake update success"
         else
           echo "❌ Flake update failed"
@@ -115,14 +129,11 @@ let
         PATH_LOG=$(mktemp)
         ERROR_LOG=$(mktemp)
 
-        # Redirect stdout (> path) and stderr (2> logs) separately
-        if nix build "$flake_url" --print-out-paths --no-link > "$PATH_LOG" 2> "$ERROR_LOG"; then
+        # Output stdout to PATH_LOG. Stream stderr to BOTH the terminal and ERROR_LOG live.
+        if nix build "$flake_url" --print-out-paths --no-link > "$PATH_LOG" 2> >(tee "$ERROR_LOG" >&2); then
           # SUCCESS: The path log will only contain the clean /nix/store/... path
           STORE_PATH=$(cat "$PATH_LOG")
           
-          # Optional: Print warnings to console
-          cat "$ERROR_LOG"
-
           nix-env --profile "$profile_path" --set "$STORE_PATH"
           nix-env --profile "$profile_path" --delete-generations +5
           echo "✅ Build created for $host"
@@ -134,9 +145,6 @@ let
           # FAILURE: Use the error log for the notification
           echo "❌ Failed to build $host"
           
-          # Print logs to stdout for debugging
-          cat "$ERROR_LOG"
-
           ERROR_SUMMARY=$(tail -n 20 "$ERROR_LOG")
           FAILED_HOSTS+=("$host")
           
@@ -249,12 +257,12 @@ let
     '';
   };
 
-  # --- 3. MANUAL COMMAND ALIAS ---
+  # --- MANUAL COMMAND ALIAS ---
   rebuildHost = pkgs.writeShellScriptBin "rebuild-Host" ''
     exec ${rebuildManager}/bin/rebuild-manager all --name "Manual" "$@"
   '';
 
-  # --- 4. TASK GENERATOR ---
+  # --- TASK GENERATOR ---
   mkRebuildTask = name: interval: hosts: {
     inherit interval;
     buildService = {
@@ -305,7 +313,7 @@ let
     };
   };
 
-  # --- 5. TASK INSTANCES ---
+  # --- TASK INSTANCES ---
   daily = mkRebuildTask "Daily" "Sun,Mon..Fri *-*-* 00:00" dailyHosts;
   weekly = mkRebuildTask "Weekly" "Sat *-*-8..31 00:00" (dailyHosts ++ weeklyHosts);
   monthly = mkRebuildTask "Monthly" "Sat *-*-1..7 00:00" (dailyHosts ++ weeklyHosts ++ monthlyHosts);

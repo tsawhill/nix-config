@@ -1,10 +1,168 @@
 keys:
   - &desktop age1vveuej3d8caxg7ujud55uxhg4k5vj5ra7dj4cn3pp9xmhznjfgkq8jzk6c
+  - &laptop age12av6jq5yyrdljujqsg873q8yv7x39dsnqfz08ht7e0f40ldy753s3n9vaz
   - &server age1xugzv5l3ks4srsnj0deysuy485wjrpzpjclzjl9qvfd934pw3ycq33sffv
+  - &build age1gn848ezdxgr3s3tf4chg27dprfad9wq3ehstrnz5kkn2js8xk3vqf8d2ex
+  - &acme age1vv402yraaklyrg0k5t4ckvnxy5pgasrdkkffvrjma5um2eespahsp76dqv
+  - &arrs age1sc4raxfl89mlnc4tjy9lny8zt4du59d4f6dmkvwnhlfhzts3s4jsvdd7s2
+  - &authentik age1l266y2z6cu7rg6p3tf5hfgyh5zr09f4e9eake67cgadx3uez55hsf2at7d
+  - &nextcloud age10gc54yhyn8slfrt9t3hzvz2ufmwf2cglftzn5cced0jmzmtpguaqey0amv
+  - &vaultwarden age1zkl8mjh7lfugphlt98dwtcd49tx3s6zwt8mf9zr66gd8eam7g56q9y60y5
+  - &romm age1q2hrvl2lx5ckvacn432d8lqshgx5cnm6gt5apr8fywchwn9j7dfsdxwpq0
+  - &samba age1v6nlyg65w0uulha8y5usg82yy06yepld7fltt3q4959pqc8fhqvsvwhtrd
 
 creation_rules:
-  - path_regex: hosts/server-nix/secrets\.yaml$
+  ##############################################################################
+  #
+  #                             SSH client keys
+  #
+  ##############################################################################
+  - path_regex: modules/secrets/ssh/client_keys/build-nix\.yaml$
     key_groups:
       - age:
-          - *desktop
-          - *server
+        - *build
+  - path_regex: modules/secrets/ssh/client_keys/acme-nix\.yaml$
+    key_groups:
+      - age:
+        - *build
+        - *acme
+  - path_regex: modules/secrets/ssh/client_keys/laptop-nix\.yaml$
+    key_groups:
+      - age:
+        - *build
+        - *laptop
+  ##############################################################################
+  #
+  #                             Samba account credentials
+  #
+  ##############################################################################
+  - path_regex: modules/secrets/server/LXCs/samba/immobile0783\.yaml$
+    key_groups:
+      - age:
+        - *build
+        - *samba
+  ##############################################################################
+  #
+  #                             Gotify tokens
+  #
+  ##############################################################################
+  - path_regex: modules/secrets/server/lXCs/gotify_token_zfs\.yaml$
+    key_groups:
+      - age:
+        - *build
+        - *server
+  ##############################################################################
+  #
+  #                             Github access token
+  #
+  ##############################################################################
+  - path_regex: modules/secrets/github_access_token_public\.yaml$
+    key_groups:
+      - age:
+        - *build
+  ##############################################################################
+  #
+  #                             SMTP passwords
+  #
+  ##############################################################################
+  ##############################################################################
+  #
+  #                             Syncthing cert/key pairs
+  #
+  ##############################################################################
+  - path_regex: modules/secrets/syncthing/desktop-nix\.yaml$
+    key_groups:
+      - age:
+        - *build
+        - *desktop
+  ##############################################################################
+  #
+  #                             SMTP passwords
+  #
+  ##############################################################################
+  - path_regex: modules/secrets/smtp/smtp_password_server\.yaml$
+    key_groups:
+      - age:
+        - *build
+        - *server
+  ##############################################################################
+  #
+  #                             arr API keys
+  #
+  ##############################################################################
+  - path_regex: modules/secrets/server/LXCs/radarr_api_key\.yaml$
+    key_groups:
+      - age:
+        - *build
+        - *arrs
+  - path_regex: modules/secrets/server/LXCs/sonarr_api_key\.yaml$
+    key_groups:
+      - age:
+        - *build
+        - *arrs
+  - path_regex: modules/secrets/server/LXCs/lidarr_api_key\.yaml$
+    key_groups:
+      - age:
+        - *build
+        - *arrs
+  - path_regex: modules/secrets/server/LXCs/prowlarr_api_key\.yaml$
+    key_groups:
+      - age:
+        - *build
+        - *arrs
+  ##############################################################################
+  #
+  #                             Authentik env file
+  #
+  ##############################################################################
+  - path_regex: modules/secrets/server/LXCs/authentik_env\.yaml$
+    key_groups:
+      - age:
+        - *build
+        - *authentik
+  - path_regex: modules/secrets/server/LXCs/authentik_ldap_outpost\.yaml$
+    key_groups:
+      - age:
+        - *build
+        - *authentik
+  ##############################################################################
+  #
+  #                             acme env file
+  #
+  ##############################################################################
+  - path_regex: modules/secrets/server/LXCs/acme_env\.yaml$
+    key_groups:
+      - age:
+        - *build
+        - *acme
+  ##############################################################################
+  #
+  #                             vaultwarden env file
+  #
+  ##############################################################################
+  - path_regex: modules/secrets/server/LXCs/vaultwarden_env\.yaml$
+    key_groups:
+      - age:
+        - *build
+        - *vaultwarden
+  ##############################################################################
+  #
+  #                             romm env file
+  #
+  ##############################################################################
+  - path_regex: modules/secrets/server/LXCs/romm_env\.yaml$
+    key_groups:
+      - age:
+        - *build
+        - *romm
+  ##############################################################################
+  #
+  #                             Nextcloud admin pass
+  #
+  ##############################################################################
+  - path_regex: modules/secrets/server/LXCs/nextcloud_admin_pass\.yaml$
+    key_groups:
+      - age:
+        - *build
+        - *nextcloud
+  

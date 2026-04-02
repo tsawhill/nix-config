@@ -1,4 +1,9 @@
-{ self, modulesPath, ... }:
+{
+  self,
+  modulesPath,
+  inputs,
+  ...
+}:
 
 let
   desktopSSHUsers = [ "root" ];
@@ -9,6 +14,11 @@ in
 {
   imports = [
     "${modulesPath}/virtualisation/lxc-container.nix"
+
+    # Secrets (SOPS)
+    inputs.sops-nix-stable.nixosModules.sops
+    "${self}/modules/secrets"
+
     # Locale
     "${self}/modules/locale/enUS-pacific.nix"
 
@@ -35,13 +45,16 @@ in
     ./home-manager.nix
 
     # Software
-    "${self}/modules/software/bundles/all.nix"
+    "${self}/modules/software/bundles"
   ];
 
   my.users.root = {
     enable = true;
   };
   my.garbage.collection.generations = 2;
+  environment.sessionVariables = {
+    EDITOR = "nvim";
+  };
 
   # This enables the tmpfs (RAM) mount for /tmp
   boot.tmp.useTmpfs = true;

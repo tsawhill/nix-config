@@ -1,4 +1,4 @@
-{ inputs, ... }:
+{ inputs, config, ... }:
 {
   imports = [ inputs.authentik-nix.nixosModules.default ];
   networking.firewall.allowedTCPPorts = [
@@ -12,7 +12,7 @@
   ];
   services.authentik = {
     enable = true;
-    environmentFile = "/root/.authentik-env";
+    environmentFile = config.sops.secrets.authentik_env.path;
 
     settings = {
       cookie_domain = "tsawhill.org";
@@ -34,10 +34,10 @@
       avatars = "initials";
     };
   };
-  # 1. Enable OCI containers (Docker or Podman)
+  # Enable OCI containers (Docker or Podman)
   virtualisation.oci-containers.backend = "docker"; # Or "podman"
 
-  # 2. Define the LDAP Outpost Container
+  # Define the LDAP Outpost Container
   virtualisation.oci-containers.containers.authentik-ldap-outpost = {
     image = "ghcr.io/goauthentik/ldap:latest"; # Or pin a version like :2024.2.1
 
@@ -50,7 +50,7 @@
 
     # Load the variables from your env file
     environmentFiles = [
-      "/var/lib/authentik/ldap-outpost.env"
+      config.sops.secrets.authentik_ldap_outpost.path
     ];
 
     # Optional: If you need it on a specific docker network (e.g. to talk to Authentik)

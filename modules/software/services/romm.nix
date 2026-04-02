@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, config, ... }:
 
 {
   virtualisation.docker.enable = true;
@@ -17,7 +17,7 @@
           MARIADB_DATABASE = "romm";
           MARIADB_USER = "romm-user";
         };
-        environmentFiles = [ "/root/.romm-env" ];
+        environmentFiles = [ config.sops.secrets.romm_env.path ];
         volumes = [
           "mysql_data:/var/lib/mysql"
         ];
@@ -36,7 +36,7 @@
           DB_USER = "romm-user";
           LISTEN_IPV6 = "false";
         };
-        environmentFiles = [ "/root/.romm-env" ];
+        environmentFiles = [ config.sops.secrets.romm_env.path ];
         ports = [ "80:8080" ];
         volumes = [
           "romm_resources:/romm/resources"

@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, config, ... }:
 {
   environment.systemPackages = [ pkgs.radarr ];
 
@@ -13,10 +13,11 @@
     };
 
     serviceConfig = {
-      type = "simple";
+      Type = "simple";
       UMask = "007";
-      ExecStart = "/usr/bin/env Radarr -nobrowser";
-      Restart = "on-failure";
+      EnvironmentFile = config.sops.secrets.radarr_api_key.path;
+      ExecStart = "${pkgs.radarr}/bin/Radarr -nobrowser";
+      Restart = "always";
       TimeoutStopSec = "20";
       User = "root";
       Group = "root";
