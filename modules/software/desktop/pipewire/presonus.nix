@@ -65,7 +65,7 @@ in
           # Route PreSonus hardware to the effects filter
           {
             matches = [
-              { "node.name" = "~alsa_input.*PreSonus.*"; }
+              { "node.name" = "alsa_input.usb-PreSonus_Studio_24c_SC1E21081241-00.analog-stereo"; }
             ];
             actions.update-props = {
               "node.target.object" = "presonus_mic_effects";
