@@ -1,6 +1,6 @@
 {
   imports = [
-    # ./taskbar-popups.nix
+    ./taskbar-popups.nix
     ./transparency.nix
     ./gaming.nix
     ./steam.nix
