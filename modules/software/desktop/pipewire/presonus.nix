@@ -19,46 +19,12 @@ in
     ];
 
     services.pipewire = {
-      # Add the mic effects filter chain
-      extraConfig.pipewire."94-presonus-effects" = {
-        "context.modules" = [
-          {
-            name = "libpipewire-module-filter-chain";
-            args = {
-              "node.description" = "PreSonus Mic Effects";
-              "media.name" = "PreSonus Mic Effects";
-              "media.class" = "Audio/Source";
-              "node.class" = "Stream";
-              "filter.graph" = {
-                nodes = [
-                  {
-                    type = "builtin";
-                    name = "passthrough";
-                  }
-                ];
-                links = [];
-              };
-            };
-          }
-        ];
-      };
-
-      # Route: PreSonus hardware input → filter-chain effects → mic_input sink
+      # Route PreSonus hardware input → mic_input sink
       wireplumber.extraConfig."95-presonus-routing" = {
         "stream.rules" = [
-          # Route PreSonus hardware to the effects filter
           {
             matches = [
               { "node.name" = "alsa_input.usb-PreSonus_Studio_24c_SC1E21081241-00.analog-stereo"; }
-            ];
-            actions.update-props = {
-              "node.target.object" = "presonus_mic_effects";
-            };
-          }
-          # Route the effects output to the mic_input sink (for apps to record from)
-          {
-            matches = [
-              { "node.name" = "presonus_mic_effects"; }
             ];
             actions.update-props = {
               "node.target.object" = "mic_input";
