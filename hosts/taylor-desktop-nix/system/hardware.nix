@@ -13,6 +13,9 @@ let
   };
 in
 {
+  # Enable redistributable firmware for Bluetooth and other devices
+  hardware.enableRedistributableFirmware = true;
+
   services.udev.packages = [
     igpu
     dgpu
