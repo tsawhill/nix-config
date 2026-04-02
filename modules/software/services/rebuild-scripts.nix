@@ -24,7 +24,7 @@ let
 
       echo "--- Deploying ${name} (${tags}) ---"
       LOG=$(mktemp)
-      if ${pkgs.colmena}/bin/colmena apply --flake "${flakePath}" --on '${tags}' --parallel 4 --keep-going switch 2>&1 | tee "$LOG"; then
+      if ${pkgs.colmena}/bin/colmena apply --flake "${flakePath}" --on '${tags}' --parallel 4 switch 2>&1 | tee "$LOG"; then
         WARNINGS=$(grep -E '\[WARN\]|warning:' "$LOG" || true)
         if [ -n "$WARNINGS" ]; then
           MSG="Warnings:\n$WARNINGS"
@@ -137,7 +137,7 @@ let
       ${pkgs.colmena}/bin/colmena apply-local "$GOAL"
     else
       echo "--- Deploying $TARGET ($GOAL) ---"
-      ${pkgs.colmena}/bin/colmena apply --on "$TARGET" --keep-going "$GOAL"
+      ${pkgs.colmena}/bin/colmena apply --on "$TARGET" "$GOAL"
     fi
   '';
 
