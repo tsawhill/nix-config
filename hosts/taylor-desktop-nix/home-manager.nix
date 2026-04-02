@@ -28,7 +28,6 @@
       ];
       home.stateVersion = "25.11";
       my.shell.starshipTheme = "personal";
-      my.audio.presonus.enable = true;
       my.hypr = {
         monitors.primary = "DP-4";
         monitors.secondary = "DP-5";
