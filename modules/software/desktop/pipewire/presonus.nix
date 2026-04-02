@@ -28,11 +28,13 @@ in
         TimeoutStartSec = 30;
         ExecStart = pkgs.writeShellScript "presonus-connect" ''
           for i in {1..15}; do
-            ${pkgs.pipewire}/bin/pw-link alsa_input.usb-PreSonus_Studio_24c_SC1E21081241-00.analog-stereo:capture_FL mic_input:playback_FL 2>/dev/null && \
-            ${pkgs.pipewire}/bin/pw-link alsa_input.usb-PreSonus_Studio_24c_SC1E21081241-00.analog-stereo:capture_FR mic_input:playback_FR 2>/dev/null && exit 0
+            if ${pkgs.pipewire}/bin/pw-link alsa_input.usb-PreSonus_Studio_24c_SC1E21081241-00.analog-stereo:capture_FL mic_input:playback_FL 2>/dev/null; then
+              ${pkgs.pipewire}/bin/pw-link alsa_input.usb-PreSonus_Studio_24c_SC1E21081241-00.analog-stereo:capture_FR mic_input:playback_FR 2>/dev/null
+              exit 0
+            fi
             sleep 0.3
           done
-          exit 1
+          exit 0
         '';
         Restart = "on-failure";
         RestartSec = 5;
