@@ -9,7 +9,14 @@ let
     description = "${name} Colmena Deploy";
     restartIfChanged = false;
     stopIfChanged = false;
-    path = [ pkgs.git pkgs.nix pkgs.colmena pkgs.openssh pkgs.jq pkgs.gotify-cli ];
+    path = [
+      pkgs.git
+      pkgs.nix
+      pkgs.colmena
+      pkgs.openssh
+      pkgs.jq
+      pkgs.gotify-cli
+    ];
     serviceConfig = {
       Type = "oneshot";
       User = "root";
@@ -52,7 +59,7 @@ let
         echo "--- [$host] deploying ---"
         LOG=$(mktemp)
         colmena_exit=0
-        ${pkgs.colmena}/bin/colmena apply --on "$host" switch 2>&1 | tee "$LOG" || colmena_exit=$?
+        ${pkgs.colmena}/bin/colmena apply --on "$host" switch --no-substitute 2>&1 | tee "$LOG" || colmena_exit=$?
 
         NEW_PATHS=$(grep -oE '/nix/store/[a-z0-9]+[^[:space:]]*' "$LOG" | sort -u || true)
         [ -n "$NEW_PATHS" ] && ALL_STORE_PATHS=$(printf '%s\n%s' "$ALL_STORE_PATHS" "$NEW_PATHS" | sort -u | grep -v '^$') || true
@@ -96,7 +103,7 @@ let
           sleep $RETRY_DELAY
           LOG=$(mktemp)
           colmena_exit=0
-          ${pkgs.colmena}/bin/colmena apply --on "$host" switch 2>&1 | tee "$LOG" || colmena_exit=$?
+          ${pkgs.colmena}/bin/colmena apply --on "$host" switch --no-substitute 2>&1 | tee "$LOG" || colmena_exit=$?
 
           NEW_PATHS=$(grep -oE '/nix/store/[a-z0-9]+[^[:space:]]*' "$LOG" | sort -u || true)
           [ -n "$NEW_PATHS" ] && ALL_STORE_PATHS=$(printf '%s\n%s' "$ALL_STORE_PATHS" "$NEW_PATHS" | sort -u | grep -v '^$') || true
@@ -188,7 +195,13 @@ let
     description = "Self Colmena Deploy";
     restartIfChanged = false;
     stopIfChanged = false;
-    path = [ pkgs.git pkgs.nix pkgs.colmena pkgs.openssh pkgs.gotify-cli ];
+    path = [
+      pkgs.git
+      pkgs.nix
+      pkgs.colmena
+      pkgs.openssh
+      pkgs.gotify-cli
+    ];
     serviceConfig = {
       Type = "oneshot";
       User = "root";

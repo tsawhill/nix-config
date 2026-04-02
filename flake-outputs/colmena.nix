@@ -18,7 +18,6 @@ let
   mkHost = tag: targetHost: modulePath: {
     deployment = {
       targetUser = "root";
-      substituteOnDestination = false;
     }
     // (
       if targetHost == null then
@@ -39,7 +38,6 @@ let
   mkUnstableHost = tag: targetHost: modulePath: {
     deployment = {
       targetUser = "root";
-      substituteOnDestination = false;
     }
     // (
       if targetHost == null then
