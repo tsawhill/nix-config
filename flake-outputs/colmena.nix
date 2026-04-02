@@ -34,7 +34,10 @@ let
   };
 
   unstablePkgs = import nixpkgs-unstable { localSystem = "x86_64-linux"; };
-  masterPkgs = import nixpkgs-master { localSystem = "x86_64-linux"; };
+  masterPkgs = import nixpkgs-master {
+    localSystem = "x86_64-linux";
+    config.allowUnfree = true;
+  };
 
   # For hosts using nixpkgs-unstable (desktop, laptop)
   mkUnstableHost = tag: targetHost: modulePath: {
