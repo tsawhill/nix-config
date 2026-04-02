@@ -27,6 +27,8 @@ in
             args = {
               "node.description" = "PreSonus Mic Effects";
               "media.name" = "PreSonus Mic Effects";
+              "media.class" = "Audio/Source";
+              "node.class" = "Stream";
               "filter.graph" = {
                 nodes = [
                   # Gate (threshold -27dB, reduction -40dB, attack 5ms, release 100ms)
@@ -51,11 +53,6 @@ in
                   { output = "Deesser:audio_out_1"; input = "Compressor:audio_in_1"; }
                   { output = "Deesser:audio_out_2"; input = "Compressor:audio_in_2"; }
                 ];
-              };
-              "capture.props" = {
-                "node.name" = "presonus_mic_effects";
-                "media.class" = "Audio/Source";
-                "audio.position" = [ "FL" "FR" ];
               };
             };
           }
