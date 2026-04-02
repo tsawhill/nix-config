@@ -5,6 +5,7 @@
   sops.templates."smb-nix-config-credentials" = {
     content = ''
       username=immobile0783
+      domain=taylor-home
       password=${config.sops.placeholder."immobile0783-pass"}
     '';
     path = "/run/secrets/smb-nix-config-credentials";
