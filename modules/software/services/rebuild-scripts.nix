@@ -113,6 +113,34 @@ let
     '';
   };
 
+  deployCmd = pkgs.writeShellScriptBin "deploy" ''
+    set -euo pipefail
+
+    if [ $# -lt 1 ]; then
+      echo "Usage: deploy <host|@tag> [goal]"
+      echo "  Examples:"
+      echo "    deploy laptop-nix"
+      echo "    deploy desktop-nix boot"
+      echo "    deploy @weekly"
+      echo "    deploy build-nix        (uses apply-local)"
+      exit 1
+    fi
+
+    TARGET="$1"
+    GOAL="''${2:-switch}"
+    HOSTNAME=$(hostname)
+
+    cd "${repoPath}"
+
+    if [[ "$TARGET" == "$HOSTNAME" ]] || [[ "$TARGET" == "build-nix" && "$HOSTNAME" == "build-nix" ]]; then
+      echo "--- Local deploy (apply-local $GOAL) ---"
+      ${pkgs.colmena}/bin/colmena apply-local "$GOAL"
+    else
+      echo "--- Deploying $TARGET ($GOAL) ---"
+      ${pkgs.colmena}/bin/colmena apply --on "$TARGET" --keep-going "$GOAL"
+    fi
+  '';
+
   mkTimer = name: onCalendar: {
     description = "Run ${name} Colmena Deploy";
     wantedBy = [ "timers.target" ];
@@ -125,6 +153,8 @@ let
 
 in
 {
+  environment.systemPackages = [ deployCmd ];
+
   systemd.services = {
     "deploy-Daily" = mkDeployService "Daily" "@daily";
     "deploy-Weekly" = mkDeployService "Weekly" "@daily,@weekly";

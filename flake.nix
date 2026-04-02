@@ -45,24 +45,18 @@
   outputs =
     inputs:
     let
-      # Load main outputs
-      mainOutputs = import ./flake-outputs/default.nix inputs;
       # Load server outputs
       serverOutputs = import ./flake-outputs/server.nix inputs;
       piOutputs = import ./flake-outputs/pi-backup.nix inputs;
       # Load OCI server outputs
       ociOutputs = import ./flake-outputs/oci-proxy.nix inputs;
-      # Colmena deployment hive (LXC hosts)
+      # Colmena deployment hive
       colmenaOutputs = import ./flake-outputs/colmena.nix inputs;
     in
-    # Merge them together. // merges the top level,
-    # but we specifically need to merge the nixosConfigurations sets.
-    mainOutputs
-    // colmenaOutputs
+    colmenaOutputs
     // {
       nixosConfigurations =
-        (mainOutputs.nixosConfigurations or { })
-        // (serverOutputs.nixosConfigurations or { })
+        (serverOutputs.nixosConfigurations or { })
         // (piOutputs.nixosConfigurations or { })
         // (ociOutputs.nixosConfigurations or { });
     };
