@@ -16,7 +16,6 @@ in
     environment.systemPackages = with pkgs; [
       calf                # Gate, deesser, reverb, loudness, compressor
       zam-plugins         # Additional deesser/gate options
-      swh-plugins         # Additional effects library
     ];
 
     services.pipewire = {
