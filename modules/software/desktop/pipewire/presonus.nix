@@ -18,46 +18,32 @@ in
     ];
 
     services.pipewire = {
-      extraConfig.pipewire."94-presonus-filter" = {
+      extraConfig.pipewire."94-presonus-loopback" = {
         "context.modules" = [
           {
-            name = "libpipewire-module-filter-chain";
+            name = "libpipewire-module-loopback";
             args = {
-              "node.name" = "PreSonus_to_Mic";
-              "node.description" = "PreSonus → Mic Input";
-              "media.class" = "Audio/Source";
-              "audio.position" = [ "FL" "FR" ];
-              "filter.graph" = {
-                "nodes" = [
-                  {
-                    "type" = "builtin";
-                    "name" = "in_node";
-                    "label" = "input";
-                    "control" = { "port.name" = "input"; };
-                  }
-                  {
-                    "type" = "builtin";
-                    "name" = "out_node";
-                    "label" = "output";
-                    "control" = { "port.name" = "output"; };
-                  }
-                ];
-                "links" = [
-                  { "output" = "in_node:In"; "input" = "out_node:In"; }
-                ];
-              };
+              "node.description" = "PreSonus Input";
               "capture.props" = {
-                "node.name" = "PreSonus_to_Mic_input";
+                "node.name" = "presonus_input";
+                "media.class" = "Audio/Source";
                 "node.target.object" = "alsa_input.usb-PreSonus_Studio_24c_SC1E21081241-00.analog-stereo";
               };
               "playback.props" = {
-                "node.name" = "PreSonus_to_Mic_output";
-                "target.object" = "mic_input";
+                "node.name" = "presonus_playback";
+                "media.class" = "Audio/Sink";
               };
             };
           }
         ];
       };
+
+      wireplumber.extraConfig."95-presonus-routing"."stream.rules" = [
+        {
+          matches = [{ "node.name" = "presonus_playback"; }];
+          actions.update-props."node.target" = "mic_input";
+        }
+      ];
     };
   };
 }
