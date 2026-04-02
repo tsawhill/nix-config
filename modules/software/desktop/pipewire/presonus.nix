@@ -25,11 +25,12 @@ in
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
+        TimeoutStartSec = 30;
         ExecStart = pkgs.writeShellScript "presonus-connect" ''
-          for i in {1..20}; do
+          for i in {1..15}; do
             ${pkgs.pipewire}/bin/pw-link alsa_input.usb-PreSonus_Studio_24c_SC1E21081241-00.analog-stereo:capture_FL mic_input:playback_FL 2>/dev/null && \
             ${pkgs.pipewire}/bin/pw-link alsa_input.usb-PreSonus_Studio_24c_SC1E21081241-00.analog-stereo:capture_FR mic_input:playback_FR 2>/dev/null && exit 0
-            sleep 0.5
+            sleep 0.3
           done
           exit 1
         '';
