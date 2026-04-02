@@ -61,13 +61,13 @@ in
     # Routing rules via WirePlumber — applies to ALL audio backends (pulse, native PW, JACK)
     # Rules are evaluated top-to-bottom; more specific matches override the catch-all.
     wireplumber.extraConfig."94-app-routing"."stream.rules" =
-      # All mic inputs go to Mic Input sink
-      lib.optionals cfg.mic.enable [
-        (mkRoute [{ "media.class" = "Stream/Input/Audio"; }] "mic_input")
-      ]
-      # Catch-all: send everything to Desktop Audio (must be first)
-      ++ lib.optionals cfg.desktop.enable [
+      # Catch-all: send output streams to Desktop Audio (must be first)
+      lib.optionals cfg.desktop.enable [
         (mkRoute [{ "media.class" = "Stream/Output/Audio"; }] "desktop_audio")
+      ]
+      # All input streams go to Mic Input sink
+      ++ lib.optionals cfg.mic.enable [
+        (mkRoute [{ "media.class" = "Stream/Input/Audio"; }] "mic_input")
       ]
       # Discord (Electron)
       ++ lib.optionals cfg.discord.enable [
