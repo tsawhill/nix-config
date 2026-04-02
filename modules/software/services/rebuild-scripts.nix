@@ -27,108 +27,122 @@ let
       cd "${repoPath}"
       RETRY_DELAY=1800
       MAX_RETRIES=46
-      PENDING='${tags}'
-      SUCCEEDED_HOSTS=""
-      FAILED_HOSTS=""
-      HAD_WARNINGS=false
-      ALL_STORE_PATHS=""
-      attempt=0
 
-      while [ -n "$PENDING" ] && [ $attempt -lt $MAX_RETRIES ]; do
-        attempt=$((attempt + 1))
-        echo "Attempt $attempt/$MAX_RETRIES (targets: $PENDING)..."
+      # Enumerate all hosts for this tag
+      TAG_NAME=$(echo '${tags}' | sed 's/^@//')
+      ALL_HOSTS=$(${pkgs.nix}/bin/nix eval --json "${flakePath}#colmena" \
+        --apply "hive: with builtins; attrNames (filterAttrs (n: v: n != \"meta\" && v ? deployment && v.deployment ? tags && elem \"$TAG_NAME\" v.deployment.tags) hive)" \
+        | ${pkgs.jq}/bin/jq -r '.[]' | tr '\n' ' ' | xargs)
+
+      if [ -z "$ALL_HOSTS" ]; then
+        echo "No hosts found for tag '${tags}'"
+        exit 0
+      fi
+      echo "Hosts to deploy: $ALL_HOSTS"
+
+      SUCCEEDED_HOSTS=""
+      HARD_FAIL_HOSTS=""
+      CONN_FAIL_HOSTS=""
+      ALL_STORE_PATHS=""
+      HAD_WARNINGS=false
+
+      # --- First pass: each host individually so one build failure can't abort others ---
+      for host in $ALL_HOSTS; do
+        echo "--- [$host] deploying ---"
         LOG=$(mktemp)
         colmena_exit=0
-        PENDING_ARG=$(echo "$PENDING" | tr ' ' ',')
-        ${pkgs.colmena}/bin/colmena apply --on "$PENDING_ARG" --parallel 4 switch 2>&1 | tee "$LOG" || colmena_exit=$?
+        ${pkgs.colmena}/bin/colmena apply --on "$host" switch 2>&1 | tee "$LOG" || colmena_exit=$?
 
-        # Accumulate store paths and warnings across all attempts
         NEW_PATHS=$(grep -oE '/nix/store/[a-z0-9]+[^[:space:]]*' "$LOG" | sort -u || true)
         [ -n "$NEW_PATHS" ] && ALL_STORE_PATHS=$(printf '%s\n%s' "$ALL_STORE_PATHS" "$NEW_PATHS" | sort -u | grep -v '^$') || true
         grep -qE '\[WARN\]|warning:' "$LOG" && HAD_WARNINGS=true || true
 
-        # Parse which hosts succeeded and which were targeted this round
-        NEW_OK=$(grep 'Activation successful' "$LOG" | grep -oP '^\[\K[^\]]+' | sort -u || true)
-        [ -n "$NEW_OK" ] && SUCCEEDED_HOSTS=$(printf '%s\n%s' "$SUCCEEDED_HOSTS" "$NEW_OK" | sort -u | grep -v '^$' | tr '\n' ' ' | xargs) || true
-
         if [ $colmena_exit -eq 0 ]; then
-          rm "$LOG"
-          PENDING=""
+          SUCCEEDED_HOSTS="$SUCCEEDED_HOSTS $host"
         else
-          # All hosts colmena printed output for this round
-          ALL_ATTEMPTED=$(grep -oP '^\[\K[^\]]+' "$LOG" | grep -vxF 'INFO' | grep -vxF 'WARN' | grep -vxF 'ERROR' | grep -vxF 'DEBUG' | sort -u || true)
-          THIS_FAILED=$(comm -23 <(echo "$ALL_ATTEMPTED" | grep -v '^$' | sort) <(echo "$NEW_OK" | grep -v '^$' | sort) 2>/dev/null | grep -v '^$' || true)
           ERROR_SUMMARY=$(tail -n 20 "$LOG")
+          if grep -qE 'ssh: connect|Connection refused|No route to host|Connection timed out|Network is unreachable|Could not connect|ssh_exchange_identification' "$LOG"; then
+            CONN_FAIL_HOSTS="$CONN_FAIL_HOSTS $host"
+          else
+            HARD_FAIL_HOSTS="$HARD_FAIL_HOSTS $host"
+            ${pkgs.gotify-cli}/bin/gotify push \
+              -t "\u274c ${name}: $host FAILED (build/activation)" \
+              -p 10 \
+              "Last 20 lines:\n$ERROR_SUMMARY"
+          fi
+        fi
+        rm "$LOG"
+      done
 
-          CONN_FAIL=""
-          HARD_FAIL=""
-          for h in $THIS_FAILED; do
-            if grep -E "^\[$h\]" "$LOG" | grep -qE 'ssh: connect|Connection refused|No route to host|Connection timed out|Network is unreachable|Could not connect|ssh_exchange_identification'; then
-              CONN_FAIL="$CONN_FAIL $h"
-            else
-              HARD_FAIL="$HARD_FAIL $h"
-            fi
-          done
-          CONN_FAIL=$(echo "$CONN_FAIL" | xargs || true)
-          HARD_FAIL=$(echo "$HARD_FAIL" | xargs || true)
+      SUCCEEDED_HOSTS=$(echo "$SUCCEEDED_HOSTS" | xargs || true)
+      HARD_FAIL_HOSTS=$(echo "$HARD_FAIL_HOSTS" | xargs || true)
+      CONN_FAIL_HOSTS=$(echo "$CONN_FAIL_HOSTS" | xargs || true)
+
+      # --- First-pass summary ---
+      SUCC_DISP=$SUCCEEDED_HOSTS;  [ -n "$SUCC_DISP" ] || SUCC_DISP="none"
+      HARD_DISP=$HARD_FAIL_HOSTS;  [ -n "$HARD_DISP" ] || HARD_DISP="none"
+      CONN_DISP=$CONN_FAIL_HOSTS;  [ -n "$CONN_DISP" ] || CONN_DISP="none"
+      ${pkgs.gotify-cli}/bin/gotify push \
+        -t "\u2139 ${name} first-pass summary" \
+        -p 3 \
+        "Succeeded: $SUCC_DISP\nHard failed: $HARD_DISP\nRetrying (conn): $CONN_DISP"
+
+      # --- Retry connection-failed hosts individually ---
+      for host in $CONN_FAIL_HOSTS; do
+        host_ok=false
+        for attempt in $(seq 1 $MAX_RETRIES); do
+          echo "[$host] retry $attempt/$MAX_RETRIES, sleeping $((RETRY_DELAY / 60)) min..."
+          sleep $RETRY_DELAY
+          LOG=$(mktemp)
+          colmena_exit=0
+          ${pkgs.colmena}/bin/colmena apply --on "$host" switch 2>&1 | tee "$LOG" || colmena_exit=$?
+
+          NEW_PATHS=$(grep -oE '/nix/store/[a-z0-9]+[^[:space:]]*' "$LOG" | sort -u || true)
+          [ -n "$NEW_PATHS" ] && ALL_STORE_PATHS=$(printf '%s\n%s' "$ALL_STORE_PATHS" "$NEW_PATHS" | sort -u | grep -v '^$') || true
+          grep -qE '\[WARN\]|warning:' "$LOG" && HAD_WARNINGS=true || true
           rm "$LOG"
 
-          # Hard failures: notify immediately and drop from future retries
-          if [ -n "$HARD_FAIL" ]; then
-            FAILED_HOSTS="$FAILED_HOSTS $HARD_FAIL"
-            ${pkgs.gotify-cli}/bin/gotify push \
-              -t "\u274c ${name} deploy FAILED ($HARD_FAIL)" \
-              -p 10 \
-              "Hard failure on: $HARD_FAIL\n\nLast 20 lines:\n$ERROR_SUMMARY"
+          if [ $colmena_exit -eq 0 ]; then
+            SUCCEEDED_HOSTS="$SUCCEEDED_HOSTS $host"
+            host_ok=true
+            break
           fi
+        done
 
-          # Connection failures: retry if attempts remain
-          if [ -n "$CONN_FAIL" ]; then
-            if [ $attempt -ge $MAX_RETRIES ]; then
-              FAILED_HOSTS="$FAILED_HOSTS $CONN_FAIL"
-              ${pkgs.gotify-cli}/bin/gotify push \
-                -t "\u274c ${name} deploy FAILED (retries exhausted)" \
-                -p 10 \
-                "Connection retries exhausted for: $CONN_FAIL"
-              CONN_FAIL=""
-            else
-              echo "Connection failed for $CONN_FAIL, retrying in $((RETRY_DELAY / 60)) minutes (attempt $attempt/$MAX_RETRIES)..."
-              sleep $RETRY_DELAY
-            fi
-          fi
-
-          # Only retry connection-failed hosts; hard-failed ones are abandoned
-          PENDING=$(echo "$CONN_FAIL" | tr ' ' '\n' | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//' || true)
+        if [ "$host_ok" = false ]; then
+          HARD_FAIL_HOSTS="$HARD_FAIL_HOSTS $host"
+          ${pkgs.gotify-cli}/bin/gotify push \
+            -t "\u274c ${name}: $host FAILED (retries exhausted)" \
+            -p 10 \
+            "All $MAX_RETRIES connection retries exhausted for $host"
         fi
       done
 
-      # Safety net in case the while condition killed the loop with PENDING still set
-      if [ -n "$PENDING" ]; then
-        FAILED_HOSTS=$(printf '%s\n%s' "$FAILED_HOSTS" "$PENDING" | sort -u | grep -v '^$' | tr '\n' ' ' | xargs || true)
+      SUCCEEDED_HOSTS=$(echo "$SUCCEEDED_HOSTS" | tr ' ' '\n' | sort -u | grep -v '^$' | tr '\n' ' ' | xargs || true)
+      HARD_FAIL_HOSTS=$(echo "$HARD_FAIL_HOSTS" | tr ' ' '\n' | sort -u | grep -v '^$' | tr '\n' ' ' | xargs || true)
+
+      # --- Final summary ---
+      SUCC_DISP=$SUCCEEDED_HOSTS; [ -n "$SUCC_DISP" ] || SUCC_DISP="none"
+      FAIL_DISP=$HARD_FAIL_HOSTS; [ -n "$FAIL_DISP" ] || FAIL_DISP="none"
+      if [ -n "$HARD_FAIL_HOSTS" ]; then
+        ${pkgs.gotify-cli}/bin/gotify push \
+          -t "\u26a0\ufe0f ${name} deploy partial" \
+          -p 6 \
+          "Succeeded: $SUCC_DISP\nFailed: $FAIL_DISP"
+      elif [ "$HAD_WARNINGS" = true ]; then
+        ${pkgs.gotify-cli}/bin/gotify push \
+          -t "\u26a0\ufe0f ${name} deploy succeeded (with warnings)" \
+          -p 4 \
+          "All hosts: $SUCC_DISP"
+      else
+        ${pkgs.gotify-cli}/bin/gotify push \
+          -t "\u2705 ${name} deploy succeeded" \
+          -p 3 \
+          "All hosts: $SUCC_DISP"
       fi
-      FAILED_HOSTS=$(echo "$FAILED_HOSTS" | tr ' ' '\n' | sort -u | grep -v '^$' | tr '\n' ' ' | xargs || true)
 
-      # Success notification and follow-up work for all hosts that deployed
+      # --- Version commit and GC roots for succeeded hosts ---
       if [ -n "$SUCCEEDED_HOSTS" ]; then
-        if [ -n "$FAILED_HOSTS" ]; then
-          DEPLOY_SUMMARY="Succeeded: $SUCCEEDED_HOSTS\nFailed: $FAILED_HOSTS"
-          TITLE_SUFFIX=" (partial)"
-        else
-          DEPLOY_SUMMARY="All targeted hosts deployed successfully."
-          TITLE_SUFFIX=""
-        fi
-        if [ "$HAD_WARNINGS" = true ]; then
-          ${pkgs.gotify-cli}/bin/gotify push \
-            -t "\u26a0\ufe0f ${name} deploy''${TITLE_SUFFIX} succeeded (with warnings)" \
-            -p 4 \
-            "$DEPLOY_SUMMARY"
-        else
-          ${pkgs.gotify-cli}/bin/gotify push \
-            -t "\u2705 ${name} deploy''${TITLE_SUFFIX} succeeded" \
-            -p 3 \
-            "$DEPLOY_SUMMARY"
-        fi
-
         REVISIONS=""
         for host in $SUCCEEDED_HOSTS; do
           VER=$(${pkgs.openssh}/bin/ssh -o ConnectTimeout=5 -o BatchMode=yes "root@$host" nixos-version 2>/dev/null || echo "unreachable")
@@ -165,7 +179,7 @@ let
         done || true
       fi
 
-      [ -z "$FAILED_HOSTS" ] || exit 1
+      [ -z "$HARD_FAIL_HOSTS" ] || exit 1
     '';
   };
 
