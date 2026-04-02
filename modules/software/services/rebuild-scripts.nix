@@ -23,41 +23,61 @@ let
       ${pkgs.git}/bin/git -C "${repoPath}" commit -m "auto: ${name} pre-deploy $(date '+%Y-%m-%d %H:%M')" || true
 
       echo "--- Deploying ${name} (${tags}) ---"
-      LOG=$(mktemp)
-      if ${pkgs.colmena}/bin/colmena apply --flake "${flakePath}" --on '${tags}' --parallel 4 switch 2>&1 | tee "$LOG"; then
-        WARNINGS=$(grep -E '\[WARN\]|warning:' "$LOG" || true)
-        if [ -n "$WARNINGS" ]; then
-          MSG="Warnings:\n$WARNINGS"
-          ${pkgs.gotify-cli}/bin/gotify push \
-            -t "\u26a0\ufe0f ${name} deploy succeeded (with warnings)" \
-            -p 4 \
-            "$MSG"
+      RETRY_DELAY=1800
+      MAX_RETRIES=46
+      for attempt in $(seq 1 $MAX_RETRIES); do
+        echo "Attempt $attempt/$MAX_RETRIES..."
+        LOG=$(mktemp)
+        if ${pkgs.colmena}/bin/colmena apply --flake "${flakePath}" --on '${tags}' --parallel 4 switch 2>&1 | tee "$LOG"; then
+          WARNINGS=$(grep -E '\[WARN\]|warning:' "$LOG" || true)
+          if [ -n "$WARNINGS" ]; then
+            MSG="Warnings:\n$WARNINGS"
+            ${pkgs.gotify-cli}/bin/gotify push \
+              -t "\u26a0\ufe0f ${name} deploy succeeded (with warnings)" \
+              -p 4 \
+              "$MSG"
+          else
+            ${pkgs.gotify-cli}/bin/gotify push \
+              -t "\u2705 ${name} deploy succeeded" \
+              -p 3 \
+              "All targeted hosts deployed successfully."
+          fi
+          REVISIONS=""
+          HOSTS=$(grep 'Activation successful' "$LOG" | grep -oP '^\[\K[^\]]+' || true)
+          for host in $HOSTS; do
+            VER=$(${pkgs.openssh}/bin/ssh -o ConnectTimeout=5 -o BatchMode=yes "root@''${host}" nixos-version 2>/dev/null || echo "unreachable")
+            REVISIONS+="''${host}: ''${VER}\n"
+          done
+          COMMIT_MSG=$(printf 'auto: ${name} deploy %s\n\n%b' "$(date '+%Y-%m-%d %H:%M')" "$REVISIONS")
+          ${pkgs.git}/bin/git -C "${repoPath}" add flake.lock
+          ${pkgs.git}/bin/git -C "${repoPath}" commit -m "$COMMIT_MSG" || true
+          rm "$LOG"
+          break
         else
-          ${pkgs.gotify-cli}/bin/gotify push \
-            -t "\u2705 ${name} deploy succeeded" \
-            -p 3 \
-            "All targeted hosts deployed successfully."
+          ERROR_SUMMARY=$(tail -n 20 "$LOG")
+          if grep -qE 'ssh: connect|Connection refused|No route to host|Connection timed out|Network is unreachable|Could not connect' "$LOG"; then
+            rm "$LOG"
+            if [ $attempt -ge $MAX_RETRIES ]; then
+              MSG="Last 20 lines of log:\n$ERROR_SUMMARY"
+              ${pkgs.gotify-cli}/bin/gotify push \
+                -t "\u274c ${name} deploy FAILED (connection retries exhausted)" \
+                -p 10 \
+                "$MSG"
+              exit 1
+            fi
+            echo "Connection failed, retrying in $((RETRY_DELAY / 60)) minutes (attempt $attempt/$MAX_RETRIES)..."
+            sleep $RETRY_DELAY
+          else
+            rm "$LOG"
+            MSG="Last 20 lines of log:\n$ERROR_SUMMARY"
+            ${pkgs.gotify-cli}/bin/gotify push \
+              -t "\u274c ${name} deploy FAILED" \
+              -p 10 \
+              "$MSG"
+            exit 1
+          fi
         fi
-        REVISIONS=""
-        HOSTS=$(grep 'Activation successful' "$LOG" | grep -oP '^\[\K[^\]]+' || true)
-        for host in $HOSTS; do
-          VER=$(${pkgs.openssh}/bin/ssh -o ConnectTimeout=5 -o BatchMode=yes "root@''${host}" nixos-version 2>/dev/null || echo "unreachable")
-          REVISIONS+="''${host}: ''${VER}\n"
-        done
-        COMMIT_MSG=$(printf 'auto: ${name} deploy %s\n\n%b' "$(date '+%Y-%m-%d %H:%M')" "$REVISIONS")
-        ${pkgs.git}/bin/git -C "${repoPath}" add flake.lock
-        ${pkgs.git}/bin/git -C "${repoPath}" commit -m "$COMMIT_MSG" || true
-      else
-        ERROR_SUMMARY=$(tail -n 20 "$LOG")
-        MSG="Last 20 lines of log:\n$ERROR_SUMMARY"
-        ${pkgs.gotify-cli}/bin/gotify push \
-          -t "\u274c ${name} deploy FAILED" \
-          -p 10 \
-          "$MSG"
-        rm "$LOG"
-        exit 1
-      fi
-      rm "$LOG"
+      done
     '';
   };
 
@@ -81,7 +101,8 @@ let
 
       echo "--- Deploying Self (build-nix) ---"
       LOG=$(mktemp)
-      if cd "${repoPath}" && ${pkgs.colmena}/bin/colmena apply-local switch 2>&1 | tee "$LOG"; then
+      cd "${repoPath}"
+      if ${pkgs.colmena}/bin/colmena apply-local switch 2>&1 | tee "$LOG"; then
         WARNINGS=$(grep -E '\[WARN\]|warning:' "$LOG" || true)
         if [ -n "$WARNINGS" ]; then
           MSG="Warnings:\n$WARNINGS"
@@ -131,6 +152,10 @@ let
     HOSTNAME=$(hostname)
 
     cd "${repoPath}"
+
+    echo "--- Committing pre-deploy state ---"
+    ${pkgs.git}/bin/git add -A
+    ${pkgs.git}/bin/git commit -m "auto: manual deploy $TARGET $(date '+%Y-%m-%d %H:%M')" || true
 
     if [[ "$TARGET" == "$HOSTNAME" ]] || [[ "$TARGET" == "build-nix" && "$HOSTNAME" == "build-nix" ]]; then
       echo "--- Local deploy (apply-local $GOAL) ---"
