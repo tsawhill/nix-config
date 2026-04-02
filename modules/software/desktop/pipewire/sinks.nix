@@ -23,6 +23,7 @@ let
 in
 {
   options.my.desktop.audio.sinks = {
+    mic.enable     = lib.mkOption { type = lib.types.bool; default = true; description = "Enable virtual Mic Input sink."; };
     game.enable    = lib.mkOption { type = lib.types.bool; default = true; description = "Enable virtual Game Audio sink."; };
     music.enable   = lib.mkOption { type = lib.types.bool; default = true; description = "Enable virtual Music sink."; };
     discord.enable = lib.mkOption { type = lib.types.bool; default = true; description = "Enable virtual Discord Audio sink."; };
@@ -33,7 +34,8 @@ in
 
     # Virtual loopback sinks — enabled individually
     extraConfig.pipewire."93-virtual-sinks"."context.modules" =
-      lib.optionals cfg.game.enable    [ (mkSink "game_audio"    "Game Audio")    ]
+      lib.optionals cfg.mic.enable      [ (mkSink "mic_input"      "Mic Input")      ]
+      ++ lib.optionals cfg.game.enable    [ (mkSink "game_audio"    "Game Audio")    ]
       ++ lib.optionals cfg.music.enable   [ (mkSink "music"         "Music")         ]
       ++ lib.optionals cfg.discord.enable [ (mkSink "discord_audio" "Discord Audio") ]
       ++ lib.optionals cfg.desktop.enable [ (mkSink "desktop_audio" "Desktop Audio") ];
@@ -41,8 +43,12 @@ in
     # Routing rules via WirePlumber — applies to ALL audio backends (pulse, native PW, JACK)
     # Rules are evaluated top-to-bottom; more specific matches override the catch-all.
     wireplumber.extraConfig."94-app-routing"."stream.rules" =
+      # All mic inputs go to Mic Input sink
+      lib.optionals cfg.mic.enable [
+        (mkRoute [{ "media.class" = "Stream/Input/Audio"; }] "mic_input")
+      ]
       # Catch-all: send everything to Desktop Audio (must be first)
-      lib.optionals cfg.desktop.enable [
+      ++ lib.optionals cfg.desktop.enable [
         (mkRoute [{ "media.class" = "Stream/Output/Audio"; }] "desktop_audio")
       ]
       # Discord (Electron)
