@@ -1,10 +1,7 @@
-{
-  pkgs,
-  keepRoots ? 14,
-  ...
-}:
+{ pkgs, ... }:
 
 let
+  keepRoots = 14; # number of per-host deploy GC roots to retain on the build machine
   repoPath = "/mnt/zpool/code/nix-config";
   flakePath = "path://${repoPath}";
 
