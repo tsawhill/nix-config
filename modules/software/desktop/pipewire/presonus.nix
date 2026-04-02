@@ -26,9 +26,7 @@ in
             matches = [
               { "node.name" = "alsa_input.usb-PreSonus_Studio_24c_SC1E21081241-00.analog-stereo"; }
             ];
-            actions.update-props = {
-              "node.target.object" = "mic_input";
-            };
+            actions.update-props."node.target" = "mic_input";
           }
         ];
       };
