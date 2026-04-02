@@ -3,12 +3,11 @@
 # Add to config.my.hypr.taskbarPopups from any module/host — definitions are concatenated.
 let
   mkPopupRules = class: [
-    "float, match:class ${class}"
+    "float on, match:class ${class}"
     "size 700 700, match:class ${class}"
     "move (monitor_w-705) 60, match:class ${class}"
     "rounding 16, match:class ${class}"             # Rounder than global default (5)
     "opacity 0.88 0.88, match:class ${class}"       # Frosted glass — pairs with global blur
-    "bordercolor rgba(ffcce6ff) rgba(9778D0ff) 45deg, match:class ${class}" # Pink/purple gradient border
   ];
 in
 {
