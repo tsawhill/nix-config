@@ -125,10 +125,10 @@ in
 
     # --- personal machines (unstable, manual-only) ---
     "taylor-desktop-nix" =
-      mkUnstableHost "weekly" "taylor-desktop-nix.lan"
+      mkUnstableHost "daily" "taylor-desktop-nix.lan"
         "${self}/hosts/taylor-desktop-nix";
     "taylor-laptop-nix" =
-      mkUnstableHost "weekly" "taylor-laptop-nix.lan"
+      mkUnstableHost "daily" "taylor-laptop-nix.lan"
         "${self}/hosts/taylor-laptop-nix";
     # --- main server ---
     "server-nix" = mkHost "weekly" "server-nix.lan" "${self}/hosts/server-nix";
