@@ -118,12 +118,12 @@ let
         fi
         if [ "$HAD_WARNINGS" = true ]; then
           ${pkgs.gotify-cli}/bin/gotify push \
-            -t "\u26a0\ufe0f ${name} deploy${TITLE_SUFFIX} succeeded (with warnings)" \
+            -t "\u26a0\ufe0f ${name} deploy''${TITLE_SUFFIX} succeeded (with warnings)" \
             -p 4 \
             "$DEPLOY_SUMMARY"
         else
           ${pkgs.gotify-cli}/bin/gotify push \
-            -t "\u2705 ${name} deploy${TITLE_SUFFIX} succeeded" \
+            -t "\u2705 ${name} deploy''${TITLE_SUFFIX} succeeded" \
             -p 3 \
             "$DEPLOY_SUMMARY"
         fi
