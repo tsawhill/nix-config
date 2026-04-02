@@ -59,15 +59,25 @@ in
         ];
       };
 
-      # Route PreSonus hardware input through the effects filter chain
+      # Route: PreSonus hardware input → filter-chain effects → mic_input sink
       wireplumber.extraConfig."95-presonus-routing" = {
         "stream.rules" = [
+          # Route PreSonus hardware to the effects filter
           {
             matches = [
               { "node.name" = "~alsa_input.*PreSonus.*"; }
             ];
             actions.update-props = {
               "node.target.object" = "presonus_mic_effects";
+            };
+          }
+          # Route the effects output to the mic_input sink (for apps to record from)
+          {
+            matches = [
+              { "node.name" = "presonus_mic_effects"; }
+            ];
+            actions.update-props = {
+              "node.target.object" = "mic_input";
             };
           }
         ];
