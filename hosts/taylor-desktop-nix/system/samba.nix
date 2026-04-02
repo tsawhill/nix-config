@@ -1,6 +1,7 @@
-{ config, ... }:
+{ config, lib, ... }:
 {
   my.secrets.immobile0783-pass.enable = true;
+  sops.secrets.immobile0783-pass.neededForUsers = lib.mkForce false;
 
   sops.templates."smb-nix-config-credentials" = {
     content = ''
@@ -13,7 +14,7 @@
   };
 
   fileSystems."/mnt/nix-config" = {
-    device = "//10.73.73.4/nix-configs";
+    device = "//10.73.73.4/nix-configs/";
     fsType = "cifs";
     options =
       let
@@ -22,3 +23,4 @@
       [ "${automount_opts},credentials=/run/secrets/smb-nix-config-credentials,uid=1000,mfsymlinks" ];
   };
 }
+(
