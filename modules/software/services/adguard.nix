@@ -281,12 +281,12 @@
             enabled = true;
           }
           {
-            domain = "laptop-nix.lan";
+            domain = "taylor-laptop-nix.lan";
             answer = "10.73.73.68";
             enabled = true;
           }
           {
-            domain = "desktop-nix.lan";
+            domain = "taylor-desktop-nix.lan";
             answer = "10.73.73.69";
             enabled = true;
           }
