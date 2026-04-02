@@ -74,7 +74,7 @@ let
           else
             HARD_FAIL_HOSTS="$HARD_FAIL_HOSTS $host"
             ${pkgs.gotify-cli}/bin/gotify push \
-              -t "\u274c ${name}: $host FAILED (build/activation)" \
+              -t "❌ ${name}: $host FAILED" \
               -p 10 \
               "Last 20 lines:\n$ERROR_SUMMARY"
           fi
@@ -91,7 +91,7 @@ let
       HARD_DISP=$HARD_FAIL_HOSTS;  [ -n "$HARD_DISP" ] || HARD_DISP="none"
       CONN_DISP=$CONN_FAIL_HOSTS;  [ -n "$CONN_DISP" ] || CONN_DISP="none"
       ${pkgs.gotify-cli}/bin/gotify push \
-        -t "\u2139 ${name} first-pass summary" \
+        -t "ℹ️ ${name} first-pass summary" \
         -p 3 \
         "Succeeded: $SUCC_DISP\nHard failed: $HARD_DISP\nRetrying (conn): $CONN_DISP"
 
@@ -120,7 +120,7 @@ let
         if [ "$host_ok" = false ]; then
           HARD_FAIL_HOSTS="$HARD_FAIL_HOSTS $host"
           ${pkgs.gotify-cli}/bin/gotify push \
-            -t "\u274c ${name}: $host FAILED (retries exhausted)" \
+            -t "❌ ${name}: $host FAILED (retries exhausted)" \
             -p 10 \
             "All $MAX_RETRIES connection retries exhausted for $host"
         fi
@@ -134,17 +134,17 @@ let
       FAIL_DISP=$HARD_FAIL_HOSTS; [ -n "$FAIL_DISP" ] || FAIL_DISP="none"
       if [ -n "$HARD_FAIL_HOSTS" ]; then
         ${pkgs.gotify-cli}/bin/gotify push \
-          -t "\u26a0\ufe0f ${name} deploy partial" \
+          -t "⚠️ ${name} deploy partial" \
           -p 6 \
           "Succeeded: $SUCC_DISP\nFailed: $FAIL_DISP"
       elif [ "$HAD_WARNINGS" = true ]; then
         ${pkgs.gotify-cli}/bin/gotify push \
-          -t "\u26a0\ufe0f ${name} deploy succeeded (with warnings)" \
+          -t "⚠️ ${name} deploy succeeded (with warnings)" \
           -p 4 \
           "All hosts: $SUCC_DISP"
       else
         ${pkgs.gotify-cli}/bin/gotify push \
-          -t "\u2705 ${name} deploy succeeded" \
+          -t "✅ ${name} deploy succeeded" \
           -p 3 \
           "All hosts: $SUCC_DISP"
       fi
@@ -229,12 +229,12 @@ let
           if [ -n "$WARNINGS" ]; then
             MSG="Warnings:\n$WARNINGS"
             ${pkgs.gotify-cli}/bin/gotify push \
-              -t "\u26a0\ufe0f Self deploy succeeded (with warnings)" \
+              -t "⚠️ Self deploy succeeded (with warnings)" \
               -p 4 \
               "$MSG"
           else
             ${pkgs.gotify-cli}/bin/gotify push \
-              -t "\u2705 Self deploy succeeded" \
+              -t "✅ Self deploy succeeded" \
               -p 3 \
               "${selfHostname} deployed successfully."
           fi
@@ -269,7 +269,7 @@ let
           else
             MSG="Last 20 lines of log:\n$ERROR_SUMMARY"
             ${pkgs.gotify-cli}/bin/gotify push \
-              -t "\u274c Self deploy FAILED" \
+              -t "❌ Self deploy FAILED" \
               -p 10 \
               "$MSG"
             exit 1
