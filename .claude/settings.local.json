@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//home/taylor/.config/easyeffects2/db/**)"
+    ]
+  }
+}
