@@ -26,24 +26,16 @@ in
               "node.description" = "PreSonus Input";
               "capture.props" = {
                 "node.name" = "presonus_input";
-                "media.class" = "Audio/Source";
                 "node.target.object" = "alsa_input.usb-PreSonus_Studio_24c_SC1E21081241-00.analog-stereo";
               };
               "playback.props" = {
-                "node.name" = "presonus_playback";
-                "media.class" = "Audio/Sink";
+                "node.name" = "presonus_output";
+                "node.target.object" = "mic_input";
               };
             };
           }
         ];
       };
-
-      wireplumber.extraConfig."95-presonus-routing"."stream.rules" = [
-        {
-          matches = [{ "node.name" = "presonus_playback"; }];
-          actions.update-props."node.target" = "mic_input";
-        }
-      ];
     };
   };
 }
