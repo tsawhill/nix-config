@@ -27,91 +27,144 @@ let
       cd "${repoPath}"
       RETRY_DELAY=1800
       MAX_RETRIES=46
-      for attempt in $(seq 1 $MAX_RETRIES); do
-        echo "Attempt $attempt/$MAX_RETRIES..."
+      PENDING='${tags}'
+      SUCCEEDED_HOSTS=""
+      FAILED_HOSTS=""
+      HAD_WARNINGS=false
+      ALL_STORE_PATHS=""
+      attempt=0
+
+      while [ -n "$PENDING" ] && [ $attempt -lt $MAX_RETRIES ]; do
+        attempt=$((attempt + 1))
+        echo "Attempt $attempt/$MAX_RETRIES (targets: $PENDING)..."
         LOG=$(mktemp)
-        if ${pkgs.colmena}/bin/colmena apply --on '${tags}' --parallel 4 switch 2>&1 | tee "$LOG"; then
-          WARNINGS=$(grep -E '\[WARN\]|warning:' "$LOG" || true)
-          if [ -n "$WARNINGS" ]; then
-            MSG="Warnings:\n$WARNINGS"
-            ${pkgs.gotify-cli}/bin/gotify push \
-              -t "\u26a0\ufe0f ${name} deploy succeeded (with warnings)" \
-              -p 4 \
-              "$MSG"
-          else
-            ${pkgs.gotify-cli}/bin/gotify push \
-              -t "\u2705 ${name} deploy succeeded" \
-              -p 3 \
-              "All targeted hosts deployed successfully."
-          fi
-          REVISIONS=""
-          HOSTS=$(grep 'Activation successful' "$LOG" | grep -oP '^\[\K[^\]]+' || true)
-          for host in $HOSTS; do
-            VER=$(${pkgs.openssh}/bin/ssh -o ConnectTimeout=5 -o BatchMode=yes "root@$host" nixos-version 2>/dev/null || echo "unreachable")
-            REVISIONS+="$host: $VER\n"
-          done
-          COMMIT_MSG=$(printf 'auto: ${name} deploy %s\n\n%b' "$(date '+%Y-%m-%d %H:%M')" "$REVISIONS")
-          ${pkgs.git}/bin/git -C "${repoPath}" add flake.lock
-          ${pkgs.git}/bin/git -C "${repoPath}" commit -m "$COMMIT_MSG" || true
-          # Keep recent build/store outputs as indirect GC roots so they
-          # survive garbage collection on the build host. We keep a small
-          # number of recent roots and prune older ones automatically.
-          TIMESTAMP=$(date -u +%Y%m%d%H%M%S)
-          BASE_GCROOT_DIR=/nix/var/nix/gcroots/colmena-hosts
-          mkdir -p "$BASE_GCROOT_DIR"
-          # collect unique /nix/store paths from the colmena log
-          STORE_PATHS=$(grep -oE '/nix/store/[a-z0-9]+[^[:space:]]*' "$LOG" | sort -u || true)
-          # create per-host gcroots so we can keep/prune per-host and detect removed hosts
-          for host in $HOSTS; do
-            HOST_DIR="$BASE_GCROOT_DIR/$host"
-            mkdir -p "$HOST_DIR"
-            for p in $STORE_PATHS; do
-              if [ -e "$p" ]; then
-                ROOT_FILE="$HOST_DIR/$TIMESTAMP-$(basename "$p")"
-                ${pkgs.nix}/bin/nix-store --add-root "$ROOT_FILE" --indirect "$p" || true
-              fi
-            done
-            KEEP=${toString keepRoots}
-            ls -1 "$HOST_DIR" 2>/dev/null | sort -r | tail -n +$((KEEP+1)) | while read f; do
-              rm -f "$HOST_DIR/$f" || true
-            done || true
-          done
-          # remove GC root dirs for hosts removed from the repo
-          KNOWN_HOSTS=$(find "${repoPath}/hosts" -mindepth 1 -maxdepth 1 -printf '%f\n' 2>/dev/null || true)
-          for d in "$BASE_GCROOT_DIR"/*; do
-            [ -d "$d" ] || continue
-            host_dir_name=$(basename "$d")
-            if ! echo "$KNOWN_HOSTS" | grep -xq "$host_dir_name"; then
-              rm -rf "$d" || true
-            fi
-          done || true
+        colmena_exit=0
+        PENDING_ARG=$(echo "$PENDING" | tr ' ' ',')
+        ${pkgs.colmena}/bin/colmena apply --on "$PENDING_ARG" --parallel 4 switch 2>&1 | tee "$LOG" || colmena_exit=$?
+
+        # Accumulate store paths and warnings across all attempts
+        NEW_PATHS=$(grep -oE '/nix/store/[a-z0-9]+[^[:space:]]*' "$LOG" | sort -u || true)
+        [ -n "$NEW_PATHS" ] && ALL_STORE_PATHS=$(printf '%s\n%s' "$ALL_STORE_PATHS" "$NEW_PATHS" | sort -u | grep -v '^$') || true
+        grep -qE '\[WARN\]|warning:' "$LOG" && HAD_WARNINGS=true || true
+
+        # Parse which hosts succeeded and which were targeted this round
+        NEW_OK=$(grep 'Activation successful' "$LOG" | grep -oP '^\[\K[^\]]+' | sort -u || true)
+        THIS_TARGETED=$(grep -oP '^\[\K[^\]]+(?=\] )' "$LOG" | grep -vxE 'INFO|WARN|ERROR|DEBUG' | sort -u || true)
+        [ -n "$NEW_OK" ] && SUCCEEDED_HOSTS=$(printf '%s\n%s' "$SUCCEEDED_HOSTS" "$NEW_OK" | sort -u | grep -v '^$' | tr '\n' ' ' | xargs) || true
+
+        if [ $colmena_exit -eq 0 ]; then
           rm "$LOG"
-          break
+          PENDING=""
         else
-          ERROR_SUMMARY=$(tail -n 20 "$LOG")
-          if grep -qE 'ssh: connect|Connection refused|No route to host|Connection timed out|Network is unreachable|Could not connect' "$LOG"; then
-            rm "$LOG"
-            if [ $attempt -ge $MAX_RETRIES ]; then
-              MSG="Last 20 lines of log:\n$ERROR_SUMMARY"
-              ${pkgs.gotify-cli}/bin/gotify push \
-                -t "\u274c ${name} deploy FAILED (connection retries exhausted)" \
-                -p 10 \
-                "$MSG"
-              exit 1
+          # Determine which hosts failed this round
+          THIS_FAILED=$(comm -23 <(echo "$THIS_TARGETED" | grep -v '^$' | sort) <(echo "$NEW_OK" | grep -v '^$' | sort) 2>/dev/null || true)
+          # Classify each failed host: connection error vs hard failure
+          CONN_FAIL=""
+          HARD_FAIL=""
+          for h in $THIS_FAILED; do
+            if grep -E "^\[$h\]" "$LOG" | grep -qE 'ssh: connect|Connection refused|No route to host|Connection timed out|Network is unreachable|Could not connect'; then
+              CONN_FAIL=$(printf '%s\n%s' "$CONN_FAIL" "$h")
+            else
+              HARD_FAIL=$(printf '%s\n%s' "$HARD_FAIL" "$h")
             fi
-            echo "Connection failed, retrying in $((RETRY_DELAY / 60)) minutes (attempt $attempt/$MAX_RETRIES)..."
-            sleep $RETRY_DELAY
-          else
-            rm "$LOG"
-            MSG="Last 20 lines of log:\n$ERROR_SUMMARY"
+          done
+          CONN_FAIL=$(echo "$CONN_FAIL" | grep -v '^$' | sort -u | tr '\n' ' ' | xargs || true)
+          HARD_FAIL=$(echo "$HARD_FAIL" | grep -v '^$' | sort -u | tr '\n' ' ' | xargs || true)
+          ERROR_SUMMARY=$(tail -n 20 "$LOG")
+          rm "$LOG"
+
+          # Hard failures: notify immediately and abandon those hosts
+          if [ -n "$HARD_FAIL" ]; then
+            FAILED_HOSTS=$(printf '%s\n%s' "$FAILED_HOSTS" "$HARD_FAIL" | sort -u | grep -v '^$' | tr '\n' ' ' | xargs || true)
             ${pkgs.gotify-cli}/bin/gotify push \
-              -t "\u274c ${name} deploy FAILED" \
+              -t "\u274c ${name} deploy FAILED ($HARD_FAIL)" \
               -p 10 \
-              "$MSG"
-            exit 1
+              "Hard failure on: $HARD_FAIL\n\nLast 20 lines:\n$ERROR_SUMMARY"
           fi
+
+          # Connection failures: retry if attempts remain, otherwise give up
+          if [ -n "$CONN_FAIL" ]; then
+            if [ $attempt -ge $MAX_RETRIES ]; then
+              FAILED_HOSTS=$(printf '%s\n%s' "$FAILED_HOSTS" "$CONN_FAIL" | sort -u | grep -v '^$' | tr '\n' ' ' | xargs || true)
+              ${pkgs.gotify-cli}/bin/gotify push \
+                -t "\u274c ${name} deploy FAILED (retries exhausted)" \
+                -p 10 \
+                "Connection retries exhausted for: $CONN_FAIL"
+              CONN_FAIL=""
+            else
+              echo "Connection failed for $CONN_FAIL, retrying in $((RETRY_DELAY / 60)) minutes (attempt $attempt/$MAX_RETRIES)..."
+              sleep $RETRY_DELAY
+            fi
+          fi
+
+          PENDING=$(echo "$CONN_FAIL" | xargs || true)
         fi
       done
+
+      # Safety net in case the while condition killed the loop with PENDING still set
+      if [ -n "$PENDING" ]; then
+        FAILED_HOSTS=$(printf '%s\n%s' "$FAILED_HOSTS" "$PENDING" | sort -u | grep -v '^$' | tr '\n' ' ' | xargs || true)
+      fi
+      FAILED_HOSTS=$(echo "$FAILED_HOSTS" | tr ' ' '\n' | sort -u | grep -v '^$' | tr '\n' ' ' | xargs || true)
+
+      # Success notification and follow-up work for all hosts that deployed
+      if [ -n "$SUCCEEDED_HOSTS" ]; then
+        if [ -n "$FAILED_HOSTS" ]; then
+          DEPLOY_SUMMARY="Succeeded: $SUCCEEDED_HOSTS\nFailed: $FAILED_HOSTS"
+          TITLE_SUFFIX=" (partial)"
+        else
+          DEPLOY_SUMMARY="All targeted hosts deployed successfully."
+          TITLE_SUFFIX=""
+        fi
+        if [ "$HAD_WARNINGS" = true ]; then
+          ${pkgs.gotify-cli}/bin/gotify push \
+            -t "\u26a0\ufe0f ${name} deploy${TITLE_SUFFIX} succeeded (with warnings)" \
+            -p 4 \
+            "$DEPLOY_SUMMARY"
+        else
+          ${pkgs.gotify-cli}/bin/gotify push \
+            -t "\u2705 ${name} deploy${TITLE_SUFFIX} succeeded" \
+            -p 3 \
+            "$DEPLOY_SUMMARY"
+        fi
+
+        REVISIONS=""
+        for host in $SUCCEEDED_HOSTS; do
+          VER=$(${pkgs.openssh}/bin/ssh -o ConnectTimeout=5 -o BatchMode=yes "root@$host" nixos-version 2>/dev/null || echo "unreachable")
+          REVISIONS+="$host: $VER\n"
+        done
+        COMMIT_MSG=$(printf 'auto: ${name} deploy %s\n\n%b' "$(date '+%Y-%m-%d %H:%M')" "$REVISIONS")
+        ${pkgs.git}/bin/git -C "${repoPath}" add flake.lock
+        ${pkgs.git}/bin/git -C "${repoPath}" commit -m "$COMMIT_MSG" || true
+
+        TIMESTAMP=$(date -u +%Y%m%d%H%M%S)
+        BASE_GCROOT_DIR=/nix/var/nix/gcroots/colmena-hosts
+        mkdir -p "$BASE_GCROOT_DIR"
+        for host in $SUCCEEDED_HOSTS; do
+          HOST_DIR="$BASE_GCROOT_DIR/$host"
+          mkdir -p "$HOST_DIR"
+          for p in $ALL_STORE_PATHS; do
+            if [ -e "$p" ]; then
+              ROOT_FILE="$HOST_DIR/$TIMESTAMP-$(basename "$p")"
+              ${pkgs.nix}/bin/nix-store --add-root "$ROOT_FILE" --indirect "$p" || true
+            fi
+          done
+          KEEP=${toString keepRoots}
+          ls -1 "$HOST_DIR" 2>/dev/null | sort -r | tail -n +$((KEEP+1)) | while read f; do
+            rm -f "$HOST_DIR/$f" || true
+          done || true
+        done
+        KNOWN_HOSTS=$(find "${repoPath}/hosts" -mindepth 1 -maxdepth 1 -printf '%f\n' 2>/dev/null || true)
+        for d in "$BASE_GCROOT_DIR"/*; do
+          [ -d "$d" ] || continue
+          host_dir_name=$(basename "$d")
+          if ! echo "$KNOWN_HOSTS" | grep -xq "$host_dir_name"; then
+            rm -rf "$d" || true
+          fi
+        done || true
+      fi
+
+      [ -z "$FAILED_HOSTS" ] || exit 1
     '';
   };
 
