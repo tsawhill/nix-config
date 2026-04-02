@@ -32,11 +32,12 @@ let
     imports = [ modulePath ];
   };
 
+  unstablePkgs = import nixpkgs-unstable { localSystem = "x86_64-linux"; };
+
   # For hosts using nixpkgs-unstable (desktop, laptop)
   mkUnstableHost = tag: targetHost: modulePath: {
     deployment = {
       targetUser = "root";
-      nixpkgs = import nixpkgs-unstable { localSystem = "x86_64-linux"; };
     }
     // (
       if targetHost == null then
@@ -49,6 +50,7 @@ let
     )
     // (if tag != null then { tags = [ tag ]; } else { });
     _module.args = {
+      pkgs = unstablePkgs;
       home-manager-input = inputs.home-manager-unstable;
       nixvim-input = inputs.nixvim-unstable;
       sops-input = inputs.sops-nix-unstable;
@@ -63,6 +65,10 @@ in
     meta = {
       nixpkgs = import nixpkgs-stable { localSystem = "x86_64-linux"; };
       specialArgs = sharedArgs;
+      nodeNixpkgs = {
+        "taylor-desktop-nix" = unstablePkgs;
+        "taylor-laptop-nix" = unstablePkgs;
+      };
     };
 
     # --- self (local deploy, no SSH) ---
