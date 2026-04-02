@@ -37,6 +37,10 @@ in
     systemd.services.openrgb.wantedBy = lib.mkForce [ ];
 
     services.udev.packages = [ pkgs.openrgb-with-all-plugins ];
+    services.udev.extraRules = ''
+      # OpenRGB uses libusb for many controllers and needs RW access to /dev/bus/usb/*
+      SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", GROUP="plugdev", MODE="0660"
+    '';
 
     # i2c is required for most RGB controllers
     hardware.i2c.enable = true;
@@ -51,6 +55,8 @@ in
     environment.systemPackages = [ pkgs.openrgb-with-all-plugins ];
 
     users.groups.plugdev = { };
-    users.users = lib.genAttrs cfg.users (_: { extraGroups = [ "plugdev" ]; });
+    users.users = lib.genAttrs cfg.users (_: {
+      extraGroups = [ "plugdev" ];
+    });
   };
 }
