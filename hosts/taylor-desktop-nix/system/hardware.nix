@@ -13,8 +13,9 @@ let
   };
 in
 {
-  services.udev.packages = [ igpu dgpu ];
+  services.udev.packages = [
+    igpu
+    dgpu
+  ];
 
-  # GPU management (disabled - managed manually for now)
-  services.lact.enable = false;
 }
