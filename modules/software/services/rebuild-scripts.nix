@@ -31,7 +31,7 @@ let
       # Enumerate all hosts for this tag
       TAG_NAME=$(echo '${tags}' | sed 's/^@//')
       ALL_HOSTS=$(${pkgs.nix}/bin/nix eval --json "${flakePath}#colmena" \
-        --apply "hive: with builtins; attrNames (filterAttrs (n: v: n != \"meta\" && v ? deployment && v.deployment ? tags && elem \"$TAG_NAME\" v.deployment.tags) hive)" \
+        --apply "hive: builtins.filter (n: n != \"meta\" && (hive.\${n}.deployment.tags or []) != [] && builtins.elem \"$TAG_NAME\" (hive.\${n}.deployment.tags or [])) (builtins.attrNames hive)" \
         | ${pkgs.jq}/bin/jq -r '.[]' | tr '\n' ' ' | xargs)
 
       if [ -z "$ALL_HOSTS" ]; then
