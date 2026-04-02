@@ -167,6 +167,7 @@ let
           HOST_DIR="$BASE_GCROOT_DIR/$host"
           mkdir -p "$HOST_DIR"
           for p in $ALL_STORE_PATHS; do
+            [ -z "$p" ] && continue  # skip empty values
             if [ -e "$p" ]; then
               ROOT_FILE="$HOST_DIR/$TIMESTAMP-$(basename "$p")"
               ${pkgs.nix}/bin/nix-store --add-root "$ROOT_FILE" --indirect "$p" || true
@@ -247,6 +248,7 @@ let
           mkdir -p "$BASE_GCROOT_DIR/self"
           STORE_PATHS=$(grep -oE '/nix/store/[a-z0-9]+[^[:space:]]*' "$LOG" | sort -u || true)
           for p in $STORE_PATHS; do
+            [ -z "$p" ] && continue  # skip empty values
             if [ -e "$p" ]; then
               ROOT_FILE="$BASE_GCROOT_DIR/self/$TIMESTAMP-$(basename "$p")"
               ${pkgs.nix}/bin/nix-store --add-root "$ROOT_FILE" --indirect "$p" || true
