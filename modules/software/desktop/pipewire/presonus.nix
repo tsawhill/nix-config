@@ -19,14 +19,26 @@ in
     ];
 
     services.pipewire = {
-      # Route PreSonus hardware input → mic_input sink
-      wireplumber.extraConfig."95-presonus-routing" = {
-        "stream.rules" = [
+      # Create loopback: PreSonus hardware input → mic_input sink
+      extraConfig.pipewire."94-presonus-loopback" = {
+        "context.modules" = [
           {
-            matches = [
-              { "node.name" = "alsa_input.usb-PreSonus_Studio_24c_SC1E21081241-00.analog-stereo"; }
-            ];
-            actions.update-props."node.target" = "mic_input";
+            name = "libpipewire-module-loopback";
+            args = {
+              "node.description" = "PreSonus → Mic Input";
+              "capture.props" = {
+                "node.name" = "presonus_to_mic";
+                "media.class" = "Audio/Sink";
+                "node.target.object" = "alsa_input.usb-PreSonus_Studio_24c_SC1E21081241-00.analog-stereo";
+              };
+              "playback.props" = {
+                "node.name" = "presonus_to_mic_out";
+                "media.class" = "Audio/Source";
+                "audio.position" = [ "FL" "FR" ];
+                "node.target.object" = "mic_input";
+                "node.passive" = true;
+              };
+            };
           }
         ];
       };
