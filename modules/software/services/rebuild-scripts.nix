@@ -114,7 +114,7 @@ let
     '';
   };
 
-  mkSelfDeployService = {
+  mkSelfDeployService = selfHostname: {
     description = "Self Colmena Deploy";
     restartIfChanged = false;
     stopIfChanged = false;
@@ -132,7 +132,7 @@ let
       ${pkgs.git}/bin/git -C "${repoPath}" add -A
       ${pkgs.git}/bin/git -C "${repoPath}" commit -m "auto: Self pre-deploy $(date '+%Y-%m-%d %H:%M')" || true
 
-      echo "--- Deploying Self (build-nix) ---"
+      echo "--- Deploying Self (${selfHostname}) ---"
       RETRY_DELAY=300
       MAX_RETRIES=3
       for attempt in $(seq 1 $MAX_RETRIES); do
@@ -151,10 +151,10 @@ let
             ${pkgs.gotify-cli}/bin/gotify push \
               -t "\u2705 Self deploy succeeded" \
               -p 3 \
-              "build-nix deployed successfully."
+              "${selfHostname} deployed successfully."
           fi
           VER=$(nixos-version 2>/dev/null || echo "unknown")
-          COMMIT_MSG=$(printf 'auto: Self deploy %s\n\nbuild-nix: %s' "$(date '+%Y-%m-%d %H:%M')" "$VER")
+          COMMIT_MSG=$(printf 'auto: Self deploy %s\n\n${selfHostname}: %s' "$(date '+%Y-%m-%d %H:%M')" "$VER")
           ${pkgs.git}/bin/git -C "${repoPath}" add flake.lock
           ${pkgs.git}/bin/git -C "${repoPath}" commit -m "$COMMIT_MSG" || true
           # Keep GC roots for build outputs created during self deploy
@@ -289,9 +289,9 @@ in
 
   systemd.services = {
     "deploy-Daily" = mkDeployService "Daily" "@daily";
-    "deploy-Weekly" = mkDeployService "Weekly" "@daily,@weekly";
-    "deploy-Monthly" = mkDeployService "Monthly" "@daily,@weekly,@monthly";
-    "deploy-Self" = mkSelfDeployService;
+    "deploy-Weekly" = mkDeployService "Weekly" "@weekly";
+    "deploy-Monthly" = mkDeployService "Monthly" "@monthly";
+    "deploy-Self" = mkSelfDeployService "build-nix";
   };
 
   systemd.timers = {
