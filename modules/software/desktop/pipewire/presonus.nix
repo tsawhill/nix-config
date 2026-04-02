@@ -19,33 +19,39 @@ in
     ];
 
     services.pipewire = {
-      # Route PreSonus hardware input directly to mic_input sink
-      extraConfig.pipewire."94-presonus-routing" = {
+      extraConfig.pipewire."94-presonus-loopback" = {
         "context.modules" = [
           {
             name = "libpipewire-module-loopback";
             args = {
-              "node.description" = "PreSonus Input";
+              "node.description" = "PreSonus → Mic Input";
               "capture.props" = {
-                "node.name" = "presonus_capture";
-                "media.class" = "Audio/Source";
+                "node.name" = "presonus_to_mic";
+                "media.class" = "Audio/Sink";
                 "node.target.object" = "alsa_input.usb-PreSonus_Studio_24c_SC1E21081241-00.analog-stereo";
               };
               "playback.props" = {
-                "node.name" = "presonus_output";
-                "media.class" = "Audio/Sink";
+                "node.name" = "presonus_to_mic_out";
+                "media.class" = "Audio/Source";
               };
             };
           }
         ];
       };
+    };
 
-      wireplumber.extraConfig."95-presonus-routing"."stream.rules" = [
-        {
-          matches = [{ "node.name" = "presonus_output"; }];
-          actions.update-props."target.object" = "mic_input";
-        }
-      ];
+    # Establish the connection after PipeWire starts
+    systemd.user.services.presonus-link = {
+      description = "Link PreSonus loopback to mic input";
+      after = [ "pipewire.service" ];
+      partOf = [ "pipewire.service" ];
+      wantedBy = [ "default.target" ];
+      serviceConfig = {
+        Type = "oneshot";
+        ExecStart = "${pkgs.pipewire}/bin/pw-link presonus_to_mic_out:output_FL mic_input:playback_FL && ${pkgs.pipewire}/bin/pw-link presonus_to_mic_out:output_FR mic_input:playback_FR";
+        Restart = "on-failure";
+        RestartSec = 2;
+      };
     };
   };
 }
