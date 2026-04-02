@@ -113,8 +113,13 @@ in
         "${self}/hosts/server-nix/LXCs/syncthing.nix";
 
     # --- personal machines (unstable, manual-only) ---
-    "desktop-nix" = mkUnstableHost "weekly" "taylor-desktop-nix.lan" "${self}/hosts/desktop-nix";
-    "laptop-nix" = mkUnstableHost "weekly" "taylor-laptop-nix.lan" "${self}/hosts/laptop-nix";
+    "taylor-desktop-nix" =
+      mkUnstableHost "weekly" "taylor-desktop-nix.lan"
+        "${self}/hosts/taylor-desktop-nix";
+    "taylor-laptop-nix" =
+      mkUnstableHost "weekly" "taylor-laptop-nix.lan"
+        "${self}/hosts/taylor-laptop-nix";
     # --- main server ---
-    "server-nix" = mkHost "weekly" "server-nix.lan" "${self}/hosts/server-nix";  };
+    "server-nix" = mkHost "weekly" "server-nix.lan" "${self}/hosts/server-nix";
+  };
 }
