@@ -62,6 +62,14 @@
       ##############################
       wireplumber.extraConfig = {
 
+        # Bluetooth codec and profile settings
+        "10-bluez"."monitor.bluez.properties" = {
+          "bluez5.enable-sbc-xq" = true;
+          "bluez5.enable-msbc" = false;
+          "bluez5.enable-hw-volume" = true;
+          "bluez5.roles" = [ "a2dp_sink" ];
+        };
+
         # Don't auto-switch to headset (hands-free) profile on call
         "11-bluetooth-policy"."wireplumber.settings"."bluetooth.autoswitch-to-headset-profile" = false;
 

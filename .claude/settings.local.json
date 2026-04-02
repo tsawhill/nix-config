@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Read(//home/taylor/.config/easyeffects2/db/**)"
+      "Read(//home/taylor/.config/easyeffects2/db/**)",
+      "Read(//tmp/**)",
+      "Bash(git checkout:*)",
+      "Bash(git restore:*)"
     ]
   }
 }
