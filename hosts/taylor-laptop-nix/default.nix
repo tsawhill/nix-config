@@ -58,6 +58,7 @@ in
 
     # Hardware
     "${self}/modules/software/services/openrgb.nix"
+    "${self}/modules/hardware/mchosem7.nix"
 
   ];
   # Required when using home-manager as a NixOS module with useUserPackages = true
