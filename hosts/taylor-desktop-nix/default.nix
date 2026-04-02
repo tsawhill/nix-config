@@ -72,7 +72,7 @@ in
 
     # Hardware services
     "${self}/modules/software/services/openrgb.nix"
-    "${self}/modules/hardware/mchosem7.nix"
+    "${self}/modules/hardware/udev"
   ];
 
   boot.kernelPackages = latestKernelPackage;
