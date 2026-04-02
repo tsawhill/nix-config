@@ -13,6 +13,7 @@ let
       };
       "playback.props" = {
         "node.name" = "${name}_out";
+        "media.class" = "Audio/Source";
         "audio.position" = [ "FL" "FR" ];
         "node.passive" = true;
       };
