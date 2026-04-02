@@ -1,5 +1,6 @@
 {
   pkgs,
+  pkgs-master,
   lib,
   config,
   ...
@@ -15,19 +16,27 @@ in
     programs.vscode = {
       enable = true;
       package = pkgs.vscodium;
-      extensions = with pkgs.vscode-extensions; [
-        jnoortheen.nix-ide
-        esbenp.prettier-vscode
-        ms-python.vscode-pylance
-        github.copilot-chat
-        anthropic.claude-code
-      ];
+      extensions =
+        with pkgs.vscode-extensions;
+        [
+          jnoortheen.nix-ide
+          esbenp.prettier-vscode
+          ms-python.vscode-pylance
+          github.copilot-chat
+        ]
+        ++ [
+          pkgs-master.vscode-extensions.anthropic.claude-code
+        ];
     };
 
-    environment.systemPackages = with pkgs; [
-      nixfmt
-      glib
-      claude-code
-    ];
+    environment.systemPackages =
+      with pkgs;
+      [
+        nixfmt
+        glib
+      ]
+      ++ [
+        pkgs-master.claude-code
+      ];
   };
 }

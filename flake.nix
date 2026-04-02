@@ -23,6 +23,7 @@
       inputs.nixpkgs.follows = "nixpkgs-stable";
     };
 
+    nixpkgs-master.url = "github:NixOS/nixpkgs/master";
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
     home-manager-unstable = {
       url = "github:nix-community/home-manager/master";

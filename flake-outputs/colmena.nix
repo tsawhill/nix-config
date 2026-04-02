@@ -2,6 +2,7 @@ inputs@{
   self,
   nixpkgs-stable,
   nixpkgs-unstable,
+  nixpkgs-master,
   ...
 }:
 let
@@ -33,6 +34,7 @@ let
   };
 
   unstablePkgs = import nixpkgs-unstable { localSystem = "x86_64-linux"; };
+  masterPkgs = import nixpkgs-master { localSystem = "x86_64-linux"; };
 
   # For hosts using nixpkgs-unstable (desktop, laptop)
   mkUnstableHost = tag: targetHost: modulePath: {
@@ -54,6 +56,7 @@ let
       nixvim-input = inputs.nixvim-unstable;
       sops-input = inputs.sops-nix-unstable;
       zen-input = inputs.zen-browser-unstable;
+      pkgs-master = masterPkgs;
     };
     imports = [ modulePath ];
   };
