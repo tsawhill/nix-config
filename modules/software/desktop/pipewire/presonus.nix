@@ -79,13 +79,8 @@ in
                 ];
               };
               "capture.props" = {
-                "node.name" = "presonus_mic_input";
-                "media.class" = "Audio/Source";
-                "audio.position" = [ "FL" "FR" ];
-              };
-              "playback.props" = {
                 "node.name" = "presonus_mic_effects";
-                "node.passive" = true;
+                "media.class" = "Audio/Source";
                 "audio.position" = [ "FL" "FR" ];
               };
             };
