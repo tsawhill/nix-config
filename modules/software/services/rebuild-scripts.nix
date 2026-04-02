@@ -81,7 +81,7 @@ let
 
       echo "--- Deploying Self (build-nix) ---"
       LOG=$(mktemp)
-      if ${pkgs.colmena}/bin/colmena apply-local --flake "${flakePath}" switch 2>&1 | tee "$LOG"; then
+      if cd "${repoPath}" && ${pkgs.colmena}/bin/colmena apply-local switch 2>&1 | tee "$LOG"; then
         WARNINGS=$(grep -E '\[WARN\]|warning:' "$LOG" || true)
         if [ -n "$WARNINGS" ]; then
           MSG="Warnings:\n$WARNINGS"
