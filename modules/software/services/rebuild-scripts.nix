@@ -1,4 +1,8 @@
-{ pkgs, keepRoots ? 14, ... }:
+{
+  pkgs,
+  keepRoots ? 14,
+  ...
+}:
 
 let
   repoPath = "/mnt/zpool/code/nix-config";
@@ -46,7 +50,7 @@ let
           HOSTS=$(grep 'Activation successful' "$LOG" | grep -oP '^\[\K[^\]]+' || true)
           for host in $HOSTS; do
             VER=$(${pkgs.openssh}/bin/ssh -o ConnectTimeout=5 -o BatchMode=yes "root@$host" nixos-version 2>/dev/null || echo "unreachable")
-            REVISIONS+="${host}: ${VER}\n"
+            REVISIONS+="$host: $VER\n"
           done
           COMMIT_MSG=$(printf 'auto: ${name} deploy %s\n\n%b' "$(date '+%Y-%m-%d %H:%M')" "$REVISIONS")
           ${pkgs.git}/bin/git -C "${repoPath}" add flake.lock
@@ -65,7 +69,7 @@ let
             mkdir -p "$HOST_DIR"
             for p in $STORE_PATHS; do
               if [ -e "$p" ]; then
-                ROOT_FILE="$HOST_DIR/${TIMESTAMP}-$(basename "$p")"
+                ROOT_FILE="$HOST_DIR/$TIMESTAMP-$(basename "$p")"
                 ${pkgs.nix}/bin/nix-store --add-root "$ROOT_FILE" --indirect "$p" || true
               fi
             done
@@ -159,7 +163,7 @@ let
         STORE_PATHS=$(grep -oE '/nix/store/[a-z0-9]+[^[:space:]]*' "$LOG" | sort -u || true)
         for p in $STORE_PATHS; do
           if [ -e "$p" ]; then
-            ROOT_FILE="$BASE_GCROOT_DIR/self/${TIMESTAMP}-$(basename "$p")"
+            ROOT_FILE="$BASE_GCROOT_DIR/self/$TIMESTAMP-$(basename "$p")"
             ${pkgs.nix}/bin/nix-store --add-root "$ROOT_FILE" --indirect "$p" || true
           fi
         done
@@ -195,7 +199,7 @@ let
     fi
 
     TARGET="$1"
-    GOAL="${2:-switch}"
+    GOAL="''${2:-switch}"
     HOSTNAME=$(hostname)
 
     cd "${repoPath}"
@@ -227,7 +231,7 @@ let
       echo "Second arg must be a negative offset like -2"
       exit 1
     fi
-    OFFSET="${OFFSET_RAW#-}"
+    OFFSET="''${OFFSET_RAW#-}"
 
     GCROOT_DIR="/nix/var/nix/gcroots/colmena-hosts/$HOST"
     if [ -d "$GCROOT_DIR" ]; then
@@ -269,7 +273,10 @@ let
 
 in
 {
-  environment.systemPackages = [ deployCmd deployOldCmd ];
+  environment.systemPackages = [
+    deployCmd
+    deployOldCmd
+  ];
 
   systemd.services = {
     "deploy-Daily" = mkDeployService "Daily" "@daily";
