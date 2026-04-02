@@ -59,8 +59,7 @@ in
     # Hardware
     "${self}/modules/software/services/openrgb.nix"
 
-    # Remote build-server deploy trigger
-    "${self}/modules/software/services/remote-deploy.nix"
+  ];
   # Required when using home-manager as a NixOS module with useUserPackages = true
   environment.pathsToLink = [
     "/share/applications"
