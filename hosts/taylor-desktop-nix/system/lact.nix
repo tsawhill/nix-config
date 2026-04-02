@@ -35,7 +35,6 @@ in
   # Enable overdrive so LACT can set power caps outside the default range.
   # This sets amdgpu.ppfeaturemask=0xffffffff as a kernel param.
   hardware.amdgpu.overdrive.enable = true;
-  hardware.amdgpu.overdrive.forbiddenProfiles = [ ];
 
   services.lact.enable = true;
 
