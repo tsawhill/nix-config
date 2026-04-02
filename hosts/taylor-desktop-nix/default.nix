@@ -71,7 +71,9 @@ in
 
     # Hardware services
     "${self}/modules/software/services/openrgb.nix"
-  ];
+
+    # Remote build-server deploy trigger
+    "${self}/modules/software/services/remote-deploy.nix"
 
   boot.kernelPackages = latestKernelPackage;
   boot.zfs.package = pkgs.zfs_unstable;
