@@ -46,6 +46,7 @@ in
 
     environment.systemPackages = [ pkgs.openrgb-with-all-plugins ];
 
+    users.groups.plugdev = { };
     users.users = lib.genAttrs cfg.users (_: { extraGroups = [ "plugdev" ]; });
   };
 }
