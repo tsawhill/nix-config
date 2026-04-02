@@ -9,6 +9,7 @@ let
     description = "${name} Colmena Deploy";
     restartIfChanged = false;
     stopIfChanged = false;
+    path = [ pkgs.git pkgs.nix pkgs.colmena pkgs.openssh pkgs.jq pkgs.gotify-cli ];
     serviceConfig = {
       Type = "oneshot";
       User = "root";
@@ -187,6 +188,7 @@ let
     description = "Self Colmena Deploy";
     restartIfChanged = false;
     stopIfChanged = false;
+    path = [ pkgs.git pkgs.nix pkgs.colmena pkgs.openssh pkgs.gotify-cli ];
     serviceConfig = {
       Type = "oneshot";
       User = "root";
