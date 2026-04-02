@@ -49,43 +49,43 @@ let
 
         # Parse which hosts succeeded and which were targeted this round
         NEW_OK=$(grep 'Activation successful' "$LOG" | grep -oP '^\[\K[^\]]+' | sort -u || true)
-        THIS_TARGETED=$(grep -oP '^\[\K[^\]]+(?=\] )' "$LOG" | grep -vxE 'INFO|WARN|ERROR|DEBUG' | sort -u || true)
         [ -n "$NEW_OK" ] && SUCCEEDED_HOSTS=$(printf '%s\n%s' "$SUCCEEDED_HOSTS" "$NEW_OK" | sort -u | grep -v '^$' | tr '\n' ' ' | xargs) || true
 
         if [ $colmena_exit -eq 0 ]; then
           rm "$LOG"
           PENDING=""
         else
-          # Determine which hosts failed this round
-          THIS_FAILED=$(comm -23 <(echo "$THIS_TARGETED" | grep -v '^$' | sort) <(echo "$NEW_OK" | grep -v '^$' | sort) 2>/dev/null || true)
-          # Classify each failed host: connection error vs hard failure
+          # All hosts colmena printed output for this round
+          ALL_ATTEMPTED=$(grep -oP '^\[\K[^\]]+' "$LOG" | grep -vxF 'INFO' | grep -vxF 'WARN' | grep -vxF 'ERROR' | grep -vxF 'DEBUG' | sort -u || true)
+          THIS_FAILED=$(comm -23 <(echo "$ALL_ATTEMPTED" | grep -v '^$' | sort) <(echo "$NEW_OK" | grep -v '^$' | sort) 2>/dev/null | grep -v '^$' || true)
+          ERROR_SUMMARY=$(tail -n 20 "$LOG")
+
           CONN_FAIL=""
           HARD_FAIL=""
           for h in $THIS_FAILED; do
-            if grep -E "^\[$h\]" "$LOG" | grep -qE 'ssh: connect|Connection refused|No route to host|Connection timed out|Network is unreachable|Could not connect'; then
-              CONN_FAIL=$(printf '%s\n%s' "$CONN_FAIL" "$h")
+            if grep -E "^\[$h\]" "$LOG" | grep -qE 'ssh: connect|Connection refused|No route to host|Connection timed out|Network is unreachable|Could not connect|ssh_exchange_identification'; then
+              CONN_FAIL="$CONN_FAIL $h"
             else
-              HARD_FAIL=$(printf '%s\n%s' "$HARD_FAIL" "$h")
+              HARD_FAIL="$HARD_FAIL $h"
             fi
           done
-          CONN_FAIL=$(echo "$CONN_FAIL" | grep -v '^$' | sort -u | tr '\n' ' ' | xargs || true)
-          HARD_FAIL=$(echo "$HARD_FAIL" | grep -v '^$' | sort -u | tr '\n' ' ' | xargs || true)
-          ERROR_SUMMARY=$(tail -n 20 "$LOG")
+          CONN_FAIL=$(echo "$CONN_FAIL" | xargs || true)
+          HARD_FAIL=$(echo "$HARD_FAIL" | xargs || true)
           rm "$LOG"
 
-          # Hard failures: notify immediately and abandon those hosts
+          # Hard failures: notify immediately and drop from future retries
           if [ -n "$HARD_FAIL" ]; then
-            FAILED_HOSTS=$(printf '%s\n%s' "$FAILED_HOSTS" "$HARD_FAIL" | sort -u | grep -v '^$' | tr '\n' ' ' | xargs || true)
+            FAILED_HOSTS="$FAILED_HOSTS $HARD_FAIL"
             ${pkgs.gotify-cli}/bin/gotify push \
               -t "\u274c ${name} deploy FAILED ($HARD_FAIL)" \
               -p 10 \
               "Hard failure on: $HARD_FAIL\n\nLast 20 lines:\n$ERROR_SUMMARY"
           fi
 
-          # Connection failures: retry if attempts remain, otherwise give up
+          # Connection failures: retry if attempts remain
           if [ -n "$CONN_FAIL" ]; then
             if [ $attempt -ge $MAX_RETRIES ]; then
-              FAILED_HOSTS=$(printf '%s\n%s' "$FAILED_HOSTS" "$CONN_FAIL" | sort -u | grep -v '^$' | tr '\n' ' ' | xargs || true)
+              FAILED_HOSTS="$FAILED_HOSTS $CONN_FAIL"
               ${pkgs.gotify-cli}/bin/gotify push \
                 -t "\u274c ${name} deploy FAILED (retries exhausted)" \
                 -p 10 \
@@ -97,7 +97,8 @@ let
             fi
           fi
 
-          PENDING=$(echo "$CONN_FAIL" | xargs || true)
+          # Only retry connection-failed hosts; hard-failed ones are abandoned
+          PENDING=$(echo "$CONN_FAIL" | tr ' ' '\n' | grep -v '^$' | sort -u | tr '\n' ',' | sed 's/,$//' || true)
         fi
       done
 
