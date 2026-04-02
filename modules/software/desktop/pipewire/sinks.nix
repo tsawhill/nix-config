@@ -13,6 +13,23 @@ let
       };
       "playback.props" = {
         "node.name" = "${name}_out";
+        "audio.position" = [ "FL" "FR" ];
+        "node.passive" = true;
+      };
+    };
+  };
+
+  mkMicSink = name: description: {
+    name = "libpipewire-module-loopback";
+    args = {
+      "node.description" = description;
+      "capture.props" = {
+        "node.name" = name;
+        "media.class" = "Audio/Sink";
+        "audio.position" = [ "FL" "FR" ];
+      };
+      "playback.props" = {
+        "node.name" = "${name}_out";
         "media.class" = "Audio/Source";
         "audio.position" = [ "FL" "FR" ];
         "node.passive" = true;
@@ -35,7 +52,7 @@ in
 
     # Virtual loopback sinks — enabled individually
     extraConfig.pipewire."93-virtual-sinks"."context.modules" =
-      lib.optionals cfg.mic.enable      [ (mkSink "mic_input"      "Mic Input")      ]
+      lib.optionals cfg.mic.enable      [ (mkMicSink "mic_input"      "Mic Input")      ]
       ++ lib.optionals cfg.game.enable    [ (mkSink "game_audio"    "Game Audio")    ]
       ++ lib.optionals cfg.music.enable   [ (mkSink "music"         "Music")         ]
       ++ lib.optionals cfg.discord.enable [ (mkSink "discord_audio" "Discord Audio") ]
