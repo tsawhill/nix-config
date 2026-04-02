@@ -45,8 +45,8 @@ let
           REVISIONS=""
           HOSTS=$(grep 'Activation successful' "$LOG" | grep -oP '^\[\K[^\]]+' || true)
           for host in $HOSTS; do
-            VER=$(${pkgs.openssh}/bin/ssh -o ConnectTimeout=5 -o BatchMode=yes "root@''${host}" nixos-version 2>/dev/null || echo "unreachable")
-            REVISIONS+="''${host}: ''${VER}\n"
+            VER=$(${pkgs.openssh}/bin/ssh -o ConnectTimeout=5 -o BatchMode=yes "root@$host" nixos-version 2>/dev/null || echo "unreachable")
+            REVISIONS+="${host}: ${VER}\n"
           done
           COMMIT_MSG=$(printf 'auto: ${name} deploy %s\n\n%b' "$(date '+%Y-%m-%d %H:%M')" "$REVISIONS")
           ${pkgs.git}/bin/git -C "${repoPath}" add flake.lock
@@ -195,7 +195,7 @@ let
     fi
 
     TARGET="$1"
-    GOAL="''${2:-switch}"
+    GOAL="${2:-switch}"
     HOSTNAME=$(hostname)
 
     cd "${repoPath}"
