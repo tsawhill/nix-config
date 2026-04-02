@@ -24,12 +24,13 @@ let
       ${pkgs.git}/bin/git -C "${repoPath}" commit -m "auto: ${name} pre-deploy $(date '+%Y-%m-%d %H:%M')" || true
 
       echo "--- Deploying ${name} (${tags}) ---"
+      cd "${repoPath}"
       RETRY_DELAY=1800
       MAX_RETRIES=46
       for attempt in $(seq 1 $MAX_RETRIES); do
         echo "Attempt $attempt/$MAX_RETRIES..."
         LOG=$(mktemp)
-        if ${pkgs.colmena}/bin/colmena apply --flake "${flakePath}" --on '${tags}' --parallel 4 switch 2>&1 | tee "$LOG"; then
+        if ${pkgs.colmena}/bin/colmena apply --on '${tags}' --parallel 4 switch 2>&1 | tee "$LOG"; then
           WARNINGS=$(grep -E '\[WARN\]|warning:' "$LOG" || true)
           if [ -n "$WARNINGS" ]; then
             MSG="Warnings:\n$WARNINGS"
