@@ -66,9 +66,6 @@ in
     meta = {
       nixpkgs = import nixpkgs-stable { localSystem = "x86_64-linux"; };
       specialArgs = sharedArgs;
-      deploymentOptions = {
-        substituteOnDestination = false;
-      };
       nodeNixpkgs = {
         "taylor-desktop-nix" = unstablePkgs;
         "taylor-laptop-nix" = unstablePkgs;
