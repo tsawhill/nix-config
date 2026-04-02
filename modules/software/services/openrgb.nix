@@ -33,6 +33,9 @@ in
       smBusModule
     ];
 
+    # AMD BIOS reserves SMBus resources via ACPI; this allows i2c-piix4 to access them
+    boot.kernelParams = lib.mkIf (cfg.cpuVendor == "amd") [ "acpi_enforce_resources=lax" ];
+
     environment.systemPackages = [ pkgs.openrgb-with-all-plugins ];
   };
 }
