@@ -229,32 +229,32 @@ let
     fi
     OFFSET="${OFFSET_RAW#-}"
 
-    GCROOT_DIR=/nix/var/nix/gcroots/colmena-hosts/"$HOST"
+    GCROOT_DIR="/nix/var/nix/gcroots/colmena-hosts/$HOST"
     if [ -d "$GCROOT_DIR" ]; then
       # copy available closures from build host to target to reduce rebuilds
       echo "Copying available closures to $HOST..."
       for f in $(find "$GCROOT_DIR" -type f -printf '%f\n' 2>/dev/null || true); do
         PATH_TO_COPY="/nix/store/$f"
         if [ -e "$PATH_TO_COPY" ]; then
-          ${pkgs.nix}/bin/nix copy --to ssh://root@${HOST} "$PATH_TO_COPY" || true
+          ${pkgs.nix}/bin/nix copy --to ssh://root@$HOST "$PATH_TO_COPY" || true
         fi
       done
     fi
 
     # determine target generation on remote
-    GEN=$(${pkgs.openssh}/bin/ssh -o BatchMode=yes root@"${HOST}" "nix-env -p /nix/var/nix/profiles/system --list-generations --no-name | tail -n ${OFFSET} | head -n 1" || echo "")
+    GEN=$(${pkgs.openssh}/bin/ssh -o BatchMode=yes root@"$HOST" "nix-env -p /nix/var/nix/profiles/system --list-generations --no-name | tail -n \"$OFFSET\" | head -n 1" || echo "")
     if [ -z "$GEN" ]; then
-      echo "Unable to determine target generation on ${HOST}"
+      echo "Unable to determine target generation on $HOST"
       exit 1
     fi
 
-    echo "Switching ${HOST} to generation ${GEN}"
-    ${pkgs.openssh}/bin/ssh -o BatchMode=yes root@"${HOST}" "sudo nix-env -p /nix/var/nix/profiles/system --switch-generation ${GEN} && sudo /nix/var/nix/profiles/system/activate" || {
-      echo "Remote activation failed on ${HOST}. If the activation failed due to missing store paths, run 'nix copy' from a machine that has the closures.'"
+    echo "Switching $HOST to generation $GEN"
+    ${pkgs.openssh}/bin/ssh -o BatchMode=yes root@"$HOST" "sudo nix-env -p /nix/var/nix/profiles/system --switch-generation $GEN && sudo /nix/var/nix/profiles/system/activate" || {
+      echo "Remote activation failed on $HOST. If the activation failed due to missing store paths, run 'nix copy' from a machine that has the closures.'"
       exit 1
     }
 
-    echo "deploy-old completed for ${HOST} -> generation ${GEN}"
+    echo "deploy-old completed for $HOST -> generation $GEN"
   '';
 
   mkTimer = name: onCalendar: {
