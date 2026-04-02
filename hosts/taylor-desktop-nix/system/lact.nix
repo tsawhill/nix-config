@@ -1,4 +1,9 @@
-{ pkgs, lib, ... }:
+{
+  pkgs,
+  lib,
+  config,
+  ...
+}:
 let
   # The GPU ID prefix is matched by LACT as "<vendor>:<device>-*".
   # Your dGPU is 1002:744C (RX 7900 XTX) at 0000:03:00.0.
@@ -30,14 +35,14 @@ in
   # Enable overdrive so LACT can set power caps outside the default range.
   # This sets amdgpu.ppfeaturemask=0xffffffff as a kernel param.
   hardware.amdgpu.overdrive.enable = true;
-  hardware.amdgpu.overdrive.forbiddenProfiles = [];
+  hardware.amdgpu.overdrive.forbiddenProfiles = [ ];
 
   services.lact.enable = true;
 
   # Write the config declaratively. LACT hot-reloads on file changes,
   # but a full daemon restart on rebuild ensures settings are always applied.
   environment.etc."lact/config.yaml" = {
-    text = lib.generators.toYAML {} lactConfig;
+    text = lib.generators.toYAML { } lactConfig;
     # Root-owned, readable by the daemon
     mode = "0644";
   };
