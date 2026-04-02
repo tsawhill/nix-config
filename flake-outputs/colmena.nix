@@ -50,7 +50,6 @@ let
     )
     // (if tag != null then { tags = [ tag ]; } else { });
     _module.args = {
-      pkgs = unstablePkgs;
       home-manager-input = inputs.home-manager-unstable;
       nixvim-input = inputs.nixvim-unstable;
       sops-input = inputs.sops-nix-unstable;
