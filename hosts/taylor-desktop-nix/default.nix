@@ -40,6 +40,7 @@ in
     ./system/boot.nix
     ./system/disks.nix
     ./system/hardware.nix
+    ./system/lact.nix
     ./system/networking.nix
     ./system/syncthing.nix
     ./system/samba.nix
