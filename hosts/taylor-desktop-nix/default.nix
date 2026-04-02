@@ -86,7 +86,7 @@ in
   desktop.hyprland.enable = true;
   services.upower.enable = true;
 
-  my.audio.presonus.enable = true;
+  my.audio.presonus.enable = false;
 
   software.dev.enable = true;
   software.fonts.enable = true;
