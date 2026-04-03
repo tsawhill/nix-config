@@ -36,49 +36,20 @@
             "node.description" = "PreSonus Mic (Processed)";
             "media.name"       = "PreSonus Mic Processed";
 
+            # TEMP: rnnoise only, VAD disabled — isolating which plugin causes silence
             "filter.graph"."nodes" = [
-
-              # Gate with threshold at minimum — effectively open, lets all audio through.
-              # Tune after confirming audio flows end-to-end.
-              {
-                type   = "ladspa";
-                name   = "gate";
-                plugin = "${pkgs.lsp-plugins}/lib/ladspa/lsp-plugins-ladspa.so";
-                label  = "http://lsp-plug.in/plugins/ladspa/sc_gate_stereo";
-                control = {
-                  "Curve threshold (G)"   = 0.001;   # -60 dB — gate always open
-                  "Attack (ms)"           = 5.0;
-                  "Release (ms)"          = 100.0;
-                  "Reduction (G)"         = 1.0;     # no reduction when closed
-                  "High-pass filter mode" = 1.0;
-                  "Sidechain mode"        = 1.0;
-                  "Sidechain preamp (G)"  = 2.0;
-                };
-              }
-
               {
                 type    = "ladspa";
                 name    = "rnnoise";
                 plugin  = "${pkgs.rnnoise-plugin}/lib/ladspa/librnnoise_ladspa.so";
                 label   = "noise_suppressor_stereo";
                 control = {
-                  "VAD Threshold (%)"          = 50.0;
-                  "VAD Grace Period (ms)"      = 200.0;
+                  "VAD Threshold (%)"          = 0.0;
+                  "VAD Grace Period (ms)"      = 0.0;
                   "Retroactive VAD Grace (ms)" = 0.0;
                 };
               }
-
-              {
-                type   = "ladspa";
-                name   = "compressor";
-                plugin = "${pkgs.lsp-plugins}/lib/ladspa/lsp-plugins-ladspa.so";
-                label  = "http://lsp-plug.in/plugins/ladspa/sc_compressor_stereo";
-                control = {
-                  "Sidechain mode" = 1.0;
-                };
-              }
-
-            ]; # /filter.graph.nodes
+            ];
 
             # ── Input: connects to the physical PreSonus mic ────────────
             # No target.object — WirePlumber auto-picks the highest-priority
