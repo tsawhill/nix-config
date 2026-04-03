@@ -36,20 +36,52 @@
             "node.description" = "PreSonus Mic (Processed)";
             "media.name"       = "PreSonus Mic Processed";
 
-            # TEMP: rnnoise only, VAD disabled — isolating which plugin causes silence
             "filter.graph"."nodes" = [
+
+              # Gate — non-SC version: only 2 audio in + 2 audio out.
+              # SC version has extra sidechain audio ports that PipeWire wires
+              # to the main signal, leaving the actual audio inputs as silence.
+              {
+                type   = "ladspa";
+                name   = "gate";
+                plugin = "${pkgs.lsp-plugins}/lib/ladspa/lsp-plugins-ladspa.so";
+                label  = "http://lsp-plug.in/plugins/ladspa/gate_stereo";
+                control = {
+                  "Curve threshold (G)"   = 0.04467;  # -27 dB
+                  "Attack (ms)"           = 5.0;
+                  "Release (ms)"          = 100.0;
+                  "Reduction (G)"         = 0.01;     # -40 dB when closed
+                  "High-pass filter mode" = 1.0;
+                  "Sidechain mode"        = 1.0;      # RMS detection
+                  "Sidechain preamp (G)"  = 2.0;      # +6 dB
+                };
+              }
+
+              # RNNoise noise suppression
               {
                 type    = "ladspa";
                 name    = "rnnoise";
                 plugin  = "${pkgs.rnnoise-plugin}/lib/ladspa/librnnoise_ladspa.so";
                 label   = "noise_suppressor_stereo";
                 control = {
-                  "VAD Threshold (%)"          = 0.0;
-                  "VAD Grace Period (ms)"      = 0.0;
+                  "VAD Threshold (%)"          = 50.0;
+                  "VAD Grace Period (ms)"      = 200.0;
                   "Retroactive VAD Grace (ms)" = 0.0;
                 };
               }
-            ];
+
+              # Compressor — non-SC version: only 2 audio in + 2 audio out.
+              {
+                type   = "ladspa";
+                name   = "compressor";
+                plugin = "${pkgs.lsp-plugins}/lib/ladspa/lsp-plugins-ladspa.so";
+                label  = "http://lsp-plug.in/plugins/ladspa/compressor_stereo";
+                control = {
+                  "Sidechain mode" = 1.0;  # RMS detection
+                };
+              }
+
+            ]; # /filter.graph.nodes
 
             # ── Input: connects to the physical PreSonus mic ────────────
             # No target.object — WirePlumber auto-picks the highest-priority
