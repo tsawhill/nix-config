@@ -63,9 +63,9 @@ in
       ++ lib.optionals cfg.discord.enable [ (mkSink "discord_audio" "Discord Audio") ]
       ++ lib.optionals cfg.desktop.enable [ (mkSink "desktop_audio" "Desktop Audio") ];
 
-    # Routing rules via WirePlumber — applies to ALL audio backends (pulse, native PW, JACK)
+    # Routing rules via pipewire-pulse (PulseAudio compat layer).
     # Rules are evaluated top-to-bottom; more specific matches override the catch-all.
-    wireplumber.extraConfig."94-app-routing"."stream.rules" =
+    extraConfig.pipewire-pulse."94-app-routing"."stream.rules" =
       # Catch-all: send everything to Desktop Audio (must be first)
       lib.optionals cfg.desktop.enable [
         (mkRoute [ { "media.class" = "Stream/Output/Audio"; } ] "desktop_audio")
