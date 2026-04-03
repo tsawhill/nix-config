@@ -93,26 +93,26 @@
 
             ]; # /filter.graph.nodes
 
-            # ── Input: PreSonus Studio 24c physical device ──────────────
+            # ── Input: connects to the physical PreSonus mic ────────────
+            # No target.object — WirePlumber auto-picks the highest-priority
+            # source that isn't in the same link-group (i.e. the physical mic,
+            # not the filter chain's own output). node.passive activates on demand.
             "capture.props" = {
-              "node.name"        = "presonus_mic_capture";
-              "node.description" = "PreSonus Mic Capture";
-              "audio.position"   = [ "FL" "FR" ];
-              "target.object"    = "alsa_input.usb-PreSonus_Studio_24c_SC1E21081241-00.analog-stereo";
-              # Not passive — always running so mic_input is always live.
+              "node.name"    = "presonus_mic_capture";
+              "node.passive" = true;
+              "audio.rate"   = 48000;
             };
 
-            # ── Output: the mic_input virtual source ──────────────────
-            # Named mic_input directly — no intermediate loopback needed.
-            # Virtual (filter-chain) nodes are unregistered, so target.object
-            # lookups from a loopback can never find them. The pipewire-pulse
-            # routing rule routes apps to mic_input, same as the output sinks.
+            # ── Output: virtual mic source visible to PulseAudio clients ─
+            # Must be "Audio/Source" not "Audio/Source/Virtual" — the Virtual
+            # suffix makes it invisible to pipewire-pulse and PulseAudio apps.
             "playback.props" = {
               "node.name"        = "mic_input";
               "node.description" = "Mic Input";
-              "media.class"      = "Audio/Source/Virtual";
+              "media.class"      = "Audio/Source";
               "audio.position"   = [ "FL" "FR" ];
               "priority.session" = 2200;
+              "audio.rate"       = 48000;
             };
 
           }; # /args
