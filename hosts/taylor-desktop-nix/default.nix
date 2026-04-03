@@ -84,7 +84,7 @@ in
   ];
 
   desktop.hyprland.enable = true;
-  # my.desktop.audio.presonusMic.enable = true;
+  my.desktop.audio.presonusMic.enable = true;
   services.upower.enable = true;
 
   software.dev.enable = true;
