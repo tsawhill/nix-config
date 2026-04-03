@@ -15,8 +15,10 @@ in
     services.pipewire = {
 
       # Virtual mic loopback:
-      #   capture side  – auto-connects to the default physical source (node.passive)
-      #   playback side – exposed as Audio/Source/Virtual; apps record from here
+      #   capture side  – passive; WirePlumber auto-connects it to the highest-priority
+      #                   source (presonus_mic_processed at 2150 > physical USB at 2109)
+      #   playback side – exposed as Audio/Source/Virtual at priority 2200, so apps
+      #                   using either native PW or PulseAudio compat default to it
       extraConfig.pipewire."93-virtual-mic"."context.modules" = [
         {
           name = "libpipewire-module-loopback";
@@ -33,27 +35,21 @@ in
               "node.description" = "Mic Input";
               "media.class"      = "Audio/Source/Virtual";
               "audio.position"   = [ "FL" "FR" ];
-              # Must exceed the physical USB mic's priority (2109) to be the default source.
+              # Beat the physical USB mic (2109) and presonus_mic_processed (2150)
+              # so apps default here without needing explicit routing rules.
               "priority.session" = 2200;
             };
           };
         }
       ];
 
-      # Route all capture apps to the virtual mic input by default.
-      # The override rule for mic_input_capture must come last — WirePlumber applies
-      # all matching rules in order and later entries win on the same property.
-      wireplumber.extraConfig."94-mic-input-routing"."stream.rules" = [
+      # Force PulseAudio-compat input streams to mic_input.
+      # NOTE: pipewire-pulse rules only affect PulseAudio clients — native PipeWire
+      # nodes like mic_input_capture are unaffected, so there is no routing loop.
+      extraConfig.pipewire-pulse."94-mic-input-routing"."stream.rules" = [
         {
           matches = [ { "media.class" = "Stream/Input/Audio"; } ];
           actions.update-props."node.target" = "mic_input";
-        }
-        # mic_input_capture is itself a Stream/Input/Audio, so the rule above would
-        # route it back to mic_input (a loop). Override it to point at the processed
-        # source instead. If presonusmic is disabled, WP falls back to default source.
-        {
-          matches = [ { "node.name" = "mic_input_capture"; } ];
-          actions.update-props."node.target" = "presonus_mic_processed";
         }
       ];
     };
