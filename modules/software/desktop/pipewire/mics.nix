@@ -28,6 +28,10 @@ in
               "node.name"        = "mic_input_capture";
               "node.description" = "Mic Input Capture";
               "audio.position"   = [ "FL" "FR" ];
+              # Explicitly target the DSP chain output. WirePlumber ignores
+              # priority.session when choosing between physical and virtual sources,
+              # so we must hardcode this rather than relying on priority ordering.
+              "target.object"    = "presonus_mic_processed";
               "stream.props"."node.passive" = true;
             };
             "playback.props" = {
