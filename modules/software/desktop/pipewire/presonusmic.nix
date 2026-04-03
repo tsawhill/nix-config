@@ -36,7 +36,7 @@
             "node.description" = "PreSonus Mic (Processed)";
             "media.name"       = "PreSonus Mic Processed";
 
-            # TEMP: compressor only — does LSP compressor_stereo pass audio alone?
+            # TEMP: compressor → rnnoise (reversed order) to test quantum compatibility
             "filter.graph"."nodes" = [
               {
                 type   = "ladspa";
@@ -44,6 +44,17 @@
                 plugin = "${pkgs.lsp-plugins}/lib/ladspa/lsp-plugins-ladspa.so";
                 label  = "http://lsp-plug.in/plugins/ladspa/compressor_stereo";
                 control = { "Sidechain mode" = 1.0; };
+              }
+              {
+                type    = "ladspa";
+                name    = "rnnoise";
+                plugin  = "${pkgs.rnnoise-plugin}/lib/ladspa/librnnoise_ladspa.so";
+                label   = "noise_suppressor_stereo";
+                control = {
+                  "VAD Threshold (%)"          = 50.0;
+                  "VAD Grace Period (ms)"      = 200.0;
+                  "Retroactive VAD Grace (ms)" = 0.0;
+                };
               }
             ];
 
