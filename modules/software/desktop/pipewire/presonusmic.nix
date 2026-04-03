@@ -48,8 +48,24 @@
                   plugin = "${pkgs.lsp-plugins}/lib/ladspa/lsp-plugins-ladspa.so";
                   label  = "http://lsp-plug.in/plugins/ladspa/gate_stereo";
                   control = {
-                    "Curve threshold (G)" = 0.001;
-                    "Reduction (G)"       = 1.0;
+                    "Curve threshold (G)"   = 0.04467;
+                    "Attack (ms)"           = 5.0;
+                    "Release (ms)"          = 100.0;
+                    "Reduction (G)"         = 0.01;
+                    "High-pass filter mode" = 1.0;
+                    "Sidechain mode"        = 1.0;
+                    "Sidechain preamp (G)"  = 2.0;
+                  };
+                }
+                {
+                  type    = "ladspa";
+                  name    = "rnnoise";
+                  plugin  = "${pkgs.rnnoise-plugin}/lib/ladspa/librnnoise_ladspa.so";
+                  label   = "noise_suppressor_stereo";
+                  control = {
+                    "VAD Threshold (%)"          = 50.0;
+                    "VAD Grace Period (ms)"      = 200.0;
+                    "Retroactive VAD Grace (ms)" = 0.0;
                   };
                 }
                 {
@@ -60,10 +76,12 @@
                   control = { "Sidechain mode" = 1.0; };
                 }
               ];
-              # Explicit wiring — auto-connect fails for multi-plugin chains
+              # rnnoise stereo ports use parens: "Input (L)" not "Input L"
               "links" = [
-                { output = "gate:Output L";   input = "compressor:Input L"; }
-                { output = "gate:Output R";   input = "compressor:Input R"; }
+                { output = "gate:Output L";      input = "rnnoise:Input (L)"; }
+                { output = "gate:Output R";      input = "rnnoise:Input (R)"; }
+                { output = "rnnoise:Output (L)"; input = "compressor:Input L"; }
+                { output = "rnnoise:Output (R)"; input = "compressor:Input R"; }
               ];
               "inputs"  = [ "gate:Input L"        "gate:Input R" ];
               "outputs" = [ "compressor:Output L"  "compressor:Output R" ];
