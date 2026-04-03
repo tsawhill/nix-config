@@ -99,22 +99,20 @@
               "node.description" = "PreSonus Mic Capture";
               "audio.position"   = [ "FL" "FR" ];
               "target.object"    = "alsa_input.usb-PreSonus_Studio_24c_SC1E21081241-00.analog-stereo";
-              "stream.props"."node.passive" = true;
+              # Not passive — always running so mic_input is always live.
             };
 
-            # ── Output: high-priority virtual source ──────────────────
-            # priority.session = 2000 makes this the preferred default source
-            # in WirePlumber, above physical USB mics (1025) and PCIe (1000).
-            # The mic_input loopback from mics.nix will auto-connect here.
+            # ── Output: the mic_input virtual source ──────────────────
+            # Named mic_input directly — no intermediate loopback needed.
+            # Virtual (filter-chain) nodes are unregistered, so target.object
+            # lookups from a loopback can never find them. The pipewire-pulse
+            # routing rule routes apps to mic_input, same as the output sinks.
             "playback.props" = {
-              "node.name"        = "presonus_mic_processed";
-              "node.description" = "PreSonus Mic (Processed)";
+              "node.name"        = "mic_input";
+              "node.description" = "Mic Input";
               "media.class"      = "Audio/Source/Virtual";
               "audio.position"   = [ "FL" "FR" ];
-              "priority.session" = 2150;
-              # Must be registered so target.object lookups from other modules
-              # (e.g. mic_input_capture) can find this node in the PipeWire registry.
-              "object.register"  = true;
+              "priority.session" = 2200;
             };
 
           }; # /args
