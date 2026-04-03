@@ -9,32 +9,57 @@ let
       "capture.props" = {
         "node.name" = name;
         "media.class" = "Audio/Sink";
-        "audio.position" = [ "FL" "FR" ];
+        "audio.position" = [
+          "FL"
+          "FR"
+        ];
       };
       "playback.props" = {
         "node.name" = "${name}_out";
-        "audio.position" = [ "FL" "FR" ];
+        "audio.position" = [
+          "FL"
+          "FR"
+        ];
         "node.passive" = true;
       };
     };
   };
 
-  mkRoute = matches: target: { inherit matches; actions.update-props."node.target" = target; };
+  mkRoute = matches: target: {
+    inherit matches;
+    actions.update-props."node.target" = target;
+  };
 in
 {
   options.my.desktop.audio.sinks = {
-    game.enable    = lib.mkOption { type = lib.types.bool; default = true; description = "Enable virtual Game Audio sink."; };
-    music.enable   = lib.mkOption { type = lib.types.bool; default = true; description = "Enable virtual Music sink."; };
-    discord.enable = lib.mkOption { type = lib.types.bool; default = true; description = "Enable virtual Discord Audio sink."; };
-    desktop.enable = lib.mkOption { type = lib.types.bool; default = true; description = "Enable virtual Desktop Audio sink (catch-all)."; };
+    game.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Enable virtual Game Audio sink.";
+    };
+    music.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Enable virtual Music sink.";
+    };
+    discord.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Enable virtual Discord Audio sink.";
+    };
+    desktop.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Enable virtual Desktop Audio sink (catch-all).";
+    };
   };
 
   config.services.pipewire = {
 
     # Virtual loopback sinks — enabled individually
     extraConfig.pipewire."93-virtual-sinks"."context.modules" =
-      lib.optionals cfg.game.enable    [ (mkSink "game_audio"    "Game Audio")    ]
-      ++ lib.optionals cfg.music.enable   [ (mkSink "music"         "Music")         ]
+      lib.optionals cfg.game.enable [ (mkSink "game_audio" "Game Audio") ]
+      ++ lib.optionals cfg.music.enable [ (mkSink "music" "Music") ]
       ++ lib.optionals cfg.discord.enable [ (mkSink "discord_audio" "Discord Audio") ]
       ++ lib.optionals cfg.desktop.enable [ (mkSink "desktop_audio" "Desktop Audio") ];
 
@@ -43,15 +68,15 @@ in
     wireplumber.extraConfig."94-app-routing"."stream.rules" =
       # Catch-all: send everything to Desktop Audio (must be first)
       lib.optionals cfg.desktop.enable [
-        (mkRoute [{ "media.class" = "Stream/Output/Audio"; }] "desktop_audio")
+        (mkRoute [ { "media.class" = "Stream/Output/Audio"; } ] "desktop_audio")
       ]
       # Discord (Electron)
       ++ lib.optionals cfg.discord.enable [
-        (mkRoute [{ "application.process.binary" = "electron"; }] "discord_audio")
+        (mkRoute [ { "application.process.binary" = "electron"; } ] "discord_audio")
       ]
       # mpv → Music
       ++ lib.optionals cfg.music.enable [
-        (mkRoute [{ "application.process.binary" = "mpv"; }] "music")
+        (mkRoute [ { "application.process.binary" = "mpv"; } ] "music")
       ]
       # Games
       ++ lib.optionals cfg.game.enable [
