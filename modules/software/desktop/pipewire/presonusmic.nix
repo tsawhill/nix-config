@@ -40,26 +40,34 @@
             # mismatch that makes the graph output silence.
             "node.latency"     = "480/48000";
 
-            # TEMP: two LSP plugins only — does gate + compressor work without rnnoise?
-            "filter.graph"."nodes" = [
-              {
-                type   = "ladspa";
-                name   = "gate";
-                plugin = "${pkgs.lsp-plugins}/lib/ladspa/lsp-plugins-ladspa.so";
-                label  = "http://lsp-plug.in/plugins/ladspa/gate_stereo";
-                control = {
-                  "Curve threshold (G)" = 0.001;
-                  "Reduction (G)"       = 1.0;
-                };
-              }
-              {
-                type   = "ladspa";
-                name   = "compressor";
-                plugin = "${pkgs.lsp-plugins}/lib/ladspa/lsp-plugins-ladspa.so";
-                label  = "http://lsp-plug.in/plugins/ladspa/compressor_stereo";
-                control = { "Sidechain mode" = 1.0; };
-              }
-            ];
+            "filter.graph" = {
+              "nodes" = [
+                {
+                  type   = "ladspa";
+                  name   = "gate";
+                  plugin = "${pkgs.lsp-plugins}/lib/ladspa/lsp-plugins-ladspa.so";
+                  label  = "http://lsp-plug.in/plugins/ladspa/gate_stereo";
+                  control = {
+                    "Curve threshold (G)" = 0.001;
+                    "Reduction (G)"       = 1.0;
+                  };
+                }
+                {
+                  type   = "ladspa";
+                  name   = "compressor";
+                  plugin = "${pkgs.lsp-plugins}/lib/ladspa/lsp-plugins-ladspa.so";
+                  label  = "http://lsp-plug.in/plugins/ladspa/compressor_stereo";
+                  control = { "Sidechain mode" = 1.0; };
+                }
+              ];
+              # Explicit wiring — auto-connect fails for multi-plugin chains
+              "links" = [
+                { output = "gate:Output L";   input = "compressor:Input L"; }
+                { output = "gate:Output R";   input = "compressor:Input R"; }
+              ];
+              "inputs"  = [ "gate:Input L"        "gate:Input R" ];
+              "outputs" = [ "compressor:Output L"  "compressor:Output R" ];
+            };
 
             # ── Input: connects to the physical PreSonus mic ────────────
             # No target.object — WirePlumber auto-picks the highest-priority
