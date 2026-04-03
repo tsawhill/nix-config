@@ -35,8 +35,11 @@
           args = {
             "node.description" = "PreSonus Mic (Processed)";
             "media.name"       = "PreSonus Mic Processed";
+            # Force 480-sample quantum at 48kHz — required by rnnoise's fixed frame size.
+            # Without this, chaining rnnoise with any other plugin causes a quantum
+            # mismatch that makes the graph output silence.
+            "node.latency"     = "480/48000";
 
-            # TEMP: compressor → rnnoise (reversed order) to test quantum compatibility
             "filter.graph"."nodes" = [
               {
                 type   = "ladspa";
