@@ -111,7 +111,9 @@
               "node.description" = "PreSonus Mic (Processed)";
               "media.class"      = "Audio/Source/Virtual";
               "audio.position"   = [ "FL" "FR" ];
-              "priority.session" = 2000;
+              # Must exceed the physical USB mic's priority (2109) so mic_input_capture
+              # auto-connects here rather than to the raw device, keeping the DSP in path.
+              "priority.session" = 2150;
             };
 
           }; # /args

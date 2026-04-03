@@ -33,17 +33,27 @@ in
               "node.description" = "Mic Input";
               "media.class"      = "Audio/Source/Virtual";
               "audio.position"   = [ "FL" "FR" ];
+              # Must exceed the physical USB mic's priority (2109) to be the default source.
+              "priority.session" = 2200;
             };
           };
         }
       ];
 
       # Route all capture apps to the virtual mic input by default.
-      # More specific per-app overrides can be added in host configs.
+      # The override rule for mic_input_capture must come last — WirePlumber applies
+      # all matching rules in order and later entries win on the same property.
       wireplumber.extraConfig."94-mic-input-routing"."stream.rules" = [
         {
           matches = [ { "media.class" = "Stream/Input/Audio"; } ];
           actions.update-props."node.target" = "mic_input";
+        }
+        # mic_input_capture is itself a Stream/Input/Audio, so the rule above would
+        # route it back to mic_input (a loop). Override it to point at the processed
+        # source instead. If presonusmic is disabled, WP falls back to default source.
+        {
+          matches = [ { "node.name" = "mic_input_capture"; } ];
+          actions.update-props."node.target" = "presonus_mic_processed";
         }
       ];
     };
