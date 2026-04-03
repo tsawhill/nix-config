@@ -52,15 +52,15 @@
                 type   = "ladspa";
                 name   = "gate";
                 plugin = "${pkgs.lsp-plugins}/lib/ladspa/lsp-plugins-ladspa.so";
-                label  = "lsp_plugins_sc_gate_stereo";
+                label  = "http://lsp-plug.in/plugins/ladspa/sc_gate_stereo";
                 control = {
-                  "Curve threshold"       = 0.04467;
-                  "Attack"                = 5.0;
-                  "Release"               = 100.0;
-                  "Reduction"             = 0.01;
+                  "Curve threshold (G)"   = 0.04467;
+                  "Attack (ms)"           = 5.0;
+                  "Release (ms)"          = 100.0;
+                  "Reduction (G)"         = 0.01;
                   "High-pass filter mode" = 1.0;
                   "Sidechain mode"        = 1.0;
-                  "Sidechain preamp"      = 2.0;
+                  "Sidechain preamp (G)"  = 2.0;
                 };
               }
 
@@ -85,9 +85,9 @@
                 type   = "ladspa";
                 name   = "compressor";
                 plugin = "${pkgs.lsp-plugins}/lib/ladspa/lsp-plugins-ladspa.so";
-                label  = "lsp_plugins_sc_compressor_stereo";
+                label  = "http://lsp-plug.in/plugins/ladspa/sc_compressor_stereo";
                 control = {
-                  "Sidechain mode" = 1.0;
+                  "Sidechain mode" = 1.0;   # RMS
                 };
               }
 
