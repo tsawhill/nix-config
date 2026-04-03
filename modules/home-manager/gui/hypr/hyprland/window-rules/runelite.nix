@@ -17,5 +17,6 @@
     # Fix black popup rendering on XWayland
     "immediate on, match:class net-runelite-client-RuneLite, match:title ^win"
     "render_unfocused on, match:class net-runelite-client-RuneLite, match:title ^win"
+    "focus_on_activate on, match:class net-runelite-client-RuneLite, match:title ^win"
   ];
 }
