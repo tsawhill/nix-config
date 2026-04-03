@@ -25,9 +25,13 @@
 
   config = lib.mkIf config.my.desktop.audio.presonusMic.enable {
 
-    # LV2 plugin discovery — PipeWire respects LV2_PATH from the user session.
-    environment.sessionVariables.LV2_PATH =
-      lib.makeSearchPathOutput "lib" "lib/lv2" [ pkgs.lsp-plugins ];
+    # LV2 plugin discovery — PipeWire's SPA LV2 plugin reads LV2_PATH from the
+    # process environment. We expose it via /etc/environment.d/ so systemd's
+    # user-session generator (systemd-environment-d-generator) injects it into
+    # every user service (including pipewire.service) on login.
+    environment.etc."environment.d/50-lv2-path.conf".text = ''
+      LV2_PATH=${lib.makeSearchPathOutput "lib" "lib/lv2" [ pkgs.lsp-plugins ]}
+    '';
 
     services.pipewire = {
 
