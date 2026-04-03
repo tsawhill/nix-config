@@ -1,10 +1,15 @@
 {
   wayland.windowManager.hyprland.settings.windowrule = [
-    "float on, match:class net-runelite-client-RuneLite"
-    # Size rule only for the main client, not popups
-    "size 1078 777, match:class net-runelite-client-RuneLite, match:title ^RuneLite$"
-
+    # Bolt Launcher
     "float on, match:class BoltLauncher"
     "size 1115 894, match:class BoltLauncher"
+
+    # RuneLite Launcher (update/splash screen)
+    "float on, match:class net-runelite-launcher-Launcher"
+    "size 640 480, match:class net-runelite-launcher-Launcher"
+
+    # RuneLite client (float all windows; size only the main client, not popups)
+    "float on, match:class net-runelite-client-RuneLite"
+    "size 1078 777, match:class net-runelite-client-RuneLite, match:title ^RuneLite$"
   ];
 }
