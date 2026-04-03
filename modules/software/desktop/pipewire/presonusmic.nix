@@ -40,24 +40,24 @@
             # mismatch that makes the graph output silence.
             "node.latency"     = "480/48000";
 
+            # TEMP: two LSP plugins only — does gate + compressor work without rnnoise?
             "filter.graph"."nodes" = [
+              {
+                type   = "ladspa";
+                name   = "gate";
+                plugin = "${pkgs.lsp-plugins}/lib/ladspa/lsp-plugins-ladspa.so";
+                label  = "http://lsp-plug.in/plugins/ladspa/gate_stereo";
+                control = {
+                  "Curve threshold (G)" = 0.001;
+                  "Reduction (G)"       = 1.0;
+                };
+              }
               {
                 type   = "ladspa";
                 name   = "compressor";
                 plugin = "${pkgs.lsp-plugins}/lib/ladspa/lsp-plugins-ladspa.so";
                 label  = "http://lsp-plug.in/plugins/ladspa/compressor_stereo";
                 control = { "Sidechain mode" = 1.0; };
-              }
-              {
-                type    = "ladspa";
-                name    = "rnnoise";
-                plugin  = "${pkgs.rnnoise-plugin}/lib/ladspa/librnnoise_ladspa.so";
-                label   = "noise_suppressor_stereo";
-                control = {
-                  "VAD Threshold (%)"          = 50.0;
-                  "VAD Grace Period (ms)"      = 200.0;
-                  "Retroactive VAD Grace (ms)" = 0.0;
-                };
               }
             ];
 
