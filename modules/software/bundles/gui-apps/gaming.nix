@@ -1,4 +1,9 @@
-{ pkgs, lib, config, ... }:
+{
+  pkgs,
+  lib,
+  config,
+  ...
+}:
 {
   options.software.apps.gaming.enable = lib.mkEnableOption "gaming tools and launchers";
 
@@ -8,11 +13,12 @@
       remotePlay.openFirewall = true;
       dedicatedServer.openFirewall = true;
       localNetworkGameTransfers.openFirewall = true;
+      gamescopeSession.enable = true;
     };
 
     programs.gamescope = {
       enable = true;
-      capSysNice = true;
+      capSysNice = false; # gamescope's sandboxing is too aggressive for some games, e.g. steam
       package = pkgs.gamescope.overrideAttrs (_: {
         NIX_CFLAGS_COMPILE = [ "-fno-fast-math" ];
       });
