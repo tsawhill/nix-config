@@ -85,8 +85,9 @@
             # source that isn't in the same link-group (i.e. the physical mic,
             # not the filter chain's own output). node.passive activates on demand.
             "capture.props" = {
-              "node.name"    = "presonus_mic_capture";
-              "node.passive" = true;
+              "node.name"      = "presonus_mic_capture";
+              "audio.position" = [ "FL" "FR" ];
+              "node.passive"   = true;
             };
 
             # ── Output: virtual mic source ────────────────────────────────
