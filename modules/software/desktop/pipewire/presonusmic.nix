@@ -36,19 +36,8 @@
             "node.description" = "PreSonus Mic (Processed)";
             "media.name"       = "PreSonus Mic Processed";
 
-            # TEMP: rnnoise + compressor only (no gate) — isolating buffer issue
+            # TEMP: compressor only — does LSP compressor_stereo pass audio alone?
             "filter.graph"."nodes" = [
-              {
-                type    = "ladspa";
-                name    = "rnnoise";
-                plugin  = "${pkgs.rnnoise-plugin}/lib/ladspa/librnnoise_ladspa.so";
-                label   = "noise_suppressor_stereo";
-                control = {
-                  "VAD Threshold (%)"          = 50.0;
-                  "VAD Grace Period (ms)"      = 200.0;
-                  "Retroactive VAD Grace (ms)" = 0.0;
-                };
-              }
               {
                 type   = "ladspa";
                 name   = "compressor";
