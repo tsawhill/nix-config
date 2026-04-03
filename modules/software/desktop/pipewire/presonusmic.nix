@@ -11,9 +11,9 @@
 # All plugins use LADSPA with absolute nix store paths — no LV2_PATH
 # discovery needed, works correctly in socket-activated pipewire.service.
 #
-# When my.desktop.audio.mics.virtual is also enabled, the processed source
-# (presonus_mic_processed) will be the highest-priority source, so the
-# mic_input loopback auto-connects to it — apps see one clean default input.
+# When my.desktop.audio.mics.virtual is also enabled, the loopback is skipped —
+# the filter chain output IS mic_input. Apps connect to it via the pipewire-pulse
+# routing rule, same mechanism as the working output sinks.
 #
 {
   options.my.desktop.audio.presonusMic.enable = lib.mkOption {
