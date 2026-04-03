@@ -100,19 +100,15 @@
             "capture.props" = {
               "node.name"    = "presonus_mic_capture";
               "node.passive" = true;
-              "audio.rate"   = 48000;
             };
 
-            # ── Output: virtual mic source visible to PulseAudio clients ─
-            # Must be "Audio/Source" not "Audio/Source/Virtual" — the Virtual
-            # suffix makes it invisible to pipewire-pulse and PulseAudio apps.
+            # ── Output: virtual mic source ────────────────────────────────
             "playback.props" = {
               "node.name"        = "mic_input";
               "node.description" = "Mic Input";
-              "media.class"      = "Audio/Source";
+              "media.class"      = "Audio/Source/Virtual";
               "audio.position"   = [ "FL" "FR" ];
               "priority.session" = 2200;
-              "audio.rate"       = 48000;
             };
 
           }; # /args
