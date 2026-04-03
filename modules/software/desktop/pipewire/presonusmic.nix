@@ -3,14 +3,13 @@
 # Native PipeWire processing chain for the PreSonus Studio 24c microphone.
 # Replicates the active EasyEffects input chain:
 #
-#   [deesser]  → skipped (default-only, no practical effect)
-#   [stereo_tools mode=5]  → handled via audio.position (stereo → mono-ish)
-#   [gate]     → LSP SC Gate Stereo (LV2)
+#   [gate]       → LSP SC Gate Stereo (LADSPA)
 #   [deepfilternet] → RNNoise (LADSPA, closest available native equivalent)
-#   [speex]    → bypassed in EasyEffects, skipped
-#   [reverb]   → bypassed in EasyEffects, skipped
-#   [loudness] → TODO: add LSP Loudness plugin if desired
-#   [compressor] → LSP SC Compressor Stereo (LV2)
+#   [compressor] → LSP SC Compressor Stereo (LADSPA)
+#   [speex/reverb] → bypassed in EasyEffects, skipped
+#
+# All plugins use LADSPA with absolute nix store paths — no LV2_PATH
+# discovery needed, works correctly in socket-activated pipewire.service.
 #
 # When my.desktop.audio.mics.virtual is also enabled, the processed source
 # (presonus_mic_processed) will be the highest-priority source, so the
@@ -24,14 +23,6 @@
   };
 
   config = lib.mkIf config.my.desktop.audio.presonusMic.enable {
-
-    # LV2 plugin discovery — PipeWire's SPA LV2 plugin reads LV2_PATH from the
-    # process environment. We expose it via /etc/environment.d/ so systemd's
-    # user-session generator (systemd-environment-d-generator) injects it into
-    # every user service (including pipewire.service) on login.
-    environment.etc."environment.d/50-lv2-path.conf".text = ''
-      LV2_PATH=${lib.makeSearchPathOutput "lib" "lib/lv2" [ pkgs.lsp-plugins ]}
-    '';
 
     services.pipewire = {
 
@@ -48,56 +39,55 @@
             "filter.graph"."nodes" = [
 
               # ── Noise gate ──────────────────────────────────────────────
-              # LSP SC Gate Stereo (LV2)
-              # EasyEffects gate settings (all linear-gain values per LSP LV2 spec):
-              #   curveThreshold = -27 dB  → gt  = 10^(-27/20) ≈ 0.04467
-              #   reduction      = -40 dB  → gr  = 10^(-40/20) = 0.01
-              #   attack         = 5 ms    → at  = 5.0
-              #   release        = 100 ms  → rt  = 100.0
-              #   hpfMode        = 1       → shpm = 1  (12 dB/oct)
-              #   sidechainMode  = 1 (RMS) → scm = 1
-              #   sidechainPreamp= 6 dB   → scp = 10^(6/20) ≈ 2.0 (linear)
+              # LSP SC Gate Stereo (LADSPA, absolute path — no discovery needed)
+              # EasyEffects settings translated to linear gain (LSP LADSPA scale):
+              #   curveThreshold = -27 dB  → "Curve threshold"       = 10^(-27/20) ≈ 0.04467
+              #   reduction      = -40 dB  → "Reduction"             = 10^(-40/20) = 0.01
+              #   attack         = 5 ms    → "Attack"                = 5.0
+              #   release        = 100 ms  → "Release"               = 100.0
+              #   hpfMode        = 1       → "High-pass filter mode"  = 1 (12 dB/oct)
+              #   sidechainMode  = 1 (RMS) → "Sidechain mode"        = 1
+              #   sidechainPreamp= +6 dB   → "Sidechain preamp"      = 10^(6/20) ≈ 2.0
               {
-                type   = "lv2";
+                type   = "ladspa";
                 name   = "gate";
-                plugin = "http://lsp-plug.in/plugins/lv2/sc_gate_stereo";
+                plugin = "${pkgs.lsp-plugins}/lib/ladspa/lsp-plugins-ladspa.so";
+                label  = "lsp_plugins_sc_gate_stereo";
                 control = {
-                  "gt"   = 0.04467;   # Curve threshold (-27 dB, linear)
-                  "at"   = 5.0;       # Attack (ms)
-                  "rt"   = 100.0;     # Release (ms)
-                  "gr"   = 0.01;      # Reduction (-40 dB, linear)
-                  "shpm" = 1.0;       # High-pass filter mode: 12 dB/oct
-                  "scm"  = 1.0;       # Sidechain mode: RMS
-                  "scp"  = 2.0;       # Sidechain preamp (+6 dB, linear)
+                  "Curve threshold"       = 0.04467;
+                  "Attack"                = 5.0;
+                  "Release"               = 100.0;
+                  "Reduction"             = 0.01;
+                  "High-pass filter mode" = 1.0;
+                  "Sidechain mode"        = 1.0;
+                  "Sidechain preamp"      = 2.0;
                 };
               }
 
               # ── Noise suppression ────────────────────────────────────────
               # RNNoise (LADSPA) — native replacement for DeepFilterNet.
-              # EasyEffects DeepFilterNet: postFilterBeta = 0.02
-              # RNNoise does not expose a direct beta parameter; VAD threshold
-              # is the closest tuning knob.
               {
                 type    = "ladspa";
                 name    = "rnnoise";
                 plugin  = "${pkgs.rnnoise-plugin}/lib/ladspa/librnnoise_ladspa.so";
                 label   = "noise_suppressor_stereo";
                 control = {
-                  "VAD Threshold (%)"              = 50.0;
-                  "VAD Grace Period (ms)"          = 200.0;
-                  "Retroactive VAD Grace (ms)"     = 0.0;
+                  "VAD Threshold (%)"          = 50.0;
+                  "VAD Grace Period (ms)"      = 200.0;
+                  "Retroactive VAD Grace (ms)" = 0.0;
                 };
               }
 
               # ── Compressor ───────────────────────────────────────────────
-              # LSP SC Compressor Stereo (LV2)
-              # EasyEffects compressor: sidechainMode = 1 (RMS), all else default.
+              # LSP SC Compressor Stereo (LADSPA)
+              # EasyEffects: sidechainMode = 1 (RMS), all else default.
               {
-                type   = "lv2";
+                type   = "ladspa";
                 name   = "compressor";
-                plugin = "http://lsp-plug.in/plugins/lv2/sc_compressor_stereo";
+                plugin = "${pkgs.lsp-plugins}/lib/ladspa/lsp-plugins-ladspa.so";
+                label  = "lsp_plugins_sc_compressor_stereo";
                 control = {
-                  "scm" = 1.0;   # Sidechain mode: RMS
+                  "Sidechain mode" = 1.0;
                 };
               }
 
@@ -108,7 +98,6 @@
               "node.name"        = "presonus_mic_capture";
               "node.description" = "PreSonus Mic Capture";
               "audio.position"   = [ "FL" "FR" ];
-              # Connect directly to the PreSonus physical device.
               "target.object"    = "alsa_input.usb-PreSonus_Studio_24c_SC1E21081241-00.analog-stereo";
               "stream.props"."node.passive" = true;
             };
