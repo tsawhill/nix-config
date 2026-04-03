@@ -40,7 +40,7 @@
             "desktop_audio.monitor"
           ];
           audio.input = [
-            "alsa_input.usb-PreSonus_Studio_24c_SC1E21081241-00.analog-stereo"
+            "mic_input"
           ];
         };
         wallpaperEngine = {
