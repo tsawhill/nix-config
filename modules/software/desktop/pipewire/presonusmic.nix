@@ -3,9 +3,9 @@
 # Native PipeWire processing chain for the PreSonus Studio 24c microphone.
 # Replicates the active EasyEffects input chain:
 #
-#   [gate]       → LSP SC Gate Stereo (LADSPA)
+#   [gate]       → LSP SC Gate Mono (LADSPA)
 #   [deepfilternet] → RNNoise (LADSPA, closest available native equivalent)
-#   [compressor] → LSP SC Compressor Stereo (LADSPA)
+#   [compressor] → LSP SC Compressor Mono (LADSPA)
 #   [speex/reverb] → bypassed in EasyEffects, skipped
 #
 # All plugins use LADSPA with absolute nix store paths — no LV2_PATH
@@ -46,7 +46,7 @@
                   type   = "ladspa";
                   name   = "gate";
                   plugin = "${pkgs.lsp-plugins}/lib/ladspa/lsp-plugins-ladspa.so";
-                  label  = "http://lsp-plug.in/plugins/ladspa/gate_stereo";
+                  label  = "http://lsp-plug.in/plugins/ladspa/gate_mono";
                   control = {
                     "Curve threshold (G)"   = 0.04467;
                     "Attack (ms)"           = 5.0;
@@ -61,7 +61,7 @@
                   type    = "ladspa";
                   name    = "rnnoise";
                   plugin  = "${pkgs.rnnoise-plugin}/lib/ladspa/librnnoise_ladspa.so";
-                  label   = "noise_suppressor_stereo";
+                  label   = "noise_suppressor_mono";
                   control = {
                     "VAD Threshold (%)"          = 50.0;
                     "VAD Grace Period (ms)"      = 200.0;
@@ -72,19 +72,16 @@
                   type   = "ladspa";
                   name   = "compressor";
                   plugin = "${pkgs.lsp-plugins}/lib/ladspa/lsp-plugins-ladspa.so";
-                  label  = "http://lsp-plug.in/plugins/ladspa/compressor_stereo";
+                  label  = "http://lsp-plug.in/plugins/ladspa/compressor_mono";
                   control = { "Sidechain mode" = 1.0; };
                 }
               ];
-              # rnnoise stereo ports use parens: "Input (L)" not "Input L"
               "links" = [
-                { output = "gate:Output L";      input = "rnnoise:Input (L)"; }
-                { output = "gate:Output R";      input = "rnnoise:Input (R)"; }
-                { output = "rnnoise:Output (L)"; input = "compressor:Input L"; }
-                { output = "rnnoise:Output (R)"; input = "compressor:Input R"; }
+                { output = "gate:Output";    input = "rnnoise:Input"; }
+                { output = "rnnoise:Output"; input = "compressor:Input"; }
               ];
-              "inputs"  = [ "gate:Input L"        "gate:Input R" ];
-              "outputs" = [ "compressor:Output L"  "compressor:Output R" ];
+              "inputs"  = [ "gate:Input" ];
+              "outputs" = [ "compressor:Output" ];
             };
 
             # ── Input: connects to the physical PreSonus mic ────────────
@@ -93,7 +90,7 @@
             # not the filter chain's own output). node.passive activates on demand.
             "capture.props" = {
               "node.name"      = "presonus_mic_capture";
-              "audio.position" = [ "FL" "FR" ];
+              "audio.position" = [ "FL" ];
               "node.passive"   = true;
             };
 
@@ -102,7 +99,7 @@
               "node.name"        = "mic_input";
               "node.description" = "Mic Input";
               "media.class"      = "Audio/Source";
-              "audio.position"   = [ "FL" "FR" ];
+              "audio.position"   = [ "MONO" ];
               "priority.session" = 2200;
             };
 
