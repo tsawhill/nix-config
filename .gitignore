@@ -1,0 +1,13 @@
+# Nix build outputs
+result
+result-*
+
+# Trash
+.Trash-*/
+
+# Claude Code
+.claude/
+CLAUDE.md
+
+# direnv
+.direnv/
