@@ -16,6 +16,11 @@
       default = 64;
       description = "PipeWire buffer size in samples for output. Lower = less latency, higher xrun risk. Powers of 2 (32, 64, 128).";
     };
+    maxQuantum = lib.mkOption {
+      type = lib.types.ints.positive;
+      default = 1024;
+      description = "Maximum quantum PipeWire may use when a node needs a larger buffer. Keeps latency-sensitive paths at `quantum` while letting greedy nodes (Electron, browser) flex up instead of causing xruns.";
+    };
     inputQuantum = lib.mkOption {
       type = lib.types.ints.positive;
       default = 64;
@@ -26,11 +31,17 @@
       default = 48000;
       description = "PipeWire default sample rate in Hz.";
     };
+    alsaHeadroom = lib.mkOption {
+      type = lib.types.ints.unsigned;
+      default = 0;
+      description = "Extra ALSA buffer headroom in samples. Absorbs USB scheduling jitter without increasing graph quantum. 32-128 recommended for USB audio at low quantum.";
+    };
   };
 
   config = let
     ll = config.my.desktop.audio.lowLatency;
     q  = toString ll.quantum;
+    mq = toString ll.maxQuantum;
     r  = toString ll.rate;
   in {
     security.rtkit.enable = true;
@@ -50,9 +61,9 @@
           "default.clock.allowed-rates" = [ 44100 48000 88200 96000 ];
           "default.clock.rate" = ll.rate;
           "default.clock.quantum" = ll.quantum;
-          "default.clock.quantum-limit" = ll.quantum;
           "default.clock.min-quantum" = ll.quantum;
-          "default.clock.max-quantum" = ll.quantum;
+          "default.clock.max-quantum" = ll.maxQuantum;
+          "default.clock.quantum-limit" = ll.maxQuantum;
         };
       };
 
@@ -67,13 +78,13 @@
           "pulse.properties" = {
             "pulse.min.req" = "${q}/${r}";
             "pulse.default.req" = "${q}/${r}";
-            "pulse.max.req" = "${q}/${r}";
+            "pulse.max.req" = "${mq}/${r}";
             "pulse.min.quantum" = "${q}/${r}";
-            "pulse.max.quantum" = "${q}/${r}";
+            "pulse.max.quantum" = "${mq}/${r}";
           };
           "stream.properties" = {
             "node.latency" = "${q}/${r}";
-            "resample.quality" = 1;
+            "resample.quality" = 4;
           };
         };
       };
@@ -102,6 +113,18 @@
           {
             matches = [ { "alsa.card_name" = "Studio 24c"; } ];
             actions.update-props."api.alsa.period-size" = ll.inputQuantum;
+          }
+        ];
+
+        # ALSA headroom — absorbs USB scheduling jitter at low quantum
+        "14-alsa-headroom"."monitor.alsa.rules" = lib.mkIf (ll.enable && ll.alsaHeadroom > 0) [
+          {
+            matches = [ { "node.name" = "~alsa_output.*"; } ];
+            actions.update-props."api.alsa.headroom" = ll.alsaHeadroom;
+          }
+          {
+            matches = [ { "node.name" = "~alsa_input.*"; } ];
+            actions.update-props."api.alsa.headroom" = ll.alsaHeadroom;
           }
         ];
 
