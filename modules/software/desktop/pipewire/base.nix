@@ -69,12 +69,6 @@
 
       extraConfig.pipewire-pulse = lib.mkIf ll.enable {
         "92-low-latency" = {
-          "context.properties" = [
-            {
-              name = "libpipewire-module-protocol-pulse";
-              args = { };
-            }
-          ];
           "pulse.properties" = {
             "pulse.min.req" = "${q}/${r}";
             "pulse.default.req" = "${q}/${r}";
