@@ -60,10 +60,10 @@
           "11-bluetooth-policy"."wireplumber.settings"."bluetooth.autoswitch-to-headset-profile" = false;
           "12-no-timeout"."wireplumber.settings"."session.suspend-timeout-seconds" = 0;
 
-          # Pin PreSonus ALSA period size (both input and output)
+          # Pin ALSA period size on all hardware devices
           "13-input-quantum"."monitor.alsa.rules" = lib.mkIf ll.enable [
             {
-              matches = [ { "alsa.card_name" = "Studio 24c"; } ];
+              matches = [ { "node.name" = "~alsa_.*"; } ];
               actions.update-props."api.alsa.period-size" = 128;
             }
           ];
