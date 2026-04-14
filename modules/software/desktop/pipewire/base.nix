@@ -16,11 +16,6 @@
       default = 64;
       description = "PipeWire buffer size in samples for output. Lower = less latency, higher xrun risk. Powers of 2 (32, 64, 128).";
     };
-    maxQuantum = lib.mkOption {
-      type = lib.types.ints.positive;
-      default = 1024;
-      description = "Maximum quantum PipeWire may use when a node needs a larger buffer. Keeps latency-sensitive paths at `quantum` while letting greedy nodes (Electron, browser) flex up instead of causing xruns.";
-    };
     inputQuantum = lib.mkOption {
       type = lib.types.ints.positive;
       default = 64;
@@ -36,7 +31,6 @@
   config = let
     ll = config.my.desktop.audio.lowLatency;
     q  = toString ll.quantum;
-    mq = toString ll.maxQuantum;
     r  = toString ll.rate;
   in {
     security.rtkit.enable = true;
@@ -58,7 +52,7 @@
             "default.clock.quantum" = ll.quantum;
             "default.clock.min-quantum" = ll.quantum;
             "default.clock.max-quantum" = ll.quantum;
-            "default.clock.quantum-limit" = ll.maxQuantum;
+            "default.clock.quantum-limit" = ll.quantum;
           };
           "stream.properties" = {
             "node.latency" = "${q}/${r}";
@@ -72,9 +66,9 @@
           "pulse.properties" = {
             "pulse.min.req" = "${q}/${r}";
             "pulse.default.req" = "${q}/${r}";
-            "pulse.max.req" = "${mq}/${r}";
+            "pulse.max.req" = "1024/${r}";
             "pulse.min.quantum" = "${q}/${r}";
-            "pulse.max.quantum" = "${mq}/${r}";
+            "pulse.max.quantum" = "1024/${r}";
           };
           "stream.properties" = {
             "node.latency" = "${q}/${r}";

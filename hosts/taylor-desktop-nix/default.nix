@@ -72,7 +72,6 @@ in
   my.desktop.audio.lowLatency = {
     enable = true;
     quantum = 32;
-    maxQuantum = 1024;
     inputQuantum = 128;
     rate = 48000;
   };
