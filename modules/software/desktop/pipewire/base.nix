@@ -57,13 +57,19 @@
       #       Low-latency tuning   #
       ##############################
       extraConfig.pipewire = lib.mkIf ll.enable {
-        "92-low-latency"."context.properties" = {
-          "default.clock.allowed-rates" = [ 44100 48000 88200 96000 ];
-          "default.clock.rate" = ll.rate;
-          "default.clock.quantum" = ll.quantum;
-          "default.clock.min-quantum" = ll.quantum;
-          "default.clock.max-quantum" = ll.quantum;
-          "default.clock.quantum-limit" = ll.maxQuantum;
+        "92-low-latency" = {
+          "context.properties" = {
+            "default.clock.allowed-rates" = [ 44100 48000 88200 96000 ];
+            "default.clock.rate" = ll.rate;
+            "default.clock.quantum" = ll.quantum;
+            "default.clock.min-quantum" = ll.quantum;
+            "default.clock.max-quantum" = ll.quantum;
+            "default.clock.quantum-limit" = ll.maxQuantum;
+          };
+          "stream.properties" = {
+            "node.latency" = "${q}/${r}";
+            "resample.quality" = 4;
+          };
         };
       };
 
