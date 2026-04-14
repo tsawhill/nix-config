@@ -38,15 +38,7 @@
         jack.enable = true;
 
         extraConfig.pipewire."92-low-latency"."context.properties" = lib.mkIf ll.enable {
-          "default.clock.allowed-rates" = [
-            44100
-            48000
-            88200
-            96000
-          ];
-          "default.clock.rate" = ll.rate;
           "default.clock.quantum" = ll.quantum;
-          "default.clock.min-quantum" = ll.quantum;
           "default.clock.max-quantum" = 1024;
         };
 
@@ -60,13 +52,6 @@
           "11-bluetooth-policy"."wireplumber.settings"."bluetooth.autoswitch-to-headset-profile" = false;
           "12-no-timeout"."wireplumber.settings"."session.suspend-timeout-seconds" = 0;
 
-          # Pin ALSA period size on all hardware devices
-          "13-input-quantum"."monitor.alsa.rules" = lib.mkIf ll.enable [
-            {
-              matches = [ { "node.name" = "~alsa_.*"; } ];
-              actions.update-props."api.alsa.period-size" = 128;
-            }
-          ];
 
           # Device priority: bluetooth > USB > PCIe
           "51-device-priority" = {
