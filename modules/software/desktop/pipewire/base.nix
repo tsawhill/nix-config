@@ -96,14 +96,21 @@
         # Prevent devices from being suspended when idle
         "12-no-timeout"."wireplumber.settings"."session.suspend-timeout-seconds" = 0;
 
-        # Pin input period size and prevent input from becoming graph driver
-        "13-input-quantum"."monitor.alsa.rules" = lib.mkIf ll.enable [
+        # Set ALSA period size on all PreSonus nodes (pro profile splits into
+        # separate input/output devices — both need explicit period-size or
+        # the USB device garbles at unsupported sizes)
+        "13-presonus-period"."monitor.alsa.rules" = lib.mkIf ll.enable [
+          {
+            matches = [ { "alsa.card_name" = "Studio 24c"; } ];
+            actions.update-props."api.alsa.period-size" = ll.inputQuantum;
+          }
+        ];
+
+        # Prevent input from becoming graph driver on pro profile
+        "13-input-priority"."monitor.alsa.rules" = [
           {
             matches = [ { "node.name" = "~alsa_input.*PreSonus*"; } ];
-            actions.update-props = {
-              "api.alsa.period-size" = ll.inputQuantum;
-              "priority.driver" = 900;
-            };
+            actions.update-props."priority.driver" = 900;
           }
         ];
 
