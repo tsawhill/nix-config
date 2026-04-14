@@ -75,7 +75,7 @@ in
     maxQuantum = 1024;
     inputQuantum = 128;
     rate = 48000;
-    alsaHeadroom = 32;
+    alsaHeadroom = 0;
   };
 
   services.upower.enable = true;
