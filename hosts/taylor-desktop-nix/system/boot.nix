@@ -53,7 +53,7 @@ in
   ];
 
   boot.kernelModules = [ "kvm-amd" ];
-  boot.extraModprobeConfig = "options snd-usb-audio lowlatency=y quirk_flags=0xa0 vid=0x194f pid=0x0109";
+  boot.extraModprobeConfig = "options snd-usb-audio lowlatency=y";
 
   boot.kernel.sysctl."kernel.sysrq" = 1;
 
