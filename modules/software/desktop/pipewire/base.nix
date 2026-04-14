@@ -39,7 +39,7 @@
 
         extraConfig.pipewire."92-low-latency"."context.properties" = lib.mkIf ll.enable {
           "default.clock.quantum" = ll.quantum;
-          "default.clock.max-quantum" = 64;
+          "default.clock.max-quantum" = ll.quantum;
         };
 
         wireplumber.extraConfig = {
@@ -52,6 +52,13 @@
           "11-bluetooth-policy"."wireplumber.settings"."bluetooth.autoswitch-to-headset-profile" = false;
           "12-no-timeout"."wireplumber.settings"."session.suspend-timeout-seconds" = 0;
 
+          # Give ALSA USB driver buffering headroom at low quantum
+          "13-alsa-period"."monitor.alsa.rules" = lib.mkIf ll.enable [
+            {
+              matches = [ { "node.name" = "~alsa_.*"; } ];
+              actions.update-props."api.alsa.period-size" = 256;
+            }
+          ];
 
           # Device priority: bluetooth > USB > PCIe
           "51-device-priority" = {
