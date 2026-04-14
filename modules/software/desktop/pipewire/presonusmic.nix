@@ -35,14 +35,35 @@
       # Filter chain: PreSonus mic → DSP → virtual source
       ##############################################################
       extraConfig.pipewire."95-presonus-mic"."context.modules" = [
+        # Stage 1: Loopback copies raw PreSonus capture to a virtual source.
+        # Runs on the PreSonus hardware driver graph (quantum 64).
+        # Decouples the rnnoise filter chain from the hardware graph.
+        {
+          name = "libpipewire-module-loopback";
+          args = {
+            "node.description" = "PreSonus Raw Capture";
+            "capture.props" = {
+              "node.name" = "presonus_raw_capture";
+              "audio.position" = [ "FL" ];
+              "node.passive" = true;
+            };
+            "playback.props" = {
+              "node.name" = "presonus_raw_mic";
+              "node.description" = "PreSonus Raw Mic";
+              "media.class" = "Audio/Source";
+              "audio.position" = [ "MONO" ];
+              "node.passive" = true;
+            };
+          };
+        }
+        # Stage 2: Filter chain captures from virtual source (separate graph).
+        # node.latency = 480/48000 required by rnnoise's fixed frame size,
+        # but now only affects this graph — not the hardware driver.
         {
           name = "libpipewire-module-filter-chain";
           args = {
             "node.description" = "PreSonus Mic (Processed)";
             "media.name" = "PreSonus Mic Processed";
-            # Force 480-sample quantum at 48kHz — required by rnnoise's fixed frame size.
-            # Without this, chaining rnnoise with any other plugin causes a quantum
-            # mismatch that makes the graph output silence.
             "node.latency" = "480/48000";
 
             "filter.graph" = {
@@ -97,14 +118,12 @@
               "outputs" = [ "compressor:Output" ];
             };
 
-            # ── Input: connects to the physical PreSonus mic ────────────
-            # No target.object — WirePlumber auto-picks the highest-priority
-            # source that isn't in the same link-group (i.e. the physical mic,
-            # not the filter chain's own output). node.passive activates on demand.
+            # ── Input: captures from the raw loopback, not hardware directly ──
             "capture.props" = {
               "node.name" = "presonus_mic_capture";
               "audio.position" = [ "FL" ];
               "node.passive" = true;
+              "target.object" = "presonus_raw_mic";
             };
 
             # ── Output: virtual mic source ────────────────────────────────
