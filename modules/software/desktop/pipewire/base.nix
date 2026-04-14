@@ -52,14 +52,6 @@
           "11-bluetooth-policy"."wireplumber.settings"."bluetooth.autoswitch-to-headset-profile" = false;
           "12-no-timeout"."wireplumber.settings"."session.suspend-timeout-seconds" = 0;
 
-          # Give ALSA USB driver buffering headroom at low quantum
-          "13-alsa-period"."monitor.alsa.rules" = lib.mkIf ll.enable [
-            {
-              matches = [ { "node.name" = "~alsa_.*"; } ];
-              actions.update-props."api.alsa.period-size" = 256;
-            }
-          ];
-
           # Device priority: bluetooth > USB > PCIe
           "51-device-priority" = {
             "monitor.bluez.rules" = [
