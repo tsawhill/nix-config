@@ -39,7 +39,7 @@
 
         extraConfig.pipewire."92-low-latency"."context.properties" = lib.mkIf ll.enable {
           "default.clock.quantum" = ll.quantum;
-          "default.clock.max-quantum" = 1024;
+          "default.clock.max-quantum" = 64;
         };
 
         wireplumber.extraConfig = {
