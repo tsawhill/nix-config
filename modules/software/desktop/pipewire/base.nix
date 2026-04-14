@@ -31,12 +31,7 @@
       default = 48000;
       description = "PipeWire default sample rate in Hz.";
     };
-    alsaHeadroom = lib.mkOption {
-      type = lib.types.ints.unsigned;
-      default = 0;
-      description = "Extra ALSA buffer headroom in samples. Absorbs USB scheduling jitter without increasing graph quantum. 32-128 recommended for USB audio at low quantum.";
-    };
-  };
+};
 
   config = let
     ll = config.my.desktop.audio.lowLatency;
@@ -107,23 +102,23 @@
         # Prevent devices from being suspended when idle
         "12-no-timeout"."wireplumber.settings"."session.suspend-timeout-seconds" = 0;
 
-        # Pin input device period size independently of output quantum
+        # Pin input period size and prevent input from becoming graph driver
         "13-input-quantum"."monitor.alsa.rules" = lib.mkIf ll.enable [
           {
-            matches = [ { "alsa.card_name" = "Studio 24c"; } ];
-            actions.update-props."api.alsa.period-size" = ll.inputQuantum;
+            matches = [ { "node.name" = "~alsa_input.*PreSonus*"; } ];
+            actions.update-props = {
+              "api.alsa.period-size" = ll.inputQuantum;
+              "priority.driver" = 900;
+            };
           }
         ];
 
-        # ALSA headroom — absorbs USB scheduling jitter at low quantum
-        "14-alsa-headroom"."monitor.alsa.rules" = lib.mkIf (ll.enable && ll.alsaHeadroom > 0) [
+        # USB output ALSA tuning — 3 periods gives USB transfers more room
+        # without changing PipeWire graph quantum
+        "14-usb-output-tuning"."monitor.alsa.rules" = lib.mkIf ll.enable [
           {
-            matches = [ { "node.name" = "~alsa_output.*"; } ];
-            actions.update-props."api.alsa.headroom" = ll.alsaHeadroom;
-          }
-          {
-            matches = [ { "node.name" = "~alsa_input.*"; } ];
-            actions.update-props."api.alsa.headroom" = ll.alsaHeadroom;
+            matches = [ { "node.name" = "~alsa_output.*usb*"; } ];
+            actions.update-props."api.alsa.period-num" = 3;
           }
         ];
 
