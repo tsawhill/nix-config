@@ -113,15 +113,6 @@
           }
         ];
 
-        # USB output ALSA tuning — 3 periods gives USB transfers more room
-        # without changing PipeWire graph quantum
-        "14-usb-output-tuning"."monitor.alsa.rules" = lib.mkIf ll.enable [
-          {
-            matches = [ { "node.name" = "~alsa_output.*usb*"; } ];
-            actions.update-props."api.alsa.period-num" = 3;
-          }
-        ];
-
         # Device priority: bluetooth > USB > PCIe
         "51-device-priority" = {
           "monitor.bluez.rules" = [
