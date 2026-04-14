@@ -35,35 +35,12 @@
       # Filter chain: PreSonus mic → DSP → virtual source
       ##############################################################
       extraConfig.pipewire."95-presonus-mic"."context.modules" = [
-        # Stage 1: Loopback copies raw PreSonus capture to a virtual source.
-        # Runs on the PreSonus hardware driver graph (quantum 64).
-        # Decouples the rnnoise filter chain from the hardware graph.
-        {
-          name = "libpipewire-module-loopback";
-          args = {
-            "node.description" = "PreSonus Raw Capture";
-            "capture.props" = {
-              "node.name" = "presonus_raw_capture";
-              "audio.position" = [ "FL" ];
-              "node.passive" = true;
-            };
-            "playback.props" = {
-              "node.name" = "presonus_raw_mic";
-              "node.description" = "PreSonus Raw Mic";
-              "media.class" = "Audio/Source";
-              "audio.position" = [ "MONO" ];
-              "node.passive" = true;
-            };
-          };
-        }
-        # Stage 2: Filter chain captures from virtual source (separate graph).
-        # node.latency = 480/48000 required by rnnoise's fixed frame size,
-        # but now only affects this graph — not the hardware driver.
         {
           name = "libpipewire-module-filter-chain";
           args = {
             "node.description" = "PreSonus Mic (Processed)";
             "media.name" = "PreSonus Mic Processed";
+            # 480 samples required by rnnoise's fixed frame size.
             "node.latency" = "480/48000";
 
             "filter.graph" = {
@@ -118,15 +95,12 @@
               "outputs" = [ "compressor:Output" ];
             };
 
-            # ── Input: captures from the raw loopback, not hardware directly ──
             "capture.props" = {
               "node.name" = "presonus_mic_capture";
               "audio.position" = [ "FL" ];
               "node.passive" = true;
-              "target.object" = "presonus_raw_mic";
             };
 
-            # ── Output: virtual mic source ────────────────────────────────
             "playback.props" = {
               "node.name" = "mic_input";
               "node.description" = "Mic Input";
