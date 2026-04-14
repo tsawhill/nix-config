@@ -60,6 +60,7 @@
                 "api.alsa.period-size" = 256;
                 "api.alsa.headroom" = 64;
                 "api.alsa.period-num" = 3;
+                "api.alsa.disable-batch" = true;
               };
             }
           ];
