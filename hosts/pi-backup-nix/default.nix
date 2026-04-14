@@ -37,6 +37,7 @@ in
     "${self}/modules/ssh/openssh.nix"
     (import "${self}/modules/ssh/keys/desktop.nix" desktopSSHUsers)
     (import "${self}/modules/ssh/keys/laptop.nix" laptopSSHUsers)
+    (import "${self}/modules/ssh/keys/server.nix" serverSSHUsers)
     (import "${self}/modules/ssh/keys/build.nix" buildSSHUsers)
     (import "${self}/modules/ssh/keys/phone.nix" phoneSSHUsers)
 
