@@ -38,6 +38,12 @@
         jack.enable = true;
 
         extraConfig.pipewire."92-low-latency"."context.properties" = lib.mkIf ll.enable {
+          "default.clock.allowed-rates" = [
+            44100
+            48000
+            88200
+            96000
+          ];
           "default.clock.rate" = ll.rate;
           "default.clock.quantum" = ll.quantum;
           "default.clock.min-quantum" = ll.quantum;
@@ -55,7 +61,7 @@
           "12-no-timeout"."wireplumber.settings"."session.suspend-timeout-seconds" = 0;
 
           # Pin PreSonus ALSA period size (both input and output)
-          "13-input-quantum"."monitor.alsa.rules" = [
+          "13-input-quantum"."monitor.alsa.rules" = lib.mkIf ll.enable [
             {
               matches = [ { "alsa.card_name" = "Studio 24c"; } ];
               actions.update-props."api.alsa.period-size" = 128;
