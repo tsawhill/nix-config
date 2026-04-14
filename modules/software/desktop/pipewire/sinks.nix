@@ -89,13 +89,5 @@ in
         ] "game_audio")
       ];
 
-    # Give Vesktop/Electron nodes internal buffering so screenshare
-    # capture doesn't cause xruns at low graph quantum.
-    wireplumber.extraConfig."15-electron-buffer"."node.rules" = lib.mkIf cfg.discord.enable [
-      {
-        matches = [ { "application.process.binary" = "electron"; } ];
-        actions.update-props."node.force-quantum" = 256;
-      }
-    ];
   };
 }

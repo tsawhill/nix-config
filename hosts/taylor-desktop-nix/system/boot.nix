@@ -59,6 +59,12 @@ in
     DefaultTimeoutStopSec = "30s";
   };
 
-  boot.kernelPackages = pkgs.linuxPackages_zen;
+  boot.kernelPackages =
+    let
+      zenZfsCheck = builtins.tryEval pkgs.linuxPackages_zen.${pkgs.zfs_unstable.kernelModuleAttribute}.meta.broken;
+    in
+    if zenZfsCheck.success && (!zenZfsCheck.value)
+    then pkgs.linuxPackages_zen
+    else latestKernelPackage;
   boot.zfs.package = pkgs.zfs_unstable;
 }
