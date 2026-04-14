@@ -30,7 +30,7 @@ in
 
   boot.kernelParams = [
     "amd_pstate=active"
-    "pcie_aspm=off"
+    "iommu=pt"
     # "video=DP-1:2560x1440@360,rgb_range=full"
     # "video=DP-2:3440x1440@165,rgb_range=full"
     # "amdgpu.mes=0"
