@@ -17,6 +17,11 @@
         limiter = false;
       };
 
+      outgoing = {
+        request_timeout = 3.0;
+        max_request_timeout = 4.0;
+      };
+
       search = {
         safe_search = 0;
         autocomplete = "google";
@@ -32,59 +37,25 @@
       engines = [
         # --- Web ---
         {
-          name = "google";
-          engine = "google";
-          shortcut = "g";
-          use_mobile_ui = true;
-          categories = [
-            "general"
-            "images"
-            "news"
-          ];
-          weight = 2;
+          name = "startpage";
+          engine = "startpage";
+          shortcut = "sp";
+          weight = 10;
+          categories = [ "general" "images" ];
         }
         {
           name = "bing";
           engine = "bing";
           shortcut = "bi";
-          categories = [
-            "general"
-            "images"
-            "news"
-          ];
-        }
-        {
-          name = "duckduckgo";
-          engine = "duckduckgo";
-          shortcut = "d";
-          categories = [
-            "general"
-            "images"
-            "news"
-          ];
+          weight = 1;
+          categories = [ "general" "images" ];
         }
         {
           name = "brave";
           engine = "brave";
           shortcut = "brave";
-          categories = [
-            "general"
-            "images"
-            "news"
-          ];
-        }
-        {
-          name = "startpage";
-          engine = "startpage";
-          shortcut = "sp";
-          weight = 3;
-          categories = [ "general" ];
-        }
-        {
-          name = "mojeek";
-          engine = "mojeek";
-          shortcut = "mj";
-          categories = [ "general" ];
+          weight = 1;
+          categories = [ "general" "images" ];
         }
 
         # --- Reference ---
