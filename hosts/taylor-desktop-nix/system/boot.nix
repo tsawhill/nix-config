@@ -59,6 +59,6 @@ in
     DefaultTimeoutStopSec = "30s";
   };
 
-  boot.kernelPackages = latestKernelPackage;
+  boot.kernelPackages = pkgs.linuxPackages_zen;
   boot.zfs.package = pkgs.zfs_unstable;
 }
