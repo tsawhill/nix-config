@@ -1,7 +1,6 @@
 {
   self,
   inputs,
-  pkgs,
   lib,
   ...
 }:
@@ -10,21 +9,10 @@ let
   laptopSSHUsers = [ "taylor" ];
   phoneSSHUsers = [ "taylor" ];
 
-  # Use the latest ZFS-compatible kernel
-  zfsCompatibleKernelPackages = lib.filterAttrs (
-    name: kernelPackages:
-    (builtins.match "linux_[0-9]+_[0-9]+" name) != null
-    && (builtins.tryEval kernelPackages).success
-    && (!kernelPackages.${pkgs.zfs_unstable.kernelModuleAttribute}.meta.broken)
-  ) pkgs.linuxKernel.packages;
-  latestKernelPackage = lib.last (
-    lib.sort (a: b: lib.versionOlder a.kernel.version b.kernel.version) (
-      builtins.attrValues zfsCompatibleKernelPackages
-    )
-  );
 in
 {
   networking.hostName = "taylor-desktop-nix";
+  nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
   system.stateVersion = "25.11";
 
   imports = [
@@ -36,10 +24,9 @@ in
     ./home-manager.nix
 
     # Hardware
-    ./hardware-configuration.nix
     ./system/boot.nix
     ./system/disks.nix
-    ./system/hardware.nix
+    ./system/hardware
     ./system/lact.nix
     ./system/networking.nix
     ./system/syncthing.nix
@@ -75,9 +62,6 @@ in
     "${self}/modules/hardware/udev"
   ];
 
-  boot.kernelPackages = latestKernelPackage;
-  boot.zfs.package = pkgs.zfs_unstable;
-
   environment.pathsToLink = [
     "/share/applications"
     "/share/xdg-desktop-portal"
@@ -85,6 +69,13 @@ in
 
   desktop.hyprland.enable = true;
   my.desktop.audio.presonusMic.enable = true;
+  my.desktop.audio.lowLatency = {
+    enable = true;
+    quantum = 32;
+    inputQuantum = 128;
+    rate = 48000;
+  };
+
   services.upower.enable = true;
 
   software.dev.enable = true;
@@ -92,7 +83,8 @@ in
   software.apps.config.enable = true;
   software.apps.web.enable = true;
   software.apps.communication.enable = true;
-  software.apps.media.enable = true;
+  software.apps.media-playback.enable = true;
+  software.apps.media-creation.enable = true;
   software.apps.gaming.enable = true;
   software.apps.emulators.enable = true;
   software.apps.printing.enable = true;

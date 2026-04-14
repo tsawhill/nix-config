@@ -75,7 +75,8 @@ in
   software.apps.config.enable = true;
   software.apps.web.enable = true;
   software.apps.communication.enable = true;
-  software.apps.media.enable = true;
+  software.apps.media-playback.enable = true;
+  software.apps.media-creation.enable = true;
   software.apps.gaming.enable = true;
   software.apps.emulators.enable = true;
   software.apps.printing.enable = true;

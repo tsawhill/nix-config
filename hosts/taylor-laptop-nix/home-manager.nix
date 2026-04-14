@@ -33,6 +33,7 @@
       ];
       home.stateVersion = "25.11";
       my.shell.starshipTheme = "personal";
+      my.yarg.enable = true;
       my.hypr.layout = "laptop";
       my.hypr.monitors.framework16.enable = true;
       my.hypr.gpuRecorder.enable = true;

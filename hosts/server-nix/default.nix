@@ -35,6 +35,8 @@ in
     "${self}/modules/locale/enUS-pacific.nix"
     # Network
     ./system/networking.nix
+    # CPU frequency scaling and hardware power settings
+    ./system/hardware.nix
 
     # NixOS Settings
     "${self}/modules/nix/nixpkgs.nix"
@@ -61,6 +63,7 @@ in
     "${self}/modules/software/packages/create-nix-lxc.nix"
 
   ];
+  boot.binfmt.emulatedSystems = [ "aarch64-linux" ];
   my.secrets = {
     gotify_token_zfs.enable = true;
     smtp_password_server.enable = true;

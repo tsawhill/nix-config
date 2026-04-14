@@ -15,13 +15,40 @@ let
 
       assetsArg = "--assets-dir ${lib.escapeShellArg cfg.assetsPath}";
 
+      disableAppsCheck = lib.concatStringsSep " || " (
+        map (app: "${pkgs.procps}/bin/pgrep -f ${lib.escapeShellArg app} > /dev/null 2>&1") cfg.disableApps
+      );
+
+      audioArgs =
+        if !monCfg.audio then
+          "--silent --no-audio-processing"
+        else
+          lib.concatStringsSep " " (
+            lib.optional monCfg.silent "--silent"
+            ++ lib.optional (!monCfg.silent) "--volume ${toString monCfg.volume}"
+            ++ lib.optional (!monCfg.audioProcessing) "--no-audio-processing"
+          );
+
+      # Fake mpv config with null audio output — prevents PipeWire node creation
+      mpvNullAudioConf = pkgs.writeTextDir "mpv.conf" "ao=null";
+
+      audioEnv = lib.optionals (!monCfg.audio) [
+        "SDL_AUDIODRIVER=dummy"
+        "MPV_HOME=${mpvNullAudioConf}"
+      ];
+
       rotationScript = pkgs.writeShellScript "wallpaper-engine-${monitor}" ''
         WALLPAPERS=(${wallpaperList})
         COUNT=''${#WALLPAPERS[@]}
 
-        trap 'kill $WPE_PID 2>/dev/null; exit' SIGTERM SIGINT
+        trap 'kill $WPE_PID $SLEEP_PID 2>/dev/null; exit' SIGTERM SIGINT
 
         while true; do
+          # Pause while any disable-app is running
+          while ${disableAppsCheck}; do
+            sleep 1
+          done
+
           IDX=$(( RANDOM % COUNT ))
           WID=''${WALLPAPERS[$IDX]}
 
@@ -31,14 +58,31 @@ let
             --fps ${toString monCfg.fps} \
             --scaling ${monCfg.scaling} \
             --clamp ${cfg.clamping} \
-            ${lib.optionalString monCfg.silent "--silent"} \
-            ${lib.optionalString (!monCfg.audioProcessing) "--no-audio-processing"} \
+            ${audioArgs} \
             ${assetsArg} &
 
           WPE_PID=$!
-          sleep ${lib.escapeShellArg monCfg.rotateInterval}
-          kill $WPE_PID 2>/dev/null
-          wait $WPE_PID 2>/dev/null
+
+          # Run rotation sleep in background so we can interrupt it
+          sleep ${lib.escapeShellArg monCfg.rotateInterval} &
+          SLEEP_PID=$!
+
+          # Wait until the interval ends or a disable-app starts
+          while kill -0 $SLEEP_PID 2>/dev/null; do
+            if ${disableAppsCheck}; then
+              kill $SLEEP_PID 2>/dev/null
+              kill $WPE_PID 2>/dev/null
+              wait $WPE_PID 2>/dev/null
+              WPE_PID=
+              break
+            fi
+            sleep 5
+          done
+
+          if [ -n "$WPE_PID" ]; then
+            kill $WPE_PID 2>/dev/null
+            wait $WPE_PID 2>/dev/null
+          fi
         done
       '';
     in
@@ -51,6 +95,7 @@ let
       Service = {
         Type = "simple";
         ExecStart = "${rotationScript}";
+        Environment = audioEnv;
         Restart = "on-failure";
         RestartSec = "5s";
       };
@@ -76,6 +121,16 @@ in
       ];
       default = "clamp";
       description = "Edge clamping mode applied to all monitors.";
+    };
+
+    disableApps = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ "gamescope" ];
+      description = "Patterns (matched via pgrep -f against the full command line) that pause all wallpaper rendering while any match is running.";
+      example = [
+        "gamescope"
+        "wine"
+      ];
     };
 
     monitors = lib.mkOption {
@@ -114,16 +169,28 @@ in
               default = "fill";
             };
 
+            audio = lib.mkOption {
+              type = lib.types.bool;
+              default = false;
+              description = "Enable wallpaper audio. When false, SDL audio is fully disabled (no PipeWire entries).";
+            };
+
             silent = lib.mkOption {
               type = lib.types.bool;
               default = true;
-              description = "Mute wallpaper audio.";
+              description = "Mute wallpaper audio. Only applies when audio is enabled.";
+            };
+
+            volume = lib.mkOption {
+              type = lib.types.int;
+              default = 15;
+              description = "Audio volume (0–100). Only applies when audio is enabled and not silent.";
             };
 
             audioProcessing = lib.mkOption {
               type = lib.types.bool;
               default = false;
-              description = "Enable audio processing/visualisation.";
+              description = "Enable audio processing/visualisation. Only applies when audio is enabled.";
             };
           };
         }

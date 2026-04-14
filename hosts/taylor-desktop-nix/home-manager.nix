@@ -25,9 +25,12 @@
         "${self}/modules/home-manager/bundles/all.nix"
         "${self}/modules/home-manager/bundles/gui.nix"
         "${self}/modules/home-manager/gui/hypr"
+        (import "${self}/pkgs/hyprcrosshair/hm-module.nix" self)
       ];
       home.stateVersion = "25.11";
       my.shell.starshipTheme = "personal";
+      my.yarg.enable = true;
+
       my.hypr = {
         monitors.primary = "DP-4";
         monitors.secondary = "DP-5";
@@ -46,23 +49,29 @@
         wallpaperEngine = {
           enable = true;
           monitors."DP-4" = {
-            wallpapers = [ "837766287" "3272204393" "1132505365" ];
+            wallpapers = [
+              "837766287"
+              "3272204393"
+              "1132505365"
+            ];
             fps = 15;
             rotateInterval = "1h";
           };
           monitors."DP-5" = {
-            wallpapers = [ "1132505365" "2784382079" ];
+            wallpapers = [
+              "1132505365"
+              "2784382079"
+            ];
             fps = 15;
             rotateInterval = "1h";
           };
         };
       };
 
-      # Use discrete GPU for Hyprland
-      wayland.windowManager.hyprland.settings.env = [
-        "DRI_PRIME, pci-0000_03_00_0"
-        "AQ_DRM_DEVICES, /dev/dri/amd-dgpu:/dev/dri/amd-igpu"
-      ];
+      systemd.user.sessionVariables = {
+        DRI_PRIME = "pci-0000_03_00_0";
+        AQ_DRM_DEVICES = "/dev/dri/amd-dgpu:/dev/dri/amd-igpu";
+      };
     };
 
     backupFileExtension = "bak";

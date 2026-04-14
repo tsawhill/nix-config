@@ -2,7 +2,7 @@
 {
   # Decoration settings
   wayland.windowManager.hyprland.settings.decoration = {
-    rounding = 5;
+    rounding = 0;
     blur = {
       enabled = "true";
       size = 6;
@@ -22,11 +22,12 @@
     enabled = "true";
     bezier = [
       "linear, 0.5, 0.5, 0.5, 0.5"
-      "overshoot, 0.05, 0.9, 0.1, 1.1" # The 1.1 at the end creates the bounce
+      "overshoot, 0.05, 0.9, 0.1, 1.1"
+      "goofy, 0.2, 1.6, 0.4, 1.5" # Fast fly-in, snappier snap-back
     ];
     animation = [
-      "windows, 1, 5, overshoot, popin 80%" # Snappier timing (5) with the bouncy curve
-      "windowsOut, 1, 5, default, popin 80%"
+      "windows, 1, 6, goofy, popin"
+      "windowsOut, 1, 5, goofy, popin"
       "fade, 1, 5, default"
       "workspaces, 1, 6, default, slidefade 20%"
     ];

@@ -9,16 +9,19 @@ let
     "rounding 16, match:class ${class}"             # Rounder than global default (5)
     "opacity 0.88 0.88, match:class ${class}"       # Frosted glass — pairs with global blur
     "border_color rgba(ffcce6ff) rgba(9778D0ff) 45deg, match:class ${class}" # Pink/purple gradient border
+    "animation slide right, match:class ${class}"  # Slide in from right using global overshoot bezier
   ];
 in
 {
+  options.my.hypr.windowRules.taskbarPopups.enable = lib.mkEnableOption "taskbar popup window rules" // { default = true; };
+
   options.my.hypr.taskbarPopups = lib.mkOption {
     type = lib.types.listOf lib.types.str;
     default = [];
     description = "Window classes to treat as taskbar slideout popups (float, sized, positioned, slide animation).";
   };
 
-  config = {
+  config = lib.mkIf config.my.hypr.windowRules.taskbarPopups.enable {
     my.hypr.taskbarPopups = [
       ".blueman-manager-wrapped"
       "org.pulseaudio.pavucontrol"

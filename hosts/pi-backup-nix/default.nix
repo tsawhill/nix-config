@@ -1,5 +1,6 @@
 {
   self,
+  lib,
   modulesPath,
   inputs,
   ...
@@ -44,7 +45,37 @@ in
     # "${self}/modules/software/services/incus.nix"
 
   ];
-  raspberry-pi-nix.board = "bcm2712"; # BCM2712 is the Pi 5 SoC
+  # NixOS defaults include x86-only modules (e.g. i8042) that don't exist
+  # in the Pi's ARM kernel, causing the initrd build to fail.
+  boot.initrd.includeDefaultModules = false;
+
+  # Use the new nixos-raspberrypi kernel bootloader; disable extlinux
+  # which gets pulled in by the aarch64 sd-image module.
+  boot.loader.raspberry-pi.bootloader = "kernel";
+  boot.loader.generic-extlinux-compatible.enable = lib.mkForce false;
+
+  # Bypass the Pi 5 boot-time PSU safety check. The Pi warns and halts
+  # at a red screen if it detects a <5A USB-PD supply, even when the
+  # board is actually powered via GPIO (e.g. from a SATA HAT). This
+  # makes headless/remote reboots work without pressing the power button.
+  hardware.raspberry-pi.config.all.options.usb_max_current_enable = {
+    enable = true;
+    value = 1;
+  };
+
+  # Enable the external PCIe x1 slot (off by default on Pi 5). Required
+  # for the Radxa Penta SATA HAT (JMB585) to appear in lspci.
+  hardware.raspberry-pi.config.all.base-dt-params = {
+    pciex1 = {
+      enable = true;
+    };
+    # Gen3 is unofficial but the JMB585 handles it reliably and doubles
+    # throughput vs the default Gen2.
+    pciex1_gen = {
+      enable = true;
+      value = 3;
+    };
+  };
 
   my.users.taylor = {
     enable = true;

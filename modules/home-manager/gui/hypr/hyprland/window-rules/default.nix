@@ -1,10 +1,15 @@
+{ lib, ... }:
+
+let
+  directoryContents = builtins.readDir ./.;
+
+  nixFiles = lib.filterAttrs (
+    name: type:
+    (type == "regular" && lib.hasSuffix ".nix" name && name != "default.nix") || (type == "directory")
+  ) directoryContents;
+
+  importPaths = map (name: ./. + "/${name}") (builtins.attrNames nixFiles);
+in
 {
-  imports = [
-    ./taskbar-popups.nix
-    ./transparency.nix
-    ./gaming.nix
-    ./steam.nix
-    ./runelite.nix
-    ./app-workspace-assignment.nix
-  ];
+  imports = importPaths;
 }

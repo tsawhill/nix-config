@@ -17,8 +17,10 @@
     "$mainMod, E, exec, nemo"
     "$mainMod, Space, togglefloating, "
     "$mainMod, D, exec, walker"
+    "$mainMod, R, exec, walker -m runner"
     "$mainMod, P, pseudo, "
     "$mainMod, V, togglesplit, "
+    "$mainMod, W, layoutmsg, addmaster"
 
     # Cycle through windows
     "$mainMod, Tab, cyclenext"
@@ -63,11 +65,6 @@
     "$mainMod CTRL, right, movewindow, r"
     "$mainMod CTRL, up, movewindow, u"
     "$mainMod CTRL, down, movewindow, d"
-
-    # Volume keys
-    ", xf86audioraisevolume, exec, pactl set-sink-volume @DEFAULT_SINK@ +5%"
-    ", xf86audiolowervolume, exec, pactl set-sink-volume @DEFAULT_SINK@ -5%"
-    ", xf86audiomute, exec, pactl set-sink-mute @DEFAULT_SINK@ toggle"
 
     # Mic mute
     "$mainMod CTRL, Z, exec, pactl set-source-mute @DEFAULT_SOURCE@ toggle"

@@ -5,13 +5,34 @@
   ...
 }:
 {
-  options.my.desktop.audio.lowLatency = lib.mkOption {
-    type = lib.types.bool;
-    default = true;
-    description = "Enable low-latency PipeWire tuning (128 quantum @ 48kHz). Disable on devices where this causes audio issues.";
+  options.my.desktop.audio.lowLatency = {
+    enable = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Enable low-latency PipeWire tuning. Disable on devices where this causes audio issues.";
+    };
+    quantum = lib.mkOption {
+      type = lib.types.ints.positive;
+      default = 64;
+      description = "PipeWire buffer size in samples for output. Lower = less latency, higher xrun risk. Powers of 2 (32, 64, 128).";
+    };
+    inputQuantum = lib.mkOption {
+      type = lib.types.ints.positive;
+      default = 64;
+      description = "ALSA period size for input devices. rnnoise requires 480. Must match filter chain node.latency.";
+    };
+    rate = lib.mkOption {
+      type = lib.types.ints.positive;
+      default = 48000;
+      description = "PipeWire default sample rate in Hz.";
+    };
   };
 
-  config = {
+  config = let
+    ll = config.my.desktop.audio.lowLatency;
+    q  = toString ll.quantum;
+    r  = toString ll.rate;
+  in {
     security.rtkit.enable = true;
 
     services.pipewire = {
@@ -24,18 +45,18 @@
       ##############################
       #       Low-latency tuning   #
       ##############################
-      extraConfig.pipewire = lib.mkIf config.my.desktop.audio.lowLatency {
+      extraConfig.pipewire = lib.mkIf ll.enable {
         "92-low-latency"."context.properties" = {
           "default.clock.allowed-rates" = [ 44100 48000 88200 96000 ];
-          "default.clock.rate" = 48000;
-          "default.clock.quantum" = 128;
-          "default.clock.quantum-limit" = 128;
-          "default.clock.min-quantum" = 128;
-          "default.clock.max-quantum" = 128;
+          "default.clock.rate" = ll.rate;
+          "default.clock.quantum" = ll.quantum;
+          "default.clock.quantum-limit" = ll.quantum;
+          "default.clock.min-quantum" = ll.quantum;
+          "default.clock.max-quantum" = ll.quantum;
         };
       };
 
-      extraConfig.pipewire-pulse = lib.mkIf config.my.desktop.audio.lowLatency {
+      extraConfig.pipewire-pulse = lib.mkIf ll.enable {
         "92-low-latency" = {
           "context.properties" = [
             {
@@ -44,14 +65,14 @@
             }
           ];
           "pulse.properties" = {
-            "pulse.min.req" = "128/48000";
-            "pulse.default.req" = "128/48000";
-            "pulse.max.req" = "128/48000";
-            "pulse.min.quantum" = "128/48000";
-            "pulse.max.quantum" = "128/48000";
+            "pulse.min.req" = "${q}/${r}";
+            "pulse.default.req" = "${q}/${r}";
+            "pulse.max.req" = "${q}/${r}";
+            "pulse.min.quantum" = "${q}/${r}";
+            "pulse.max.quantum" = "${q}/${r}";
           };
           "stream.properties" = {
-            "node.latency" = "128/48000";
+            "node.latency" = "${q}/${r}";
             "resample.quality" = 1;
           };
         };
@@ -75,6 +96,14 @@
 
         # Prevent devices from being suspended when idle
         "12-no-timeout"."wireplumber.settings"."session.suspend-timeout-seconds" = 0;
+
+        # Pin input device period size independently of output quantum
+        "13-input-quantum"."monitor.alsa.rules" = lib.mkIf ll.enable [
+          {
+            matches = [ { "alsa.card_name" = "Studio 24c"; } ];
+            actions.update-props."api.alsa.period-size" = ll.inputQuantum;
+          }
+        ];
 
         # Device priority: bluetooth > USB > PCIe
         "51-device-priority" = {

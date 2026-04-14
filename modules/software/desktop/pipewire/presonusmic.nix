@@ -48,9 +48,9 @@
                   plugin = "${pkgs.lsp-plugins}/lib/ladspa/lsp-plugins-ladspa.so";
                   label  = "http://lsp-plug.in/plugins/ladspa/gate_mono";
                   control = {
-                    "Curve threshold (G)"   = 0.04467;
+                    "Curve threshold (G)"   = 0.12;
                     "Attack (ms)"           = 5.0;
-                    "Release (ms)"          = 100.0;
+                    "Release (ms)"          = 50.0;
                     "Reduction (G)"         = 0.01;
                     "High-pass filter mode" = 1.0;
                     "Sidechain mode"        = 1.0;
@@ -63,7 +63,7 @@
                   plugin  = "${pkgs.rnnoise-plugin}/lib/ladspa/librnnoise_ladspa.so";
                   label   = "noise_suppressor_mono";
                   control = {
-                    "VAD Threshold (%)"          = 50.0;
+                    "VAD Threshold (%)"          = 75.0;
                     "VAD Grace Period (ms)"      = 200.0;
                     "Retroactive VAD Grace (ms)" = 0.0;
                   };

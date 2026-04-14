@@ -6,8 +6,6 @@
     "rfkill unblock 0; sleep 15; rfkill unblock 0"
 
     # App launches via uwsm for proper systemd session scoping
-    "uwsm app -- walker --gapplication-service"
-    "uwsm app -- elephant"
     "uwsm app -- steam"
     "sleep 10; uwsm app -- vesktop"
     "sleep 15; uwsm app -- heroic"

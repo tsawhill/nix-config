@@ -2,7 +2,6 @@ inputs@{
   self,
   nixpkgs-stable,
   nixpkgs-unstable,
-  nixpkgs-master,
   ...
 }:
 let
@@ -34,10 +33,6 @@ let
   };
 
   unstablePkgs = import nixpkgs-unstable { localSystem = "x86_64-linux"; };
-  masterPkgs = import nixpkgs-master {
-    localSystem = "x86_64-linux";
-    config.allowUnfree = true;
-  };
 
   # For hosts using nixpkgs-unstable (desktop, laptop)
   mkUnstableHost = tag: targetHost: modulePath: {
@@ -59,7 +54,6 @@ let
       nixvim-input = inputs.nixvim-unstable;
       sops-input = inputs.sops-nix-unstable;
       zen-input = inputs.zen-browser-unstable;
-      pkgs-master = masterPkgs;
     };
     imports = [ modulePath ];
   };
@@ -100,6 +94,7 @@ in
     "jellyfin-nix" = mkHost "weekly" "jellyfin-nix.lan" "${self}/hosts/server-nix/LXCs/jellyfin.nix";
     "gotify-nix" = mkHost "weekly" "gotify-nix.lan" "${self}/hosts/server-nix/LXCs/gotify.nix";
     "llm-nix" = mkHost "weekly" "llm-nix.lan" "${self}/hosts/server-nix/LXCs/llm.nix";
+    "searx-nix" = mkHost "weekly" "searx-nix.lan" "${self}/hosts/server-nix/LXCs/searx.nix";
     "arrs-nix" = mkHost "weekly" "arrs-nix.lan" "${self}/hosts/server-nix/LXCs/arrs.nix";
     "socks5-vpn-eu-nix" =
       mkHost "weekly" "socks5-vpn-eu-nix.lan"

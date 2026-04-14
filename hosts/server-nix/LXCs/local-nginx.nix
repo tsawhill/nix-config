@@ -71,6 +71,10 @@ in
     enable = true;
     domain = "unifi.tsawhill.org";
   };
+  proxy.searx = {
+    enable = true;
+    domain = "searx.tsawhill.org";
+  };
 
   networking.hostName = "local-nginx-nix";
 }

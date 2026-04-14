@@ -1,14 +1,19 @@
-{ pkgs, config, lib, ... }:
+{
+  pkgs,
+  config,
+  lib,
+  ...
+}:
 let
   cfg = config.my.hypr.gpuRecorder;
 
-  audioArgs = lib.concatMapStringsSep " "
-    (d: "-a ${lib.escapeShellArg d}")
-    (cfg.audio.output ++ cfg.audio.input);
+  audioArgs = lib.concatMapStringsSep " " (d: "-a ${lib.escapeShellArg d}") (
+    cfg.audio.output ++ cfg.audio.input
+  );
 
   # -restore-portal-session only applies when using the portal capture target
-  portalArgs = lib.optionalString (cfg.captureTarget == "portal")
-    "-restore-portal-session yes";
+  portalArgs = lib.optionalString (cfg.captureTarget == "portal") "-restore-portal-session yes";
+
 in
 {
   options.my.hypr.gpuRecorder = {

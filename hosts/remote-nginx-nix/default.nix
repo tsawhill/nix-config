@@ -127,4 +127,9 @@ in
     domain = "unifi.tsawhill.org";
     mTLSCert = "mTLS-CA";
   };
+  proxy.searx = {
+    enable = true;
+    domain = "searx.tsawhill.org";
+    mTLSCert = "mTLS-CA";
+  };
 }

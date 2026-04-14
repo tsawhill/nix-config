@@ -25,6 +25,10 @@
 
     # Start flushing to disk sooner (at 64MB) to keep I/O consistent
     "zfs.zfs_dirty_data_sync_percent=10"
+
+    # Cap ZFS ARC at 16GB (out of 64GB) — prevents ZFS from consuming
+    # all free RAM at the expense of LXC workloads
+    "zfs.zfs_arc_max=17179869184"
   ];
 
   fileSystems = {

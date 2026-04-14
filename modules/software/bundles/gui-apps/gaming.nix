@@ -13,7 +13,6 @@
       remotePlay.openFirewall = true;
       dedicatedServer.openFirewall = true;
       localNetworkGameTransfers.openFirewall = true;
-      gamescopeSession.enable = true;
     };
 
     programs.gamescope = {
@@ -36,8 +35,9 @@
       heroic
       lutris
       faugus-launcher
-      bolt-launcher
+      (pkgs.bolt-launcher.override { jdk17 = pkgs.openjdk; })
       boilr
+      (pkgs.callPackage ../../../../pkgs/yarc-launcher.nix { })
 
       # Mod / config tools
       protonplus

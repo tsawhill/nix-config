@@ -171,9 +171,37 @@
         blocking_ipv6 = "";
         blocked_services = {
           schedule = {
-            time_zone = "UTC";
+            time_zone = "Local";
+            sun = {
+              start = "6h";
+              end = "23h59m";
+            };
+            mon = {
+              start = "6h";
+              end = "23h59m";
+            };
+            tue = {
+              start = "6h";
+              end = "23h59m";
+            };
+            wed = {
+              start = "6h";
+              end = "23h59m";
+            };
+            thu = {
+              start = "6h";
+              end = "23h59m";
+            };
+            fri = {
+              start = "6h";
+              end = "23h59m";
+            };
+            sat = {
+              start = "6h";
+              end = "23h59m";
+            };
           };
-          ids = [ ];
+          ids = [ "youtube" ];
         };
         protection_disabled_until = null;
         safe_search = {
@@ -189,161 +217,134 @@
         blocking_mode = "default";
         parental_block_host = "family-block.dns.adguard.com";
         safebrowsing_block_host = "standard-block.dns.adguard.com";
-        rewrites = [
+        rewrites = map (r: r // { enabled = true; }) [
+          {
+            domain = "server-nix.lan";
+            answer = "10.73.73.3";
+          }
           {
             domain = "samba-nix.lan";
             answer = "10.73.73.4";
-            enabled = true;
           }
           {
             domain = "unbound-vpn-na-nix.lan";
             answer = "10.73.73.5";
-            enabled = true;
           }
           {
             domain = "adguard-nix.lan";
             answer = "10.73.73.6";
-            enabled = true;
           }
           {
             domain = "llm-nix.lan";
             answer = "10.73.73.7";
-            enabled = true;
           }
           {
             domain = "local-nginx-nix.lan";
             answer = "10.73.73.8";
-            enabled = true;
           }
           {
             domain = "vaultwarden-nix.lan";
             answer = "10.73.73.9";
-            enabled = true;
           }
           {
             domain = "acme-nix.lan";
             answer = "10.73.73.10";
-            enabled = true;
           }
           {
             domain = "socks5-vpn-eunix.lan";
             answer = "10.73.73.11";
-            enabled = true;
           }
           {
             domain = "immich-nix.lan";
             answer = "10.73.73.12";
-            enabled = true;
           }
           {
             domain = "arrs-nix.lan";
             answer = "10.73.73.13";
-            enabled = true;
-          }
-          {
-            domain = "jellyfin-nix.lan";
-            answer = "10.73.73.15";
-            enabled = true;
-          }
-          {
-            domain = "nextcloud-nix.lan";
-            answer = "10.73.73.18";
-            enabled = true;
-          }
-          {
-            domain = "deluge-nix.lan";
-            answer = "10.73.73.20";
-            enabled = true;
-          }
-          {
-            domain = "jellyseerr-nix.lan";
-            answer = "10.73.73.26";
-            enabled = true;
-          }
-          {
-            domain = "gotify-nix.lan";
-            answer = "10.73.73.27";
-            enabled = true;
-          }
-          {
-            domain = "pufferpanel-nix.lan";
-            answer = "10.73.73.30";
-            enabled = true;
-          }
-          {
-            domain = "build-nix.lan";
-            answer = "10.73.73.40";
-            enabled = true;
-          }
-          {
-            domain = "unifi-nix.lan";
-            answer = "10.73.73.41";
-            enabled = true;
-          }
-          {
-            domain = "taylor-laptop-nix.lan";
-            answer = "10.73.73.68";
-            enabled = true;
-          }
-          {
-            domain = "taylor-desktop-nix.lan";
-            answer = "10.73.73.69";
-            enabled = true;
-          }
-          {
-            domain = "printer.lan";
-            answer = "10.73.73.71";
-            enabled = true;
-          }
-          {
-            domain = "deck-nix.lan";
-            answer = "10.73.73.73";
-            enabled = true;
-          }
-          {
-            domain = "*.tsawhill.org";
-            answer = "10.73.73.8";
-            enabled = true;
-          }
-          {
-            domain = "tsawhill.org";
-            answer = "10.73.73.8";
-            enabled = true;
-          }
-          {
-            domain = "remote-nginx-nix.lan";
-            answer = "10.50.50.16";
-            enabled = true;
-          }
-          {
-            domain = "server-nix.lan";
-            answer = "10.73.73.3";
-            enabled = true;
-          }
-          {
-            domain = "remote-nginx-nix.lan";
-            answer = "10.50.50.16";
-            enabled = true;
-          }
-          {
-            domain = "authentik-nix.lan";
-            answer = "10.73.73.29";
-            enabled = true;
           }
           {
             domain = "syncthing-nix.lan";
             answer = "10.73.73.14";
-            enabled = true;
+          }
+          {
+            domain = "jellyfin-nix.lan";
+            answer = "10.73.73.15";
+          }
+          {
+            domain = "searx-nix.lan";
+            answer = "10.73.73.16";
+          }
+          {
+            domain = "nextcloud-nix.lan";
+            answer = "10.73.73.18";
           }
           {
             domain = "romm-nix.lan";
             answer = "10.73.73.19";
-            enabled = true;
+          }
+          {
+            domain = "deluge-nix.lan";
+            answer = "10.73.73.20";
+          }
+          {
+            domain = "jellyseerr-nix.lan";
+            answer = "10.73.73.26";
+          }
+          {
+            domain = "gotify-nix.lan";
+            answer = "10.73.73.27";
+          }
+          {
+            domain = "authentik-nix.lan";
+            answer = "10.73.73.29";
+          }
+          {
+            domain = "pufferpanel-nix.lan";
+            answer = "10.73.73.30";
+          }
+          {
+            domain = "build-nix.lan";
+            answer = "10.73.73.40";
+          }
+          {
+            domain = "unifi-nix.lan";
+            answer = "10.73.73.41";
+          }
+          {
+            domain = "pi-backup-nix.lan";
+            answer = "10.73.73.42";
+          }
+          {
+            domain = "taylor-laptop-nix.lan";
+            answer = "10.73.73.68";
+          }
+          {
+            domain = "taylor-desktop-nix.lan";
+            answer = "10.73.73.69";
+          }
+          {
+            domain = "printer.lan";
+            answer = "10.73.73.71";
+          }
+          {
+            domain = "deck-nix.lan";
+            answer = "10.73.73.73";
           }
           {
             domain = "sunshine-nix.lan";
             answer = "10.73.73.140";
-            enabled = true;
+          }
+          {
+            domain = "tsawhill.org";
+            answer = "10.73.73.8";
+          }
+          {
+            domain = "*.tsawhill.org";
+            answer = "10.73.73.8";
+          }
+          {
+            domain = "remote-nginx-nix.lan";
+            answer = "10.50.50.16";
           }
         ];
         safe_fs_patterns = [ "/var/lib/private/AdGuardHome/userfilters/*" ];

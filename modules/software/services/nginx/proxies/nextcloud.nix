@@ -1,6 +1,7 @@
 {
   config,
   lib,
+  pkgs,
   mkProxyVhost,
   ...
 }:
@@ -8,6 +9,17 @@
 let
   cfg = config.proxy.nextcloud;
   proxyOptions = import ./options.nix;
+
+  # Static HTML with SSI directive — gixy can't see variables in external files.
+  # SSI substitutes $request_uri at runtime to build the download URL.
+  discordEmbedPage = pkgs.writeTextDir "embed.html" ''
+    <!DOCTYPE html><html><head>
+    <meta property="og:type" content="video.other"/>
+    <meta property="og:video:url" content="https://${cfg.domain}<!--# echo var="request_uri" -->/download"/>
+    <meta property="og:video:secure_url" content="https://${cfg.domain}<!--# echo var="request_uri" -->/download"/>
+    <meta property="og:video:type" content="video/mp4"/>
+    </head><body></body></html>
+  '';
 in
 {
   options.proxy.nextcloud = lib.mkOption {
@@ -16,15 +28,39 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    services.nginx.virtualHosts."${cfg.domain}" = mkProxyVhost {
-      inherit cfg;
-      proxyPass = "http://nextcloud-nix.lan:80";
+    services.nginx.virtualHosts."${cfg.domain}" = lib.recursiveUpdate
+      (mkProxyVhost {
+        inherit cfg;
+        proxyPass = "http://nextcloud-nix.lan:80";
 
-      # Specific nextcloud config
-      extraExtraConfig = lib.concatStringsSep "\n" [
-        "client_max_body_size 10g;"
-        "client_body_buffer_size 400M;"
-      ];
-    };
+        # Specific nextcloud config
+        extraExtraConfig = lib.concatStringsSep "\n" [
+          "client_max_body_size 10g;"
+          "client_body_buffer_size 400M;"
+        ];
+      })
+      {
+        # Serve OG video meta tags to Discord bot so share links embed.
+        # Points og:video at /s/TOKEN/download which always returns raw video.
+        # Normal users get the regular Nextcloud share page.
+        locations."~ ^/s/[\\w]+$" = {
+          proxyPass = "http://nextcloud-nix.lan:80";
+          extraConfig = ''
+            error_page 418 = @nc_discord_embed;
+            if ($http_user_agent ~* "Discordbot") {
+              return 418;
+            }
+          '';
+        };
+        locations."@nc_discord_embed" = {
+          extraConfig = ''
+            internal;
+            ssi on;
+            default_type text/html;
+            root ${discordEmbedPage};
+            try_files /embed.html =404;
+          '';
+        };
+      };
   };
 }

@@ -13,7 +13,7 @@ let
   # Power cap in watts. Stock TDP for the 7900 XTX is ~355W.
   # 290W is the sweet spot: eliminates SMU hangs with minimal perf impact.
   # Raise toward 330W if stable, lower toward 250W if still crashing.
-  powerCapWatts = 290.0;
+  powerCapWatts = 260.0;
 
   lactConfig = {
     daemon = {
@@ -33,7 +33,7 @@ let
 in
 {
   # Enable overdrive so LACT can set power caps outside the default range.
-  # This sets amdgpu.ppfeaturemask=0xffffffff as a kernel param.
+  # This sets amdgpu.ppfeaturemask=0xfffd7fff as a kernel param.
   hardware.amdgpu.overdrive.enable = true;
 
   services.lact.enable = true;

@@ -1,4 +1,9 @@
-{ pkgs, lib, config, ... }:
+{
+  pkgs,
+  lib,
+  config,
+  ...
+}:
 {
   options.software.apps.tools.enable = lib.mkEnableOption "desktop utility apps";
 
@@ -13,7 +18,6 @@
 
       # Downloading
       deluge-gtk
-      pyload-ng
 
       # Music / tuning
       lingot

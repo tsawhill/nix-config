@@ -8,34 +8,29 @@
 {
   imports = [
     ./base
-    ../hardware/nvidia.nix # Import NVIDIA driver configuration for encoding support
+    ../hardware/nvidia.nix
     "${self}/modules/software/services/sunshine.nix"
   ];
 
-  programs.xwayland.enable = true;
   networking.hostName = "sunshine-nix";
   services.desktopManager.plasma6.enable = true;
+  services.displayManager.sddm.enable = false;
 
-  # Enable graphics drivers to utilize your passed-through GPU
   hardware.graphics = {
     enable = true;
     enable32Bit = true;
   };
 
   environment.systemPackages = with pkgs; [
-    sunshine
     kdePackages.kscreen
-    xwayland
     kdePackages.qtwayland
     xorg.xcbutilcursor
   ];
 
-  # Required for Sunshine to inject controller/mouse/keyboard inputs
   boot.kernelModules = [ "uinput" ];
 
   users.users.taylor = {
     isNormalUser = true;
-    # 'render' and 'video' are crucial for accessing the passed-through GPU DRM nodes
     extraGroups = [
       "wheel"
       "video"
@@ -44,30 +39,44 @@
     ];
   };
 
-  # Declaratively define the headless session user service
+  # Without linger, user services never start (no login = no session)
+  systemd.tmpfiles.rules = [
+    "f /var/lib/systemd/linger/taylor 0644 root root -"
+  ];
+
   systemd.user.services.plasma-headless = {
     description = "Headless KDE Plasma Wayland Session";
     wantedBy = [ "default.target" ];
+    after = [ "dbus.socket" ];
 
     path = with pkgs; [
       kdePackages.kwin
       kdePackages.plasma-workspace
       xwayland
-      # We can safely drop the manual qt/xcb plugins we added earlier
-      # because the NixOS profile will handle them now.
     ];
 
     serviceConfig = {
       Type = "simple";
-      # The -l flag tells bash to source /etc/profile, pulling in all Qt variables
-      # exec replaces the bash process with kwin to keep systemd process tracking clean
-      ExecStart = "${pkgs.bash}/bin/bash -l -c 'exec kwin_wayland --virtual --xwayland startplasma-wayland'";
+      # startplasma-wayland starts kwin internally — calling kwin directly here
+      # would spawn two compositors fighting each other
+      ExecStart = "${pkgs.kdePackages.plasma-workspace}/bin/startplasma-wayland";
       Restart = "on-failure";
       RestartSec = "5";
     };
 
     environment = {
       KWIN_WAYLAND_VIRTUAL_SCREENS = "1";
+      WAYLAND_DISPLAY = "wayland-1";
+    };
+  };
+
+  # Sunshine connects to the plasma Wayland session
+  systemd.user.services.sunshine = {
+    after = [ "plasma-headless.service" ];
+    wants = [ "plasma-headless.service" ];
+    environment = {
+      WAYLAND_DISPLAY = "wayland-1";
+      DISPLAY = ":0";
     };
   };
 }

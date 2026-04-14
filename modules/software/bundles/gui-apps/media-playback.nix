@@ -1,8 +1,8 @@
 { pkgs, lib, config, ... }:
 {
-  options.software.apps.media.enable = lib.mkEnableOption "media playback and editing apps";
+  options.software.apps.media-playback.enable = lib.mkEnableOption "media playback apps";
 
-  config = lib.mkIf config.software.apps.media.enable {
+  config = lib.mkIf config.software.apps.media-playback.enable {
     # OBS with capture plugins
     programs.obs-studio = {
       enable = true;
@@ -15,15 +15,9 @@
     };
 
     environment.systemPackages = with pkgs; [
-      # Playback
       mpv
       feishin
       delfin
-
-      # Editing
-      audacity
-      kdePackages.kdenlive
-      gimp
     ];
   };
 }

@@ -39,7 +39,9 @@ in
     services.udev.packages = [ pkgs.openrgb-with-all-plugins ];
     services.udev.extraRules = ''
       # OpenRGB uses libusb for many controllers and needs RW access to /dev/bus/usb/*
-      SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", GROUP="plugdev", MODE="0660"
+      SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", GROUP="plugdev", MODE="0660", TAG+="uaccess"
+      # HID devices (keyboards, mice, etc.) need direct hidraw access for RGB control
+      SUBSYSTEM=="hidraw", GROUP="plugdev", MODE="0660", TAG+="uaccess"
     '';
 
     # i2c is required for most RGB controllers
