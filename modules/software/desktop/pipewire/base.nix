@@ -59,7 +59,6 @@
       extraConfig.pipewire = lib.mkIf ll.enable {
         "92-low-latency" = {
           "context.properties" = {
-            "default.clock.allowed-rates" = [ 44100 48000 88200 96000 ];
             "default.clock.rate" = ll.rate;
             "default.clock.quantum" = ll.quantum;
             "default.clock.min-quantum" = ll.quantum;
@@ -78,9 +77,9 @@
           "pulse.properties" = {
             "pulse.min.req" = "${q}/${r}";
             "pulse.default.req" = "${q}/${r}";
-            "pulse.max.req" = "${q}/${r}";
+            "pulse.max.req" = "${mq}/${r}";
             "pulse.min.quantum" = "${q}/${r}";
-            "pulse.max.quantum" = "${q}/${r}";
+            "pulse.max.quantum" = "${mq}/${r}";
           };
           "stream.properties" = {
             "node.latency" = "${q}/${r}";
