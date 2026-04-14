@@ -1,4 +1,9 @@
 {
+  services.resolved = {
+    enable = true;
+    fallbackDns = [ "9.9.9.9" ];
+  };
+
   # Needed for routing on WAN
   boot.kernel.sysctl = {
     "net.bridge.bridge-nf-call-iptables" = 0;
@@ -10,7 +15,6 @@
     useNetworkd = true;
     nameservers = [
       "10.73.73.6"
-      "9.9.9.9"
     ];
   };
 
@@ -90,7 +94,6 @@
         Gateway = "10.73.73.1";
         DNS = [
           "10.73.73.6"
-          "9.9.9.9"
         ];
       };
       linkConfig.RequiredForOnline = "routable";

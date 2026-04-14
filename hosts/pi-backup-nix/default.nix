@@ -9,6 +9,7 @@
 let
   desktopSSHUsers = [ "taylor" ];
   laptopSSHUsers = [ "taylor" ];
+  serverSSHUsers = [ "root" ];
   buildSSHUsers = [ "root" ];
   phoneSSHUsers = [ "taylor" ];
 in
