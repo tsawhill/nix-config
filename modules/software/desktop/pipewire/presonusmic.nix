@@ -1,4 +1,9 @@
-{ lib, config, pkgs, ... }:
+{
+  lib,
+  config,
+  pkgs,
+  ...
+}:
 #
 # Native PipeWire processing chain for the PreSonus Studio 24c microphone.
 # Replicates the active EasyEffects input chain:
@@ -34,53 +39,61 @@
           name = "libpipewire-module-filter-chain";
           args = {
             "node.description" = "PreSonus Mic (Processed)";
-            "media.name"       = "PreSonus Mic Processed";
+            "media.name" = "PreSonus Mic Processed";
             # Force 480-sample quantum at 48kHz — required by rnnoise's fixed frame size.
             # Without this, chaining rnnoise with any other plugin causes a quantum
             # mismatch that makes the graph output silence.
-            "node.latency"     = "480/48000";
+            "node.latency" = "480/48000";
 
             "filter.graph" = {
               "nodes" = [
                 {
-                  type   = "ladspa";
-                  name   = "gate";
+                  type = "ladspa";
+                  name = "gate";
                   plugin = "${pkgs.lsp-plugins}/lib/ladspa/lsp-plugins-ladspa.so";
-                  label  = "http://lsp-plug.in/plugins/ladspa/gate_mono";
+                  label = "http://lsp-plug.in/plugins/ladspa/gate_mono";
                   control = {
-                    "Curve threshold (G)"   = 0.12;
-                    "Attack (ms)"           = 5.0;
-                    "Release (ms)"          = 50.0;
-                    "Reduction (G)"         = 0.01;
+                    "Curve threshold (G)" = 0.12;
+                    "Attack (ms)" = 5.0;
+                    "Release (ms)" = 50.0;
+                    "Reduction (G)" = 0.01;
                     "High-pass filter mode" = 1.0;
-                    "Sidechain mode"        = 1.0;
-                    "Sidechain preamp (G)"  = 2.0;
+                    "Sidechain mode" = 1.0;
+                    "Sidechain preamp (G)" = 2.0;
                   };
                 }
                 {
-                  type    = "ladspa";
-                  name    = "rnnoise";
-                  plugin  = "${pkgs.rnnoise-plugin}/lib/ladspa/librnnoise_ladspa.so";
-                  label   = "noise_suppressor_mono";
+                  type = "ladspa";
+                  name = "rnnoise";
+                  plugin = "${pkgs.rnnoise-plugin}/lib/ladspa/librnnoise_ladspa.so";
+                  label = "noise_suppressor_mono";
                   control = {
-                    "VAD Threshold (%)"          = 75.0;
-                    "VAD Grace Period (ms)"      = 200.0;
+                    "VAD Threshold (%)" = 75.0;
+                    "VAD Grace Period (ms)" = 200.0;
                     "Retroactive VAD Grace (ms)" = 0.0;
                   };
                 }
                 {
-                  type   = "ladspa";
-                  name   = "compressor";
+                  type = "ladspa";
+                  name = "compressor";
                   plugin = "${pkgs.lsp-plugins}/lib/ladspa/lsp-plugins-ladspa.so";
-                  label  = "http://lsp-plug.in/plugins/ladspa/compressor_mono";
-                  control = { "Sidechain mode" = 1.0; };
+                  label = "http://lsp-plug.in/plugins/ladspa/compressor_mono";
+                  control = {
+                    "Sidechain mode" = 1.0;
+                  };
                 }
               ];
               "links" = [
-                { output = "gate:Output";    input = "rnnoise:Input"; }
-                { output = "rnnoise:Output"; input = "compressor:Input"; }
+                {
+                  output = "gate:Output";
+                  input = "rnnoise:Input";
+                }
+                {
+                  output = "rnnoise:Output";
+                  input = "compressor:Input";
+                }
               ];
-              "inputs"  = [ "gate:Input" ];
+              "inputs" = [ "gate:Input" ];
               "outputs" = [ "compressor:Output" ];
             };
 
@@ -89,17 +102,17 @@
             # source that isn't in the same link-group (i.e. the physical mic,
             # not the filter chain's own output). node.passive activates on demand.
             "capture.props" = {
-              "node.name"      = "presonus_mic_capture";
+              "node.name" = "presonus_mic_capture";
               "audio.position" = [ "FL" ];
-              "node.passive"   = true;
+              "node.passive" = true;
             };
 
             # ── Output: virtual mic source ────────────────────────────────
             "playback.props" = {
-              "node.name"        = "mic_input";
+              "node.name" = "mic_input";
               "node.description" = "Mic Input";
-              "media.class"      = "Audio/Source";
-              "audio.position"   = [ "MONO" ];
+              "media.class" = "Audio/Source";
+              "audio.position" = [ "MONO" ];
               "priority.session" = 2200;
             };
 
