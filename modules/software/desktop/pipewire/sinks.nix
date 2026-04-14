@@ -13,7 +13,6 @@ let
           "FL"
           "FR"
         ];
-        "node.passive" = true;
       };
       "playback.props" = {
         "node.name" = "${name}_out";
