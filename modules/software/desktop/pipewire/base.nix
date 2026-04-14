@@ -62,7 +62,7 @@
           "default.clock.rate" = ll.rate;
           "default.clock.quantum" = ll.quantum;
           "default.clock.min-quantum" = ll.quantum;
-          "default.clock.max-quantum" = ll.maxQuantum;
+          "default.clock.max-quantum" = ll.quantum;
           "default.clock.quantum-limit" = ll.maxQuantum;
         };
       };
@@ -78,9 +78,9 @@
           "pulse.properties" = {
             "pulse.min.req" = "${q}/${r}";
             "pulse.default.req" = "${q}/${r}";
-            "pulse.max.req" = "${mq}/${r}";
+            "pulse.max.req" = "${q}/${r}";
             "pulse.min.quantum" = "${q}/${r}";
-            "pulse.max.quantum" = "${mq}/${r}";
+            "pulse.max.quantum" = "${q}/${r}";
           };
           "stream.properties" = {
             "node.latency" = "${q}/${r}";
