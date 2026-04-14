@@ -26,7 +26,7 @@
       default = 48000;
       description = "PipeWire default sample rate in Hz.";
     };
-};
+  };
 
   config = let
     ll = config.my.desktop.audio.lowLatency;
@@ -46,18 +46,13 @@
       #       Low-latency tuning   #
       ##############################
       extraConfig.pipewire = lib.mkIf ll.enable {
-        "92-low-latency" = {
-          "context.properties" = {
-            "default.clock.rate" = ll.rate;
-            "default.clock.quantum" = ll.quantum;
-            "default.clock.min-quantum" = ll.quantum;
-            "default.clock.max-quantum" = ll.quantum;
-            "default.clock.quantum-limit" = ll.quantum;
-          };
-          "stream.properties" = {
-            "node.latency" = "${q}/${r}";
-            "resample.quality" = 4;
-          };
+        "92-low-latency"."context.properties" = {
+          "default.clock.allowed-rates" = [ 44100 48000 88200 96000 ];
+          "default.clock.rate" = ll.rate;
+          "default.clock.quantum" = ll.quantum;
+          "default.clock.quantum-limit" = ll.quantum;
+          "default.clock.min-quantum" = ll.quantum;
+          "default.clock.max-quantum" = ll.quantum;
         };
       };
 
@@ -66,13 +61,13 @@
           "pulse.properties" = {
             "pulse.min.req" = "${q}/${r}";
             "pulse.default.req" = "${q}/${r}";
-            "pulse.max.req" = "1024/${r}";
+            "pulse.max.req" = "${q}/${r}";
             "pulse.min.quantum" = "${q}/${r}";
-            "pulse.max.quantum" = "1024/${r}";
+            "pulse.max.quantum" = "${q}/${r}";
           };
           "stream.properties" = {
             "node.latency" = "${q}/${r}";
-            "resample.quality" = 4;
+            "resample.quality" = 1;
           };
         };
       };
@@ -96,21 +91,11 @@
         # Prevent devices from being suspended when idle
         "12-no-timeout"."wireplumber.settings"."session.suspend-timeout-seconds" = 0;
 
-        # Set ALSA period size on all PreSonus nodes (pro profile splits into
-        # separate input/output devices — both need explicit period-size or
-        # the USB device garbles at unsupported sizes)
-        "13-presonus-period"."monitor.alsa.rules" = lib.mkIf ll.enable [
+        # Pin input device period size independently of output quantum
+        "13-input-quantum"."monitor.alsa.rules" = lib.mkIf ll.enable [
           {
             matches = [ { "alsa.card_name" = "Studio 24c"; } ];
             actions.update-props."api.alsa.period-size" = ll.inputQuantum;
-          }
-        ];
-
-        # Prevent input from becoming graph driver on pro profile
-        "13-input-priority"."monitor.alsa.rules" = [
-          {
-            matches = [ { "node.name" = "~alsa_input.*PreSonus*"; } ];
-            actions.update-props."priority.driver" = 900;
           }
         ];
 
