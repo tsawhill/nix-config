@@ -69,10 +69,10 @@ in
 
   desktop.hyprland.enable = true;
   my.desktop.audio.presonusMic.enable = true;
-  # my.desktop.audio.lowLatency = {
-  #   enable = true;
-  #   quantum = 32;
-  # };
+  my.desktop.audio.lowLatency = {
+    enable = true;
+    quantum = 64;
+  };
 
   software.dev.enable = true;
   software.fonts.enable = true;
