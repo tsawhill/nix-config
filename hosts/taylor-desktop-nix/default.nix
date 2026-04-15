@@ -74,8 +74,6 @@ in
   #   quantum = 32;
   # };
 
-  services.upower.enable = true;
-
   software.dev.enable = true;
   software.fonts.enable = true;
   software.apps.config.enable = true;
