@@ -15,10 +15,10 @@ in
     services.pipewire = {
 
       # Passthrough loopback: only created when no DSP chain is providing mic_input.
-      # When presonusMic is enabled, the filter chain output IS mic_input — no loopback
+      # When motuMic is enabled, the filter chain output IS mic_input — no loopback
       # needed. When disabled, this loopback creates mic_input from the default source.
       extraConfig.pipewire."93-virtual-mic"."context.modules" =
-        lib.optionals (!config.my.desktop.audio.presonusMic.enable) [
+        lib.optionals (!config.my.desktop.audio.motuMic.enable) [
           {
             name = "libpipewire-module-loopback";
             args = {
