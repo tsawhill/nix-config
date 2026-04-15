@@ -5,7 +5,7 @@
   ...
 }:
 #
-# Native PipeWire processing chain for the PreSonus Studio 24c microphone.
+# Native PipeWire processing chain for the MOTU M2 microphone.
 # Replicates the active EasyEffects input chain:
 #
 #   [gate]       → LSP SC Gate Mono (LADSPA)
@@ -21,25 +21,25 @@
 # routing rule, same mechanism as the working output sinks.
 #
 {
-  options.my.desktop.audio.presonusMic.enable = lib.mkOption {
+  options.my.desktop.audio.motuMic.enable = lib.mkOption {
     type = lib.types.bool;
     default = false;
-    description = "Enable native PipeWire DSP chain for the PreSonus Studio 24c microphone.";
+    description = "Enable native PipeWire DSP chain for the MOTU M2 microphone.";
   };
 
-  config = lib.mkIf config.my.desktop.audio.presonusMic.enable {
+  config = lib.mkIf config.my.desktop.audio.motuMic.enable {
 
     services.pipewire = {
 
       ##############################################################
-      # Filter chain: PreSonus mic → DSP → virtual source
+      # Filter chain: MOTU M2 mic → DSP → virtual source
       ##############################################################
-      extraConfig.pipewire."95-presonus-mic"."context.modules" = [
+      extraConfig.pipewire."95-motu-mic"."context.modules" = [
         {
           name = "libpipewire-module-filter-chain";
           args = {
-            "node.description" = "PreSonus Mic (Processed)";
-            "media.name" = "PreSonus Mic Processed";
+            "node.description" = "MOTU M2 Mic (Processed)";
+            "media.name" = "MOTU M2 Mic Processed";
             # 480 samples required by rnnoise's fixed frame size.
             "node.latency" = "480/48000";
 
@@ -96,7 +96,7 @@
             };
 
             "capture.props" = {
-              "node.name" = "presonus_mic_capture";
+              "node.name" = "motu_mic_capture";
               "audio.position" = [ "FL" ];
               "node.passive" = true;
             };
