@@ -52,6 +52,11 @@ in
   boot.kernelModules = [ "kvm-amd" ];
   boot.extraModprobeConfig = "options snd-usb-audio lowlatency=y";
 
+  # Disable USB autosuspend for PreSonus Studio 24c to prevent audio crackling
+  services.udev.extraRules = ''
+    ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="194f", ATTR{idProduct}=="0109", ATTR{power/control}="on"
+  '';
+
   boot.kernel.sysctl."kernel.sysrq" = 1;
 
   # Force reboot if shutdown hangs (CIFS/ZFS unmount can stall with dead network)
