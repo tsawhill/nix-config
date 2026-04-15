@@ -58,7 +58,7 @@ in
     "${self}/modules/software/desktop"
 
     # Hardware services
-    "${self}/modules/software/services/openrgb.nix"
+    # "${self}/modules/software/services/openrgb.nix"
     "${self}/modules/hardware/udev"
   ];
 
