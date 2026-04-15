@@ -68,10 +68,10 @@ in
   ];
 
   desktop.hyprland.enable = true;
-  # my.desktop.audio.presonusMic.enable = true;
+  my.desktop.audio.presonusMic.enable = true;
   my.desktop.audio.lowLatency = {
-    enable = false;
-    # quantum = 256;
+    enable = true;
+    quantum = 32;
   };
 
   services.upower.enable = true;
