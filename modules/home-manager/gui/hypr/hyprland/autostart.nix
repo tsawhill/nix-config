@@ -51,18 +51,18 @@
       Install.WantedBy = [ "wayland-session@hyprland.desktop.target" ];
     };
 
-    openrgb = {
-      Unit = {
-        Description = "OpenRGB lighting controller";
-        After = [ "wayland-session@hyprland.desktop.target" ];
-        PartOf = [ "wayland-session@hyprland.desktop.target" ];
-      };
-      Service = {
-        ExecStart = "${pkgs.openrgb}/bin/openrgb --startminimized -p default";
-        Restart = "on-failure";
-        RestartSec = "3s";
-      };
-      Install.WantedBy = [ "wayland-session@hyprland.desktop.target" ];
-    };
+    # openrgb = {
+    #   Unit = {
+    #     Description = "OpenRGB lighting controller";
+    #     After = [ "wayland-session@hyprland.desktop.target" ];
+    #     PartOf = [ "wayland-session@hyprland.desktop.target" ];
+    #   };
+    #   Service = {
+    #     ExecStart = "${pkgs.openrgb}/bin/openrgb --startminimized -p default";
+    #     Restart = "on-failure";
+    #     RestartSec = "3s";
+    #   };
+    #   Install.WantedBy = [ "wayland-session@hyprland.desktop.target" ];
+    # };
   };
 }
