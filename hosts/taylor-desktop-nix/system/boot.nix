@@ -31,9 +31,6 @@ in
   boot.kernelParams = [
     "amd_pstate=active"
     "iommu=pt"
-    "usbcore.autosuspend=-1"
-    "processor.max_cstate=1"
-    "threadirqs"
     # "video=DP-1:2560x1440@360,rgb_range=full"
     # "video=DP-2:3440x1440@165,rgb_range=full"
     # "amdgpu.mes=0"
@@ -65,10 +62,10 @@ in
 
   boot.kernelPackages =
     let
-      zenZfsCheck = builtins.tryEval pkgs.linuxPackages_zen.${pkgs.zfs_unstable.kernelModuleAttribute}.meta.broken;
+      zenZfsCheck =
+        builtins.tryEval
+          pkgs.linuxPackages_zen.${pkgs.zfs_unstable.kernelModuleAttribute}.meta.broken;
     in
-    if zenZfsCheck.success && (!zenZfsCheck.value)
-    then pkgs.linuxPackages_zen
-    else latestKernelPackage;
-  boot.zfs.package = pkgs.zfs_unstable;
+    if zenZfsCheck.success && (!zenZfsCheck.value) then pkgs.linuxPackages_zen else latestKernelPackage;
+  # boot.zfs.package = pkgs.zfs_unstable;
 }

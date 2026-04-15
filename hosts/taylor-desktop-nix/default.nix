@@ -71,7 +71,7 @@ in
   # my.desktop.audio.presonusMic.enable = true;
   my.desktop.audio.lowLatency = {
     enable = true;
-    quantum = 128;
+    quantum = 256;
   };
 
   services.upower.enable = true;
