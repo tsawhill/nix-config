@@ -31,12 +31,6 @@ in
   boot.kernelParams = [
     "amd_pstate=active"
     "iommu=pt"
-    # "video=DP-1:2560x1440@360,rgb_range=full"
-    # "video=DP-2:3440x1440@165,rgb_range=full"
-    # "amdgpu.mes=0"
-    # "amdgpu.gpu_recovery=1"
-    # "amdgpu.lockup_timeout=1000,1000,1000,1000"
-    # "amdgpu.gfxoff=0"
   ];
 
   boot.initrd.availableKernelModules = [
@@ -50,12 +44,6 @@ in
   ];
 
   boot.kernelModules = [ "kvm-amd" ];
-  boot.extraModprobeConfig = "options snd-usb-audio lowlatency=y";
-
-  # Disable USB autosuspend for PreSonus Studio 24c to prevent audio crackling
-  services.udev.extraRules = ''
-    ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="194f", ATTR{idProduct}=="0109", ATTR{power/control}="on"
-  '';
 
   boot.kernel.sysctl."kernel.sysrq" = 1;
 
