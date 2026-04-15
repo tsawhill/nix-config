@@ -38,6 +38,7 @@
         jack.enable = true;
 
         extraConfig.pipewire."92-low-latency"."context.properties" = lib.mkIf ll.enable {
+          "default.clock.rate" = ll.rate;
           "default.clock.quantum" = ll.quantum;
           "default.clock.max-quantum" = ll.quantum * 4;
         };
