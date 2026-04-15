@@ -71,9 +71,8 @@ in
       rtKernel = latestKernelPackage.kernel.override {
         structuredExtraConfig = with lib.kernel; {
           PREEMPT_RT = yes;
-          PREEMPT_VOLUNTARY = lib.mkForce no;
-          PREEMPT = lib.mkForce no;
         };
+        ignoreConfigErrors = true;
       };
     in
     pkgs.linuxPackagesFor rtKernel;
