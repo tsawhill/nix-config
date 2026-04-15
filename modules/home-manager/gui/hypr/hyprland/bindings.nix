@@ -21,6 +21,7 @@
     "$mainMod, P, pseudo, "
     "$mainMod, V, togglesplit, "
     "$mainMod, W, layoutmsg, addmaster"
+    "$mainMod, E, layoutmsg, removemaster"
 
     # Cycle through windows
     "$mainMod, Tab, cyclenext"
