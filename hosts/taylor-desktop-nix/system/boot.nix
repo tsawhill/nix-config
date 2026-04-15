@@ -67,10 +67,14 @@ in
 
   boot.kernelPackages =
     let
-      zenZfsCheck =
-        builtins.tryEval
-          pkgs.linuxPackages_zen.${pkgs.zfs_unstable.kernelModuleAttribute}.meta.broken;
+      # Take the latest stock kernel that supports ZFS, then enable PREEMPT_RT
+      rtKernel = latestKernelPackage.kernel.override {
+        structuredExtraConfig = with lib.kernel; {
+          PREEMPT_RT = yes;
+          PREEMPT_VOLUNTARY = lib.mkForce no;
+          PREEMPT = lib.mkForce no;
+        };
+      };
     in
-    if zenZfsCheck.success && (!zenZfsCheck.value) then pkgs.linuxPackages_zen else latestKernelPackage;
-  # boot.zfs.package = pkgs.zfs_unstable;
+    pkgs.linuxPackagesFor rtKernel;
 }
