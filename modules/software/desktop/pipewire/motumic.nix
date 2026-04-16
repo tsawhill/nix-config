@@ -51,13 +51,25 @@
                   plugin = "${pkgs.lsp-plugins}/lib/ladspa/lsp-plugins-ladspa.so";
                   label = "http://lsp-plug.in/plugins/ladspa/gate_mono";
                   control = {
-                    "Curve threshold (G)" = 0.12;
+                    "Curve threshold (G)" = 0.05;
                     "Attack (ms)" = 5.0;
-                    "Release (ms)" = 50.0;
+                    "Release (ms)" = 100.0;
                     "Reduction (G)" = 0.01;
+                    "Hysteresis" = 1.0;
+                    "Hysteresis threshold (G)" = 0.02;
                     "High-pass filter mode" = 1.0;
+                    "High-pass filter frequency" = 100.0;
                     "Sidechain mode" = 1.0;
                     "Sidechain preamp (G)" = 2.0;
+                  };
+                }
+                {
+                  type = "builtin";
+                  name = "hpf";
+                  label = "bq_highpass";
+                  control = {
+                    "Freq" = 80.0;
+                    "Q" = 0.707;
                   };
                 }
                 {
@@ -66,9 +78,29 @@
                   plugin = "${pkgs.rnnoise-plugin}/lib/ladspa/librnnoise_ladspa.so";
                   label = "noise_suppressor_mono";
                   control = {
-                    "VAD Threshold (%)" = 75.0;
+                    "VAD Threshold (%)" = 60.0;
                     "VAD Grace Period (ms)" = 200.0;
-                    "Retroactive VAD Grace (ms)" = 0.0;
+                    "Retroactive VAD Grace (ms)" = 20.0;
+                  };
+                }
+                {
+                  type = "builtin";
+                  name = "eq_presence";
+                  label = "bq_peaking";
+                  control = {
+                    "Freq" = 3000.0;
+                    "Q" = 1.0;
+                    "Gain" = 2.0;
+                  };
+                }
+                {
+                  type = "builtin";
+                  name = "eq_air";
+                  label = "bq_highshelf";
+                  control = {
+                    "Freq" = 10000.0;
+                    "Q" = 0.707;
+                    "Gain" = 2.0;
                   };
                 }
                 {
@@ -78,21 +110,35 @@
                   label = "http://lsp-plug.in/plugins/ladspa/compressor_mono";
                   control = {
                     "Sidechain mode" = 1.0;
+                    "Attack threshold (G)" = 0.178;
+                    "Ratio" = 3.0;
+                    "Knee (G)" = 0.5;
+                    "Attack time (ms)" = 5.0;
+                    "Release time (ms)" = 150.0;
+                    "Makeup gain (G)" = 2.0;
+                  };
+                }
+                {
+                  type = "ladspa";
+                  name = "limiter";
+                  plugin = "${pkgs.lsp-plugins}/lib/ladspa/lsp-plugins-ladspa.so";
+                  label = "http://lsp-plug.in/plugins/ladspa/limiter_mono";
+                  control = {
+                    "Threshold (G)" = 0.891;
+                    "Lookahead (ms)" = 1.5;
                   };
                 }
               ];
               "links" = [
-                {
-                  output = "gate:Output";
-                  input = "rnnoise:Input";
-                }
-                {
-                  output = "rnnoise:Output";
-                  input = "compressor:Input";
-                }
+                { output = "gate:Output"; input = "hpf:In"; }
+                { output = "hpf:Out"; input = "rnnoise:Input"; }
+                { output = "rnnoise:Output"; input = "eq_presence:In"; }
+                { output = "eq_presence:Out"; input = "eq_air:In"; }
+                { output = "eq_air:Out"; input = "compressor:Input"; }
+                { output = "compressor:Output"; input = "limiter:Input"; }
               ];
               "inputs" = [ "gate:Input" ];
-              "outputs" = [ "compressor:Output" ];
+              "outputs" = [ "limiter:Output" ];
             };
 
             "capture.props" = {
