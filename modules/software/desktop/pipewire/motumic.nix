@@ -58,7 +58,7 @@
                     "Hysteresis" = 1.0;
                     "Hysteresis threshold (G)" = 0.02;
                     "High-pass filter mode" = 1.0;
-                    "High-pass filter frequency" = 100.0;
+                    "High-pass filter frequency (Hz)" = 100.0;
                     "Sidechain mode" = 1.0;
                     "Sidechain preamp (G)" = 2.0;
                   };
