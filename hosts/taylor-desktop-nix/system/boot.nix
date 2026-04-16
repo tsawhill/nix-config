@@ -53,15 +53,5 @@ in
     DefaultTimeoutStopSec = "30s";
   };
 
-  boot.kernelPackages =
-    let
-      # Take the latest stock kernel that supports ZFS, then enable PREEMPT_RT
-      rtKernel = latestKernelPackage.kernel.override {
-        structuredExtraConfig = with lib.kernel; {
-          PREEMPT_RT = yes;
-        };
-        ignoreConfigErrors = true;
-      };
-    in
-    pkgs.linuxPackagesFor rtKernel;
+  boot.kernelPackages = latestKernelPackage;
 }
