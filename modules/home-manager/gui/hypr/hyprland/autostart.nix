@@ -2,7 +2,8 @@
 {
   wayland.windowManager.hyprland.settings.exec-once = [
     # One-shot setup commands (not app launches)
-    "xrandr --output DP-1 --primary"
+    # xrandr --primary is now set dynamically by workspaces.nix/swap-monitors.nix
+    # based on which monitor is currently hosting workspaces 1-5.
     "rfkill unblock 0; sleep 15; rfkill unblock 0"
 
     # App launches via uwsm for proper systemd session scoping

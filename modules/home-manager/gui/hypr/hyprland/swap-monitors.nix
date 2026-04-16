@@ -21,7 +21,8 @@ let
     SECONDARY=$(echo "$REAL_MONITORS" | ${lib.getExe pkgs.jq} -r '[.[] | select(.name != "'"$PRIMARY"'")] | .[0].name')
 
     RULES_FILE="$HOME/.config/hypr/workspace-rules.conf"
-    STATE_FILE="/tmp/hypr-swap-state"
+    STATE_FILE="$HOME/.local/state/hypr-swap-state"
+    mkdir -p "$(dirname "$STATE_FILE")"
 
     # Record what each monitor is currently showing before we move anything
     WS_ON_PRIMARY=$(echo "$REAL_MONITORS" | ${lib.getExe pkgs.jq} -r --arg m "$PRIMARY" '.[] | select(.name == $m) | .activeWorkspace.id')
@@ -56,6 +57,9 @@ EOF
     # Restore each monitor to the workspace it was showing before the swap
     hyprctl dispatch focusmonitor "$SECONDARY" && hyprctl dispatch workspace "$WS_ON_PRIMARY"
     hyprctl dispatch focusmonitor "$PRIMARY"   && hyprctl dispatch workspace "$WS_ON_SECONDARY"
+
+    # Update X primary output so XWayland apps (Steam toasts) place popups on the correct monitor
+    ${pkgs.xorg.xrandr}/bin/xrandr --output "$A" --primary 2>/dev/null || true
   '';
 in
 {

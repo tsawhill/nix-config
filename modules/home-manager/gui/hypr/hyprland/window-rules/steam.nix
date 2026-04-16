@@ -14,18 +14,20 @@
       "no_initial_focus on, match:class steam, match:title ^notificationtoasts"
 
       # Fallback: any steam window except notification toasts — catches chat/DMs where title is dynamic
-      # More specific rules below override position/size for library and friends list
+      # More specific rules below override position/size for library and friends list.
+      # Percentages are relative to the window's current monitor so layout scales
+      # correctly across monitors of different resolutions (e.g. ultrawide after swap).
       "float on, match:class steam, match:title negative:^notificationtoasts"
-      "move 1561 71, match:class steam, match:title negative:^notificationtoasts"
-      "size 973 684, match:class steam, match:title negative:^notificationtoasts"
+      "move 61% 5%, match:class steam, match:title negative:^notificationtoasts"
+      "size 38% 47%, match:class steam, match:title negative:^notificationtoasts"
 
       # Steam library (main window) — overrides fallback
-      "move 13 86, match:class steam, match:title ^Steam$"
-      "size 1430 1260, match:class steam, match:title ^Steam$"
+      "move 1% 6%, match:class steam, match:title ^Steam$"
+      "size 56% 88%, match:class steam, match:title ^Steam$"
 
       # Steam friends list — overrides fallback
-      "move 1696 790, match:class steam, match:title ^Friends List$"
-      "size 755 622, match:class steam, match:title ^Friends List$"
+      "move 66% 55%, match:class steam, match:title ^Friends List$"
+      "size 30% 43%, match:class steam, match:title ^Friends List$"
     ];
   };
 }
