@@ -38,19 +38,19 @@
       Install.WantedBy = [ "wayland-session@hyprland.desktop.target" ];
     };
 
-    easyeffects = {
-      Unit = {
-        Description = "EasyEffects audio processor";
-        After = [ "wayland-session@hyprland.desktop.target" ];
-        PartOf = [ "wayland-session@hyprland.desktop.target" ];
-      };
-      Service = {
-        ExecStart = "${pkgs.easyeffects}/bin/easyeffects --gapplication-service";
-        Restart = "on-failure";
-        RestartSec = "3s";
-      };
-      Install.WantedBy = [ "wayland-session@hyprland.desktop.target" ];
-    };
+    # easyeffects = {
+    #   Unit = {
+    #     Description = "EasyEffects audio processor";
+    #     After = [ "wayland-session@hyprland.desktop.target" ];
+    #     PartOf = [ "wayland-session@hyprland.desktop.target" ];
+    #   };
+    #   Service = {
+    #     ExecStart = "${pkgs.easyeffects}/bin/easyeffects --gapplication-service";
+    #     Restart = "on-failure";
+    #     RestartSec = "3s";
+    #   };
+    #   Install.WantedBy = [ "wayland-session@hyprland.desktop.target" ];
+    # };
 
     # openrgb = {
     #   Unit = {
