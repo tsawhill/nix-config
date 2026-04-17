@@ -66,6 +66,16 @@
             }
           ];
 
+          # Force low quantum for latency-sensitive games
+          "14-game-low-quantum"."node.rules" = lib.mkIf ll.enable [
+            {
+              matches = [ { "application.process.binary" = "YARG"; } ];
+              actions.update-props = {
+                "node.force-quantum" = ll.quantum;
+              };
+            }
+          ];
+
           # Device priority: bluetooth > USB > PCIe
           "51-device-priority" = {
             "monitor.bluez.rules" = [
