@@ -71,7 +71,7 @@ in
   my.desktop.audio.motuMic.enable = true;
   my.desktop.audio.lowLatency = {
     enable = true;
-    quantum = 32;
+    quantum = 64;
   };
 
   software.dev.enable = true;
