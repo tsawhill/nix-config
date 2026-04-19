@@ -51,14 +51,14 @@
                   plugin = "${pkgs.lsp-plugins}/lib/ladspa/lsp-plugins-ladspa.so";
                   label = "http://lsp-plug.in/plugins/ladspa/gate_mono";
                   control = {
-                    "Curve threshold (G)" = 0.1;
+                    "Curve threshold (G)" = 0.15;
                     "Attack (ms)" = 5.0;
                     "Release (ms)" = 100.0;
                     "Reduction (G)" = 0.01;
                     "Hysteresis" = 1.0;
                     "Hysteresis threshold (G)" = 0.02;
                     "High-pass filter mode" = 1.0;
-                    "High-pass filter frequency (Hz)" = 100.0;
+                    "High-pass filter frequency (Hz)" = 300.0;
                     "Sidechain mode" = 1.0;
                     "Sidechain preamp (G)" = 2.0;
                   };
