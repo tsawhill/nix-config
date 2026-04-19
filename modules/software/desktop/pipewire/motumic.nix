@@ -46,6 +46,16 @@
             "filter.graph" = {
               "nodes" = [
                 {
+                  type = "builtin";
+                  name = "preamp";
+                  label = "bq_highshelf";
+                  control = {
+                    "Freq" = 1.0;
+                    "Q" = 0.707;
+                    "Gain" = 6.0;
+                  };
+                }
+                {
                   type = "ladspa";
                   name = "gate";
                   plugin = "${pkgs.lsp-plugins}/lib/ladspa/lsp-plugins-ladspa.so";
@@ -130,6 +140,7 @@
                 }
               ];
               "links" = [
+                { output = "preamp:Out"; input = "gate:Input"; }
                 { output = "gate:Output"; input = "hpf:In"; }
                 { output = "hpf:Out"; input = "rnnoise:Input"; }
                 { output = "rnnoise:Output"; input = "eq_presence:In"; }
@@ -137,7 +148,7 @@
                 { output = "eq_air:Out"; input = "compressor:Input"; }
                 { output = "compressor:Output"; input = "limiter:Input"; }
               ];
-              "inputs" = [ "gate:Input" ];
+              "inputs" = [ "preamp:In" ];
               "outputs" = [ "limiter:Output" ];
             };
 
