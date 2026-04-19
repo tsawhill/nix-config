@@ -30,13 +30,14 @@
         "${self}/modules/home-manager/bundles/all.nix"
         "${self}/modules/home-manager/bundles/gui.nix"
         "${self}/modules/home-manager/gui/hypr"
+        (import "${self}/pkgs/hyprcrosshair/hm-module.nix" self)
       ];
       home.stateVersion = "25.11";
       my.shell.starshipTheme = "personal";
       my.yarg.enable = true;
       my.hypr.layout = "laptop";
       my.hypr.monitors.framework16.enable = true;
-      my.hypr.gpuRecorder.enable = true;
+      my.hypr.gpuRecorder.enable = false;
 
       my.hypr.wallpaperEngine = {
         enable = true;
