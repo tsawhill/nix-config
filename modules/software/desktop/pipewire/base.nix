@@ -43,6 +43,8 @@
             "default.clock.quantum" = ll.quantum;
             "default.clock.min-quantum" = ll.quantum;
             "default.clock.max-quantum" = ll.quantum * 4;
+            "default.clock.force-quantum" = ll.quantum;
+            "default.clock.force-rate" = ll.rate;
           };
         };
 
@@ -58,17 +60,6 @@
           ];
         };
 
-        extraConfig.client."92-low-latency" = lib.mkIf ll.enable {
-          "stream.rules" = [
-            {
-              matches = [ { "node.name" = "~alsa_playback.*"; } ];
-              actions.update-props = {
-                "node.force-quantum" = ll.quantum;
-                "node.force-rate" = ll.rate;
-              };
-            }
-          ];
-        };
 
         wireplumber.extraConfig = {
           "10-bluez"."monitor.bluez.properties" = {
