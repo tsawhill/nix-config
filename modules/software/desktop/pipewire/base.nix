@@ -67,11 +67,12 @@
           ];
 
           # Force low quantum for latency-sensitive games
-          "14-game-low-quantum"."node.rules" = lib.mkIf ll.enable [
+          "14-game-low-quantum"."monitor.alsa.rules" = lib.mkIf ll.enable [
             {
-              matches = [ { "application.process.binary" = "YARG"; } ];
+              matches = [ { "node.name" = "~alsa_playback.YARG"; } ];
               actions.update-props = {
                 "node.force-quantum" = ll.quantum;
+                "node.force-rate" = ll.rate;
               };
             }
           ];
