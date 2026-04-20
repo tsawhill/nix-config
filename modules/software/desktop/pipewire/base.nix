@@ -54,6 +54,18 @@
           ];
         };
 
+        extraConfig.pipewire-pulse."92-low-latency" = lib.mkIf ll.enable {
+          "pulse.rules" = [
+            {
+              matches = [ { "node.name" = "~.*"; } ];
+              actions.update-props = {
+                "node.force-quantum" = ll.quantum;
+                "node.force-rate" = ll.rate;
+              };
+            }
+          ];
+        };
+
 
         wireplumber.extraConfig = {
           "10-bluez"."monitor.bluez.properties" = {
