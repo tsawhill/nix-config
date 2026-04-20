@@ -41,20 +41,14 @@
           "context.properties" = {
             "default.clock.rate" = ll.rate;
             "default.clock.quantum" = ll.quantum;
-            "default.clock.min-quantum" = ll.quantum;
             "default.clock.max-quantum" = ll.quantum * 4;
-            "default.clock.force-quantum" = ll.quantum;
-            "default.clock.force-rate" = ll.rate;
           };
-        };
-
-        extraConfig.pipewire-pulse."92-low-latency" = lib.mkIf ll.enable {
-          "pulse.rules" = [
+          "stream.rules" = [
             {
               matches = [ { "node.name" = "~.*"; } ];
               actions.update-props = {
-                "node.latency" = "${toString ll.quantum}/${toString ll.rate}";
-                "resample.quality" = 1;
+                "node.force-quantum" = ll.quantum;
+                "node.force-rate" = ll.rate;
               };
             }
           ];
@@ -83,7 +77,6 @@
               };
             }
           ];
-
 
           # Device priority: bluetooth > USB > PCIe
           "51-device-priority" = {
