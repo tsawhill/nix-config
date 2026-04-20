@@ -37,10 +37,25 @@
         alsa.support32Bit = true;
         jack.enable = true;
 
-        extraConfig.pipewire."92-low-latency"."context.properties" = lib.mkIf ll.enable {
-          "default.clock.rate" = ll.rate;
-          "default.clock.quantum" = ll.quantum;
-          "default.clock.max-quantum" = ll.quantum * 4;
+        extraConfig.pipewire."92-low-latency" = lib.mkIf ll.enable {
+          "context.properties" = {
+            "default.clock.rate" = ll.rate;
+            "default.clock.quantum" = ll.quantum;
+            "default.clock.min-quantum" = ll.quantum;
+            "default.clock.max-quantum" = ll.quantum * 4;
+          };
+        };
+
+        extraConfig.pipewire-pulse."92-low-latency" = lib.mkIf ll.enable {
+          "pulse.rules" = [
+            {
+              matches = [ { "node.name" = "~.*"; } ];
+              actions.update-props = {
+                "node.latency" = "${toString ll.quantum}/${toString ll.rate}";
+                "resample.quality" = 1;
+              };
+            }
+          ];
         };
 
         wireplumber.extraConfig = {
@@ -66,10 +81,10 @@
             }
           ];
 
-          # Force low quantum for latency-sensitive games
+          # Force low quantum for latency-sensitive games (wireplumber side)
           "14-game-low-quantum"."node.rules" = lib.mkIf ll.enable [
             {
-              matches = [ { "node.name" = "~alsa_playback.YARG"; } ];
+              matches = [ { "node.name" = "~alsa_playback.YARG*"; } ];
               actions.update-props = {
                 "node.force-quantum" = ll.quantum;
                 "node.force-rate" = ll.rate;
