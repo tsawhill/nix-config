@@ -58,6 +58,18 @@
           ];
         };
 
+        extraConfig.client-rt."92-low-latency" = lib.mkIf ll.enable {
+          "stream.rules" = [
+            {
+              matches = [ { "node.name" = "~alsa_playback.*"; } ];
+              actions.update-props = {
+                "node.force-quantum" = ll.quantum;
+                "node.force-rate" = ll.rate;
+              };
+            }
+          ];
+        };
+
         wireplumber.extraConfig = {
           "10-bluez"."monitor.bluez.properties" = {
             "bluez5.enable-sbc-xq" = true;
@@ -81,16 +93,6 @@
             }
           ];
 
-          # Force low quantum for latency-sensitive games (wireplumber side)
-          "14-game-low-quantum"."node.rules" = lib.mkIf ll.enable [
-            {
-              matches = [ { "node.name" = "~alsa_playback.YARG*"; } ];
-              actions.update-props = {
-                "node.force-quantum" = ll.quantum;
-                "node.force-rate" = ll.rate;
-              };
-            }
-          ];
 
           # Device priority: bluetooth > USB > PCIe
           "51-device-priority" = {
