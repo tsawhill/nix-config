@@ -58,7 +58,7 @@
           ];
         };
 
-        extraConfig.client-rt."92-low-latency" = lib.mkIf ll.enable {
+        extraConfig.client."92-low-latency" = lib.mkIf ll.enable {
           "stream.rules" = [
             {
               matches = [ { "node.name" = "~alsa_playback.*"; } ];
