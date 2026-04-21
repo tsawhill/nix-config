@@ -46,24 +46,26 @@
             "mic_input"
           ];
         };
+
         wallpaperEngine = {
           enable = true;
           monitors."DP-4" = {
             wallpapers = [
-              "837766287"
-              "3272204393"
-              "1132505365"
+              "3690417937"
+              "3687714819"
+              "3691946745"
             ];
             fps = 15;
-            rotateInterval = "1h";
+            rotateInterval = "10m";
           };
           monitors."DP-5" = {
             wallpapers = [
-              "1132505365"
-              "2784382079"
+              "3690417937"
+              "3687714819"
+              "3691946745"
             ];
             fps = 15;
-            rotateInterval = "1h";
+            rotateInterval = "10m";
           };
         };
       };
