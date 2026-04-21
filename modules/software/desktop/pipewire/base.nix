@@ -59,8 +59,7 @@
             {
               matches = [ { "node.name" = "~.*"; } ];
               actions.update-props = {
-                "node.force-quantum" = ll.quantum;
-                "node.force-rate" = ll.rate;
+                "node.latency" = "${toString ll.quantum}/${toString ll.rate}";
               };
             }
           ];
