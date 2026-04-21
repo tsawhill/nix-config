@@ -65,6 +65,18 @@
           ];
         };
 
+        extraConfig.client."92-low-latency" = lib.mkIf ll.enable {
+          "stream.rules" = [
+            {
+              matches = [ { "node.name" = "~.*"; } ];
+              actions.update-props = {
+                "node.force-quantum" = ll.quantum;
+                "node.force-rate" = ll.rate;
+              };
+            }
+          ];
+        };
+
 
         wireplumber.extraConfig = {
           "10-bluez"."monitor.bluez.properties" = {
