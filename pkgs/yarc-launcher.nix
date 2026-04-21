@@ -1,7 +1,7 @@
 { lib, pkgs }:
 
 let
-  version = "1.2.0";
+  version = "1.3.0";
 in
 pkgs.appimageTools.wrapType2 {
   pname = "yarc-launcher";
@@ -9,7 +9,7 @@ pkgs.appimageTools.wrapType2 {
 
   src = pkgs.fetchurl {
     url = "https://github.com/YARC-Official/YARC-Launcher/releases/download/v${version}/YARC.Launcher_${version}_amd64.AppImage";
-    sha256 = "03m1gan1d66aafvlvcrdpj0r1k8jm66ik53lbm94yb95sh4mn5gx";
+    sha256 = "40e6e72370ed81f899f4660139ba076ad99d131bcabdca76499a3dceebb5e556";
   };
 
   meta = {
