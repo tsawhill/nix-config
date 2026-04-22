@@ -35,6 +35,7 @@ let
       audioEnv = lib.optionals (!monCfg.audio) [
         "SDL_AUDIODRIVER=dummy"
         "MPV_HOME=${mpvNullAudioConf}"
+        "PULSE_SERVER=/dev/null"
       ];
 
       rotationScript = pkgs.writeShellScript "wallpaper-engine-${monitor}" ''
