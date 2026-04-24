@@ -38,32 +38,32 @@ in
       profiles = {
         active = 0;
         configs = [
+          # {
+          #   name = "White Ring";
+          #   settings = {
+          #     outputName = cfg.monitor;
+          #     shape = "ring";
+          #     color = {
+          #       red = 1.0;
+          #       green = 1.0;
+          #       blue = 1.0;
+          #     };
+          #     ring.size = 6.0;
+          #     ring.thickness = 1.2;
+          #     outline = {
+          #       enable = true;
+          #       size = 1.0;
+          #       feather = 0.0;
+          #     };
+          #   };
+          # }
           {
-            name = "White Ring";
-            settings = {
-              outputName = cfg.monitor;
-              shape = "ring";
-              color = {
-                red = 1.0;
-                green = 1.0;
-                blue = 1.0;
-              };
-              ring.size = 6.0;
-              ring.thickness = 1.2;
-              outline = {
-                enable = true;
-                size = 1.0;
-                feather = 0.0;
-              };
-            };
-          }
-          {
-            name = "Cyan Dot";
+            name = "White Dot";
             settings = {
               outputName = cfg.monitor;
               shape = "dot";
               color = {
-                red = 0.0;
+                red = 1.0;
                 green = 1.0;
                 blue = 1.0;
               };
@@ -72,6 +72,26 @@ in
                 enable = true;
                 size = 0.1;
                 feather = 1.3;
+              };
+            };
+          }
+          {
+            name = "Green Cross";
+            settings = {
+              outputName = cfg.monitor;
+              shape = "cross";
+              color = {
+                red = 0.0;
+                green = 1.0;
+                blue = 0.0;
+              };
+              cross.thickness = 2.0;
+              cross.length = 7.0;
+              cross.gap = 4.0;
+              outline = {
+                enable = true;
+                size = 0.2;
+                feather = 0.2;
               };
             };
           }
