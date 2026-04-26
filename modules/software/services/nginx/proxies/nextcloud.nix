@@ -18,6 +18,8 @@ let
     <meta property="og:video:url" content="https://${cfg.domain}<!--# echo var="request_uri" -->/download"/>
     <meta property="og:video:secure_url" content="https://${cfg.domain}<!--# echo var="request_uri" -->/download"/>
     <meta property="og:video:type" content="video/mp4"/>
+    <meta property="og:video:width" content="2560"/>
+    <meta property="og:video:height" content="1440"/>
     </head><body></body></html>
   '';
 in
