@@ -21,6 +21,7 @@
         After = lib.mkForce [ "wayland-session@hyprland.desktop.target" ];
         PartOf = lib.mkForce [ "wayland-session@hyprland.desktop.target" ];
       };
+      Service.TimeoutStopSec = "5s";
       Install.WantedBy = lib.mkForce [ "wayland-session@hyprland.desktop.target" ];
     };
 
