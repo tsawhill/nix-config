@@ -33,7 +33,6 @@
     environment.systemPackages = with pkgs; [
       # Launchers
       heroic
-      lutris
       faugus-launcher
       (pkgs.bolt-launcher.override { jdk17 = pkgs.openjdk; })
       boilr
