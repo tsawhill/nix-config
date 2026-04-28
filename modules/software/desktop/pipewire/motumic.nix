@@ -48,7 +48,7 @@
 {
                   type = "ladspa";
                   name = "gate";
-                  plugin = "lsp-plugins-ladspa.so";
+                  plugin = "lsp-plugins-ladspa";
                   label = "http://lsp-plug.in/plugins/ladspa/gate_mono";
                   control = {
                     "Curve threshold (G)" = 0.15;
@@ -75,7 +75,7 @@
                 {
                   type = "ladspa";
                   name = "rnnoise";
-                  plugin = "librnnoise_ladspa.so";
+                  plugin = "librnnoise_ladspa";
                   label = "noise_suppressor_mono";
                   control = {
                     "VAD Threshold (%)" = 80.0;
@@ -106,7 +106,7 @@
                 {
                   type = "ladspa";
                   name = "compressor";
-                  plugin = "lsp-plugins-ladspa.so";
+                  plugin = "lsp-plugins-ladspa";
                   label = "http://lsp-plug.in/plugins/ladspa/compressor_mono";
                   control = {
                     "Sidechain mode" = 1.0;
@@ -121,7 +121,7 @@
                 {
                   type = "ladspa";
                   name = "limiter";
-                  plugin = "lsp-plugins-ladspa.so";
+                  plugin = "lsp-plugins-ladspa";
                   label = "http://lsp-plug.in/plugins/ladspa/limiter_mono";
                   control = {
                     "Threshold (G)" = 0.891;
