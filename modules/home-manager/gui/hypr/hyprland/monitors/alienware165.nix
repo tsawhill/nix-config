@@ -34,8 +34,8 @@ MONITOREOF
     '';
 
     wayland.windowManager.hyprland.extraConfig = ''
-      exec-once = sed -i 's/sdr_brightness = [0-9.]*/sdr_brightness = 1.00/' $HOME/.config/hypr/monitors/alienware165.conf
-      source = $HOME/.config/hypr/monitors/alienware165.conf
+      exec-once = sed -i 's/sdr_brightness = [0-9.]*/sdr_brightness = 1.00/' ${config.home.homeDirectory}/.config/hypr/monitors/alienware165.conf
+      source = ${config.home.homeDirectory}/.config/hypr/monitors/alienware165.conf
     '';
   };
 }
