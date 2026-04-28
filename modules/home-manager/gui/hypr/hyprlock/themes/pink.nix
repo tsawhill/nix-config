@@ -18,6 +18,7 @@ lib.mkIf (config.my.hypr.lock.theme == "pink") {
     background = [
       {
         monitor = "";
+        path = "screenshot";
         blur_passes = 3;
         blur_size = 6;
         brightness = 0.6;
