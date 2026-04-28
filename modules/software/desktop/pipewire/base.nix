@@ -36,6 +36,7 @@
         alsa.enable = true;
         alsa.support32Bit = true;
         jack.enable = true;
+        extraLadspaPackages = with pkgs; [ lsp-plugins rnnoise-plugin ];
 
         extraConfig.pipewire."92-low-latency" = lib.mkIf ll.enable {
           "context.properties" = {
