@@ -51,7 +51,7 @@
           monitors."DP-4" = {
             wallpapers = [
               "3687714819"
-              "3638441224"
+              # "3638441224"
             ];
             fps = 15;
             rotateInterval = "10m";
@@ -59,7 +59,7 @@
           monitors."DP-5" = {
             wallpapers = [
               "3687714819"
-              "3638441224"
+              # "3638441224"
             ];
             fps = 15;
             rotateInterval = "10m";
