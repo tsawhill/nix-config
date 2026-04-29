@@ -61,8 +61,6 @@ EOF
     # Update X primary output so XWayland apps (Steam toasts) place popups on the correct monitor
     ${pkgs.xorg.xrandr}/bin/xrandr --output "$A" --primary 2>/dev/null || true
 
-    # Restart GPU Screen Recorder so it captures the new primary monitor
-    ${pkgs.systemd}/bin/systemctl --user restart gpu-screen-recorder.service 2>/dev/null || true
   '';
 in
 {

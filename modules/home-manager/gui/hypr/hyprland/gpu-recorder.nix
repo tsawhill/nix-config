@@ -6,34 +6,24 @@
 }:
 let
   cfg = config.my.hypr.gpuRecorder;
-  monCfg = config.my.hypr.monitors;
 
   audioArgs = lib.concatMapStringsSep " " (d: "-a ${lib.escapeShellArg d}") (
     cfg.audio.output ++ cfg.audio.input
   );
 
-  # Wrapper that reads swap state to determine which monitor is currently primary
-  launchScript = pkgs.writeShellScript "gpu-screen-recorder-launch" ''
-    STATE_FILE="$HOME/.local/state/hypr-swap-state"
-    if [ -f "$STATE_FILE" ]; then
-      MONITOR=${lib.escapeShellArg monCfg.secondary}
-    else
-      MONITOR=${lib.escapeShellArg monCfg.primary}
-    fi
-    exec ${lib.getExe pkgs.gpu-screen-recorder} \
-      -w "$MONITOR" \
-      -f ${toString cfg.fps} \
-      -fm cfr -k hevc -bm qp -q very_high \
-      ${audioArgs} \
-      -r ${toString cfg.replayDuration} \
-      -c mkv \
-      -o ${lib.escapeShellArg cfg.outputDir}
-  '';
+  # -restore-portal-session only applies when using the portal capture target
+  portalArgs = lib.optionalString (cfg.captureTarget == "portal") "-restore-portal-session yes";
 
 in
 {
   options.my.hypr.gpuRecorder = {
     enable = lib.mkEnableOption "GPU Screen Recorder replay buffer";
+
+    captureTarget = lib.mkOption {
+      type = lib.types.str;
+      default = "portal";
+      description = "Capture target passed to -w: screen, portal, focused, a monitor name (e.g. DP-1), region, etc.";
+    };
 
     fps = lib.mkOption {
       type = lib.types.int;
@@ -75,7 +65,17 @@ in
       Service = {
         Type = "simple";
         ExecStartPre = "${pkgs.coreutils}/bin/mkdir -p ${cfg.outputDir}";
-        ExecStart = "${launchScript}";
+        ExecStart = lib.concatStringsSep " " [
+          "${lib.getExe pkgs.gpu-screen-recorder}"
+          "-w ${lib.escapeShellArg cfg.captureTarget}"
+          portalArgs
+          "-f ${toString cfg.fps}"
+          "-fm cfr -k hevc -bm qp -q very_high"
+          audioArgs
+          "-r ${toString cfg.replayDuration}"
+          "-c mkv"
+          "-o ${lib.escapeShellArg cfg.outputDir}"
+        ];
         Restart = "on-failure";
         RestartSec = "3s";
       };
