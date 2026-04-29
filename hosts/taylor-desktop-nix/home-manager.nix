@@ -37,6 +37,7 @@
         gpuRecorder = {
           enable = true;
           fps = 120;
+          cardName = "amd-igpu";
           audio.output = [
             "discord_audio.monitor"
             "game_audio.monitor"

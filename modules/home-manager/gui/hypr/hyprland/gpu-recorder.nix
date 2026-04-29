@@ -25,6 +25,12 @@ in
       description = "Capture target passed to -w: screen, portal, focused, a monitor name (e.g. DP-1), region, etc.";
     };
 
+    cardName = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = "DRI card name (e.g. card2) to symlink as card0 for gpu-screen-recorder.";
+    };
+
     fps = lib.mkOption {
       type = lib.types.int;
       default = 60;
@@ -64,7 +70,12 @@ in
       };
       Service = {
         Type = "simple";
-        ExecStartPre = "${pkgs.coreutils}/bin/mkdir -p ${cfg.outputDir}";
+        ExecStartPre = let
+          mkdirCmd = "${pkgs.coreutils}/bin/mkdir -p ${cfg.outputDir}";
+          symlinkCmd = "${pkgs.coreutils}/bin/ln -sfn /dev/dri/${cfg.cardName} /dev/dri/card0";
+        in if cfg.cardName != null
+          then [ symlinkCmd mkdirCmd ]
+          else mkdirCmd;
         ExecStart = lib.concatStringsSep " " [
           "${lib.getExe pkgs.gpu-screen-recorder}"
           "-w ${lib.escapeShellArg cfg.captureTarget}"
