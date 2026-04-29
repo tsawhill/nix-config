@@ -21,8 +21,8 @@ in
 
     captureTarget = lib.mkOption {
       type = lib.types.str;
-      default = "portal";
-      description = "Capture target passed to -w: portal, focused, a monitor name (e.g. DP-1), region, etc.";
+      default = "focused";
+      description = "Capture target passed to -w: screen, portal, focused, a monitor name (e.g. DP-1), region, etc.";
     };
 
     fps = lib.mkOption {
