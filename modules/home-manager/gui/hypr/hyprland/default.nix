@@ -62,6 +62,8 @@
 
   config.wayland.windowManager.hyprland = {
     enable = true;
+    package = null;
+    portalPackage = null;
     systemd.enable = false; # Using uwsm -- https://wiki.hyprland.org/Useful-Utilities/Systemd-start/
     settings = {
       env = [
