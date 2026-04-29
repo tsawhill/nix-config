@@ -7,7 +7,7 @@
       enabled = "true";
       size = 6;
       passes = 3; # Multiple passes create a much smoother, frosted glass look
-      ignore_opacity = true; # Ensures blur works nicely with window transparency
+      ignore_opacity = false; # Ensures blur works nicely with window transparency
     };
     shadow = {
       enabled = "true";
