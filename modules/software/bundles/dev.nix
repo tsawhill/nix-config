@@ -9,7 +9,6 @@ let
   cfg = config.software.dev;
   pkgs-master = import inputs.nixpkgs-master { inherit (pkgs) system config; };
 
-  });
   chatgptExt = pkgs.vscode-utils.buildVscodeMarketplaceExtension {
     mktplcRef = {
       name = "chatgpt";
