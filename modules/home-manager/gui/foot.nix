@@ -11,7 +11,7 @@
         pad = "12x12 center";
       };
       colors-dark = {
-        alpha = 0.9;
+        alpha = 0.95;
 
         # Catppuccin-frappe theme - from https://github.com/catppuccin/foot/blob/main/themes/catppuccin-frappe.ini
         foreground = "c6d0f5";

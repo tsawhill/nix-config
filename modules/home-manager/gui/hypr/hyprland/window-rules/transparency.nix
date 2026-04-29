@@ -1,10 +1,10 @@
 { config, lib, ... }:
-# All windows default to 90% inactive opacity.
-# Add classes to dimApps for 80% inactive opacity.
+# All windows default to 97.5% inactive opacity.
+# Add classes to dimApps for 95% inactive opacity.
 # Add raw match strings to opaqueApps to exempt windows from dimming (full inactive opacity).
 # Both lists are additive — definitions across modules are concatenated.
 {
-  options.my.hypr.windowRules.transparency.enable = lib.mkEnableOption "transparency window rules";
+  options.my.hypr.windowRules.transparency.enable = lib.mkEnableOption "transparency window rules" // { default = true; };
 
   options.my.hypr.transparency = {
     dimApps = lib.mkOption {
@@ -32,8 +32,8 @@
     };
 
     wayland.windowManager.hyprland.settings.windowrule =
-      [ "opacity 1.0 override 0.90 override, match:class .+" ]
+      [ "opacity 1.0 override 0.975 override, match:class .+" ]
       ++ map (m: "opacity 1.0 override 1.0 override, match:${m}") config.my.hypr.transparency.opaqueApps
-      ++ map (c: "opacity 1.0 override 0.8 override, match:class ${c}") config.my.hypr.transparency.dimApps;
+      ++ map (c: "opacity 1.0 override 0.95 override, match:class ${c}") config.my.hypr.transparency.dimApps;
   };
 }
