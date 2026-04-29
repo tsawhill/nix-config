@@ -32,7 +32,6 @@ in
           esbenp.prettier-vscode
           ms-python.vscode-pylance
           github.copilot-chat
-          anthropic.claude-code
         ])
         ++ [ chatgptExt ];
     };
