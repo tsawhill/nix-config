@@ -32,8 +32,8 @@
     };
 
     wayland.windowManager.hyprland.settings.windowrule =
-      [ "opacity 1.0 0.90, match:class .+" ]
-      ++ map (m: "opacity 1.0 1.0, match:${m}") config.my.hypr.transparency.opaqueApps
-      ++ map (c: "opacity 1.0 0.8, match:class ${c}") config.my.hypr.transparency.dimApps;
+      [ "opacity 1.0 override 0.90 override, match:class .+" ]
+      ++ map (m: "opacity 1.0 override 1.0 override, match:${m}") config.my.hypr.transparency.opaqueApps
+      ++ map (c: "opacity 1.0 override 0.8 override, match:class ${c}") config.my.hypr.transparency.dimApps;
   };
 }
