@@ -9,11 +9,6 @@ let
   cfg = config.software.dev;
   pkgs-master = import inputs.nixpkgs-master { inherit (pkgs) system config; };
 
-  # Override claude-code vsix hash — marketplace republished 2.1.92 with different content
-  claude-code-ext = pkgs-master.vscode-extensions.anthropic.claude-code.overrideAttrs (old: {
-    src = old.src.overrideAttrs {
-      outputHash = "sha256-f+6xXZVb5sYrmrH7eoon6/QoQaTnBuTnb+YnvszqyKA=";
-    };
   });
   chatgptExt = pkgs.vscode-utils.buildVscodeMarketplaceExtension {
     mktplcRef = {
@@ -38,7 +33,7 @@ in
           esbenp.prettier-vscode
           ms-python.vscode-pylance
           github.copilot-chat
-          claude-code-ext
+          anthropic.claude-code
         ])
         ++ [ chatgptExt ];
     };
@@ -46,7 +41,7 @@ in
     environment.systemPackages = with pkgs; [
       nixfmt
       glib
-      pkgs-master.claude-code
+      claude-code
       codex
     ];
   };
