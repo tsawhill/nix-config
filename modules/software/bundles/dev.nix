@@ -7,7 +7,10 @@
 }:
 let
   cfg = config.software.dev;
-  pkgs-master = import inputs.nixpkgs-master { inherit (pkgs) system config; };
+  pkgs-master = import inputs.nixpkgs-master {
+    inherit (pkgs) config;
+    system = pkgs.stdenv.hostPlatform.system;
+  };
 
   chatgptExt = pkgs.vscode-utils.buildVscodeMarketplaceExtension {
     mktplcRef = {
@@ -32,7 +35,7 @@ in
           esbenp.prettier-vscode
           ms-python.vscode-pylance
           github.copilot-chat
-          anthropic.claude-code
+          pkgs-master.vscode-extensions.anthropic.claude-code
         ])
         ++ [ chatgptExt ];
     };
