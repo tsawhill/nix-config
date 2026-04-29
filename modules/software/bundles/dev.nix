@@ -20,7 +20,7 @@ let
       name = "chatgpt";
       publisher = "openai";
       version = "26.5422.71525"; # put actual version
-      sha256 = "sha256-16qkyn5xhh6clchx2c7w4y9ly82kj576dy3ha9q3ljj8sk3sp7gm";
+      sha256 = "16qkyn5xhh6clchx2c7w4y9ly82kj576dy3ha9q3ljj8sk3sp7gm";
     };
   };
 in
@@ -40,7 +40,7 @@ in
           github.copilot-chat
           claude-code-ext
         ])
-        ++ [ openai-chatgpt ];
+        ++ [ chatgptExt ];
     };
 
     environment.systemPackages = with pkgs; [
