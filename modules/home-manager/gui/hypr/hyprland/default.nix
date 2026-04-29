@@ -83,6 +83,12 @@
         vfr = true;
       };
 
+      render = {
+        # Latest Hyprland color-management builds can produce transparent
+        # screencopy buffers unless an unmodified SDR copy is kept.
+        keep_unmodified_copy = 1;
+      };
+
       general = {
         layout = config.my.hypr.windowLayout;
         allow_tearing = true;
