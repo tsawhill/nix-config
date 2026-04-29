@@ -73,11 +73,14 @@
       ];
 
       misc = {
-        vfr = true;
         disable_hyprland_logo = true;
         enable_swallow = false;
         swallow_regex = "^(foot)$";
         enable_anr_dialog = false;
+      };
+
+      debug = {
+        vfr = true;
       };
 
       general = {

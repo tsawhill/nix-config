@@ -19,7 +19,7 @@
     "$mainMod, D, exec, walker"
     "$mainMod, R, exec, walker -m runner"
     "$mainMod, P, pseudo, "
-    "$mainMod, V, togglesplit, "
+    "$mainMod, V, layoutmsg, togglesplit"
     "$mainMod, W, layoutmsg, addmaster"
     "$mainMod, S, layoutmsg, removemaster"
 

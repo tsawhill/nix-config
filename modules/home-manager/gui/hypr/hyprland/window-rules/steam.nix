@@ -9,7 +9,7 @@
       "no_initial_focus on, match:class steam"
 
       # Notification toasts — block idle inhibition and focus grabs
-      "idle_inhibit never, match:class steam, match:title ^notificationtoasts"
+      "idle_inhibit none, match:class steam, match:title ^notificationtoasts"
       "suppress_event activatefocus, match:class steam, match:title ^notificationtoasts"
       "no_initial_focus on, match:class steam, match:title ^notificationtoasts"
 
