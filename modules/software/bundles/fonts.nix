@@ -11,6 +11,7 @@
     fonts.packages = with pkgs; [
       roboto
       ubuntu-sans
+      comfortaa
       nerd-fonts.jetbrains-mono
       nerd-fonts.geist-mono
       nerd-fonts.fira-code
