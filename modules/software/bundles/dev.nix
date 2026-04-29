@@ -30,6 +30,7 @@ in
         ms-python.vscode-pylance
         github.copilot-chat
         claude-code-ext
+        genieai.chatgpt-vscode
       ];
     };
 
@@ -37,6 +38,7 @@ in
       nixfmt
       glib
       pkgs-master.claude-code
+      codex
     ];
   };
 }
