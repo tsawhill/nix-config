@@ -56,7 +56,7 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    systemd.user.services.gpu-screen-recorder = {
+    systemd.user.services.gpu-recorder = {
       Unit = {
         Description = "GPU Screen Recorder (Replay Buffer)";
         After = [ "wayland-session@hyprland.desktop.target" ];
