@@ -84,8 +84,6 @@
       };
 
       render = {
-        # Latest Hyprland color-management builds can produce transparent
-        # screencopy buffers unless an unmodified SDR copy is kept.
         keep_unmodified_copy = 1;
       };
 

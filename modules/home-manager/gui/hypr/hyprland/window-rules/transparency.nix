@@ -32,10 +32,7 @@
     };
 
     wayland.windowManager.hyprland.settings.windowrule =
-      [
-        "force_rgbx on, match:class .+"
-        "opacity 1.0 override 0.90 override, match:class .+"
-      ]
+      [ "opacity 1.0 override 0.90 override, match:class .+" ]
       ++ map (m: "opacity 1.0 override 1.0 override, match:${m}") config.my.hypr.transparency.opaqueApps
       ++ map (c: "opacity 1.0 override 0.8 override, match:class ${c}") config.my.hypr.transparency.dimApps;
   };
