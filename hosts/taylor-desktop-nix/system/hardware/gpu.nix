@@ -10,6 +10,13 @@ let
     text = ''KERNEL=="card*", SUBSYSTEM=="drm", SUBSYSTEMS=="pci", ATTRS{vendor}=="0x1002", ATTRS{device}=="0x164e", SYMLINK+="dri/amd-igpu"'';
     destination = "/etc/udev/rules.d/amd-igpu-dev-path.rules";
   };
+  # gpu-screen-recorder scans from card0; if cards don't start at 0 it fails.
+  # Symlink card0 to the iGPU (which has the monitors attached).
+  card0 = pkgs.writeTextFile {
+    name = "card0-udev";
+    text = ''KERNEL=="card*", SUBSYSTEM=="drm", SUBSYSTEMS=="pci", ATTRS{vendor}=="0x1002", ATTRS{device}=="0x164e", SYMLINK+="dri/card0"'';
+    destination = "/etc/udev/rules.d/amd-card0-dev-path.rules";
+  };
   dgpu = pkgs.writeTextFile {
     name = "dgpu-udev";
     text = ''KERNEL=="card*", SUBSYSTEM=="drm", SUBSYSTEMS=="pci", ATTRS{vendor}=="0x1002", ATTRS{device}=="0x744c", SYMLINK+="dri/amd-dgpu"'';
@@ -17,7 +24,7 @@ let
   };
 in
 {
-  services.udev.packages = [ igpu dgpu ];
+  services.udev.packages = [ igpu dgpu card0 ];
 
   # ROCm OpenCL runtime — required for GPU compute in DaVinci Resolve
   hardware.graphics.extraPackages = [ pkgs.rocmPackages.clr ];
