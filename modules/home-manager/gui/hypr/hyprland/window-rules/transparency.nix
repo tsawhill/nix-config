@@ -4,7 +4,7 @@
 # Add raw match strings to opaqueApps to exempt windows from dimming (full inactive opacity).
 # Both lists are additive — definitions across modules are concatenated.
 {
-  options.my.hypr.windowRules.transparency.enable = lib.mkEnableOption "transparency window rules" // { default = true; };
+  options.my.hypr.windowRules.transparency.enable = lib.mkEnableOption "transparency window rules";
 
   options.my.hypr.transparency = {
     dimApps = lib.mkOption {
