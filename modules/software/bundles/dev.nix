@@ -17,8 +17,21 @@ let
       name = "claude-code";
       publisher = "anthropic";
       version = "2.1.92";
-      sha256 = "sha256-f+6xXZVb5sYrmrH7eoon6/QoQaTnBuTnb+YnvszqyKA=";
-    };
+    }
+    // (
+      {
+        x86_64-linux = {
+          arch = "linux-x64";
+          hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+        };
+        aarch64-linux = {
+          arch = "linux-arm64";
+          hash = "sha256-f+6xXZVb5sYrmrH7eoon6/QoQaTnBuTnb+YnvszqyKA=";
+        };
+      }
+      .${pkgs.stdenv.hostPlatform.system}
+        or (throw "Unsupported Claude Code extension system: ${pkgs.stdenv.hostPlatform.system}")
+    );
   };
 
   chatgptExt = pkgs.vscode-utils.buildVscodeMarketplaceExtension {
