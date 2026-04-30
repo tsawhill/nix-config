@@ -12,6 +12,15 @@ let
     system = pkgs.stdenv.hostPlatform.system;
   };
 
+  claudeCodeExt = pkgs-master.vscode-utils.buildVscodeMarketplaceExtension {
+    mktplcRef = {
+      name = "claude-code";
+      publisher = "anthropic";
+      version = "2.1.92";
+      sha256 = "sha256-f+6xXZVb5sYrmrH7eoon6/QoQaTnBuTnb+YnvszqyKA=";
+    };
+  };
+
   chatgptExt = pkgs.vscode-utils.buildVscodeMarketplaceExtension {
     mktplcRef = {
       name = "chatgpt";
@@ -35,9 +44,11 @@ in
           esbenp.prettier-vscode
           ms-python.vscode-pylance
           github.copilot-chat
-          pkgs-master.vscode-extensions.anthropic.claude-code
         ])
-        ++ [ chatgptExt ];
+        ++ [
+          claudeCodeExt
+          chatgptExt
+        ];
     };
 
     environment.systemPackages = with pkgs; [
