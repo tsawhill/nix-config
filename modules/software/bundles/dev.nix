@@ -32,6 +32,10 @@ let
       .${pkgs.stdenv.hostPlatform.system}
         or (throw "Unsupported Claude Code extension system: ${pkgs.stdenv.hostPlatform.system}")
     );
+
+    dontPatchELF = false;
+    nativeBuildInputs = [ pkgs-master.autoPatchelfHook ];
+    buildInputs = [ pkgs-master.glibc ];
   };
 
   chatgptExt = pkgs.vscode-utils.buildVscodeMarketplaceExtension {
