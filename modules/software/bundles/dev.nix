@@ -22,7 +22,7 @@ let
       {
         x86_64-linux = {
           arch = "linux-x64";
-          hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+          hash = "sha256-dZ9625x6qCWwI2tY/GP3QSNoG/Sxi6nZGHNFnSSIy+Y=";
         };
         aarch64-linux = {
           arch = "linux-arm64";
