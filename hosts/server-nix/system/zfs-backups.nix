@@ -120,6 +120,24 @@ in
       echo "Target backup datasets: $(wc -l < "$target_file")"
       echo "Target backup snapshots: $(wc -l < "$target_snapshot_file")"
 
+      debug_snapshot="backup/zpool/immich@idiot"
+      debug_dataset="''${debug_snapshot%@*}"
+      if grep -Fxq "$debug_dataset" "$expected_file"; then
+        echo "Debug $debug_dataset: source dataset present"
+      else
+        echo "Debug $debug_dataset: source dataset missing"
+      fi
+      if grep -Fxq "$debug_snapshot" "$expected_snapshot_file"; then
+        echo "Debug $debug_snapshot: source snapshot present"
+      else
+        echo "Debug $debug_snapshot: source snapshot missing"
+      fi
+      if grep -Fxq "$debug_snapshot" "$target_snapshot_file"; then
+        echo "Debug $debug_snapshot: target snapshot present"
+      else
+        echo "Debug $debug_snapshot: target snapshot missing"
+      fi
+
       while IFS= read -r target_snapshot; do
         [ -n "$target_snapshot" ] || continue
 
