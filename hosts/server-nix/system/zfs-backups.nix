@@ -32,6 +32,7 @@ let
   };
 
   orphanProperty = "org.tsawhill:orphaned-since";
+  staleSnapshotProperty = "org.tsawhill:stale-snapshot-since";
   orphanGraceDays = 90;
   backupDatasetArgs = builtins.concatStringsSep " " backupDatasets;
 in
@@ -78,13 +79,16 @@ in
 
       remote="root@pi-backup-nix.lan"
       orphan_property="${orphanProperty}"
+      stale_snapshot_property="${staleSnapshotProperty}"
       grace_days=${toString orphanGraceDays}
       today="$(date -u +%F)"
       cutoff_epoch="$(date -u -d "$grace_days days ago" +%s)"
 
       expected_file="$(mktemp)"
+      expected_snapshot_file="$(mktemp)"
       target_file="$(mktemp)"
-      trap 'rm -f "$expected_file" "$target_file"' EXIT
+      target_snapshot_file="$(mktemp)"
+      trap 'rm -f "$expected_file" "$expected_snapshot_file" "$target_file" "$target_snapshot_file"' EXIT
 
       for source_root in ${backupDatasetArgs}; do
         target_root="backup/$source_root"
@@ -92,13 +96,50 @@ in
         if zfs list -H -o name "$source_root" >/dev/null 2>&1; then
           zfs list -H -o name -r "$source_root" \
             | sed 's#^#backup/#' >> "$expected_file"
+          zfs list -H -t snapshot -o name -r "$source_root" 2>/dev/null \
+            | sed 's#^#backup/#' >> "$expected_snapshot_file" || true
         fi
 
         ssh "$remote" zfs list -H -o name -r "$target_root" 2>/dev/null >> "$target_file" || true
+        ssh "$remote" zfs list -H -t snapshot -o name -r "$target_root" 2>/dev/null >> "$target_snapshot_file" || true
       done
 
       sort -u -o "$expected_file" "$expected_file"
+      sort -u -o "$expected_snapshot_file" "$expected_snapshot_file"
       sort -ur -o "$target_file" "$target_file"
+      sort -u -o "$target_snapshot_file" "$target_snapshot_file"
+
+      while IFS= read -r target_snapshot; do
+        [ -n "$target_snapshot" ] || continue
+
+        target_dataset="''${target_snapshot%@*}"
+        if ! grep -Fxq "$target_dataset" "$expected_file"; then
+          continue
+        fi
+
+        if grep -Fxq "$target_snapshot" "$expected_snapshot_file"; then
+          if [ "$(ssh "$remote" zfs get -H -o value "$stale_snapshot_property" "$target_snapshot" 2>/dev/null || true)" != "-" ]; then
+            echo "Clearing stale snapshot marker on $target_snapshot"
+            ssh "$remote" zfs inherit "$stale_snapshot_property" "$target_snapshot"
+          fi
+          continue
+        fi
+
+        stale_since="$(ssh "$remote" zfs get -H -o value "$stale_snapshot_property" "$target_snapshot" 2>/dev/null || true)"
+        if [ -z "$stale_since" ] || [ "$stale_since" = "-" ]; then
+          echo "Marking stale backup snapshot $target_snapshot"
+          ssh "$remote" zfs set "$stale_snapshot_property=$today" "$target_snapshot"
+          continue
+        fi
+
+        stale_epoch="$(date -u -d "$stale_since" +%s 2>/dev/null || echo 0)"
+        if [ "$stale_epoch" -le "$cutoff_epoch" ]; then
+          echo "Destroying stale backup snapshot $target_snapshot marked since $stale_since"
+          ssh "$remote" zfs destroy "$target_snapshot"
+        else
+          echo "Keeping stale backup snapshot $target_snapshot marked since $stale_since"
+        fi
+      done < "$target_snapshot_file"
 
       while IFS= read -r target_dataset; do
         [ -n "$target_dataset" ] || continue
