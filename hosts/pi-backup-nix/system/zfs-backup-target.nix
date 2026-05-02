@@ -30,7 +30,7 @@
       if zfs list backup >/dev/null 2>&1; then
         for dataset in backup/downloadHDD backup/zpool; do
           if zfs list "$dataset" >/dev/null 2>&1; then
-            zfs set mountpoint=none "$dataset"
+            zfs set -u mountpoint=none "$dataset"
           else
             zfs create -o mountpoint=none "$dataset"
           fi
