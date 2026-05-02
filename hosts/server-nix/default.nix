@@ -62,8 +62,7 @@ in
     "${self}/modules/software/bundles"
     "${self}/modules/software/services/incus.nix"
     "${self}/modules/software/services/incus-declarative.nix"
-    "${self}/modules/software/packages/create-nix-lxc.nix"
-    "${self}/modules/software/packages/rename-nix-lxc.nix"
+    "${self}/modules/software/packages/nixos-factory.nix"
     "${self}/modules/software/packages/incus-sync.nix"
 
   ];
