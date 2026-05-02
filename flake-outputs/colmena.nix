@@ -33,6 +33,30 @@ let
   };
 
   unstablePkgs = import nixpkgs-unstable { localSystem = "x86_64-linux"; };
+  piPkgs = import nixpkgs-stable { localSystem = "aarch64-linux"; };
+
+  mkPiHost = tag: targetHost: {
+    deployment = {
+      targetUser = "root";
+      inherit targetHost;
+    }
+    // (if tag != null then { tags = [ tag ]; } else { });
+    _module.args = {
+      nixvim-input = inputs.nixvim-stable;
+      nixos-raspberrypi = inputs.nixos-raspberrypi;
+    };
+    imports = [
+      {
+        imports = with inputs.nixos-raspberrypi.nixosModules; [
+          raspberry-pi-5.base
+          raspberry-pi-5.page-size-16k
+          raspberry-pi-5.display-vc4
+          sd-image
+        ];
+      }
+      "${self}/hosts/pi-backup-nix"
+    ];
+  };
 
   # For hosts using nixpkgs-unstable (desktop, laptop)
   mkUnstableHost = tag: targetHost: modulePath: {
@@ -65,6 +89,7 @@ in
       nixpkgs = import nixpkgs-stable { localSystem = "x86_64-linux"; };
       specialArgs = sharedArgs;
       nodeNixpkgs = {
+        "pi-backup-nix" = piPkgs;
         "taylor-desktop-nix" = unstablePkgs;
         "taylor-laptop-nix" = unstablePkgs;
       };
@@ -127,5 +152,8 @@ in
         "${self}/hosts/taylor-laptop-nix";
     # --- main server ---
     "server-nix" = mkHost "weekly" "server-nix.lan" "${self}/hosts/server-nix";
+
+    # --- backup target ---
+    "pi-backup-nix" = mkPiHost "weekly" "pi-backup-nix.lan";
   };
 }
