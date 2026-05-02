@@ -134,7 +134,11 @@ json.dump(data, sys.stdout)
       ${pkgs.jq}/bin/jq --arg mode "$configured_mode" '. + { mode: $mode }' "$registry_source" > "$desired"
     fi
 
-    mode=$(${pkgs.jq}/bin/jq -r '.mode' "$desired")
+    if [ -n "''${INCUS_APPLY_MODE:-}" ]; then
+      mode="$INCUS_APPLY_MODE"
+    else
+      mode=$(${pkgs.jq}/bin/jq -r '.mode' "$desired")
+    fi
 
     log() {
       echo "[incus-declarative] $*"

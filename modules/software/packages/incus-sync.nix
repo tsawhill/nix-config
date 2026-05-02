@@ -386,7 +386,7 @@ json.dump(data, sys.stdout)
             $GUM style --foreground 214 "Aborted. No changes made."
             exit 0
           fi
-          incus-declarative-apply
+          INCUS_APPLY_MODE=exact incus-declarative-apply
           $GUM style --foreground 82 --border rounded --padding "1 2" \
             "Push complete. Live Incus state updated from YAML."
         else
