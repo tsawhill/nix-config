@@ -29,6 +29,7 @@ in
     ./system/disks.nix
     ./system/smart-alerts.nix
     ./system/zfs-alerts.nix
+    ./system/zfs-backups.nix
     ./system/zfs-scrub-trim.nix
 
     # Locale
@@ -67,6 +68,7 @@ in
   my.secrets = {
     gotify_token_zfs.enable = true;
     smtp_password_server.enable = true;
+    syncoid_pi_backup.enable = true;
   };
   my.users.taylor = {
     enable = true;

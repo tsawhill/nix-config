@@ -1,0 +1,76 @@
+{ pkgs, ... }:
+
+{
+  boot.supportedFilesystems = [ "zfs" ];
+  boot.zfs.extraPools = [ "backup" ];
+  boot.zfs.devNodes = "/dev/disk/by-id";
+  networking.hostId = "70696261";
+
+  environment.systemPackages = [
+    pkgs.sanoid
+    pkgs.zfs
+  ];
+
+  users.groups.syncoid-recv = { };
+  users.users.syncoid-recv = {
+    isSystemUser = true;
+    group = "syncoid-recv";
+    home = "/var/lib/syncoid-recv";
+    createHome = true;
+    openssh.authorizedKeys.keys = [
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILzjP3mVlVL+E3xxvbE9HT/H47sRxej+fcArYVlo2tV6 syncoid@server-nix-to-pi-backup"
+    ];
+  };
+
+  systemd.services.prepare-zfs-backup-pool = {
+    description = "Prepare backup pool for Syncoid receives";
+    wantedBy = [ "zfs.target" ];
+    after = [ "zfs-import.target" ];
+    serviceConfig.Type = "oneshot";
+    path = [
+      pkgs.coreutils
+      pkgs.zfs
+    ];
+    script = ''
+      if zfs list backup >/dev/null 2>&1; then
+        zfs set mountpoint=none backup
+
+        for dataset in backup/downloadHDD backup/zpool; do
+          if zfs list "$dataset" >/dev/null 2>&1; then
+            zfs set mountpoint=none "$dataset"
+          else
+            zfs create -o mountpoint=none "$dataset"
+          fi
+        done
+
+        for dataset in backup backup/downloadHDD backup/zpool; do
+          zfs allow -u syncoid-recv create,destroy,mount,receive,rollback "$dataset"
+        done
+      fi
+    '';
+  };
+
+  services.zfs.autoScrub = {
+    enable = true;
+    interval = "monthly";
+    pools = [ "backup" ];
+  };
+
+  services.sanoid = {
+    enable = true;
+    interval = "*-*-* 04:00:00";
+    templates.backup-target = {
+      autosnap = false;
+      autoprune = true;
+      hourly = 0;
+      daily = 30;
+      monthly = 12;
+      yearly = 0;
+    };
+    datasets."backup" = {
+      useTemplate = [ "backup-target" ];
+      recursive = "zfs";
+      processChildrenOnly = true;
+    };
+  };
+}

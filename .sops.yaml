@@ -32,6 +32,11 @@ creation_rules:
       - age:
         - *build
         - *laptop
+  - path_regex: modules/secrets/server/syncoid_pi_backup\.yaml$
+    key_groups:
+      - age:
+        - *build
+        - *server
   ##############################################################################
   #
   #                             Samba account credentials
@@ -178,4 +183,3 @@ creation_rules:
         - *build
         - *nextcloud
   
-
