@@ -94,7 +94,7 @@ jellyfin-nix:
   config:
     limits.memory: "16GiB"
   devices:
-    root: { type: "disk", path: "/", pool: "rpool", size: "16GiB" }
+    root: { type: "disk", path: "/", pool: "rpool", size: "32GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/jellyfin-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:92:d7:50" }
 
