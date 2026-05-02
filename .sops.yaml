@@ -28,7 +28,12 @@ creation_rules:
       - age:
         - *build
         - *acme
-  - path_regex: modules/secrets/ssh/client_keys/laptop-nix-taylor\.yaml$
+  - path_regex: modules/secrets/ssh/client_keys/taylor-desktop-nix-taylor\.yaml$
+    key_groups:
+      - age:
+        - *build
+        - *desktop
+  - path_regex: modules/secrets/ssh/client_keys/taylor-laptop-nix-taylor\.yaml$
     key_groups:
       - age:
         - *build

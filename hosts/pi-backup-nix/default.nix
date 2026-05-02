@@ -41,8 +41,8 @@ in
 
     # SSH Access
     "${self}/modules/ssh/openssh.nix"
-    (import "${self}/modules/ssh/pubkeys/desktop-nix-taylor.nix" desktopSSHUsers)
-    (import "${self}/modules/ssh/pubkeys/laptop-nix-taylor.nix" laptopSSHUsers)
+    (import "${self}/modules/ssh/pubkeys/taylor-desktop-nix-taylor.nix" desktopSSHUsers)
+    (import "${self}/modules/ssh/pubkeys/taylor-laptop-nix-taylor.nix" laptopSSHUsers)
     (import "${self}/modules/ssh/pubkeys/server-nix-root.nix" serverSSHUsers)
     (import "${self}/modules/ssh/pubkeys/build-nix-root.nix" buildSSHUsers)
     (import "${self}/modules/ssh/pubkeys/phone-taylor.nix" phoneSSHUsers)

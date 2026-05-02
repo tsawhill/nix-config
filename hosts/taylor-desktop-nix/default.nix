@@ -48,7 +48,7 @@ in
     # SSH Access
     "${self}/modules/ssh/openssh.nix"
     (import "${self}/modules/ssh/pubkeys/build-nix-root.nix" buildSSHUsers)
-    (import "${self}/modules/ssh/pubkeys/laptop-nix-taylor.nix" laptopSSHUsers)
+    (import "${self}/modules/ssh/pubkeys/taylor-laptop-nix-taylor.nix" laptopSSHUsers)
     (import "${self}/modules/ssh/pubkeys/phone-taylor.nix" phoneSSHUsers)
 
     # Software
@@ -87,6 +87,7 @@ in
   software.apps.tools.enable = true;
 
   my.secrets.syncthing.desktop-nix.enable = true;
+  my.secrets.sshclientkey.taylor-desktop-nix-taylor.enable = true;
 
   my.users.taylor = {
     enable = true;
