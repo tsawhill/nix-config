@@ -226,4 +226,4 @@ unifi-nix:
   devices:
     root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/unifi-nix" }
-    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "02:58:6E:62:D3:A8" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "02:B8:7E:D3:5C:C8" }
