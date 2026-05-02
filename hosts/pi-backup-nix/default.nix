@@ -20,6 +20,7 @@ in
 
     # Home Manager
     ./home-manager.nix
+    ./system/disks.nix
     ./system/zfs-backup-target.nix
     # Locale
     "${self}/modules/locale/enUS-pacific.nix"

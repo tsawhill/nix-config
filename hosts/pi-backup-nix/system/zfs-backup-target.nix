@@ -1,11 +1,6 @@
 { pkgs, ... }:
 
 {
-  boot.supportedFilesystems = [ "zfs" ];
-  boot.zfs.extraPools = [ "backup" ];
-  boot.zfs.devNodes = "/dev/disk/by-id";
-  networking.hostId = "70696261";
-
   environment.systemPackages = [
     pkgs.sanoid
     pkgs.zfs
@@ -33,8 +28,6 @@
     ];
     script = ''
       if zfs list backup >/dev/null 2>&1; then
-        zfs set mountpoint=none backup
-
         for dataset in backup/downloadHDD backup/zpool; do
           if zfs list "$dataset" >/dev/null 2>&1; then
             zfs set mountpoint=none "$dataset"
