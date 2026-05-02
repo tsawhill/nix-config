@@ -22,7 +22,7 @@ for line in lines:
     if not skip and stripped == target + ':':
         skip = True
         # Remove preceding blank line
-        if result and result[-1].strip() == '':
+        if result and result[-1].strip() == "":
             result.pop()
         continue
     # End of block: non-indented non-blank line
@@ -32,9 +32,9 @@ for line in lines:
         continue
     result.append(line)
 # Remove trailing blank lines
-while result and result[-1].strip() == '':
+while result and result[-1].strip() == "":
     result.pop()
-result.append('')  # ensure single trailing newline
+result.append("")  # ensure single trailing newline
 with open(sys.argv[2], 'w') as f:
     f.writelines(result)
 " "$TARGET" "$FILE"
