@@ -38,7 +38,7 @@
         done
 
         for dataset in backup backup/VM-Disks backup/downloadHDD backup/downloadSSD backup/rpool backup/zpool; do
-          zfs allow -u syncoid-recv change-key,compression,create,destroy,mount,mountpoint,receive,rollback "$dataset"
+          zfs allow -u syncoid-recv change-key,compression,create,destroy,mount,mountpoint,receive,rollback,userprop "$dataset"
         done
       fi
     '';
