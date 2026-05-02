@@ -158,14 +158,18 @@ let
                 has_changes = True
                 lines.append(f"  {RED}{BOLD}{name}{RESET}{RED} (will be removed){RESET}")
             elif name not in source and name in target:
-                has_changes = True
-                lines.append(f"  {GREEN}{BOLD}{name}{RESET}{GREEN} (will be added){RESET}")
-                t = target[name]
-                desc = t.get("description") or ""
-                if desc:
-                    lines.append(f"    description: {desc}")
-                for dk, dv in (t.get("devices") or {}).items():
-                    lines.append(f"    {GREEN}+ device {dk}: {fmt_device_inline(dv)}{RESET}")
+                if direction == "push":
+                    # On push, YAML-only profiles can't be pushed (they don't exist in runtime yet)
+                    lines.append(f"  {YELLOW}{BOLD}{name}{RESET}{YELLOW} (declared in YAML but not in runtime — skipped){RESET}")
+                else:
+                    has_changes = True
+                    lines.append(f"  {GREEN}{BOLD}{name}{RESET}{GREEN} (will be added){RESET}")
+                    t = target[name]
+                    desc = t.get("description") or ""
+                    if desc:
+                        lines.append(f"    description: {desc}")
+                    for dk, dv in (t.get("devices") or {}).items():
+                        lines.append(f"    {GREEN}+ device {dk}: {fmt_device_inline(dv)}{RESET}")
             else:
                 s, t = source[name], target[name]
                 changes = []
@@ -202,8 +206,12 @@ let
                 has_changes = True
                 lines.append(f"  {RED}{BOLD}{name}{RESET}{RED} (will be removed){RESET}")
             elif name not in source and name in target:
-                has_changes = True
-                lines.append(f"  {GREEN}{BOLD}{name}{RESET}{GREEN} (will be added){RESET}")
+                if direction == "push":
+                    # On push, YAML-only instances can't be pushed (nix-store likely doesn't exist)
+                    lines.append(f"  {YELLOW}{BOLD}{name}{RESET}{YELLOW} (declared in YAML but not running — skipped){RESET}")
+                else:
+                    has_changes = True
+                    lines.append(f"  {GREEN}{BOLD}{name}{RESET}{GREEN} (will be added){RESET}")
             else:
                 s, t = source[name], target[name]
                 changes = []

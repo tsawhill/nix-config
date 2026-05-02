@@ -1,6 +1,45 @@
 { config, pkgs, ... }:
 
 let
+  pythonWithYaml = pkgs.python3.withPackages (ps: [ ps.pyyaml ]);
+
+  # Helper: remove a top-level YAML block by key name from a file.
+  # Operates on raw lines to preserve exact formatting.
+  removeYamlBlock = pkgs.writeShellScript "remove-yaml-block" ''
+    set -euo pipefail
+    TARGET="$1"
+    FILE="$2"
+    ${pythonWithYaml}/bin/python3 -c "
+import sys
+target = sys.argv[1]
+with open(sys.argv[2]) as f:
+    lines = f.readlines()
+result = []
+skip = False
+for line in lines:
+    stripped = line.rstrip()
+    # Match the start of the target block (top-level key)
+    if not skip and stripped == target + ':':
+        skip = True
+        # Remove preceding blank line
+        if result and result[-1].strip() == '':
+            result.pop()
+        continue
+    # End of block: non-indented non-blank line
+    if skip and stripped and not line[0].isspace():
+        skip = False
+    if skip:
+        continue
+    result.append(line)
+# Remove trailing blank lines
+while result and result[-1].strip() == '':
+    result.pop()
+result.append('')  # ensure single trailing newline
+with open(sys.argv[2], 'w') as f:
+    f.writelines(result)
+" "$TARGET" "$FILE"
+  '';
+
   nixosFactoryScript = pkgs.writeShellScriptBin "nixos-factory" ''
     set -e
 
@@ -303,9 +342,8 @@ YAML
     #    4. Double-confirm (defaults to No)
     #    5. Stop if running, delete container
     #    6. Destroy ZFS dataset if opted in
+    #    7. Remove instance from instances.yaml
     #
-    #  NOTE: This does NOT remove the instance from instances.yaml.
-    #  Run incus-sync pull after to update the declarative config.
     # ══════════════════════════════════════════════════════════════
     do_delete() {
       # Build list of all containers for the picker
@@ -370,6 +408,12 @@ YAML
       if [ "$DESTROY_STORE" = true ]; then
         echo "==> Destroying ZFS dataset $NIX_DATASET..."
         sudo zfs destroy -r "$NIX_DATASET"
+      fi
+
+      # Remove from instances.yaml so declarative config stays in sync
+      if grep -q "^$TARGET:" "$INSTANCES_YAML" 2>/dev/null; then
+        echo "==> Removing $TARGET from instances.yaml..."
+        ${removeYamlBlock} "$TARGET" "$INSTANCES_YAML"
       fi
 
       $GUM style --foreground 82 --border rounded --padding "1 2" \
