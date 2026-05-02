@@ -12,6 +12,7 @@
     group = "syncoid-recv";
     home = "/var/lib/syncoid-recv";
     createHome = true;
+    shell = pkgs.bashInteractive;
     openssh.authorizedKeys.keys = [
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILzjP3mVlVL+E3xxvbE9HT/H47sRxej+fcArYVlo2tV6 syncoid@server-nix-to-pi-backup"
     ];
