@@ -78,7 +78,7 @@ in
       set -euo pipefail
 
       ssh_remote="syncoid-recv@pi-backup-nix.lan"
-      ssh_cmd="ssh -i ${config.sops.secrets.syncoid_pi_backup_id_ed25519.path} -o IdentitiesOnly=yes"
+      ssh_cmd="ssh -i ${config.sops.secrets.syncoid_pi_backup_id_ed25519.path} -o BatchMode=yes -o IdentitiesOnly=yes"
       orphan_property="${orphanProperty}"
       stale_snapshot_property="${staleSnapshotProperty}"
       grace_days=${toString orphanGraceDays}
@@ -91,6 +91,9 @@ in
       target_snapshot_file="$(mktemp)"
       trap 'rm -f "$expected_file" "$expected_snapshot_file" "$target_file" "$target_snapshot_file"' EXIT
 
+      $ssh_cmd "$ssh_remote" true
+      $ssh_cmd "$ssh_remote" zfs list -H -o name backup >/dev/null
+
       for source_root in ${backupDatasetArgs}; do
         target_root="backup/$source_root"
 
@@ -101,14 +104,21 @@ in
             | sed 's#^#backup/#' >> "$expected_snapshot_file" || true
         fi
 
-        $ssh_cmd "$ssh_remote" zfs list -H -o name -r "$target_root" 2>/dev/null >> "$target_file" || true
-        $ssh_cmd "$ssh_remote" zfs list -H -t snapshot -o name -r "$target_root" 2>/dev/null >> "$target_snapshot_file" || true
+        if $ssh_cmd "$ssh_remote" zfs list -H -o name "$target_root" >/dev/null 2>&1; then
+          $ssh_cmd "$ssh_remote" zfs list -H -o name -r "$target_root" >> "$target_file"
+          $ssh_cmd "$ssh_remote" zfs list -H -t snapshot -o name -r "$target_root" >> "$target_snapshot_file"
+        fi
       done
 
       sort -u -o "$expected_file" "$expected_file"
       sort -u -o "$expected_snapshot_file" "$expected_snapshot_file"
       sort -ur -o "$target_file" "$target_file"
       sort -u -o "$target_snapshot_file" "$target_snapshot_file"
+
+      echo "Expected backup datasets: $(wc -l < "$expected_file")"
+      echo "Expected backup snapshots: $(wc -l < "$expected_snapshot_file")"
+      echo "Target backup datasets: $(wc -l < "$target_file")"
+      echo "Target backup snapshots: $(wc -l < "$target_snapshot_file")"
 
       while IFS= read -r target_snapshot; do
         [ -n "$target_snapshot" ] || continue
