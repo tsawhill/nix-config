@@ -1,4 +1,9 @@
-{ config, lib, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   wireguard = {
@@ -8,6 +13,7 @@ let
 
     address = "10.50.50.5/32";
     peer = {
+      name = "server";
       publicKey = "***REDACTED_WG_PUBKEY***";
       allowedIPs = [
         "10.73.73.0/24"
@@ -16,10 +22,12 @@ let
       endpoint = "taylordnsfree.zapto.org:51820";
     };
   };
+
+  wireguardTarget = "wireguard-${wireguard.interface}.target";
+  peerService = "wireguard-${wireguard.interface}-peer-${wireguard.peer.name}.service";
 in
 {
   networking.useDHCP = lib.mkDefault true;
-  networking.firewall.checkReversePath = "loose";
 
   networking.wireguard.interfaces = lib.mkIf wireguard.enable {
     ${wireguard.interface} = {
@@ -31,10 +39,36 @@ in
 
       peers = [
         {
-          inherit (wireguard.peer) publicKey allowedIPs endpoint;
+          inherit (wireguard.peer)
+            name
+            publicKey
+            allowedIPs
+            endpoint
+            ;
           persistentKeepalive = 25;
         }
       ];
     };
+  };
+
+  systemd.services."wireguard-${wireguard.interface}-dns" = lib.mkIf wireguard.enable {
+    description = "Prefer VPN DNS when ${wireguard.interface} is active";
+    requires = [ peerService ];
+    after = [ peerService ];
+    wantedBy = [ wireguardTarget ];
+    unitConfig.PartOf = [ wireguardTarget ];
+
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+
+    script = ''
+      printf 'nameserver 10.73.73.6\n' | ${pkgs.openresolv}/sbin/resolvconf -m 0 -x -a ${wireguard.interface}
+    '';
+
+    postStop = ''
+      ${pkgs.openresolv}/sbin/resolvconf -d ${wireguard.interface} || true
+    '';
   };
 }
