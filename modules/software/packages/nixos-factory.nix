@@ -20,6 +20,10 @@ let
 
     UID_GID="100000:100000"
 
+    NIX_CONFIG="/mnt/zpool/code/nix-config"
+    INSTANCES_YAML="$NIX_CONFIG/hosts/server-nix/system/incus/instances.yaml"
+    COLMENA_NIX="$NIX_CONFIG/flake-outputs/colmena.nix"
+
     # --- Splash ---
     clear
     $GUM style --foreground 86 --border-foreground 86 --border double \
@@ -34,8 +38,16 @@ let
       HOSTNAME=$($GUM input --placeholder "Enter the new container hostname")
       if [ -z "$HOSTNAME" ]; then exit 1; fi
 
+      # Verify NixOS config exists in colmena
+      if ! grep -q "\"$HOSTNAME\"" "$COLMENA_NIX"; then
+        $GUM style --foreground 196 --bold "No colmena config found for $HOSTNAME"
+        $GUM style --foreground 214 \
+          "Create a NixOS config at hosts/server-nix/LXCs/ and add a colmena entry first."
+        exit 1
+      fi
+
       if incus info "$HOSTNAME" >/dev/null 2>&1; then
-        $GUM style --foreground 196 "Container $HOSTNAME already exists."
+        $GUM style --foreground 196 "Container $HOSTNAME already exists in Incus."
         exit 1
       fi
 
@@ -50,10 +62,12 @@ let
 
       echo ""
       $GUM style --foreground 86 --bold "Create plan:"
-      echo "  Hostname: $HOSTNAME"
-      echo "  Pool:     $SELECTED_POOL"
-      echo "  MAC:      $MAC_ADDR"
-      echo "  Store:    $NIX_HOST_MOUNT_BASE/$HOSTNAME"
+      echo "  Hostname:  $HOSTNAME"
+      echo "  Pool:      $SELECTED_POOL"
+      echo "  MAC:       $MAC_ADDR"
+      echo "  Store:     $NIX_HOST_MOUNT_BASE/$HOSTNAME"
+      echo "  YAML:      $INSTANCES_YAML (will be updated)"
+      echo "  Deploy:    ssh build-nix.lan deploy $HOSTNAME"
       echo ""
 
       if ! $GUM confirm "Create container?"; then
@@ -82,10 +96,36 @@ let
         fi
       "
 
-      $GUM confirm "Start $HOSTNAME?" && incus start "$HOSTNAME"
+      # Add to instances.yaml
+      echo "==> Adding $HOSTNAME to instances.yaml..."
+      cat >> "$INSTANCES_YAML" <<YAML
+
+$HOSTNAME:
+  type: "container"
+  profiles: ["nixos-lxc"]
+  config: {}
+  devices:
+    root: { type: "disk", path: "/", pool: "$SELECTED_POOL", size: "4GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "$NIX_HOST_MOUNT_BASE/$HOSTNAME" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "$MAC_ADDR" }
+YAML
+
+      echo "==> Starting $HOSTNAME..."
+      incus start "$HOSTNAME"
+
+      echo "==> Waiting for $HOSTNAME to get network..."
+      for i in $(seq 1 30); do
+        if incus exec "$HOSTNAME" -- ping -c1 -W1 build-nix.lan >/dev/null 2>&1; then
+          break
+        fi
+        sleep 1
+      done
+
+      echo "==> Deploying NixOS config via build-nix..."
+      ssh build-nix.lan "deploy $HOSTNAME"
 
       $GUM style --foreground 82 --border rounded --padding "1 2" \
-        "Successfully created $HOSTNAME
+        "Successfully created and deployed $HOSTNAME
     Pool:  $SELECTED_POOL
     MAC:   $MAC_ADDR
     Store: $NIX_HOST_MOUNT_BASE/$HOSTNAME"
