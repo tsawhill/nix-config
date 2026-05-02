@@ -241,10 +241,10 @@ json.dump(data, sys.stdout)
 
       local desired_desc current_desc
       desired_desc=$(json_get "$expr.description // empty")
-      current_desc=$(incus profile show "$profile" | ${pkgs.gnugrep}/bin/grep -oP '^description: \K.*' || true)
+      current_desc=$(incus query "/1.0/profiles/$profile" | ${pkgs.jq}/bin/jq -r '.description // empty')
       if [ -n "$desired_desc" ] && [ "$current_desc" != "$desired_desc" ]; then
-        log "setting profile $profile description"
-        if ! incus profile set "$profile" description="$desired_desc"; then
+        log "setting profile $profile description=$desired_desc"
+        if ! incus query -X PATCH "/1.0/profiles/$profile" -d "$(${pkgs.jq}/bin/jq -nc --arg d "$desired_desc" '{description: $d}')"; then
           warn "failed to set profile $profile description"
         fi
       fi
