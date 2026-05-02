@@ -5,7 +5,7 @@
   boot.zfs.extraPools = [ "backup" ];
   boot.zfs.devNodes = "/dev/disk/by-id";
 
-  networking.hostId = "70696261";
+  networking.hostId = "8425e349";
 
   systemd.services.configure-zfs-datasets = {
     description = "Ensure ZFS datasets have correct mountpoints";
