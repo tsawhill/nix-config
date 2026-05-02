@@ -1,0 +1,216 @@
+OPNSense:
+  type: "virtual-machine"
+  profiles: ["default"]
+  config:
+    boot.autostart: "true"
+    boot.autostart.delay: "5"
+    boot.autostart.priority: "100"
+    limits.cpu: "4"
+    limits.memory: "8GiB"
+    raw.qemu: "-cpu host"
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "16GiB" }
+    lan0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "14:29:0d:71:37:00" }
+    wan0: { type: "nic", nictype: "bridged", parent: "br1", hwaddr: "14:29:0d:71:37:01" }
+
+acme-nix:
+  type: "container"
+  profiles: ["nixos-lxc"]
+  config: {}
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/acme-nix" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:d5:6e:ab" }
+
+adguard-nix:
+  type: "container"
+  profiles: ["nixos-lxc"]
+  config: {}
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/adguard-nix" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:cd:cd:ec" }
+
+arrs-nix:
+  type: "container"
+  profiles: ["nixos-lxc", "media-mount", "downloadHDD-mount", "downloadSSD-mount"]
+  config: {}
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/arrs-nix" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "BC:24:11:59:07:12" }
+
+authentik-nix:
+  type: "container"
+  profiles: ["nixos-lxc"]
+  config: {}
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/authentik-nix" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "8e:95:4f:6e:c7:13" }
+
+build-nix:
+  type: "container"
+  profiles: ["nixos-lxc", "nix-config-mount"]
+  config:
+    limits.cpu: "12"
+    limits.memory: "24GiB"
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/build-nix" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:e1:63:a2" }
+
+deluge-nix:
+  type: "container"
+  profiles: ["nixos-lxc"]
+  config:
+    limits.memory: "8GiB"
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/deluge-nix" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:43:7d:c4" }
+
+gotify-nix:
+  type: "container"
+  profiles: ["nixos-lxc"]
+  config: {}
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/gotify-nix" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:2b:3d:4a" }
+
+immich-nix:
+  type: "container"
+  profiles: ["nixos-lxc"]
+  config: {}
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/immich-nix" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:de:09:b6" }
+
+jellyfin-nix:
+  type: "container"
+  profiles: ["nixos-lxc"]
+  config:
+    limits.memory: "16GiB"
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/jellyfin-nix" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:92:d7:50" }
+
+jellyseerr-nix:
+  type: "container"
+  profiles: ["nixos-lxc"]
+  config: {}
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/jellyseerr-nix" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:23:f8:93" }
+
+llm-nix:
+  type: "container"
+  profiles: ["nixos-lxc"]
+  config: {}
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "32GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/llm-nix" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:40:c1:43" }
+
+local-nginx-nix:
+  type: "container"
+  profiles: ["nixos-lxc"]
+  config: {}
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/local-nginx-nix" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "BC:24:11:42:40:51" }
+
+nextcloud-nix:
+  type: "container"
+  profiles: ["nixos-lxc"]
+  config: {}
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/nextcloud-nix" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:60:3d:cc" }
+
+pufferpanel-nix:
+  type: "container"
+  profiles: ["nixos-lxc"]
+  config:
+    limits.memory: "8GiB"
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/pufferpanel-nix" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:9d:2b:70" }
+
+romm-nix:
+  type: "container"
+  profiles: ["nixos-lxc", "roms-mount"]
+  config: {}
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/romm-nix" }
+
+samba-nix:
+  type: "container"
+  profiles: ["nixos-lxc", "nix-config-mount", "media-mount"]
+  config: {}
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/samba-nix" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:0f:b8:97" }
+
+searx-nix:
+  type: "container"
+  profiles: ["nixos-lxc"]
+  config: {}
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/searx-nix" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "02:FF:B9:66:68:1E" }
+
+socks5-nix:
+  type: "container"
+  profiles: ["nixos-lxc"]
+  config: {}
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/socks5-nix" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:51:dd:4e" }
+
+sunshine-nix:
+  type: "container"
+  profiles: ["nixos-lxc"]
+  config: {}
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/sunshine-nix" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "10:66:6a:90:af:9f" }
+
+syncthing-nix:
+  type: "container"
+  profiles: ["nixos-lxc", "roms-mount", "gamesaves-mount"]
+  config: {}
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/syncthing-nix" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "10:66:6a:aa:e3:ba" }
+
+unbound-vpn-na-nix:
+  type: "container"
+  profiles: ["nixos-lxc"]
+  config: {}
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/unbound-vpn-na-nix" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "a6:1e:69:87:fb:f3" }
+
+vaultwarden-nix:
+  type: "container"
+  profiles: ["nixos-lxc"]
+  config: {}
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/vaultwarden-nix" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:f5:ac:e2" }
