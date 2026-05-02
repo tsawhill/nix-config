@@ -216,8 +216,36 @@ YAML
       # --- Step 6: Deploy NixOS config ---
       # SSH to build-nix (the colmena deployment host) and trigger a deploy.
       # This builds the NixOS config and pushes it to the new container.
+      # If the deploy fails, automatically roll back everything we just created
+      # so the system is left in the same state as before the script ran.
       echo "==> Deploying NixOS config via build-nix..."
-      ssh -i "$FACTORY_SSH_KEY" -o IdentitiesOnly=yes root@build-nix.lan "deploy $HOSTNAME"
+      if ! ssh -i "$FACTORY_SSH_KEY" -o IdentitiesOnly=yes root@build-nix.lan "deploy $HOSTNAME"; then
+        $GUM style --foreground 196 --bold "Deploy failed — rolling back..."
+
+        # Stop the container if it's running
+        if incus info "$HOSTNAME" >/dev/null 2>&1; then
+          echo "==> Stopping $HOSTNAME..."
+          incus stop "$HOSTNAME" --force 2>/dev/null || true
+          echo "==> Deleting container $HOSTNAME..."
+          incus delete "$HOSTNAME" 2>/dev/null || true
+        fi
+
+        # Destroy the ZFS nix store dataset we cloned
+        if zfs list "$NIX_PARENT_DATASET/$HOSTNAME" >/dev/null 2>&1; then
+          echo "==> Destroying ZFS dataset $NIX_PARENT_DATASET/$HOSTNAME..."
+          sudo zfs destroy -r "$NIX_PARENT_DATASET/$HOSTNAME"
+        fi
+
+        # Remove from instances.yaml
+        if grep -q "^$HOSTNAME:" "$INSTANCES_YAML" 2>/dev/null; then
+          echo "==> Removing $HOSTNAME from instances.yaml..."
+          ${removeYamlBlock} "$HOSTNAME" "$INSTANCES_YAML"
+        fi
+
+        $GUM style --foreground 196 --border rounded --padding "1 2" \
+          "Create aborted. All changes rolled back."
+        exit 1
+      fi
 
       $GUM style --foreground 82 --border rounded --padding "1 2" \
         "Successfully created and deployed $HOSTNAME
