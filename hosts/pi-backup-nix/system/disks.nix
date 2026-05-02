@@ -9,12 +9,19 @@
 
   systemd.services.configure-zfs-datasets = {
     description = "Ensure ZFS datasets have correct mountpoints";
-    wantedBy = [ "zfs-mount.service" ];
+    wantedBy = [ "zfs.target" ];
     after = [ "zfs-import.target" ];
-    before = [ "zfs-mount.service" ];
     serviceConfig.Type = "oneshot";
     script = ''
       ${pkgs.zfs}/bin/zfs set mountpoint=/mnt/backup backup
     '';
+  };
+
+  fileSystems."/mnt/backup" = {
+    device = "backup";
+    fsType = "zfs";
+    options = [
+      "nofail"
+    ];
   };
 }
