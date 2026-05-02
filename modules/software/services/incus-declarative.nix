@@ -239,6 +239,16 @@ json.dump(data, sys.stdout)
         fi
       fi
 
+      local desired_desc current_desc
+      desired_desc=$(json_get "$expr.description // empty")
+      current_desc=$(incus profile show "$profile" | ${pkgs.gnugrep}/bin/grep -oP '^description: \K.*' || true)
+      if [ -n "$desired_desc" ] && [ "$current_desc" != "$desired_desc" ]; then
+        log "setting profile $profile description"
+        if ! incus profile set "$profile" description="$desired_desc"; then
+          warn "failed to set profile $profile description"
+        fi
+      fi
+
       local key desired_value current_value
       while IFS= read -r key; do
         desired_value=$(json_get "$expr.config[$(printf '%s' "$key" | ${pkgs.jq}/bin/jq -Rsa .)]")
@@ -424,14 +434,14 @@ json.dump(data, sys.stdout)
           [ -n "$dev" ] || continue
           if ! ${pkgs.jq}/bin/jq -e --arg i "$instance" --arg d "$dev" '.instances[$i].devices | has($d)' "$desired" >/dev/null; then
             if [ "$mode" = "exact" ]; then
-              log "removing undeclared local disk $instance/$dev"
-              incus config device remove "$instance" "$dev" || warn "failed to remove local disk $instance/$dev"
+              log "removing undeclared device $instance/$dev"
+              incus config device remove "$instance" "$dev" || warn "failed to remove device $instance/$dev"
             else
-              warn "$instance has undeclared local disk device $dev"
+              warn "$instance has undeclared local device $dev"
             fi
           fi
         done < <(incus query "/1.0/instances/$instance" \
-          | ${pkgs.jq}/bin/jq -r '.devices | to_entries[] | select(.value.type == "disk" and .key != "root" and .key != "nix-store") | .key')
+          | ${pkgs.jq}/bin/jq -r '.devices | to_entries[] | select(.key != "root" and .key != "nix-store") | .key')
       done < <(json_keys ".instances")
     }
 
