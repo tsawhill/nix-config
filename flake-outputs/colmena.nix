@@ -49,6 +49,9 @@ let
       {
         nixpkgs.hostPlatform = "aarch64-linux";
         imports = with inputs.nixos-raspberrypi.nixosModules; [
+          trusted-nix-caches
+          nixpkgs-rpi
+          inputs.nixos-raspberrypi.lib.inject-overlays
           raspberry-pi-5.base
           raspberry-pi-5.page-size-16k
           raspberry-pi-5.display-vc4
