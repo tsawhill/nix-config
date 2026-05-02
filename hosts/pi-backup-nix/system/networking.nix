@@ -28,6 +28,7 @@ let
 in
 {
   networking.useDHCP = lib.mkDefault true;
+  networking.firewall.checkReversePath = "loose";
 
   networking.wireguard.interfaces = lib.mkIf wireguard.enable {
     ${wireguard.interface} = {
