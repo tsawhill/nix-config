@@ -26,7 +26,8 @@ let
 
     def format_profile(name, profile):
         lines = [f"{name}:"]
-        lines.append(f"  description: {quote(profile.get('description', ''))}")
+        desc = profile.get("description") or ""
+        lines.append(f"  description: {quote(desc)}")
 
         cfg = profile.get("config") or {}
         if not cfg:
