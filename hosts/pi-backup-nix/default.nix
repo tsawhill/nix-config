@@ -17,10 +17,14 @@ in
   networking.hostName = "pi-backup-nix";
   system.stateVersion = "25.11";
   imports = [
+    # Secrets (SOPS)
+    inputs.sops-nix-stable.nixosModules.sops
+    "${self}/modules/secrets"
 
     # Home Manager
     ./home-manager.nix
     ./system/disks.nix
+    ./system/networking.nix
     ./system/zfs-backup-target.nix
     # Locale
     "${self}/modules/locale/enUS-pacific.nix"
@@ -80,6 +84,10 @@ in
       value = 3;
     };
   };
+
+  # Enable after modules/secrets/wireguard/pi-backup-nix.yaml exists and
+  # hosts/pi-backup-nix/system/networking.nix has the real peer settings.
+  # my.secrets.wireguard.pi-backup-nix.enable = true;
 
   my.users.taylor = {
     enable = true;

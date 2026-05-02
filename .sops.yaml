@@ -11,6 +11,7 @@ keys:
   - &romm age1q2hrvl2lx5ckvacn432d8lqshgx5cnm6gt5apr8fywchwn9j7dfsdxwpq0
   - &samba age1v6nlyg65w0uulha8y5usg82yy06yepld7fltt3q4959pqc8fhqvsvwhtrd
   - &searx age1cn9q9fez96w3em99m4m3xw4yr4yysy2tfx0ajsyf5tc03s99jetspxr38l
+  - &pi_backup age1yr4z8se806dmsgn89r9ekq8pc25pfu36xyrrmrly8lnaergt0cjs07jhrw
 
 creation_rules:
   ##############################################################################
@@ -37,6 +38,16 @@ creation_rules:
       - age:
         - *build
         - *server
+  ##############################################################################
+  #
+  #                             WireGuard keys
+  #
+  ##############################################################################
+  - path_regex: modules/secrets/wireguard/pi-backup-nix\.yaml$
+    key_groups:
+      - age:
+        - *build
+        - *pi_backup
   ##############################################################################
   #
   #                             Samba account credentials
