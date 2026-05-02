@@ -103,9 +103,9 @@ json.dump(data, sys.stdout)
   applyScript = pkgs.writeShellScript "apply-declarative-incus" ''
     set -uo pipefail
 
-    registry_source=${lib.escapeShellArg registrySource}
-    profiles_source=${lib.escapeShellArg profilesSource}
-    instances_source=${lib.escapeShellArg instancesSource}
+    registry_source=${registrySource}
+    profiles_source=${profilesSource}
+    instances_source=${instancesSource}
     registry_format=${lib.escapeShellArg registryFormat}
     configured_mode=${lib.escapeShellArg cfg.mode}
     desired=$(mktemp)
