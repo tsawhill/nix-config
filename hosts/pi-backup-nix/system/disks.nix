@@ -22,6 +22,7 @@
     fsType = "zfs";
     options = [
       "nofail"
+      "zfsutil"
     ];
   };
 }
