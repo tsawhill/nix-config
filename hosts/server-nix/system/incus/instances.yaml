@@ -87,6 +87,7 @@ immich-nix:
     root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/immich-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:de:09:b6" }
+    gpu-1: { type: "gpu", gputype: "physical", pci: "0000:0b:00.0" }
 
 jellyfin-nix:
   type: "container"
@@ -97,6 +98,7 @@ jellyfin-nix:
     root: { type: "disk", path: "/", pool: "rpool", size: "32GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/jellyfin-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:92:d7:50" }
+    gpu-1: { type: "gpu", gputype: "physical", pci: "0000:0b:00.0" }
 
 jellyseerr-nix:
   type: "container"
@@ -170,13 +172,13 @@ searx-nix:
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/searx-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "02:FF:B9:66:68:1E" }
 
-socks5-nix:
+socks5-vpn-eu-nix:
   type: "container"
   profiles: ["nixos-lxc"]
   config: {}
   devices:
     root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
-    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/socks5-nix" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/socks5-vpn-eu-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:51:dd:4e" }
 
 sunshine-nix:
@@ -214,3 +216,4 @@ vaultwarden-nix:
     root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/vaultwarden-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:f5:ac:e2" }
+

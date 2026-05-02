@@ -24,6 +24,46 @@ nixos-lxc:
       pool: "rpool"
       size: "4GiB"
 
+downloadHDD-mount:
+  description: "Disk passthrough for downloadHDD directory"
+  config: {}
+  devices:
+    downloadHDD:
+      type: "disk"
+      path: "/mnt/downloadHDD"
+      source: "/mnt/downloadHDD"
+      shift: "true"
+
+downloadSSD-mount:
+  description: "Disk passthrough for downloadSSD directory"
+  config: {}
+  devices:
+    downloadSSD:
+      type: "disk"
+      path: "/mnt/downloadSSD"
+      source: "/mnt/downloadSSD"
+      shift: "true"
+
+gamesaves-mount:
+  description: "Disk passthrough for gamesaves directory"
+  config: {}
+  devices:
+    gamesaves:
+      type: "disk"
+      path: "/mnt/zpool/gamesaves"
+      source: "/mnt/zpool/gamesaves"
+      shift: "true"
+
+gameserver-mount:
+  description: "Disk passthrough for gameserver directory"
+  config: {}
+  devices:
+    /mnt/zpool/gameservers:
+      type: "disk"
+      path: "/mnt/zpool/gameservers"
+      source: "/mnt/zpool/gameservers"
+      shift: "true"
+
 media-mount:
   description: "Disk passthrough for media directory"
   config: {}
@@ -54,42 +94,3 @@ roms-mount:
       source: "/mnt/zpool/roms"
       shift: "true"
 
-gamesaves-mount:
-  description: "Disk passthrough for gamesaves directory"
-  config: {}
-  devices:
-    gamesaves:
-      type: "disk"
-      path: "/mnt/zpool/gamesaves"
-      source: "/mnt/zpool/gamesaves"
-      shift: "true"
-
-gameserver-mount:
-  description: "Disk passthrough for gameserver directory"
-  config: {}
-  devices:
-    /mnt/zpool/gameservers:
-      type: "disk"
-      path: "/mnt/zpool/gameservers"
-      source: "/mnt/zpool/gameservers"
-      shift: "true"
-
-downloadHDD-mount:
-  description: "Disk passthrough for downloadHDD directory"
-  config: {}
-  devices:
-    downloadHDD:
-      type: "disk"
-      path: "/mnt/downloadHDD"
-      source: "/mnt/downloadHDD"
-      shift: "true"
-
-downloadSSD-mount:
-  description: "Disk passthrough for downloadSSD directory"
-  config: {}
-  devices:
-    downloadSSD:
-      type: "disk"
-      path: "/mnt/downloadSSD"
-      source: "/mnt/downloadSSD"
-      shift: "true"
