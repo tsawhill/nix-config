@@ -125,6 +125,7 @@ in
 
         target_dataset="''${target_snapshot%@*}"
         if ! grep -Fxq "$target_dataset" "$expected_file"; then
+          echo "Skipping snapshot for orphaned backup dataset $target_snapshot"
           continue
         fi
 
@@ -136,6 +137,7 @@ in
           continue
         fi
 
+        echo "Found stale backup snapshot $target_snapshot"
         stale_since="$($ssh_cmd "$ssh_remote" zfs get -H -o value "$stale_snapshot_property" "$target_snapshot" 2>/dev/null || true)"
         if [ -z "$stale_since" ] || [ "$stale_since" = "-" ]; then
           echo "Marking stale backup snapshot $target_snapshot"
