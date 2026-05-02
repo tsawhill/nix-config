@@ -35,6 +35,7 @@ in
     "${self}/modules/locale/enUS-pacific.nix"
     # Network
     ./system/networking.nix
+    ./system/incus
     # CPU frequency scaling and hardware power settings
     ./system/hardware.nix
 
@@ -60,6 +61,7 @@ in
     # Software
     "${self}/modules/software/bundles"
     "${self}/modules/software/services/incus.nix"
+    "${self}/modules/software/services/incus-declarative.nix"
     "${self}/modules/software/packages/create-nix-lxc.nix"
 
   ];
