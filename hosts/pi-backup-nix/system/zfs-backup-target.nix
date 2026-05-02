@@ -29,7 +29,7 @@
     ];
     script = ''
       if zfs list backup >/dev/null 2>&1; then
-        for dataset in backup/downloadHDD backup/zpool; do
+        for dataset in backup/VM-Disks backup/downloadHDD backup/downloadSSD backup/rpool backup/zpool; do
           if zfs list "$dataset" >/dev/null 2>&1; then
             zfs set -u mountpoint=none "$dataset"
           else
@@ -37,8 +37,8 @@
           fi
         done
 
-        for dataset in backup backup/downloadHDD backup/zpool; do
-          zfs allow -u syncoid-recv create,destroy,mount,receive,rollback "$dataset"
+        for dataset in backup backup/VM-Disks backup/downloadHDD backup/downloadSSD backup/rpool backup/zpool; do
+          zfs allow -u syncoid-recv change-key,compression,create,destroy,mount,mountpoint,receive,rollback "$dataset"
         done
       fi
     '';

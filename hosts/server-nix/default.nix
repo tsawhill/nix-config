@@ -1,5 +1,6 @@
 {
   self,
+  config,
   modulesPath,
   inputs,
   ...
@@ -27,10 +28,8 @@ in
     ./hardware/nvidia.nix
     # Disks and alerts
     ./system/disks.nix
-    ./system/smart-alerts.nix
-    ./system/zfs-alerts.nix
     ./system/zfs-backups.nix
-    ./system/zfs-scrub-trim.nix
+    "${self}/modules/monitoring"
 
     # Locale
     "${self}/modules/locale/enUS-pacific.nix"
@@ -69,6 +68,38 @@ in
     gotify_token_zfs.enable = true;
     smtp_password_server.enable = true;
     syncoid_pi_backup.enable = true;
+  };
+  my.monitoring = {
+    notifications = {
+      recipientEmail = "me@tsawhill.org";
+      smtp = {
+        host = "smtp.purelymail.com";
+        port = 587;
+        user = "server@tsawhill.org";
+        from = "server@tsawhill.org";
+        passwordFile = config.sops.secrets.smtp_password_server.path;
+      };
+      gotify = {
+        url = "https://gotify.tsawhill.org/message";
+        tokenFile = config.sops.secrets.gotify_token_zfs.path;
+      };
+    };
+
+    zfsAlerts = {
+      enable = true;
+      gotifyPriority = 5;
+    };
+
+    smartAlerts = {
+      enable = true;
+      gotifyPriority = 8;
+    };
+
+    zfsMaintenance = {
+      enable = true;
+      scrub.interval = "monthly";
+      trim.interval = "monthly";
+    };
   };
   my.users.taylor = {
     enable = true;
