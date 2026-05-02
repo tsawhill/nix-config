@@ -25,6 +25,8 @@ in
       ips = [ wireguard.address ];
       privateKeyFile = config.sops.secrets.pi_backup_wireguard_private_key.path;
       listenPort = wireguard.listenPort;
+      # Keep VPN routes as fallbacks when the Pi is directly on the same LAN.
+      metric = 50000;
 
       peers = [
         {
