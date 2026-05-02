@@ -117,6 +117,7 @@ llm-nix:
     root: { type: "disk", path: "/", pool: "rpool", size: "32GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/llm-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:40:c1:43" }
+    gpu-1: { type: "gpu", gputype: "physical", pci: "0000:0b:00.0" }
 
 local-nginx-nix:
   type: "container"
