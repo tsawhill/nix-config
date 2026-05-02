@@ -1,6 +1,12 @@
 { config, pkgs, ... }:
 
 let
+  # Source roots to protect. Syncoid receives each source under the same path
+  # beneath the Pi's `backup` pool, e.g. `zpool/code` -> `backup/zpool/code`.
+  #
+  # `rpool` is intentionally split into children. The bare `backup/rpool`
+  # dataset is just a container on the target, and trying to replicate the empty
+  # parent caused Syncoid to refuse the sync once children already existed.
   backupDatasets = [
     "VM-Disks"
     "downloadHDD/nix-stores"
@@ -14,6 +20,8 @@ let
     "zpool/taylor"
   ];
 
+  # Sanoid creates/prunes source snapshots for every configured root and all of
+  # its children.
   mkDatasetConfig = dataset: {
     name = dataset;
     value = {
@@ -22,6 +30,10 @@ let
     };
   };
 
+  # Syncoid sends snapshots to the non-root receiver on pi-backup-nix.
+  # `recvOptions = "u x mountpoint"` keeps received datasets unmounted and
+  # excludes source mountpoint properties, so the backup pool layout stays under
+  # the target host's control.
   mkSyncoidCommand = dataset: {
     name = dataset;
     value = {
@@ -31,12 +43,18 @@ let
     };
   };
 
+  # Target-side cleanup uses ZFS user properties as grace-period markers.
+  # Datasets and snapshots are marked first, then destroyed only after the grace
+  # period if the source side still does not contain them.
   orphanProperty = "org.tsawhill:orphaned-since";
   staleSnapshotProperty = "org.tsawhill:stale-snapshot-since";
   orphanGraceDays = 90;
   backupDatasetArgs = builtins.concatStringsSep " " backupDatasets;
 in
 {
+  # Source-side snapshot policy: daily/monthly retention, no hourly/yearly
+  # snapshots. The Pi has its own Sanoid config that prunes received snapshots
+  # without creating snapshots there.
   services.sanoid = {
     enable = true;
     interval = "*-*-* 01:00:00";
@@ -51,6 +69,7 @@ in
     datasets = builtins.listToAttrs (map mkDatasetConfig backupDatasets);
   };
 
+  # Replication runs after Sanoid has had time to create the day's snapshots.
   services.syncoid = {
     enable = true;
     interval = "*-*-* 03:00:00";
@@ -62,6 +81,9 @@ in
   programs.ssh.knownHosts."pi-backup-nix.lan".publicKey =
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILWyZ/i1VfPZmQphX5HtPsO4DEd0YhHeut7BTTHd8znI";
 
+  # Prune whole target datasets and stale target snapshots that no longer exist
+  # on the source. Dataset deletion is recursive but delayed by 90 days; stale
+  # snapshots get the same 90-day grace period.
   systemd.services.prune-zfs-backup-orphans = {
     description = "Mark and prune orphaned ZFS backup datasets";
     after = [ "network-online.target" ];
@@ -78,6 +100,9 @@ in
       set -euo pipefail
 
       ssh_remote="syncoid-recv@pi-backup-nix.lan"
+      # `ssh -n` matters here: the pruning loops read from temp files, and ssh
+      # can otherwise consume stdin and stop the loop after the first remote
+      # command.
       ssh_cmd="ssh -n -i ${config.sops.secrets.syncoid_pi_backup_id_ed25519.path} -o BatchMode=yes -o IdentitiesOnly=yes"
       orphan_property="${orphanProperty}"
       stale_snapshot_property="${staleSnapshotProperty}"
@@ -95,6 +120,10 @@ in
       $ssh_cmd "$ssh_remote" true
       $ssh_cmd "$ssh_remote" zfs list -H -o name backup >/dev/null
 
+      # Build four sets:
+      # - expected datasets/snapshots from server-nix
+      # - actual datasets/snapshots on pi-backup-nix
+      # The target lists are fetched with the same key/account Syncoid uses.
       for source_root in ${backupDatasetArgs}; do
         target_root="backup/$source_root"
 
@@ -121,6 +150,9 @@ in
       echo "Target backup datasets: $(wc -l < "$target_file")"
       echo "Target backup snapshots: $(wc -l < "$target_snapshot_file")"
 
+      # Stale snapshots are target snapshots missing from the source snapshot
+      # set. Snapshots under orphaned datasets are skipped here because the
+      # dataset orphan pass handles them recursively after its grace period.
       comm -23 "$target_snapshot_file" "$expected_snapshot_file" > "$stale_snapshot_file"
 
       while IFS= read -r target_snapshot; do

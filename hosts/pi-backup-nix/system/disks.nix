@@ -7,6 +7,10 @@
 
   networking.hostId = "8425e349";
 
+  # Keep the backup pool mounted at the host-local mountpoint without forcing a
+  # remount during every activation. `zfs set -u` updates the property without
+  # unmounting `/mnt/backup`, which avoids deploy failures while the pool is in
+  # use.
   systemd.services.configure-zfs-datasets = {
     description = "Ensure ZFS datasets have correct mountpoints";
     wantedBy = [ "zfs.target" ];

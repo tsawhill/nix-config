@@ -5,6 +5,9 @@ let
   notifications = cfg.notifications;
 in
 {
+  # ZFS Event Daemon notifications. ZED invokes `ZED_EMAIL_PROG` with the
+  # subject as argv[1] and the event body on stdin; the wrapper fans that out to
+  # Gotify and SMTP.
   options.my.monitoring.zfsAlerts = {
     enable = lib.mkEnableOption "ZFS ZED monitoring notifications";
 
@@ -19,11 +22,15 @@ in
     services.zfs.zed = {
       enableMail = true;
       settings = {
+        # ZED still requires mail-style settings even though the actual delivery
+        # is handled by the wrapper below.
         ZED_EMAIL_ADDR = [ notifications.smtp.from ];
         ZED_EMAIL_OPTS = "'@SUBJECT@'";
         ZED_NOTIFY_VERBOSE = true;
         ZED_NOTIFY_DATA = true;
 
+        # Keep the generated script self-contained: secrets are read at runtime
+        # from SOPS-managed files, not embedded into the Nix store.
         ZED_EMAIL_PROG = "${pkgs.writeShellScript "zed-notify" ''
           SUBJECT="$1"
           BODY=$(${pkgs.coreutils}/bin/cat)

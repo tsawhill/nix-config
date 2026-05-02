@@ -5,6 +5,9 @@ let
   notifications = cfg.notifications;
 in
 {
+  # SMART daemon notifications. smartd gives the mailer a subject through
+  # `-s <subject>` and writes the message body on stdin; the wrapper sends both
+  # Gotify and SMTP notifications.
   options.my.monitoring.smartAlerts = {
     enable = lib.mkEnableOption "SMART monitoring notifications";
 
@@ -21,6 +24,8 @@ in
       notifications.mail = {
         enable = true;
         recipient = notifications.recipientEmail;
+        # Secrets are read at runtime from SOPS-managed files, keeping tokens
+        # and SMTP passwords out of the Nix store.
         mailer = "${pkgs.writeShellScript "smartd-notify" ''
           if [ "$1" = "-s" ]; then
             SUBJECT="$2"

@@ -67,7 +67,7 @@ in
   my.secrets = {
     gotify_token_zfs.enable = true;
     smtp_password_server.enable = true;
-    syncoid_pi_backup.enable = true;
+    sshclientkey.syncoid-pi-backup.enable = true;
   };
   my.monitoring = {
     notifications = {

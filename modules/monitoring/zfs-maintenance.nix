@@ -4,6 +4,9 @@ let
   cfg = config.my.monitoring.zfsMaintenance;
 in
 {
+  # Scrub/trim policy with host-local knobs. By default we do not hardcode a
+  # pool list, so NixOS/ZFS can apply its normal auto-discovery behavior unless
+  # a host opts into `scrub.pools`.
   options.my.monitoring.zfsMaintenance = {
     enable = lib.mkEnableOption "ZFS scrub and trim maintenance";
 

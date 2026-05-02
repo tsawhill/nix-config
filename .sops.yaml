@@ -32,7 +32,7 @@ creation_rules:
       - age:
         - *build
         - *laptop
-  - path_regex: modules/secrets/server/syncoid_pi_backup\.yaml$
+  - path_regex: modules/secrets/ssh/client_keys/syncoid-pi-backup\.yaml$
     key_groups:
       - age:
         - *build

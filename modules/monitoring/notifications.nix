@@ -5,11 +5,17 @@ let
   notifications = cfg.notifications;
   smtp = notifications.smtp;
   gotify = notifications.gotify;
+
+  # The SMTP account is only needed when at least one alerting feature is
+  # enabled. ZFS maintenance can use this module tree without configuring mail.
   alertsEnabled = cfg.zfsAlerts.enable || cfg.smartAlerts.enable;
 
   secretPathType = with lib.types; nullOr (coercedTo path toString str);
 in
 {
+  # Shared notification settings. Feature modules consume these paths and
+  # addresses, so each host can reuse the same monitoring code with its own
+  # SOPS secrets and delivery endpoints.
   options.my.monitoring.notifications = {
     recipientEmail = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
@@ -83,6 +89,8 @@ in
   };
 
   config = lib.mkIf alertsEnabled {
+    # Fail evaluation early instead of deploying an alerting service that cannot
+    # deliver messages.
     assertions = [
       {
         assertion = notifications.recipientEmail != null;
@@ -110,6 +118,9 @@ in
       }
     ];
 
+    # ZED and smartd both send email through msmtp. Gotify is posted directly by
+    # each feature-specific wrapper script because the priority differs by alert
+    # type.
     programs.msmtp = {
       enable = true;
       accounts.default = {
