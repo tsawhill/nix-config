@@ -4,6 +4,9 @@
     ./base
     "${self}/modules/software/services/rebuild-scripts.nix"
 
+    # Allow server-nix nixos-factory script to SSH in for deploys
+    (import "${self}/modules/ssh/pubkeys/server-nix-factory.nix" [ "root" ])
+
     # Secrets (SOPS)
     inputs.sops-nix-stable.nixosModules.sops
     "${self}/modules/secrets"
@@ -15,7 +18,7 @@
   nix.extraOptions = ''
     !include /run/secrets/github_access_token_public
   '';
-  my.secrets.sshclientkey.build-nix.enable = true;
+  my.secrets.sshclientkey.build-nix-root.enable = true;
   my.secrets.github_access_token_public.enable = true;
   my.groups = {
     code = {

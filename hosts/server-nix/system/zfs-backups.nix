@@ -73,7 +73,7 @@ in
   services.syncoid = {
     enable = true;
     interval = "*-*-* 03:00:00";
-    sshKey = config.sops.secrets.syncoid_pi_backup_id_ed25519.path;
+    sshKey = config.sops.secrets.server_nix_syncoid_id_ed25519.path;
     commonArgs = [ "--no-sync-snap" ];
     commands = builtins.listToAttrs (map mkSyncoidCommand backupDatasets);
   };
@@ -103,7 +103,7 @@ in
       # `ssh -n` matters here: the pruning loops read from temp files, and ssh
       # can otherwise consume stdin and stop the loop after the first remote
       # command.
-      ssh_cmd="ssh -n -i ${config.sops.secrets.syncoid_pi_backup_id_ed25519.path} -o BatchMode=yes -o IdentitiesOnly=yes"
+      ssh_cmd="ssh -n -i ${config.sops.secrets.server_nix_syncoid_id_ed25519.path} -o BatchMode=yes -o IdentitiesOnly=yes"
       orphan_property="${orphanProperty}"
       stale_snapshot_property="${staleSnapshotProperty}"
       grace_days=${toString orphanGraceDays}

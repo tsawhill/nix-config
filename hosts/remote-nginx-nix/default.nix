@@ -41,11 +41,11 @@ in
 
     # SSH Access
     "${self}/modules/ssh/openssh.nix"
-    (import "${self}/modules/ssh/keys/desktop.nix" desktopSSHUsers)
-    (import "${self}/modules/ssh/keys/laptop.nix" laptopSSHUsers)
-    (import "${self}/modules/ssh/keys/build.nix" buildSSHUsers)
-    (import "${self}/modules/ssh/keys/phone.nix" phoneSSHUsers)
-    (import "${self}/modules/ssh/keys/acme.nix" acmeSSHUsers)
+    (import "${self}/modules/ssh/pubkeys/desktop-nix-taylor.nix" desktopSSHUsers)
+    (import "${self}/modules/ssh/pubkeys/laptop-nix-taylor.nix" laptopSSHUsers)
+    (import "${self}/modules/ssh/pubkeys/build-nix-root.nix" buildSSHUsers)
+    (import "${self}/modules/ssh/pubkeys/phone-taylor.nix" phoneSSHUsers)
+    (import "${self}/modules/ssh/pubkeys/acme-nix-root.nix" acmeSSHUsers)
 
     # Software
     "${self}/modules/software/bundles"

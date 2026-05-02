@@ -46,9 +46,9 @@ in
 
     # SSH Access
     "${self}/modules/ssh/openssh.nix"
-    (import "${self}/modules/ssh/keys/desktop.nix" desktopSSHUsers)
-    (import "${self}/modules/ssh/keys/build.nix" buildSSHUsers)
-    (import "${self}/modules/ssh/keys/phone.nix" phoneSSHUsers)
+    (import "${self}/modules/ssh/pubkeys/desktop-nix-taylor.nix" desktopSSHUsers)
+    (import "${self}/modules/ssh/pubkeys/build-nix-root.nix" buildSSHUsers)
+    (import "${self}/modules/ssh/pubkeys/phone-taylor.nix" phoneSSHUsers)
 
     # Software
     "${self}/modules/software/bundles"
@@ -82,7 +82,7 @@ in
   software.apps.printing.enable = true;
   software.apps.tools.enable = true;
 
-  my.secrets.sshclientkey.laptop-nix.enable = true;
+  my.secrets.sshclientkey.laptop-nix-taylor.enable = true;
   my.users.taylor = {
     enable = true;
     extraGroups = [

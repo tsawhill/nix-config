@@ -5,7 +5,7 @@
     "${self}/modules/software/services/acme.nix"
   ];
   my.secrets = {
-    sshclientkey.acme-nix.enable = true;
+    sshclientkey.acme-nix-root.enable = true;
     acme_env.enable = true;
   };
   networking.hostName = "acme-nix";

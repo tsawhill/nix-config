@@ -19,21 +19,26 @@ creation_rules:
   #                             SSH client keys
   #
   ##############################################################################
-  - path_regex: modules/secrets/ssh/client_keys/build-nix\.yaml$
+  - path_regex: modules/secrets/ssh/client_keys/build-nix-root\.yaml$
     key_groups:
       - age:
         - *build
-  - path_regex: modules/secrets/ssh/client_keys/acme-nix\.yaml$
+  - path_regex: modules/secrets/ssh/client_keys/acme-nix-root\.yaml$
     key_groups:
       - age:
         - *build
         - *acme
-  - path_regex: modules/secrets/ssh/client_keys/laptop-nix\.yaml$
+  - path_regex: modules/secrets/ssh/client_keys/laptop-nix-taylor\.yaml$
     key_groups:
       - age:
         - *build
         - *laptop
-  - path_regex: modules/secrets/ssh/client_keys/syncoid-pi-backup\.yaml$
+  - path_regex: modules/secrets/ssh/client_keys/server-nix-syncoid\.yaml$
+    key_groups:
+      - age:
+        - *build
+        - *server
+  - path_regex: modules/secrets/ssh/client_keys/server-nix-factory\.yaml$
     key_groups:
       - age:
         - *build

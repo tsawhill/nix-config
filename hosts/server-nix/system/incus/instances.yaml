@@ -217,3 +217,12 @@ vaultwarden-nix:
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/vaultwarden-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:f5:ac:e2" }
 
+
+unifi-nix:
+  type: "container"
+  profiles: ["nixos-lxc"]
+  config: {}
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/unifi-nix" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:50:c5:51" }
