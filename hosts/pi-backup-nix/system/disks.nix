@@ -13,7 +13,9 @@
     after = [ "zfs-import.target" ];
     serviceConfig.Type = "oneshot";
     script = ''
-      ${pkgs.zfs}/bin/zfs set mountpoint=/mnt/backup backup
+      if [ "$(${pkgs.zfs}/bin/zfs get -H -o value mountpoint backup)" != "/mnt/backup" ]; then
+        ${pkgs.zfs}/bin/zfs set -u mountpoint=/mnt/backup backup
+      fi
     '';
   };
 
