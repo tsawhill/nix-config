@@ -89,7 +89,8 @@ in
       expected_snapshot_file="$(mktemp)"
       target_file="$(mktemp)"
       target_snapshot_file="$(mktemp)"
-      trap 'rm -f "$expected_file" "$expected_snapshot_file" "$target_file" "$target_snapshot_file"' EXIT
+      stale_snapshot_file="$(mktemp)"
+      trap 'rm -f "$expected_file" "$expected_snapshot_file" "$target_file" "$target_snapshot_file" "$stale_snapshot_file"' EXIT
 
       $ssh_cmd "$ssh_remote" true
       $ssh_cmd "$ssh_remote" zfs list -H -o name backup >/dev/null
@@ -138,6 +139,8 @@ in
         echo "Debug $debug_snapshot: target snapshot missing"
       fi
 
+      comm -23 "$target_snapshot_file" "$expected_snapshot_file" > "$stale_snapshot_file"
+
       while IFS= read -r target_snapshot; do
         [ -n "$target_snapshot" ] || continue
 
@@ -170,7 +173,7 @@ in
         else
           echo "Keeping stale backup snapshot $target_snapshot marked since $stale_since"
         fi
-      done < "$target_snapshot_file"
+      done < "$stale_snapshot_file"
 
       while IFS= read -r target_dataset; do
         [ -n "$target_dataset" ] || continue
