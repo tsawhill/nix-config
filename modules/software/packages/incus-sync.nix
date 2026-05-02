@@ -157,8 +157,8 @@ let
     FIGLET="${pkgs.figlet}/bin/figlet"
     DIFF="${pkgs.diffutils}/bin/diff"
 
-    PROFILES_YAML="/mnt/nix-config/hosts/server-nix/system/incus/profiles.yaml"
-    INSTANCES_YAML="/mnt/nix-config/hosts/server-nix/system/incus/instances.yaml"
+    PROFILES_YAML="/mnt/zpool/code/nix-config/hosts/server-nix/system/incus/profiles.yaml"
+    INSTANCES_YAML="/mnt/zpool/code/nix-config/hosts/server-nix/system/incus/instances.yaml"
 
     WORKDIR=$(mktemp -d)
     trap 'rm -rf "$WORKDIR"' EXIT
