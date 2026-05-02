@@ -85,9 +85,7 @@ in
     };
   };
 
-  # Enable after modules/secrets/wireguard/pi-backup-nix.yaml exists and
-  # hosts/pi-backup-nix/system/networking.nix has the real peer settings.
-  # my.secrets.wireguard.pi-backup-nix.enable = true;
+  my.secrets.wireguard.pi-backup-nix.enable = true;
 
   my.users.taylor = {
     enable = true;

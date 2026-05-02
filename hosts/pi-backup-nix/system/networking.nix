@@ -2,7 +2,7 @@
 
 let
   wireguard = {
-    enable = false;
+    enable = true;
     interface = "wg0";
     listenPort = 51820;
 
