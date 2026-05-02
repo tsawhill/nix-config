@@ -78,7 +78,7 @@ in
       set -euo pipefail
 
       ssh_remote="syncoid-recv@pi-backup-nix.lan"
-      ssh_cmd="ssh -i ${config.sops.secrets.syncoid_pi_backup_id_ed25519.path} -o BatchMode=yes -o IdentitiesOnly=yes"
+      ssh_cmd="ssh -n -i ${config.sops.secrets.syncoid_pi_backup_id_ed25519.path} -o BatchMode=yes -o IdentitiesOnly=yes"
       orphan_property="${orphanProperty}"
       stale_snapshot_property="${staleSnapshotProperty}"
       grace_days=${toString orphanGraceDays}
@@ -121,24 +121,6 @@ in
       echo "Target backup datasets: $(wc -l < "$target_file")"
       echo "Target backup snapshots: $(wc -l < "$target_snapshot_file")"
 
-      debug_snapshot="backup/zpool/immich@idiot"
-      debug_dataset="''${debug_snapshot%@*}"
-      if grep -Fxq "$debug_dataset" "$expected_file"; then
-        echo "Debug $debug_dataset: source dataset present"
-      else
-        echo "Debug $debug_dataset: source dataset missing"
-      fi
-      if grep -Fxq "$debug_snapshot" "$expected_snapshot_file"; then
-        echo "Debug $debug_snapshot: source snapshot present"
-      else
-        echo "Debug $debug_snapshot: source snapshot missing"
-      fi
-      if grep -Fxq "$debug_snapshot" "$target_snapshot_file"; then
-        echo "Debug $debug_snapshot: target snapshot present"
-      else
-        echo "Debug $debug_snapshot: target snapshot missing"
-      fi
-
       comm -23 "$target_snapshot_file" "$expected_snapshot_file" > "$stale_snapshot_file"
 
       while IFS= read -r target_snapshot; do
@@ -147,14 +129,6 @@ in
         target_dataset="''${target_snapshot%@*}"
         if ! grep -Fxq "$target_dataset" "$expected_file"; then
           echo "Skipping snapshot for orphaned backup dataset $target_snapshot"
-          continue
-        fi
-
-        if grep -Fxq "$target_snapshot" "$expected_snapshot_file"; then
-          if [ "$($ssh_cmd "$ssh_remote" zfs get -H -o value "$stale_snapshot_property" "$target_snapshot" 2>/dev/null || true)" != "-" ]; then
-            echo "Clearing stale snapshot marker on $target_snapshot"
-            $ssh_cmd "$ssh_remote" zfs inherit "$stale_snapshot_property" "$target_snapshot"
-          fi
           continue
         fi
 
