@@ -23,6 +23,7 @@ keys:
   - &nextcloud-nix age10gc54yhyn8slfrt9t3hzvz2ufmwf2cglftzn5cced0jmzmtpguaqey0amv
   - &searx-nix age1cn9q9fez96w3em99m4m3xw4yr4yysy2tfx0ajsyf5tc03s99jetspxr38l
   - &socks5-vpn-eu-nix age10cx3x3mre7vmt6heg7ht4nzfgc5z3dtewzak8l0ejptkzguu8geq2pmndq
+  - &sunshine-nix age12vuv2sk24jv233acn93dc3700pnz4t4pqjt2dq3fvhtpy4ykz45sgu3qla
   - &unbound-vpn-na-nix age1hnf6xl9jtkeegvfn4rnkeycm0n556u4dr7n2nyshcl4fhhp285zq3atcvc
   - &vaultwarden-nix age1zkl8mjh7lfugphlt98dwtcd49tx3s6zwt8mf9zr66gd8eam7g56q9y60y5
 
@@ -34,9 +35,6 @@ keys:
   - &romm-nix age1q2hrvl2lx5ckvacn432d8lqshgx5cnm6gt5apr8fywchwn9j7dfsdxwpq0
   - &samba-nix age1v6nlyg65w0uulha8y5usg82yy06yepld7fltt3q4959pqc8fhqvsvwhtrd
   - &syncthing-nix age108wu5u8xmx3r8nehyj75vlue5hg4v6zr2rhur463r2kdszal9yjsfl02uf
-
-# Weekly services
-  - &sunshine-nix age12vuv2sk24jv233acn93dc3700pnz4t4pqjt2dq3fvhtpy4ykz45sgu3qla
 
 creation_rules:
   ##############################################################################

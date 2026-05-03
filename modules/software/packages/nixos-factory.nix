@@ -117,10 +117,10 @@ let
     import sys
 
     SECTION_BY_TAG = {
-        "self": "# Core hosts",
-        "daily": "# Daily services",
-        "weekly": "# Weekly services",
-        "monthly": "# Monthly services",
+        "self": "  # Core hosts",
+        "daily": "  # Daily services",
+        "weekly": "  # Weekly services",
+        "monthly": "  # Monthly services",
     }
 
     def read_lines(path):
@@ -163,7 +163,7 @@ let
                 start = idx + 1
                 end = creation_start
                 for section_end in range(start, creation_start):
-                    if lines[section_end].startswith("# "):
+                    if lines[section_end].lstrip().startswith("# "):
                         end = section_end
                         break
                 return start, end
@@ -177,7 +177,7 @@ let
         return insert_at + len(block), insert_at + len(block)
 
     def upsert(path, host, recipient, tag):
-        header = SECTION_BY_TAG.get(tag, "# Factory-managed hosts")
+        header = SECTION_BY_TAG.get(tag, "  # Factory-managed hosts")
         lines = without_key(read_lines(path), host)
         keys_start, creation_start = keys_bounds(lines)
         start, end = section_bounds(lines, keys_start, creation_start, header)
