@@ -14,6 +14,7 @@ let
     "rpool/VMDisks"
     "rpool/home"
     "rpool/root"
+    "zpool/gamesaves"
     "zpool/immich"
     "zpool/nextcloud"
     "zpool/code"
