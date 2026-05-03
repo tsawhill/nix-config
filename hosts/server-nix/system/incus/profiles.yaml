@@ -74,6 +74,16 @@ media-mount:
       source: "/mnt/zpool/media"
       shift: "true"
 
+nextcloud-mount:
+  description: "Disk passthrough for nextcloud directory"
+  config: {}
+  devices:
+    /mnt/zpool/nextcloud:
+      type: "disk"
+      path: "/mnt/zpool/nextcloud"
+      source: "/mnt/zpool/nextcloud"
+      shift: "true"
+
 nix-config-mount:
   description: "Disk passthrough for nixos config directory"
   config: {}

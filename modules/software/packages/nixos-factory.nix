@@ -3,6 +3,112 @@
 let
   pythonWithYaml = pkgs.python3.withPackages (ps: [ ps.pyyaml ]);
 
+  knownHostsManager = pkgs.writeText "known-hosts-manager.py" ''
+    import sys
+
+    SECTION_BY_TAG = {
+        "self": "# Core hosts",
+        "daily": "# Daily services",
+        "weekly": "# Weekly services",
+        "monthly": "# Monthly services",
+    }
+
+    def read_lines(path):
+        try:
+            with open(path) as f:
+                return f.readlines()
+        except FileNotFoundError:
+            return []
+
+    def write_lines(path, lines):
+        while lines and not lines[-1].strip():
+            lines.pop()
+        lines.append("\n")
+        with open(path, "w") as f:
+            f.writelines(lines)
+
+    def without_host(lines, host):
+        result = []
+        for line in lines:
+            stripped = line.strip()
+            if stripped and not stripped.startswith("#") and stripped.split()[0] == host:
+                continue
+            result.append(line)
+        return result
+
+    def section_bounds(lines, header):
+        try:
+            start = lines.index(header + "\n")
+        except ValueError:
+            if lines and lines[-1].strip():
+                lines.append("\n")
+            lines.append(header + "\n")
+            return len(lines), len(lines)
+
+        end = len(lines)
+        for idx in range(start + 1, len(lines)):
+            if lines[idx].startswith("# "):
+                end = idx
+                break
+        return start + 1, end
+
+    def upsert(path, host, key_line, tag):
+        header = SECTION_BY_TAG.get(tag, "# Factory-managed hosts")
+        lines = without_host(read_lines(path), host)
+        start, end = section_bounds(lines, header)
+        before = lines[:start]
+        section = [
+            line for line in lines[start:end]
+            if line.strip() and not line.startswith("#")
+        ]
+        after = lines[end:]
+        while after and not after[0].strip():
+            after.pop(0)
+
+        section.append(key_line.rstrip() + "\n")
+        section = sorted(section, key=lambda line: line.split()[0])
+
+        new_lines = before + section
+        if after:
+            new_lines.append("\n")
+        new_lines.extend(after)
+        write_lines(path, new_lines)
+
+    def remove(path, host):
+        write_lines(path, without_host(read_lines(path), host))
+
+    action = sys.argv[1]
+    if action == "upsert":
+        upsert(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
+    elif action == "remove":
+        remove(sys.argv[2], sys.argv[3])
+    else:
+        raise SystemExit(f"unknown action: {action}")
+  '';
+
+  colmenaTagReader = pkgs.writeText "colmena-tag-reader.py" ''
+    import re
+    import sys
+
+    path, host = sys.argv[1], sys.argv[2]
+    with open(path) as f:
+        lines = f.readlines()
+
+    for idx, line in enumerate(lines):
+        if f'"{host}"' not in line or "=" not in line:
+            continue
+
+        block = "".join(lines[idx:idx + 6])
+        match = re.search(r'mk(?:Unstable)?Host\s+"([^"]+)"', block)
+        if match is None:
+            match = re.search(r'mkPiHost\s+"([^"]+)"', block)
+        if match is not None:
+            print(match.group(1))
+            raise SystemExit(0)
+
+    print("weekly")
+  '';
+
   # Helper: remove a top-level YAML block by key name from a file.
   # Operates on raw lines to preserve exact formatting.
   removeYamlBlock = pkgs.writeShellScript "remove-yaml-block" ''
@@ -70,13 +176,59 @@ with open(sys.argv[2], 'w') as f:
     # (security.idmap.base = 100000 in the nixos-lxc profile).
     UID_GID="100000:100000"
 
-    # SSH key for factory → build-nix deploys (managed by sops)
-    FACTORY_SSH_KEY="/run/secrets/server_nix_factory_id_ed25519"
-
     # --- Nix config repo paths (on server-nix) ---
     NIX_CONFIG="/mnt/zpool/code/nix-config"
     INSTANCES_YAML="$NIX_CONFIG/hosts/server-nix/system/incus/instances.yaml"
     COLMENA_NIX="$NIX_CONFIG/flake-outputs/colmena.nix"
+    KNOWN_HOSTS_FILE="$NIX_CONFIG/modules/ssh/known_hosts"
+
+    validate_hostname() {
+      if [[ ! "$1" =~ ^[A-Za-z0-9][A-Za-z0-9-]*$ ]]; then
+        $GUM style --foreground 196 --bold "Invalid hostname: $1"
+        exit 1
+      fi
+    }
+
+    colmena_tag_for_host() {
+      ${pythonWithYaml}/bin/python3 ${colmenaTagReader} "$COLMENA_NIX" "$1"
+    }
+
+    add_known_host() {
+      host="$1"
+      host_lan="$host.lan"
+      tag=$(colmena_tag_for_host "$host")
+
+      key_line=$(${pkgs.openssh}/bin/ssh-keyscan -T 10 -t ed25519 "$host_lan" 2>/dev/null \
+        | grep -E "^$host_lan[[:space:]]+ssh-ed25519[[:space:]]" \
+        | head -n1 || true)
+
+      if [ -z "$key_line" ]; then
+        $GUM style --foreground 196 --bold "Could not scan Ed25519 host key for $host_lan"
+        return 1
+      fi
+
+      ${pythonWithYaml}/bin/python3 ${knownHostsManager} upsert \
+        "$KNOWN_HOSTS_FILE" "$host_lan" "$key_line" "$tag"
+      ${pkgs.openssh}/bin/ssh-keygen -l -f "$KNOWN_HOSTS_FILE" >/dev/null
+      echo "==> Added $host_lan to known_hosts ($tag)"
+    }
+
+    remove_known_host() {
+      host="$1"
+      ${pythonWithYaml}/bin/python3 ${knownHostsManager} remove \
+        "$KNOWN_HOSTS_FILE" "$host.lan"
+      ${pkgs.openssh}/bin/ssh-keygen -l -f "$KNOWN_HOSTS_FILE" >/dev/null
+      echo "==> Removed $host.lan from known_hosts"
+    }
+
+    deploy_build_nix() {
+      incus exec build-nix -- deploy build-nix
+    }
+
+    deploy_from_build_nix() {
+      host="$1"
+      incus exec build-nix -- deploy "$host"
+    }
 
     # ── Splash screen ─────────────────────────────────────────────
     clear
@@ -99,11 +251,13 @@ with open(sys.argv[2], 'w') as f:
     #    7. Wire up devices (nix-store disk, eth0 NIC)
     #    8. Append instance to instances.yaml (declarative config)
     #    9. Start the container, wait for network
-    #   10. SSH to build-nix and deploy the NixOS config
+    #   10. Trust the new host key and deploy build-nix
+    #   11. Exec into build-nix and deploy the NixOS config
     # ══════════════════════════════════════════════════════════════
     do_create() {
       HOSTNAME=$($GUM input --placeholder "Enter the new container hostname")
       if [ -z "$HOSTNAME" ]; then exit 1; fi
+      validate_hostname "$HOSTNAME"
 
       # --- Pre-flight checks ---
 
@@ -144,7 +298,7 @@ with open(sys.argv[2], 'w') as f:
       echo "  MAC:       $MAC_ADDR"
       echo "  Store:     $NIX_HOST_MOUNT_BASE/$HOSTNAME"
       echo "  YAML:      $INSTANCES_YAML (will be updated)"
-      echo "  Deploy:    ssh build-nix.lan deploy $HOSTNAME"
+      echo "  Deploy:    incus exec build-nix -- deploy $HOSTNAME"
       echo ""
 
       if ! $GUM confirm "Create container?"; then
@@ -213,14 +367,70 @@ YAML
         sleep 1
       done
 
-      # --- Step 6: Deploy NixOS config ---
-      # SSH to build-nix (the colmena deployment host) and trigger a deploy.
+      # --- Step 6: Trust the new host from build-nix before deployment ---
+      # Colmena runs from build-nix. The new container's host key must be in
+      # the repo-level known_hosts and applied to build-nix before build-nix
+      # can SSH to the target non-interactively.
+      echo "==> Adding $HOSTNAME.lan to known_hosts..."
+      if ! add_known_host "$HOSTNAME"; then
+        $GUM style --foreground 196 --bold "Host key scan failed — rolling back..."
+
+        if incus info "$HOSTNAME" >/dev/null 2>&1; then
+          echo "==> Stopping $HOSTNAME..."
+          incus stop "$HOSTNAME" --force 2>/dev/null || true
+          echo "==> Deleting container $HOSTNAME..."
+          incus delete "$HOSTNAME" 2>/dev/null || true
+        fi
+
+        if zfs list "$NIX_PARENT_DATASET/$HOSTNAME" >/dev/null 2>&1; then
+          echo "==> Destroying ZFS dataset $NIX_PARENT_DATASET/$HOSTNAME..."
+          sudo zfs destroy -r "$NIX_PARENT_DATASET/$HOSTNAME"
+        fi
+
+        if grep -q "^$HOSTNAME:" "$INSTANCES_YAML" 2>/dev/null; then
+          echo "==> Removing $HOSTNAME from instances.yaml..."
+          ${removeYamlBlock} "$HOSTNAME" "$INSTANCES_YAML"
+        fi
+
+        exit 1
+      fi
+
+      echo "==> Deploying updated known_hosts to build-nix..."
+      if ! deploy_build_nix; then
+        $GUM style --foreground 196 --bold "build-nix deploy failed — rolling back..."
+
+        remove_known_host "$HOSTNAME" || true
+
+        if incus info "$HOSTNAME" >/dev/null 2>&1; then
+          echo "==> Stopping $HOSTNAME..."
+          incus stop "$HOSTNAME" --force 2>/dev/null || true
+          echo "==> Deleting container $HOSTNAME..."
+          incus delete "$HOSTNAME" 2>/dev/null || true
+        fi
+
+        if zfs list "$NIX_PARENT_DATASET/$HOSTNAME" >/dev/null 2>&1; then
+          echo "==> Destroying ZFS dataset $NIX_PARENT_DATASET/$HOSTNAME..."
+          sudo zfs destroy -r "$NIX_PARENT_DATASET/$HOSTNAME"
+        fi
+
+        if grep -q "^$HOSTNAME:" "$INSTANCES_YAML" 2>/dev/null; then
+          echo "==> Removing $HOSTNAME from instances.yaml..."
+          ${removeYamlBlock} "$HOSTNAME" "$INSTANCES_YAML"
+        fi
+
+        exit 1
+      fi
+
+      # --- Step 7: Deploy NixOS config ---
+      # Exec into build-nix (the colmena deployment host) and trigger a deploy.
       # This builds the NixOS config and pushes it to the new container.
       # If the deploy fails, automatically roll back everything we just created
       # so the system is left in the same state as before the script ran.
       echo "==> Deploying NixOS config via build-nix..."
-      if ! ssh -i "$FACTORY_SSH_KEY" -o IdentitiesOnly=yes root@build-nix.lan "deploy $HOSTNAME"; then
+      if ! deploy_from_build_nix "$HOSTNAME"; then
         $GUM style --foreground 196 --bold "Deploy failed — rolling back..."
+
+        remove_known_host "$HOSTNAME" || true
 
         # Stop the container if it's running
         if incus info "$HOSTNAME" >/dev/null 2>&1; then
@@ -241,6 +451,8 @@ YAML
           echo "==> Removing $HOSTNAME from instances.yaml..."
           ${removeYamlBlock} "$HOSTNAME" "$INSTANCES_YAML"
         fi
+
+        deploy_build_nix || true
 
         $GUM style --foreground 196 --border rounded --padding "1 2" \
           "Create aborted. All changes rolled back."
@@ -284,6 +496,7 @@ YAML
 
       NEW_NAME=$($GUM input --placeholder "Enter the new hostname")
       if [ -z "$NEW_NAME" ]; then exit 1; fi
+      validate_hostname "$NEW_NAME"
 
       if [ "$OLD_NAME" = "$NEW_NAME" ]; then
         $GUM style --foreground 214 "Names are identical. Nothing to do."
@@ -371,6 +584,7 @@ YAML
     #    5. Stop if running, delete container
     #    6. Destroy ZFS dataset if opted in
     #    7. Remove instance from instances.yaml
+    #    8. Remove the global known_hosts entry and deploy build-nix
     #
     # ══════════════════════════════════════════════════════════════
     do_delete() {
@@ -443,6 +657,12 @@ YAML
         echo "==> Removing $TARGET from instances.yaml..."
         ${removeYamlBlock} "$TARGET" "$INSTANCES_YAML"
       fi
+
+      echo "==> Removing $TARGET.lan from known_hosts..."
+      remove_known_host "$TARGET"
+
+      echo "==> Deploying updated known_hosts to build-nix..."
+      deploy_build_nix
 
       $GUM style --foreground 82 --border rounded --padding "1 2" \
         "Deleted $TARGET"

@@ -91,7 +91,7 @@ immich-nix:
 
 jellyfin-nix:
   type: "container"
-  profiles: ["nixos-lxc"]
+  profiles: ["nixos-lxc", "media-mount"]
   config:
     limits.memory: "16GiB"
   devices:
@@ -130,7 +130,7 @@ local-nginx-nix:
 
 nextcloud-nix:
   type: "container"
-  profiles: ["nixos-lxc"]
+  profiles: ["nixos-lxc", "nextcloud-mount", "downloadHDD-mount"]
   config: {}
   devices:
     root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }

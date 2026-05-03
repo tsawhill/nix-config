@@ -43,11 +43,6 @@ creation_rules:
       - age:
         - *build
         - *server
-  - path_regex: modules/secrets/ssh/client_keys/server-nix-factory\.yaml$
-    key_groups:
-      - age:
-        - *build
-        - *server
   ##############################################################################
   #
   #                             WireGuard keys
@@ -203,4 +198,3 @@ creation_rules:
       - age:
         - *build
         - *nextcloud
-  

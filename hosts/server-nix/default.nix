@@ -71,7 +71,6 @@ in
     gotify_token_zfs.enable = true;
     smtp_password_server.enable = true;
     sshclientkey.server-nix-syncoid.enable = true;
-    sshclientkey.server-nix-factory.enable = true;
   };
   my.monitoring = {
     notifications = {
