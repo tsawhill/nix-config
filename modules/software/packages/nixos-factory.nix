@@ -299,9 +299,21 @@ with open(sys.argv[2], 'w') as f:
       ${pythonWithYaml}/bin/python3 ${colmenaTagReader} "$COLMENA_NIX" "$1"
     }
 
-    scan_host_key_line() {
+    host_key_line() {
       host="$1"
       host_lan="$host.lan"
+
+      public_key=$(incus exec "$host" -- sh -c '
+        if [ ! -s /etc/ssh/ssh_host_ed25519_key.pub ]; then
+          ssh-keygen -A >/dev/null 2>&1 || true
+        fi
+        cat /etc/ssh/ssh_host_ed25519_key.pub 2>/dev/null || true
+      ' 2>/dev/null | grep -E "^ssh-ed25519[[:space:]]" | head -n1 || true)
+
+      if [ -n "$public_key" ]; then
+        printf '%s %s\n' "$host_lan" "$public_key"
+        return 0
+      fi
 
       ${pkgs.openssh}/bin/ssh-keyscan -T 10 -t ed25519 "$host_lan" 2>/dev/null \
         | grep -E "^$host_lan[[:space:]]+ssh-ed25519[[:space:]]" \
@@ -313,10 +325,10 @@ with open(sys.argv[2], 'w') as f:
       host_lan="$host.lan"
       tag=$(colmena_tag_for_host "$host")
 
-      key_line=$(scan_host_key_line "$host")
+      key_line=$(host_key_line "$host")
 
       if [ -z "$key_line" ]; then
-        $GUM style --foreground 196 --bold "Could not scan Ed25519 host key for $host_lan"
+        $GUM style --foreground 196 --bold "Could not read or scan Ed25519 host key for $host_lan"
         return 1
       fi
 
@@ -338,10 +350,10 @@ with open(sys.argv[2], 'w') as f:
       host="$1"
       host_lan="$host.lan"
       tag=$(colmena_tag_for_host "$host")
-      key_line=$(scan_host_key_line "$host")
+      key_line=$(host_key_line "$host")
 
       if [ -z "$key_line" ]; then
-        $GUM style --foreground 196 --bold "Could not scan Ed25519 host key for $host_lan"
+        $GUM style --foreground 196 --bold "Could not read or scan Ed25519 host key for $host_lan"
         return 1
       fi
 
