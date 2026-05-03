@@ -181,16 +181,6 @@ socks5-vpn-eu-nix:
     root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/socks5-vpn-eu-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:51:dd:4e" }
-
-sunshine-nix:
-  type: "container"
-  profiles: ["nixos-lxc"]
-  config: {}
-  devices:
-    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
-    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/sunshine-nix" }
-    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "10:66:6a:90:af:9f" }
-
 syncthing-nix:
   type: "container"
   profiles: ["nixos-lxc", "roms-mount", "gamesaves-mount"]
