@@ -35,6 +35,9 @@ keys:
   - &samba-nix age1v6nlyg65w0uulha8y5usg82yy06yepld7fltt3q4959pqc8fhqvsvwhtrd
   - &syncthing-nix age108wu5u8xmx3r8nehyj75vlue5hg4v6zr2rhur463r2kdszal9yjsfl02uf
 
+# Weekly services
+  - &sunshine-nix age12vuv2sk24jv233acn93dc3700pnz4t4pqjt2dq3fvhtpy4ykz45sgu3qla
+
 creation_rules:
   ##############################################################################
   #
