@@ -18,7 +18,6 @@ acme-nix:
   profiles: ["nixos-lxc"]
   config: {}
   devices:
-    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/acme-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:d5:6e:ab" }
 
@@ -27,7 +26,6 @@ adguard-nix:
   profiles: ["nixos-lxc"]
   config: {}
   devices:
-    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/adguard-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:cd:cd:ec" }
 
@@ -36,7 +34,6 @@ arrs-nix:
   profiles: ["nixos-lxc", "media-mount", "downloadHDD-mount", "downloadSSD-mount"]
   config: {}
   devices:
-    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/arrs-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "BC:24:11:59:07:12" }
 
@@ -45,7 +42,6 @@ authentik-nix:
   profiles: ["nixos-lxc"]
   config: {}
   devices:
-    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/authentik-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "8e:95:4f:6e:c7:13" }
 
@@ -56,7 +52,6 @@ build-nix:
     limits.cpu: "12"
     limits.memory: "24GiB"
   devices:
-    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/build-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:e1:63:a2" }
 
@@ -66,7 +61,6 @@ deluge-nix:
   config:
     limits.memory: "8GiB"
   devices:
-    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/deluge-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:43:7d:c4" }
 
@@ -75,7 +69,6 @@ gotify-nix:
   profiles: ["nixos-lxc"]
   config: {}
   devices:
-    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/gotify-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:2b:3d:4a" }
 
@@ -84,7 +77,6 @@ immich-nix:
   profiles: ["nixos-lxc"]
   config: {}
   devices:
-    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/immich-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:de:09:b6" }
     gpu-1: { type: "gpu", gputype: "physical", pci: "0000:0b:00.0" }
@@ -105,7 +97,6 @@ jellyseerr-nix:
   profiles: ["nixos-lxc"]
   config: {}
   devices:
-    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/jellyseerr-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:23:f8:93" }
 
@@ -124,7 +115,6 @@ local-nginx-nix:
   profiles: ["nixos-lxc"]
   config: {}
   devices:
-    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/local-nginx-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "BC:24:11:42:40:51" }
 
@@ -133,7 +123,6 @@ nextcloud-nix:
   profiles: ["nixos-lxc", "nextcloud-mount", "downloadHDD-mount"]
   config: {}
   devices:
-    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/nextcloud-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:60:3d:cc" }
 
@@ -143,7 +132,6 @@ pufferpanel-nix:
   config:
     limits.memory: "8GiB"
   devices:
-    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/pufferpanel-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:9d:2b:70" }
 
@@ -152,7 +140,6 @@ romm-nix:
   profiles: ["nixos-lxc", "roms-mount"]
   config: {}
   devices:
-    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/romm-nix" }
 
 samba-nix:
@@ -160,7 +147,6 @@ samba-nix:
   profiles: ["nixos-lxc", "nix-config-mount", "media-mount"]
   config: {}
   devices:
-    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/samba-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:0f:b8:97" }
 
@@ -169,7 +155,6 @@ searx-nix:
   profiles: ["nixos-lxc"]
   config: {}
   devices:
-    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/searx-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "02:FF:B9:66:68:1E" }
 
@@ -178,7 +163,6 @@ socks5-vpn-eu-nix:
   profiles: ["nixos-lxc"]
   config: {}
   devices:
-    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/socks5-vpn-eu-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:51:dd:4e" }
 syncthing-nix:
@@ -186,7 +170,6 @@ syncthing-nix:
   profiles: ["nixos-lxc", "roms-mount", "gamesaves-mount"]
   config: {}
   devices:
-    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/syncthing-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "10:66:6a:aa:e3:ba" }
 
@@ -195,7 +178,6 @@ unbound-vpn-na-nix:
   profiles: ["nixos-lxc"]
   config: {}
   devices:
-    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/unbound-vpn-na-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "a6:1e:69:87:fb:f3" }
 
@@ -204,16 +186,6 @@ vaultwarden-nix:
   profiles: ["nixos-lxc"]
   config: {}
   devices:
-    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/vaultwarden-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:f5:ac:e2" }
 
-
-sunshine-nix:
-  type: "container"
-  profiles: ["nixos-lxc"]
-  config: {}
-  devices:
-    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
-    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/sunshine-nix" }
-    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "02:7D:DA:73:CC:0D" }
