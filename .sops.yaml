@@ -1,17 +1,39 @@
 keys:
-  - &desktop age1vveuej3d8caxg7ujud55uxhg4k5vj5ra7dj4cn3pp9xmhznjfgkq8jzk6c
-  - &laptop age12av6jq5yyrdljujqsg873q8yv7x39dsnqfz08ht7e0f40ldy753s3n9vaz
-  - &server age1xugzv5l3ks4srsnj0deysuy485wjrpzpjclzjl9qvfd934pw3ycq33sffv
-  - &build age1gn848ezdxgr3s3tf4chg27dprfad9wq3ehstrnz5kkn2js8xk3vqf8d2ex
-  - &acme age1vv402yraaklyrg0k5t4ckvnxy5pgasrdkkffvrjma5um2eespahsp76dqv
-  - &arrs age1sc4raxfl89mlnc4tjy9lny8zt4du59d4f6dmkvwnhlfhzts3s4jsvdd7s2
-  - &authentik age1l266y2z6cu7rg6p3tf5hfgyh5zr09f4e9eake67cgadx3uez55hsf2at7d
-  - &nextcloud age10gc54yhyn8slfrt9t3hzvz2ufmwf2cglftzn5cced0jmzmtpguaqey0amv
-  - &vaultwarden age1zkl8mjh7lfugphlt98dwtcd49tx3s6zwt8mf9zr66gd8eam7g56q9y60y5
-  - &romm age1q2hrvl2lx5ckvacn432d8lqshgx5cnm6gt5apr8fywchwn9j7dfsdxwpq0
-  - &samba age1v6nlyg65w0uulha8y5usg82yy06yepld7fltt3q4959pqc8fhqvsvwhtrd
-  - &searx age1cn9q9fez96w3em99m4m3xw4yr4yysy2tfx0ajsyf5tc03s99jetspxr38l
-  - &pi_backup age1yr4z8se806dmsgn89r9ekq8pc25pfu36xyrrmrly8lnaergt0cjs07jhrw
+  # Core hosts
+  - &build-nix age1gn848ezdxgr3s3tf4chg27dprfad9wq3ehstrnz5kkn2js8xk3vqf8d2ex
+  - &server-nix age1xugzv5l3ks4srsnj0deysuy485wjrpzpjclzjl9qvfd934pw3ycq33sffv
+  - &remote-nginx-nix age14n0d0f9wq38h3qd2ur9rasjpw82rlg6zeyj0kmztrccywr0z332qms98qd
+  - &pi-backup-nix age1yr4z8se806dmsgn89r9ekq8pc25pfu36xyrrmrly8lnaergt0cjs07jhrw
+
+  # Personal machines
+  - &taylor-desktop-nix age1vveuej3d8caxg7ujud55uxhg4k5vj5ra7dj4cn3pp9xmhznjfgkq8jzk6c
+  - &taylor-laptop-nix age12av6jq5yyrdljujqsg873q8yv7x39dsnqfz08ht7e0f40ldy753s3n9vaz
+
+  # Daily services
+  - &local-nginx-nix age16hhtega9xw3qp9xlwf899hy6a7jqgv8cvexpuaf4j72r8n3avcxqvgn9k4
+
+  # Weekly services
+  - &acme-nix age1vv402yraaklyrg0k5t4ckvnxy5pgasrdkkffvrjma5um2eespahsp76dqv
+  - &adguard-nix age1u96ec563v3cth2j7pjkjdj9cza70766uv50nzae9lg3geuxa49tqwqhstp
+  - &arrs-nix age1sc4raxfl89mlnc4tjy9lny8zt4du59d4f6dmkvwnhlfhzts3s4jsvdd7s2
+  - &gotify-nix age14qvg2gfkta6njmctl3cnkytu9spwwkjp8hx5mzcjhn5mjzzd9e4qcayh28
+  - &jellyfin-nix age1ttr947d3e630m9y9hvnpyxxs54rjytnfz52m45j8gvh3nmjnkq0qp6mskn
+  - &jellyseerr-nix age1z49zdj5uxmyhg6vtp77rz0u4kpat3zuvs8e2mergvje4caqxg32sfdtj3e
+  - &llm-nix age1vntw8mh9ncahfksquz4ws0ukucdq3qndftwur7e2z98kfffa2gdqstdkad
+  - &nextcloud-nix age10gc54yhyn8slfrt9t3hzvz2ufmwf2cglftzn5cced0jmzmtpguaqey0amv
+  - &searx-nix age1cn9q9fez96w3em99m4m3xw4yr4yysy2tfx0ajsyf5tc03s99jetspxr38l
+  - &socks5-vpn-eu-nix age10cx3x3mre7vmt6heg7ht4nzfgc5z3dtewzak8l0ejptkzguu8geq2pmndq
+  - &unbound-vpn-na-nix age1hnf6xl9jtkeegvfn4rnkeycm0n556u4dr7n2nyshcl4fhhp285zq3atcvc
+  - &vaultwarden-nix age1zkl8mjh7lfugphlt98dwtcd49tx3s6zwt8mf9zr66gd8eam7g56q9y60y5
+
+  # Monthly services
+  - &authentik-nix age1l266y2z6cu7rg6p3tf5hfgyh5zr09f4e9eake67cgadx3uez55hsf2at7d
+  - &deluge-nix age19ll2lcu9n4lrh4v7r6y8lswurexft6uj47xd7kcyce3y9xcq8fusgf99gx
+  - &immich-nix age1n0hjc0p648e8klkcjds7ffa6mztjpfpzjwvflrcweaagm7m2yvusrlq0wa
+  - &pufferpanel-nix age1awqq8a7sq40uusne7e4uwp74s5vzmpggcvs2ll782ycy2jfuspsqx5x7cy
+  - &romm-nix age1q2hrvl2lx5ckvacn432d8lqshgx5cnm6gt5apr8fywchwn9j7dfsdxwpq0
+  - &samba-nix age1v6nlyg65w0uulha8y5usg82yy06yepld7fltt3q4959pqc8fhqvsvwhtrd
+  - &syncthing-nix age108wu5u8xmx3r8nehyj75vlue5hg4v6zr2rhur463r2kdszal9yjsfl02uf
 
 creation_rules:
   ##############################################################################
@@ -22,27 +44,27 @@ creation_rules:
   - path_regex: modules/secrets/ssh/client_keys/build-nix-root\.yaml$
     key_groups:
       - age:
-        - *build
+        - *build-nix
   - path_regex: modules/secrets/ssh/client_keys/acme-nix-root\.yaml$
     key_groups:
       - age:
-        - *build
-        - *acme
+        - *build-nix
+        - *acme-nix
   - path_regex: modules/secrets/ssh/client_keys/taylor-desktop-nix-taylor\.yaml$
     key_groups:
       - age:
-        - *build
-        - *desktop
+        - *build-nix
+        - *taylor-desktop-nix
   - path_regex: modules/secrets/ssh/client_keys/taylor-laptop-nix-taylor\.yaml$
     key_groups:
       - age:
-        - *build
-        - *laptop
+        - *build-nix
+        - *taylor-laptop-nix
   - path_regex: modules/secrets/ssh/client_keys/server-nix-syncoid\.yaml$
     key_groups:
       - age:
-        - *build
-        - *server
+        - *build-nix
+        - *server-nix
   ##############################################################################
   #
   #                             WireGuard keys
@@ -51,8 +73,8 @@ creation_rules:
   - path_regex: modules/secrets/wireguard/pi-backup-nix\.yaml$
     key_groups:
       - age:
-        - *build
-        - *pi_backup
+        - *build-nix
+        - *pi-backup-nix
   ##############################################################################
   #
   #                             Samba account credentials
@@ -61,9 +83,9 @@ creation_rules:
   - path_regex: modules/secrets/server/LXCs/samba/immobile0783\.yaml$
     key_groups:
       - age:
-        - *build
-        - *samba
-        - *desktop
+        - *build-nix
+        - *samba-nix
+        - *taylor-desktop-nix
   ##############################################################################
   #
   #                             Gotify tokens
@@ -72,8 +94,8 @@ creation_rules:
   - path_regex: modules/secrets/server/LXCs/gotify_token_zfs\.yaml$
     key_groups:
       - age:
-        - *build
-        - *server
+        - *build-nix
+        - *server-nix
   ##############################################################################
   #
   #                             Github access token
@@ -82,7 +104,7 @@ creation_rules:
   - path_regex: modules/secrets/github_access_token_public\.yaml$
     key_groups:
       - age:
-        - *build
+        - *build-nix
   ##############################################################################
   #
   #                             SMTP passwords
@@ -96,8 +118,8 @@ creation_rules:
   - path_regex: modules/secrets/syncthing/desktop-nix\.yaml$
     key_groups:
       - age:
-        - *build
-        - *desktop
+        - *build-nix
+        - *taylor-desktop-nix
   ##############################################################################
   #
   #                             SMTP passwords
@@ -106,8 +128,8 @@ creation_rules:
   - path_regex: modules/secrets/smtp/smtp_password_server\.yaml$
     key_groups:
       - age:
-        - *build
-        - *server
+        - *build-nix
+        - *server-nix
   ##############################################################################
   #
   #                             arr API keys
@@ -116,23 +138,23 @@ creation_rules:
   - path_regex: modules/secrets/server/LXCs/radarr_api_key\.yaml$
     key_groups:
       - age:
-        - *build
-        - *arrs
+        - *build-nix
+        - *arrs-nix
   - path_regex: modules/secrets/server/LXCs/sonarr_api_key\.yaml$
     key_groups:
       - age:
-        - *build
-        - *arrs
+        - *build-nix
+        - *arrs-nix
   - path_regex: modules/secrets/server/LXCs/lidarr_api_key\.yaml$
     key_groups:
       - age:
-        - *build
-        - *arrs
+        - *build-nix
+        - *arrs-nix
   - path_regex: modules/secrets/server/LXCs/prowlarr_api_key\.yaml$
     key_groups:
       - age:
-        - *build
-        - *arrs
+        - *build-nix
+        - *arrs-nix
   ##############################################################################
   #
   #                             Authentik env file
@@ -141,13 +163,13 @@ creation_rules:
   - path_regex: modules/secrets/server/LXCs/authentik_env\.yaml$
     key_groups:
       - age:
-        - *build
-        - *authentik
+        - *build-nix
+        - *authentik-nix
   - path_regex: modules/secrets/server/LXCs/authentik_ldap_outpost\.yaml$
     key_groups:
       - age:
-        - *build
-        - *authentik
+        - *build-nix
+        - *authentik-nix
   ##############################################################################
   #
   #                             acme env file
@@ -156,8 +178,8 @@ creation_rules:
   - path_regex: modules/secrets/server/LXCs/acme_env\.yaml$
     key_groups:
       - age:
-        - *build
-        - *acme
+        - *build-nix
+        - *acme-nix
   ##############################################################################
   #
   #                             vaultwarden env file
@@ -166,8 +188,8 @@ creation_rules:
   - path_regex: modules/secrets/server/LXCs/vaultwarden_env\.yaml$
     key_groups:
       - age:
-        - *build
-        - *vaultwarden
+        - *build-nix
+        - *vaultwarden-nix
   ##############################################################################
   #
   #                             romm env file
@@ -176,8 +198,8 @@ creation_rules:
   - path_regex: modules/secrets/server/LXCs/romm_env\.yaml$
     key_groups:
       - age:
-        - *build
-        - *romm
+        - *build-nix
+        - *romm-nix
   ##############################################################################
   #
   #                             Searx secret key
@@ -186,8 +208,8 @@ creation_rules:
   - path_regex: modules/secrets/server/LXCs/searx_secret_key\.yaml$
     key_groups:
       - age:
-        - *build
-        - *searx
+        - *build-nix
+        - *searx-nix
   ##############################################################################
   #
   #                             Nextcloud admin pass
@@ -196,5 +218,5 @@ creation_rules:
   - path_regex: modules/secrets/server/LXCs/nextcloud_admin_pass\.yaml$
     key_groups:
       - age:
-        - *build
-        - *nextcloud
+        - *build-nix
+        - *nextcloud-nix

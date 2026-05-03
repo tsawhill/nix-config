@@ -109,6 +109,103 @@ let
     print("weekly")
   '';
 
+  sopsYamlManager = pkgs.writeText "sops-yaml-manager.py" ''
+    import sys
+
+    SECTION_BY_TAG = {
+        "self": "# Core hosts",
+        "daily": "# Daily services",
+        "weekly": "# Weekly services",
+        "monthly": "# Monthly services",
+    }
+
+    def read_lines(path):
+        with open(path) as f:
+            return f.readlines()
+
+    def write_lines(path, lines):
+        while lines and not lines[-1].strip():
+            lines.pop()
+        lines.append("\n")
+        with open(path, "w") as f:
+            f.writelines(lines)
+
+    def without_key(lines, host):
+        result = []
+        needle = f"  - &{host} "
+        for line in lines:
+            if line.startswith(needle):
+                continue
+            result.append(line)
+        return result
+
+    def keys_bounds(lines):
+        try:
+            keys_start = lines.index("keys:\n") + 1
+        except ValueError:
+            raise SystemExit("missing top-level keys section")
+
+        try:
+            creation_start = lines.index("creation_rules:\n")
+        except ValueError:
+            raise SystemExit("missing top-level creation_rules section")
+
+        return keys_start, creation_start
+
+    def section_bounds(lines, keys_start, creation_start, header):
+        for idx in range(keys_start, creation_start):
+            if lines[idx] == header + "\n":
+                start = idx + 1
+                end = creation_start
+                for section_end in range(start, creation_start):
+                    if lines[section_end].startswith("# "):
+                        end = section_end
+                        break
+                return start, end
+
+        insert_at = creation_start
+        block = []
+        if insert_at > keys_start and lines[insert_at - 1].strip():
+            block.append("\n")
+        block.append(header + "\n")
+        lines[insert_at:insert_at] = block
+        return insert_at + len(block), insert_at + len(block)
+
+    def upsert(path, host, recipient, tag):
+        header = SECTION_BY_TAG.get(tag, "# Factory-managed hosts")
+        lines = without_key(read_lines(path), host)
+        keys_start, creation_start = keys_bounds(lines)
+        start, end = section_bounds(lines, keys_start, creation_start, header)
+        before = lines[:start]
+        section = [
+            line for line in lines[start:end]
+            if line.strip() and not line.startswith("#")
+        ]
+        after = lines[end:]
+        while after and not after[0].strip():
+            after.pop(0)
+
+        section.append(f"  - &{host} {recipient}\n")
+        section = sorted(section, key=lambda line: line.split()[1].removeprefix("&"))
+
+        new_lines = before + section
+        if after:
+            new_lines.append("\n")
+        new_lines.extend(after)
+        write_lines(path, new_lines)
+
+    def remove(path, host):
+        write_lines(path, without_key(read_lines(path), host))
+
+    action = sys.argv[1]
+    if action == "upsert":
+        upsert(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
+    elif action == "remove":
+        remove(sys.argv[2], sys.argv[3])
+    else:
+        raise SystemExit(f"unknown action: {action}")
+  '';
+
   # Helper: remove a top-level YAML block by key name from a file.
   # Operates on raw lines to preserve exact formatting.
   removeYamlBlock = pkgs.writeShellScript "remove-yaml-block" ''
@@ -181,6 +278,7 @@ with open(sys.argv[2], 'w') as f:
     INSTANCES_YAML="$NIX_CONFIG/hosts/server-nix/system/incus/instances.yaml"
     COLMENA_NIX="$NIX_CONFIG/flake-outputs/colmena.nix"
     KNOWN_HOSTS_FILE="$NIX_CONFIG/modules/ssh/known_hosts"
+    SOPS_YAML="$NIX_CONFIG/.sops.yaml"
 
     validate_hostname() {
       if [[ ! "$1" =~ ^[A-Za-z0-9][A-Za-z0-9-]*$ ]]; then
@@ -193,14 +291,21 @@ with open(sys.argv[2], 'w') as f:
       ${pythonWithYaml}/bin/python3 ${colmenaTagReader} "$COLMENA_NIX" "$1"
     }
 
+    scan_host_key_line() {
+      host="$1"
+      host_lan="$host.lan"
+
+      ${pkgs.openssh}/bin/ssh-keyscan -T 10 -t ed25519 "$host_lan" 2>/dev/null \
+        | grep -E "^$host_lan[[:space:]]+ssh-ed25519[[:space:]]" \
+        | head -n1 || true
+    }
+
     add_known_host() {
       host="$1"
       host_lan="$host.lan"
       tag=$(colmena_tag_for_host "$host")
 
-      key_line=$(${pkgs.openssh}/bin/ssh-keyscan -T 10 -t ed25519 "$host_lan" 2>/dev/null \
-        | grep -E "^$host_lan[[:space:]]+ssh-ed25519[[:space:]]" \
-        | head -n1 || true)
+      key_line=$(scan_host_key_line "$host")
 
       if [ -z "$key_line" ]; then
         $GUM style --foreground 196 --bold "Could not scan Ed25519 host key for $host_lan"
@@ -219,6 +324,39 @@ with open(sys.argv[2], 'w') as f:
         "$KNOWN_HOSTS_FILE" "$host.lan"
       ${pkgs.openssh}/bin/ssh-keygen -l -f "$KNOWN_HOSTS_FILE" >/dev/null
       echo "==> Removed $host.lan from known_hosts"
+    }
+
+    add_sops_age_key() {
+      host="$1"
+      host_lan="$host.lan"
+      tag=$(colmena_tag_for_host "$host")
+      key_line=$(scan_host_key_line "$host")
+
+      if [ -z "$key_line" ]; then
+        $GUM style --foreground 196 --bold "Could not scan Ed25519 host key for $host_lan"
+        return 1
+      fi
+
+      public_key=''${key_line#"$host_lan "}
+      age_recipient=$(printf '%s\n' "$public_key" \
+        | ${pkgs.ssh-to-age}/bin/ssh-to-age -i - \
+        | head -n1)
+
+      if [[ ! "$age_recipient" =~ ^age1 ]]; then
+        $GUM style --foreground 196 --bold "Could not derive age recipient for $host"
+        return 1
+      fi
+
+      ${pythonWithYaml}/bin/python3 ${sopsYamlManager} upsert \
+        "$SOPS_YAML" "$host" "$age_recipient" "$tag"
+      echo "==> Added $host age recipient to .sops.yaml ($tag)"
+    }
+
+    remove_sops_age_key() {
+      host="$1"
+      ${pythonWithYaml}/bin/python3 ${sopsYamlManager} remove \
+        "$SOPS_YAML" "$host"
+      echo "==> Removed $host age recipient from .sops.yaml"
     }
 
     deploy_build_nix() {
@@ -251,7 +389,7 @@ with open(sys.argv[2], 'w') as f:
     #    7. Wire up devices (nix-store disk, eth0 NIC)
     #    8. Append instance to instances.yaml (declarative config)
     #    9. Start the container, wait for network
-    #   10. Trust the new host key and deploy build-nix
+    #   10. Trust the new host key, add its age recipient, and deploy build-nix
     #   11. Exec into build-nix and deploy the NixOS config
     # ══════════════════════════════════════════════════════════════
     do_create() {
@@ -395,11 +533,38 @@ YAML
         exit 1
       fi
 
-      echo "==> Deploying updated known_hosts to build-nix..."
+      echo "==> Adding $HOSTNAME age recipient to .sops.yaml..."
+      if ! add_sops_age_key "$HOSTNAME"; then
+        $GUM style --foreground 196 --bold "SOPS age recipient setup failed — rolling back..."
+
+        remove_known_host "$HOSTNAME" || true
+
+        if incus info "$HOSTNAME" >/dev/null 2>&1; then
+          echo "==> Stopping $HOSTNAME..."
+          incus stop "$HOSTNAME" --force 2>/dev/null || true
+          echo "==> Deleting container $HOSTNAME..."
+          incus delete "$HOSTNAME" 2>/dev/null || true
+        fi
+
+        if zfs list "$NIX_PARENT_DATASET/$HOSTNAME" >/dev/null 2>&1; then
+          echo "==> Destroying ZFS dataset $NIX_PARENT_DATASET/$HOSTNAME..."
+          sudo zfs destroy -r "$NIX_PARENT_DATASET/$HOSTNAME"
+        fi
+
+        if grep -q "^$HOSTNAME:" "$INSTANCES_YAML" 2>/dev/null; then
+          echo "==> Removing $HOSTNAME from instances.yaml..."
+          ${removeYamlBlock} "$HOSTNAME" "$INSTANCES_YAML"
+        fi
+
+        exit 1
+      fi
+
+      echo "==> Deploying updated trust data to build-nix..."
       if ! deploy_build_nix; then
         $GUM style --foreground 196 --bold "build-nix deploy failed — rolling back..."
 
         remove_known_host "$HOSTNAME" || true
+        remove_sops_age_key "$HOSTNAME" || true
 
         if incus info "$HOSTNAME" >/dev/null 2>&1; then
           echo "==> Stopping $HOSTNAME..."
@@ -431,6 +596,7 @@ YAML
         $GUM style --foreground 196 --bold "Deploy failed — rolling back..."
 
         remove_known_host "$HOSTNAME" || true
+        remove_sops_age_key "$HOSTNAME" || true
 
         # Stop the container if it's running
         if incus info "$HOSTNAME" >/dev/null 2>&1; then
@@ -584,7 +750,7 @@ YAML
     #    5. Stop if running, delete container
     #    6. Destroy ZFS dataset if opted in
     #    7. Remove instance from instances.yaml
-    #    8. Remove the global known_hosts entry and deploy build-nix
+    #    8. Remove global trust entries and deploy build-nix
     #
     # ══════════════════════════════════════════════════════════════
     do_delete() {
@@ -661,7 +827,10 @@ YAML
       echo "==> Removing $TARGET.lan from known_hosts..."
       remove_known_host "$TARGET"
 
-      echo "==> Deploying updated known_hosts to build-nix..."
+      echo "==> Removing $TARGET age recipient from .sops.yaml..."
+      remove_sops_age_key "$TARGET"
+
+      echo "==> Deploying updated trust data to build-nix..."
       deploy_build_nix
 
       $GUM style --foreground 82 --border rounded --padding "1 2" \
