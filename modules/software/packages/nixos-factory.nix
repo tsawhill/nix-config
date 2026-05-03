@@ -23,7 +23,8 @@ let
     def write_lines(path, lines):
         while lines and not lines[-1].strip():
             lines.pop()
-        lines.append("\n")
+        if lines and not lines[-1].endswith("\n"):
+            lines[-1] += "\n"
         with open(path, "w") as f:
             f.writelines(lines)
 
@@ -75,7 +76,10 @@ let
         write_lines(path, new_lines)
 
     def remove(path, host):
-        write_lines(path, without_host(read_lines(path), host))
+        lines = read_lines(path)
+        new_lines = without_host(lines, host)
+        if new_lines != lines:
+            write_lines(path, new_lines)
 
     action = sys.argv[1]
     if action == "upsert":
@@ -126,7 +130,8 @@ let
     def write_lines(path, lines):
         while lines and not lines[-1].strip():
             lines.pop()
-        lines.append("\n")
+        if lines and not lines[-1].endswith("\n"):
+            lines[-1] += "\n"
         with open(path, "w") as f:
             f.writelines(lines)
 
@@ -195,7 +200,10 @@ let
         write_lines(path, new_lines)
 
     def remove(path, host):
-        write_lines(path, without_key(read_lines(path), host))
+        lines = read_lines(path)
+        new_lines = without_key(lines, host)
+        if new_lines != lines:
+            write_lines(path, new_lines)
 
     action = sys.argv[1]
     if action == "upsert":
