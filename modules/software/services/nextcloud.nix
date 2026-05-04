@@ -28,6 +28,15 @@
         richdocuments
         tasks
         ;
+      shopping_list = pkgs.fetchNextcloudApp {
+        appName = "shopping_list";
+        appVersion = "1.1.0";
+        license = "agpl3Plus";
+        hash = "sha256-MJGqOvgTeXY9me/rNGtmk+WS30LU2F/O9XwPwoU1b4o=";
+        url = "https://github.com/otherworld-dev/Shopping-List/releases/download/v1.1.0/shopping_list.tar.gz";
+        description = "Shared shopping lists for your household";
+        homepage = "https://github.com/otherworld-dev/Shopping-List";
+      };
     };
     extraAppsEnable = true;
   };

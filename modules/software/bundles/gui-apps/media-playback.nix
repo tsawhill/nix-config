@@ -1,4 +1,9 @@
-{ pkgs, lib, config, ... }:
+{
+  pkgs,
+  lib,
+  config,
+  ...
+}:
 {
   options.software.apps.media-playback.enable = lib.mkEnableOption "media playback apps";
 
@@ -10,7 +15,6 @@
       plugins = with pkgs.obs-studio-plugins; [
         obs-pipewire-audio-capture
         wlrobs
-        obs-vkcapture
       ];
     };
 
