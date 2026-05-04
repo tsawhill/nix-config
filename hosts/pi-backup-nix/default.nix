@@ -59,6 +59,10 @@ in
 
   # Use the new nixos-raspberrypi kernel bootloader; disable extlinux
   # which gets pulled in by the aarch64 sd-image module.
+  # Manual headless recovery: this bootloader keeps previous generations under
+  # /boot/firmware/nixos/. If a bad deploy wedges the Pi, edit the FAT boot
+  # partition from another machine and change config.txt's os_prefix from
+  # nixos/default/ to a retained generation such as nixos/123-default/.
   boot.loader.raspberry-pi.bootloader = "kernel";
   boot.loader.generic-extlinux-compatible.enable = lib.mkForce false;
 

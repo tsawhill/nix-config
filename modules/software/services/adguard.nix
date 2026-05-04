@@ -145,7 +145,11 @@
         }
       ];
       whitelist_filters = [ ];
-      user_rules = [ ];
+      user_rules = [
+        "||ubereats.com^"
+        "||doordash.com^"
+        "||grubhub.com^"
+      ];
       dhcp = {
         enabled = false;
         interface_name = "";
