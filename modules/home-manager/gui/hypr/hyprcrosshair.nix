@@ -70,8 +70,8 @@ in
               dot.size = 2.5;
               outline = {
                 enable = true;
-                size = 0.1;
-                feather = 1.3;
+                size = 1.2;
+                feather = 1.0;
               };
             };
           }
@@ -81,17 +81,17 @@ in
               outputName = cfg.monitor;
               shape = "cross";
               color = {
-                red = 0.0;
+                red = 1.0;
                 green = 1.0;
-                blue = 0.0;
+                blue = 1.0;
               };
-              cross.thickness = 2.0;
-              cross.length = 7.0;
-              cross.gap = 4.0;
+              cross.thickness = 2.5;
+              cross.length = 9.0;
+              cross.gap = 5.0;
               outline = {
                 enable = true;
-                size = 0.2;
-                feather = 0.2;
+                size = 0.8;
+                feather = 0.0;
               };
             };
           }
@@ -104,16 +104,16 @@ in
               color = {
                 red = 1.0;
                 green = 1.0;
-                blue = 0.75;
+                blue = 1.0;
                 alpha = 1.0;
               };
-              cross.thickness = 1.9;
-              cross.length = 5.0;
-              chevron.angle = 44.0;
+              cross.thickness = 1.7;
+              cross.length = 3.0;
+              chevron.angle = 45.0;
               outline = {
                 enable = true;
                 size = 1.0;
-                feather = 0.15;
+                feather = 0.0;
                 color = {
                   red = 0.0;
                   green = 0.0;
