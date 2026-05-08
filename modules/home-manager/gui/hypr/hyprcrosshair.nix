@@ -90,7 +90,7 @@ in
               cross.gap = 5.0;
               outline = {
                 enable = true;
-                size = 0.8;
+                size = 1.0;
                 feather = 0.0;
               };
             };
