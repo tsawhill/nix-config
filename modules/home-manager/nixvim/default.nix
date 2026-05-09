@@ -7,6 +7,7 @@
   ];
   programs.nixvim = {
     enable = true;
+    nixpkgs.useGlobalPackages = true;
     clipboard.register = "unnamedplus";
     globals.mapleader = " "; # Sets leader to Space
     colorschemes.catppuccin = {
