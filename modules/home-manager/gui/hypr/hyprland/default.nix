@@ -32,7 +32,10 @@
     };
 
     windowLayout = lib.mkOption {
-      type = lib.types.enum [ "master" "dwindle" ];
+      type = lib.types.enum [
+        "master"
+        "dwindle"
+      ];
       default = "master";
       description = "Default tiling layout engine for Hyprland.";
     };
@@ -79,20 +82,20 @@
         enable_anr_dialog = false;
       };
 
-      debug = {
-        vfr = true;
-      };
+      # debug = {
+      #   vfr = true;
+      # };
 
-      render = {
-        keep_unmodified_copy = 1;
-      };
+      # render = {
+      #   keep_unmodified_copy = 1;
+      # };
 
       general = {
         layout = config.my.hypr.windowLayout;
         allow_tearing = true;
       };
 
-"$mainMod" = "SUPER";
+      "$mainMod" = "SUPER";
     };
   };
 }
