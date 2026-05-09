@@ -32,7 +32,10 @@ let
     imports = [ modulePath ];
   };
 
-  unstablePkgs = import nixpkgs-unstable { localSystem = "x86_64-linux"; };
+  unstablePkgs = import nixpkgs-unstable {
+    localSystem = "x86_64-linux";
+    config.allowUnfree = true;
+  };
   piPkgs = import nixpkgs-stable { localSystem = "aarch64-linux"; };
 
   unstableArgs = sharedArgs // {
