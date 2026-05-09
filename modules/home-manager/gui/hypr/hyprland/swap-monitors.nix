@@ -59,7 +59,7 @@ EOF
     hyprctl dispatch focusmonitor "$PRIMARY"   && hyprctl dispatch workspace "$WS_ON_SECONDARY"
 
     # Update X primary output so XWayland apps (Steam toasts) place popups on the correct monitor
-    ${pkgs.xorg.xrandr}/bin/xrandr --output "$A" --primary 2>/dev/null || true
+    ${lib.getExe pkgs.xrandr} --output "$A" --primary 2>/dev/null || true
 
   '';
 in

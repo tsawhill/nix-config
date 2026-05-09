@@ -40,7 +40,7 @@ let
       mkdir -p "$(dirname ${rulesPath})"
       cp ${defaultRules} "${rulesPath}"
       hyprctl reload config-only
-      ${pkgs.xorg.xrandr}/bin/xrandr --output "${p}" --primary 2>/dev/null || true
+      ${lib.getExe pkgs.xrandr} --output "${p}" --primary 2>/dev/null || true
     '' else ''
       mkdir -p "$(dirname ${stateFile})" "$(dirname ${rulesPath})"
       if [ -f "${stateFile}" ]; then
@@ -51,7 +51,7 @@ let
         XRANDR_PRIMARY="${p}"
       fi
       hyprctl reload config-only
-      ${pkgs.xorg.xrandr}/bin/xrandr --output "$XRANDR_PRIMARY" --primary 2>/dev/null || true
+      ${lib.getExe pkgs.xrandr} --output "$XRANDR_PRIMARY" --primary 2>/dev/null || true
     ''
   );
 in

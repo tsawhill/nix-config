@@ -35,6 +35,13 @@ let
   unstablePkgs = import nixpkgs-unstable { localSystem = "x86_64-linux"; };
   piPkgs = import nixpkgs-stable { localSystem = "aarch64-linux"; };
 
+  unstableArgs = sharedArgs // {
+    home-manager-input = inputs.home-manager-unstable;
+    nixvim-input = inputs.nixvim-unstable;
+    sops-input = inputs.sops-nix-unstable;
+    zen-input = inputs.zen-browser-unstable;
+  };
+
   mkPiHost = tag: targetHost: {
     deployment = {
       targetUser = "root";
@@ -77,12 +84,6 @@ let
         { inherit targetHost; }
     )
     // (if tag != null then { tags = [ tag ]; } else { });
-    _module.args = {
-      home-manager-input = inputs.home-manager-unstable;
-      nixvim-input = inputs.nixvim-unstable;
-      sops-input = inputs.sops-nix-unstable;
-      zen-input = inputs.zen-browser-unstable;
-    };
     imports = [ modulePath ];
   };
 
@@ -96,6 +97,10 @@ in
         "pi-backup-nix" = piPkgs;
         "taylor-desktop-nix" = unstablePkgs;
         "taylor-laptop-nix" = unstablePkgs;
+      };
+      nodeSpecialArgs = {
+        "taylor-desktop-nix" = unstableArgs;
+        "taylor-laptop-nix" = unstableArgs;
       };
     };
 
