@@ -316,7 +316,7 @@
           }
           {
             domain = "pi-backup-nix.lan";
-            answer = "10.50.50.5;
+            answer = "10.50.50.5";
           }
           {
             domain = "taylor-laptop-nix.lan";
