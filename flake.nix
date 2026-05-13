@@ -10,6 +10,7 @@
       url = "github:abenz1267/walker";
       inputs.elephant.follows = "elephant";
     };
+    kopuz.url = "github:temidaradev/kopuz";
 
     nixpkgs-stable.url = "github:NixOS/nixpkgs/nixos-25.11";
     home-manager-stable = {
@@ -75,7 +76,10 @@
         // (piOutputs.nixosConfigurations or { })
         // (ociOutputs.nixosConfigurations or { });
 
-      packages.x86_64-linux.yarc-launcher = pkgs.callPackage ./pkgs/yarc-launcher.nix { };
-      packages.x86_64-linux.hyprcrosshair = pkgs.callPackage ./pkgs/hyprcrosshair/package.nix { };
+      packages.x86_64-linux = {
+        yarc-launcher = pkgs.callPackage ./pkgs/yarc-launcher.nix { };
+        hyprcrosshair = pkgs.callPackage ./pkgs/hyprcrosshair/package.nix { };
+        kopuz = inputs.kopuz.packages.x86_64-linux.default;
+      };
     };
 }
