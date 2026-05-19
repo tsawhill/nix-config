@@ -52,7 +52,7 @@ let
       exec ${lib.getExe pkgs.gpu-screen-recorder} ${
         lib.concatStringsSep " " [
           "-w ${lib.escapeShellArg cfg.captureTarget}"
-          # portalArgs
+          portalArgs
           "-f ${toString cfg.fps}"
           "-fm cfr -k hevc -bm qp -q very_high"
           audioArgs
@@ -157,7 +157,7 @@ in
         ExecStart = lib.concatStringsSep " " [
           "${lib.getExe pkgs.gpu-screen-recorder}"
           "-w ${lib.escapeShellArg cfg.captureTarget}"
-          # portalArgs
+          portalArgs
           "-f ${toString cfg.fps}"
           "-fm cfr -k hevc -bm qp -q very_high"
           audioArgs
