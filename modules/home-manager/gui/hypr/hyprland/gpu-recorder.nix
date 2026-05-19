@@ -83,7 +83,7 @@ let
 
       if [[ "$mode" == "--replay" ]]; then
         exec ${lib.getExe pkgs.gpu-screen-recorder} ${
-          lib.concatStringsSep " " [
+          lib.concatStringsSep " " ([
             ''-w "$capture_target"''
             "-f ${toString cfg.fps}"
             "-fm cfr -k ${lib.escapeShellArg cfg.videoCodec} -bm qp -q ${cfg.quality}"
@@ -91,12 +91,12 @@ let
             "-r ${toString cfg.replayDuration}"
             "-c mkv"
             ''-o "$output_dir"''
-          ]
+          ] ++ cfg.extraArgs)
         }
       fi
 
       exec ${lib.getExe pkgs.gpu-screen-recorder} ${
-        lib.concatStringsSep " " [
+        lib.concatStringsSep " " ([
           ''-w "$capture_target"''
           "-f ${toString cfg.fps}"
           "-fm cfr -k ${lib.escapeShellArg cfg.videoCodec} -bm qp -q ${cfg.quality}"
@@ -104,7 +104,7 @@ let
           "-c mkv"
           "-sc ${lib.getExe recordingSavedNotification}"
           ''-o "$output_file"''
-        ]
+        ] ++ cfg.extraArgs)
       }
     '';
   };
@@ -193,9 +193,20 @@ in
     };
 
     quality = lib.mkOption {
-      type = lib.types.str;
+      type = lib.types.enum [
+        "medium"
+        "high"
+        "very_high"
+        "ultra"
+      ];
       default = "very_high";
-      description = "Video quality passed to -q: a preset (medium, high, very_high, ultra) or a numeric CQP value (lower = higher quality).";
+      description = "Video quality preset passed to -q.";
+    };
+
+    extraArgs = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      description = "Extra arguments passed to gpu-screen-recorder (e.g. -tune quality, -ffmpeg-opts).";
     };
 
     replayDuration = lib.mkOption {
