@@ -37,7 +37,7 @@
         gpuRecorder = {
           enable = true;
           captureTarget = "primary";
-          videoCodec = "av1_hdr";
+          videoCodec = "hevc_hdr";
           quality = "ultra";
           extraArgs = [ "-tune quality" ];
           fps = 120;
