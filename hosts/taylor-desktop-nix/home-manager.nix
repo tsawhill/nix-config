@@ -32,8 +32,8 @@
       my.yarg.enable = true;
 
       my.hypr = {
-        monitors.primary = "DP-4";
-        monitors.secondary = "DP-5";
+        monitors.primary = "DP-1";
+        monitors.secondary = "DP-2";
         gpuRecorder = {
           enable = true;
           fps = 120;
@@ -48,7 +48,7 @@
         };
         wallpaperEngine = {
           enable = true;
-          monitors."DP-4" = {
+          monitors."DP-1" = {
             wallpapers = [
               "3648098553"
               "3652040138"
@@ -57,7 +57,7 @@
             fps = 15;
             rotateInterval = "10m";
           };
-          monitors."DP-5" = {
+          monitors."DP-2" = {
             wallpapers = [
               "3648098553"
               "3652040138"
