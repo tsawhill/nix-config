@@ -70,8 +70,7 @@
       };
 
       systemd.user.sessionVariables = {
-        DRI_PRIME = "pci-0000_03_00_0";
-        AQ_DRM_DEVICES = "/dev/dri/amd-dgpu:/dev/dri/amd-igpu";
+        AQ_DRM_DEVICES = "/dev/dri/amd-dgpu";
       };
     };
 
