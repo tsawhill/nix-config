@@ -2,7 +2,8 @@
 let
   cfg = config.my.hypr;
 
-  swapScript = pkgs.writeShellScriptBin "hypr-swap-monitors" ''
+  swapScript = pkgs.writeShellScriptBin "hypr-swap-monitors" (
+    ''
     REAL_MONITORS=$(hyprctl monitors -j | ${lib.getExe pkgs.jq} '[.[] | select(.name | startswith("HEADLESS") | not)]')
 
     # Abort if fewer than 2 real monitors are connected
@@ -22,6 +23,7 @@ let
 
     RULES_FILE="$HOME/.config/hypr/workspace-rules.conf"
     STATE_FILE="$HOME/.local/state/hypr-swap-state"
+    PRIMARY_FILE="$HOME/.local/state/hypr-primary-monitor"
     mkdir -p "$(dirname "$STATE_FILE")"
 
     # Record what each monitor is currently showing before we move anything
@@ -36,6 +38,18 @@ let
       echo "swapped" > "$STATE_FILE"
     fi
 
+    printf '%s\n' "$A" > "$PRIMARY_FILE"
+
+    ''
+    + lib.optionalString (cfg.gpuRecorder.enable && cfg.gpuRecorder.captureTarget == "primary") ''
+    # Replay capture reads the primary monitor at service start.
+    # Restart only the replay service so manual recordings are not interrupted.
+    if ${pkgs.systemd}/bin/systemctl --user --quiet is-active gpu-recorder.service; then
+      ${pkgs.systemd}/bin/systemctl --user restart gpu-recorder.service
+    fi
+
+    ''
+    + ''
     # Update rules file so non-existent workspaces land on the right monitor after restart
     cat > "$RULES_FILE" << EOF
 workspace = 1, monitor:$A, default:true
@@ -61,7 +75,8 @@ EOF
     # Update X primary output so XWayland apps (Steam toasts) place popups on the correct monitor
     ${lib.getExe pkgs.xrandr} --output "$A" --primary 2>/dev/null || true
 
-  '';
+    ''
+  );
 in
 {
   home.packages = [ swapScript ];

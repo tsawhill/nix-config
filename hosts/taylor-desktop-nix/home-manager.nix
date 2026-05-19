@@ -36,6 +36,7 @@
         monitors.secondary = "DP-2";
         gpuRecorder = {
           enable = true;
+          captureTarget = "primary";
           fps = 120;
           audio.output = [
             "discord_audio.monitor"

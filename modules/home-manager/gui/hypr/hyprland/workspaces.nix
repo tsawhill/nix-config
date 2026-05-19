@@ -31,18 +31,20 @@ let
 
   rulesPath = "${config.home.homeDirectory}/.config/hypr/workspace-rules.conf";
   stateFile = "${config.home.homeDirectory}/.local/state/hypr-swap-state";
+  primaryMonitorFile = "${config.home.homeDirectory}/.local/state/hypr-primary-monitor";
 
   # Runs on every Hyprland start. Restores workspace/monitor mapping based on
   # the persisted swap state, reloads config, and points X primary output at
   # the monitor currently hosting workspaces 1-5 (where Steam lives).
   initScript = pkgs.writeShellScript "hypr-init-workspace-rules" (
     if s == null then ''
-      mkdir -p "$(dirname ${rulesPath})"
+      mkdir -p "$(dirname ${rulesPath})" "$(dirname ${primaryMonitorFile})"
       cp ${defaultRules} "${rulesPath}"
+      printf '%s\n' "${p}" > "${primaryMonitorFile}"
       hyprctl reload config-only
       ${lib.getExe pkgs.xrandr} --output "${p}" --primary 2>/dev/null || true
     '' else ''
-      mkdir -p "$(dirname ${stateFile})" "$(dirname ${rulesPath})"
+      mkdir -p "$(dirname ${stateFile})" "$(dirname ${rulesPath})" "$(dirname ${primaryMonitorFile})"
       if [ -f "${stateFile}" ]; then
         cp ${swappedRules} "${rulesPath}"
         XRANDR_PRIMARY="${s}"
@@ -50,6 +52,7 @@ let
         cp ${defaultRules} "${rulesPath}"
         XRANDR_PRIMARY="${p}"
       fi
+      printf '%s\n' "$XRANDR_PRIMARY" > "${primaryMonitorFile}"
       hyprctl reload config-only
       ${lib.getExe pkgs.xrandr} --output "$XRANDR_PRIMARY" --primary 2>/dev/null || true
     ''
@@ -61,14 +64,17 @@ lib.mkIf (p != "") {
   home.activation.initHyprWorkspaceRules = lib.hm.dag.entryAfter [ "writeBoundary" ] (
     ''
       mkdir -p "$HOME/.config/hypr"
+      mkdir -p "$HOME/.local/state"
     '' + (if s == null then ''
       cp ${defaultRules} "$HOME/.config/hypr/workspace-rules.conf"
+      printf '%s\n' "${p}" > "$HOME/.local/state/hypr-primary-monitor"
     '' else ''
-      mkdir -p "$HOME/.local/state"
       if [ -f "$HOME/.local/state/hypr-swap-state" ]; then
         cp ${swappedRules} "$HOME/.config/hypr/workspace-rules.conf"
+        printf '%s\n' "${s}" > "$HOME/.local/state/hypr-primary-monitor"
       else
         cp ${defaultRules} "$HOME/.config/hypr/workspace-rules.conf"
+        printf '%s\n' "${p}" > "$HOME/.local/state/hypr-primary-monitor"
       fi
     '')
   );

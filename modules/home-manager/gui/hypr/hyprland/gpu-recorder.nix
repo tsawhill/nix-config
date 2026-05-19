@@ -6,10 +6,43 @@
 }:
 let
   cfg = config.my.hypr.gpuRecorder;
+  hyprCfg = config.my.hypr;
+  primaryMonitorFile = "${config.home.homeDirectory}/.local/state/hypr-primary-monitor";
 
   audioArgs = lib.concatMapStringsSep " " (d: "-a ${lib.escapeShellArg d}") (
     cfg.audio.output ++ cfg.audio.input
   );
+
+  captureTargetResolver = pkgs.writeShellApplication {
+    name = "gpu-recorder-capture-target";
+    runtimeInputs = [
+      pkgs.coreutils
+    ];
+    text = ''
+      configured_target=${lib.escapeShellArg cfg.captureTarget}
+      state_file=${lib.escapeShellArg primaryMonitorFile}
+      fallback_primary=${lib.escapeShellArg hyprCfg.monitors.primary}
+
+      if [[ "$configured_target" != "primary" ]]; then
+        printf '%s\n' "$configured_target"
+        exit 0
+      fi
+
+      if [[ -s "$state_file" ]]; then
+        IFS= read -r primary_monitor < "$state_file" || true
+        if [[ -n "$primary_monitor" ]]; then
+          printf '%s\n' "$primary_monitor"
+          exit 0
+        fi
+      fi
+
+      if [[ -n "$fallback_primary" ]]; then
+        printf '%s\n' "$fallback_primary"
+      else
+        printf '%s\n' "portal"
+      fi
+    '';
+  };
 
   recordingSavedNotification = pkgs.writeShellApplication {
     name = "gpu-recorder-notify-saved";
@@ -40,15 +73,31 @@ let
       pkgs.coreutils
     ];
     text = ''
+      mode="''${1:-recording}"
       output_dir=${lib.escapeShellArg cfg.outputDir}
+      capture_target="$(${lib.getExe captureTargetResolver})"
       timestamp="$(${pkgs.coreutils}/bin/date +%Y-%m-%d_%H-%M-%S)"
       output_file="$output_dir/$timestamp.mkv"
 
       mkdir -p "$output_dir"
 
+      if [[ "$mode" == "--replay" ]]; then
+        exec ${lib.getExe pkgs.gpu-screen-recorder} ${
+          lib.concatStringsSep " " [
+            ''-w "$capture_target"''
+            "-f ${toString cfg.fps}"
+            "-fm cfr -k hevc -bm qp -q very_high"
+            audioArgs
+            "-r ${toString cfg.replayDuration}"
+            "-c mkv"
+            ''-o "$output_dir"''
+          ]
+        }
+      fi
+
       exec ${lib.getExe pkgs.gpu-screen-recorder} ${
         lib.concatStringsSep " " [
-          "-w ${lib.escapeShellArg cfg.captureTarget}"
+          ''-w "$capture_target"''
           "-f ${toString cfg.fps}"
           "-fm cfr -k hevc -bm qp -q very_high"
           audioArgs
@@ -129,7 +178,7 @@ in
     captureTarget = lib.mkOption {
       type = lib.types.str;
       default = "portal";
-      description = "Capture target passed to -w: screen, portal, focused, a monitor name (e.g. DP-1), region, etc.";
+      description = "Capture target passed to -w: primary, screen, portal, focused, a monitor name (e.g. DP-1), region, etc.";
     };
 
     fps = lib.mkOption {
@@ -184,16 +233,7 @@ in
       Service = {
         Type = "simple";
         ExecStartPre = "${pkgs.coreutils}/bin/mkdir -p ${cfg.outputDir}";
-        ExecStart = lib.concatStringsSep " " [
-          "${lib.getExe pkgs.gpu-screen-recorder}"
-          "-w ${lib.escapeShellArg cfg.captureTarget}"
-          "-f ${toString cfg.fps}"
-          "-fm cfr -k hevc -bm qp -q very_high"
-          audioArgs
-          "-r ${toString cfg.replayDuration}"
-          "-c mkv"
-          "-o ${lib.escapeShellArg cfg.outputDir}"
-        ];
+        ExecStart = "${lib.getExe recordingRunner} --replay";
         Restart = "on-failure";
         RestartSec = "3s";
       };
@@ -215,9 +255,8 @@ in
       };
     };
 
-    wayland.windowManager.hyprland.settings.bindl = [
-      "${cfg.recordingToggleKeybind}, exec, ${lib.getExe recordingToggle}"
-      "${cfg.sourcePickerKeybind}, exec, ${lib.getExe sourcePicker}"
-    ];
+    wayland.windowManager.hyprland.settings.bindl =
+      [ "${cfg.recordingToggleKeybind}, exec, ${lib.getExe recordingToggle}" ]
+      ++ lib.optional (cfg.captureTarget == "portal") "${cfg.sourcePickerKeybind}, exec, ${lib.getExe sourcePicker}";
   };
 }
