@@ -38,7 +38,7 @@
           enable = true;
           captureTarget = "primary";
           videoCodec = "hevc_hdr";
-          quality = "ultra";
+          # quality = "ultra";
           extraArgs = [ "-tune quality" ];
           fps = 120;
           audio.output = [
