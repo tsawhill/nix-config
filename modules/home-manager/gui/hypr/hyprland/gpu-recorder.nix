@@ -230,6 +230,8 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    home.file.".local/share/luts/pq-to-sdr.cube".source = ./assets/pq-to-sdr.cube;
+
     systemd.user.services.gpu-recorder = {
       Unit = {
         Description = "GPU Screen Recorder (Replay Buffer)";
