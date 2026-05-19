@@ -193,14 +193,9 @@ in
     };
 
     quality = lib.mkOption {
-      type = lib.types.enum [
-        "medium"
-        "high"
-        "very_high"
-        "ultra"
-      ];
+      type = lib.types.str;
       default = "very_high";
-      description = "Video quality passed to -q.";
+      description = "Video quality passed to -q: a preset (medium, high, very_high, ultra) or a numeric CQP value (lower = higher quality).";
     };
 
     replayDuration = lib.mkOption {
