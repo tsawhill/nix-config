@@ -86,7 +86,7 @@ let
           lib.concatStringsSep " " [
             ''-w "$capture_target"''
             "-f ${toString cfg.fps}"
-            "-fm cfr -k ${lib.escapeShellArg cfg.videoCodec} -bm qp -q very_high"
+            "-fm cfr -k ${lib.escapeShellArg cfg.videoCodec} -bm qp -q ${cfg.quality}"
             audioArgs
             "-r ${toString cfg.replayDuration}"
             "-c mkv"
@@ -99,7 +99,7 @@ let
         lib.concatStringsSep " " [
           ''-w "$capture_target"''
           "-f ${toString cfg.fps}"
-          "-fm cfr -k ${lib.escapeShellArg cfg.videoCodec} -bm qp -q very_high"
+          "-fm cfr -k ${lib.escapeShellArg cfg.videoCodec} -bm qp -q ${cfg.quality}"
           audioArgs
           "-c mkv"
           "-sc ${lib.getExe recordingSavedNotification}"
@@ -190,6 +190,17 @@ in
       type = lib.types.str;
       default = "hevc";
       description = "Video codec passed to -k, for example hevc, hevc_hdr, av1, or av1_hdr.";
+    };
+
+    quality = lib.mkOption {
+      type = lib.types.enum [
+        "medium"
+        "high"
+        "very_high"
+        "ultra"
+      ];
+      default = "very_high";
+      description = "Video quality passed to -q.";
     };
 
     replayDuration = lib.mkOption {

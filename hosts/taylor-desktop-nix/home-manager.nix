@@ -38,6 +38,7 @@
           enable = true;
           captureTarget = "primary";
           videoCodec = "av1_hdr";
+          quality = "ultra";
           fps = 120;
           audio.output = [
             "discord_audio.monitor"
