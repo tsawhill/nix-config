@@ -11,6 +11,13 @@ let
     cfg.audio.output ++ cfg.audio.input
   );
 
+  serviceEnvironment = [
+    "AQ_DRM_DEVICES=/dev/dri/amd-igpu:/dev/dri/amd-dgpu"
+  ];
+  serviceUnsetEnvironment = [
+    "DRI_PRIME"
+  ];
+
   recordingSavedNotification = pkgs.writeShellApplication {
     name = "gpu-recorder-notify-saved";
     runtimeInputs = [
@@ -183,6 +190,8 @@ in
       };
       Service = {
         Type = "simple";
+        Environment = serviceEnvironment;
+        UnsetEnvironment = serviceUnsetEnvironment;
         ExecStartPre = "${pkgs.coreutils}/bin/mkdir -p ${cfg.outputDir}";
         ExecStart = lib.concatStringsSep " " [
           "${lib.getExe pkgs.gpu-screen-recorder}"
@@ -209,6 +218,8 @@ in
       };
       Service = {
         Type = "simple";
+        Environment = serviceEnvironment;
+        UnsetEnvironment = serviceUnsetEnvironment;
         ExecStart = lib.getExe recordingRunner;
         KillSignal = "SIGINT";
         TimeoutStopSec = "30s";
