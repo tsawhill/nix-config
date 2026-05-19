@@ -37,7 +37,7 @@
         gpuRecorder = {
           enable = true;
           captureTarget = "primary";
-          videoCodec = "hevc_hdr";
+          videoCodec = "av1_hdr";
           fps = 120;
           audio.output = [
             "discord_audio.monitor"
