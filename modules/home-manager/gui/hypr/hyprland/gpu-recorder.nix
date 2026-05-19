@@ -11,9 +11,6 @@ let
     cfg.audio.output ++ cfg.audio.input
   );
 
-  # -restore-portal-session only applies when using the portal capture target
-  portalArgs = lib.optionalString (cfg.captureTarget == "portal") "-restore-portal-session yes";
-
   recordingSavedNotification = pkgs.writeShellApplication {
     name = "gpu-recorder-notify-saved";
     runtimeInputs = [
@@ -52,7 +49,6 @@ let
       exec ${lib.getExe pkgs.gpu-screen-recorder} ${
         lib.concatStringsSep " " [
           "-w ${lib.escapeShellArg cfg.captureTarget}"
-          portalArgs
           "-f ${toString cfg.fps}"
           "-fm cfr -k hevc -bm qp -q very_high"
           audioArgs
@@ -97,6 +93,34 @@ let
     '';
   };
 
+  sourcePicker = pkgs.writeShellApplication {
+    name = "gpu-recorder-pick-source";
+    runtimeInputs = [
+      pkgs.coreutils
+      pkgs.libnotify
+      pkgs.systemd
+    ];
+    text = ''
+      replay_service="gpu-recorder.service"
+      recording_service="gpu-recorder-recording.service"
+      token_file="''${XDG_CONFIG_HOME:-$HOME/.config}/gpu-screen-recorder/restore_token"
+
+      notify() {
+        notify-send -t 2000 -u low -- "GPU Screen Recorder" "$1"
+      }
+
+      if systemctl --user --quiet is-active "$recording_service"; then
+        notify "Stop recording before changing source"
+        exit 1
+      fi
+
+      systemctl --user stop "$replay_service"
+      rm -f "$token_file"
+      notify "Pick replay source"
+      systemctl --user start "$replay_service"
+    '';
+  };
+
 in
 {
   options.my.hypr.gpuRecorder = {
@@ -123,6 +147,12 @@ in
       type = lib.types.str;
       default = "$mainMod SHIFT, Next";
       description = "Hyprland keybind used to start/stop a regular GPU Screen Recorder recording.";
+    };
+
+    sourcePickerKeybind = lib.mkOption {
+      type = lib.types.str;
+      default = "$mainMod CTRL, Next";
+      description = "Hyprland keybind used to restart the replay buffer and pick a portal source.";
     };
 
     outputDir = lib.mkOption {
@@ -157,7 +187,6 @@ in
         ExecStart = lib.concatStringsSep " " [
           "${lib.getExe pkgs.gpu-screen-recorder}"
           "-w ${lib.escapeShellArg cfg.captureTarget}"
-          portalArgs
           "-f ${toString cfg.fps}"
           "-fm cfr -k hevc -bm qp -q very_high"
           audioArgs
@@ -188,6 +217,7 @@ in
 
     wayland.windowManager.hyprland.settings.bindl = [
       "${cfg.recordingToggleKeybind}, exec, ${lib.getExe recordingToggle}"
+      "${cfg.sourcePickerKeybind}, exec, ${lib.getExe sourcePicker}"
     ];
   };
 }
