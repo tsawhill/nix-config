@@ -48,6 +48,7 @@
           ];
           audio.input = [
             "mic_input"
+            "alsa_input.usb-MOTU_M2_M2MA072BWT-00.pro-input-0"
           ];
         };
         wallpaperEngine = {
