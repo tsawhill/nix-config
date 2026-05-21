@@ -1,6 +1,19 @@
-{ pkgs, ... }:
+{ lib, pkgs, ... }:
 
+let
+  hdparm = lib.getExe pkgs.hdparm;
+  # Backup pool drives — spin down after 30 min idle (hdparm -S 241).
+  backupDriveSerials = [
+    "Hitachi_HUA723030ALA640_MK0371YHK6P13A"
+    "WDC_WD30EZRZ-00WN9B0_WD-WCC4E7KF51NR"
+    "Hitachi_HUA723030ALA640_MK0371YHJZLJ0A"
+  ];
+  spindownRule = serial:
+    ''ACTION=="add|change", SUBSYSTEM=="block", ENV{DEVTYPE}=="disk", ENV{ID_SERIAL}=="${serial}", RUN+="${hdparm} -S 241 /dev/%k"'';
+in
 {
+  services.udev.extraRules = lib.concatMapStringsSep "\n" spindownRule backupDriveSerials;
+
   boot.supportedFilesystems = [ "zfs" ];
   boot.zfs.extraPools = [ "backup" ];
   boot.zfs.devNodes = "/dev/disk/by-id";
