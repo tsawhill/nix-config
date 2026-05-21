@@ -57,12 +57,6 @@ in
   # in the Pi's ARM kernel, causing the initrd build to fail.
   boot.initrd.includeDefaultModules = false;
 
-  # The JMB585 SATA HAT only exposes 32-bit DMA on this Pi. The Raspberry Pi
-  # kernel defaults to `coherent_pool=1M`, which has failed AHCI probe with
-  # `failed to start port 0 (errno=-12)` after the disks were in standby across
-  # a warm reboot. Keep this after the board defaults so the larger pool wins.
-  boot.kernelParams = lib.mkAfter [ "coherent_pool=8M" ];
-
   # Use the new nixos-raspberrypi kernel bootloader; disable extlinux
   # which gets pulled in by the aarch64 sd-image module.
   # Manual headless recovery: this bootloader keeps previous generations under
