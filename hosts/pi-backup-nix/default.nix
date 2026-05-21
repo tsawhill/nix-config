@@ -57,11 +57,6 @@ in
   # in the Pi's ARM kernel, causing the initrd build to fail.
   boot.initrd.includeDefaultModules = false;
 
-  # The JMB585 SATA controller on the Radxa Penta HAT can only do 32-bit
-  # DMA. The default swiotlb bounce buffer is too small, causing AHCI probe
-  # to fail with ENOMEM. 131072 slots = 256 MiB of bounce buffer.
-  boot.kernelParams = [ "swiotlb=131072" ];
-
   # Use the new nixos-raspberrypi kernel bootloader; disable extlinux
   # which gets pulled in by the aarch64 sd-image module.
   # Manual headless recovery: this bootloader keeps previous generations under
@@ -82,6 +77,15 @@ in
 
   # Enable the external PCIe x1 slot (off by default on Pi 5). Required
   # for the Radxa Penta SATA HAT (JMB585) to appear in lspci.
+  # The JMB585 SATA controller can only do 32-bit DMA but the Pi 5 IOMMU
+  # assigns IOVA addresses above 4 GiB by default, causing AHCI probe to
+  # fail with ENOMEM. This overlay constrains the PCIe IOVA range to 32-bit.
+  hardware.raspberry-pi.config.all.dt-overlays = {
+    pcie-32bit-dma-pi5 = {
+      enable = true;
+    };
+  };
+
   hardware.raspberry-pi.config.all.base-dt-params = {
     pciex1 = {
       enable = true;
