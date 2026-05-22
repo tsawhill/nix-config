@@ -1,12 +1,18 @@
 { pkgs, lib, ... }:
 let
   # Use the latest ZFS-compatible kernel
+  # TODO: Remove maxKernelVersion cap once MT7922 bluetooth regression is fixed upstream (kernel 7.0+)
+  # See: https://bbs.archlinux.org/viewtopic.php?id=313561
+  maxKernelVersion = "7.0";
   zfsCompatibleKernelPackages = lib.filterAttrs (
     name: kernelPackages:
     let
       zfsCheck = builtins.tryEval kernelPackages.${pkgs.zfs_unstable.kernelModuleAttribute}.meta.broken;
     in
-    (builtins.match "linux_[0-9]+_[0-9]+" name) != null && zfsCheck.success && (!zfsCheck.value)
+    (builtins.match "linux_[0-9]+_[0-9]+" name) != null
+    && zfsCheck.success
+    && (!zfsCheck.value)
+    && lib.versionOlder kernelPackages.kernel.version maxKernelVersion
   ) pkgs.linuxKernel.packages;
   latestKernelPackage = lib.last (
     lib.sort (a: b: lib.versionOlder a.kernel.version b.kernel.version) (
