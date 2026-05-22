@@ -54,4 +54,15 @@ in
   };
 
   boot.kernelPackages = latestKernelPackage;
+
+  # TODO: Remove once btmtk fix lands in stable kernel (NixOS/nixpkgs#521528)
+  boot.kernelPatches = [
+    {
+      name = "bluetooth-btmtk-accept-short-wmt-func-ctrl";
+      patch = pkgs.fetchurl {
+        url = "https://git.kernel.org/pub/scm/linux/kernel/git/bluetooth/bluetooth-next.git/patch/?id=162b1adeb057d28ad84fd8a03f3c50cf08db5c62";
+        hash = "sha256-ij0hQmC0U++AdXWQy6nycnDe6z4yaMoQIrSiLal5DHc=";
+      };
+    }
+  ];
 }
