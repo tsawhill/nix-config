@@ -120,6 +120,8 @@ in
   ];
   networking.firewall.allowedUDPPorts = [ 27017 ];
 
+  my.nginx.geoblock.enable = true;
+
   my.secrets.wireguard.pi-backup-nix.enable = true;
 
   users.users.nginx = {

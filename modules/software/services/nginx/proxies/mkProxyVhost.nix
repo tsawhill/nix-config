@@ -1,4 +1,4 @@
-{ lib, ... }:
+{ config, lib, ... }:
 {
   _module.args.mkProxyVhost =
     {
@@ -81,6 +81,12 @@
       // (if cfg.enableAuthentik then authentikLocations else { });
 
       extraConfig = lib.concatStringsSep "\n" [
+        (lib.optionalString config.my.nginx.geoblock.enable ''
+          if ($nginx_geoblock_deny) {
+            return ${toString config.my.nginx.geoblock.blockStatus};
+          }
+        '')
+
         (lib.optionalString (cfg.mTLSCert != null) ''
           ssl_client_certificate /etc/mTLSCerts/${cfg.mTLSCert}.crt;
           ssl_verify_client on;
