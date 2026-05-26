@@ -2,6 +2,7 @@
 {
   networking.useDHCP = lib.mkDefault true;
   networking.networkmanager.enable = true;
+  networking.interfaces.eno2.wakeOnLan.enable = true;
 
   hardware.bluetooth = {
     enable = true;
