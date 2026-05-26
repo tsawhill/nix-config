@@ -11,10 +11,6 @@ let
   laptopSSHUsers = [ "root" ];
   buildSSHUsers = [ "root" ];
   phoneSSHUsers = [ "root" ];
-  acmeSSHUsers = [
-    "nginx"
-    "root"
-  ];
 in
 {
   networking.hostName = "remote-nginx-nix";
@@ -50,7 +46,6 @@ in
     (import "${self}/modules/ssh/pubkeys/taylor-laptop-nix-taylor.nix" laptopSSHUsers)
     (import "${self}/modules/ssh/pubkeys/build-nix-root.nix" buildSSHUsers)
     (import "${self}/modules/ssh/pubkeys/phone-taylor.nix" phoneSSHUsers)
-    (import "${self}/modules/ssh/pubkeys/acme-nix-root.nix" acmeSSHUsers)
 
     # Software
     "${self}/modules/software/bundles"

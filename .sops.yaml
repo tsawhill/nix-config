@@ -44,11 +44,6 @@ creation_rules:
     key_groups:
       - age:
         - *build-nix
-  - path_regex: modules/secrets/ssh/client_keys/acme-nix-root\.yaml$
-    key_groups:
-      - age:
-        - *build-nix
-        - *acme-nix
   - path_regex: modules/secrets/ssh/client_keys/taylor-desktop-nix-taylor\.yaml$
     key_groups:
       - age:
@@ -105,6 +100,10 @@ creation_rules:
       - age:
         - *build-nix
         - *server-nix
+  - path_regex: modules/secrets/server/LXCs/gotify_token_deploy\.yaml$
+    key_groups:
+      - age:
+        - *build-nix
   ##############################################################################
   #
   #                             Github access token
@@ -188,7 +187,6 @@ creation_rules:
     key_groups:
       - age:
         - *build-nix
-        - *acme-nix
         - *remote-nginx-nix
         - *local-nginx-nix
         - *pi-backup-nix

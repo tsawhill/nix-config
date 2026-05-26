@@ -1,9 +1,38 @@
-{ pkgs, ... }:
+{ config, pkgs, ... }:
 
 let
   keepRoots = 14; # number of per-host deploy GC roots to retain on the build machine
   repoPath = "/mnt/zpool/code/nix-config";
   flakePath = "path://${repoPath}";
+  notifications = config.my.monitoring.notifications;
+
+  # Bash helper that sends both a Gotify push and an email.
+  # Usage: notify "Title" <priority> "Body"
+  notifyFn = ''
+    notify() {
+      local title="$1"
+      local priority="$2"
+      local body="$3"
+
+      ${pkgs.curl}/bin/curl -s -X POST "${notifications.gotify.url}" \
+        -H "X-Gotify-Key: $GOTIFY_KEY" \
+        -F "title=$title" \
+        -F "message=$body" \
+        -F "priority=$priority" > /dev/null || true
+
+      (
+        echo "To: ${notifications.recipientEmail}"
+        echo "Subject: $title"
+        echo ""
+        echo "$body"
+      ) | ${pkgs.msmtp}/bin/msmtp "${notifications.recipientEmail}" || true
+    }
+  '';
+
+  notifyPreamble = ''
+    GOTIFY_KEY=$(${pkgs.coreutils}/bin/cat ${notifications.gotify.tokenFile})
+    ${notifyFn}
+  '';
 
   mkDeployService = name: tags: {
     description = "${name} Colmena Deploy";
@@ -15,7 +44,8 @@ let
       pkgs.colmena
       pkgs.openssh
       pkgs.jq
-      pkgs.gotify-cli
+      pkgs.curl
+      pkgs.msmtp
     ];
     serviceConfig = {
       Type = "oneshot";
@@ -23,6 +53,7 @@ let
     };
     script = ''
       set -euo pipefail
+      ${notifyPreamble}
 
       echo "--- Updating flake ---"
       ${pkgs.nix}/bin/nix flake update --flake "${flakePath}"
@@ -73,10 +104,7 @@ let
             CONN_FAIL_HOSTS="$CONN_FAIL_HOSTS $host"
           else
             HARD_FAIL_HOSTS="$HARD_FAIL_HOSTS $host"
-            ${pkgs.gotify-cli}/bin/gotify push \
-              -t "❌ ${name}: $host FAILED" \
-              -p 10 \
-              "Last 20 lines:\n$ERROR_SUMMARY"
+            notify "❌ ${name}: $host FAILED" 10 "Last 20 lines:\n$ERROR_SUMMARY"
           fi
         fi
         rm "$LOG"
@@ -90,9 +118,7 @@ let
       SUCC_DISP=$SUCCEEDED_HOSTS;  [ -n "$SUCC_DISP" ] || SUCC_DISP="none"
       HARD_DISP=$HARD_FAIL_HOSTS;  [ -n "$HARD_DISP" ] || HARD_DISP="none"
       CONN_DISP=$CONN_FAIL_HOSTS;  [ -n "$CONN_DISP" ] || CONN_DISP="none"
-      ${pkgs.gotify-cli}/bin/gotify push \
-        -t "ℹ️ ${name} first-pass summary" \
-        -p 3 \
+      notify "ℹ️ ${name} first-pass summary" 3 \
         "Succeeded: $SUCC_DISP\nHard failed: $HARD_DISP\nRetrying (conn): $CONN_DISP"
 
       # --- Retry connection-failed hosts individually ---
@@ -119,9 +145,7 @@ let
 
         if [ "$host_ok" = false ]; then
           HARD_FAIL_HOSTS="$HARD_FAIL_HOSTS $host"
-          ${pkgs.gotify-cli}/bin/gotify push \
-            -t "❌ ${name}: $host FAILED (retries exhausted)" \
-            -p 10 \
+          notify "❌ ${name}: $host FAILED (retries exhausted)" 10 \
             "All $MAX_RETRIES connection retries exhausted for $host"
         fi
       done
@@ -133,19 +157,13 @@ let
       SUCC_DISP=$SUCCEEDED_HOSTS; [ -n "$SUCC_DISP" ] || SUCC_DISP="none"
       FAIL_DISP=$HARD_FAIL_HOSTS; [ -n "$FAIL_DISP" ] || FAIL_DISP="none"
       if [ -n "$HARD_FAIL_HOSTS" ]; then
-        ${pkgs.gotify-cli}/bin/gotify push \
-          -t "⚠️ ${name} deploy partial" \
-          -p 6 \
+        notify "⚠️ ${name} deploy partial" 6 \
           "Succeeded: $SUCC_DISP\nFailed: $FAIL_DISP"
       elif [ "$HAD_WARNINGS" = true ]; then
-        ${pkgs.gotify-cli}/bin/gotify push \
-          -t "⚠️ ${name} deploy succeeded (with warnings)" \
-          -p 4 \
+        notify "⚠️ ${name} deploy succeeded (with warnings)" 4 \
           "All hosts: $SUCC_DISP"
       else
-        ${pkgs.gotify-cli}/bin/gotify push \
-          -t "✅ ${name} deploy succeeded" \
-          -p 3 \
+        notify "✅ ${name} deploy succeeded" 3 \
           "All hosts: $SUCC_DISP"
       fi
 
@@ -201,7 +219,8 @@ let
       pkgs.nix
       pkgs.colmena
       pkgs.openssh
-      pkgs.gotify-cli
+      pkgs.curl
+      pkgs.msmtp
     ];
     serviceConfig = {
       Type = "oneshot";
@@ -209,6 +228,7 @@ let
     };
     script = ''
       set -euo pipefail
+      ${notifyPreamble}
 
       echo "--- Updating flake ---"
       ${pkgs.nix}/bin/nix flake update --flake "${flakePath}"
@@ -227,15 +247,10 @@ let
         if ${pkgs.colmena}/bin/colmena apply-local switch 2>&1 | tee "$LOG"; then
           WARNINGS=$(grep -E '\[WARN\]|warning:' "$LOG" || true)
           if [ -n "$WARNINGS" ]; then
-            MSG="Warnings:\n$WARNINGS"
-            ${pkgs.gotify-cli}/bin/gotify push \
-              -t "⚠️ Self deploy succeeded (with warnings)" \
-              -p 4 \
-              "$MSG"
+            notify "⚠️ Self deploy succeeded (with warnings)" 4 \
+              "Warnings:\n$WARNINGS"
           else
-            ${pkgs.gotify-cli}/bin/gotify push \
-              -t "✅ Self deploy succeeded" \
-              -p 3 \
+            notify "✅ Self deploy succeeded" 3 \
               "${selfHostname} deployed successfully."
           fi
           VER=$(nixos-version 2>/dev/null || echo "unknown")
@@ -267,11 +282,8 @@ let
             echo "Deploy failed, retrying in $((RETRY_DELAY / 60)) minutes (attempt $attempt/$MAX_RETRIES)..."
             sleep $RETRY_DELAY
           else
-            MSG="Last 20 lines of log:\n$ERROR_SUMMARY"
-            ${pkgs.gotify-cli}/bin/gotify push \
-              -t "❌ Self deploy FAILED" \
-              -p 10 \
-              "$MSG"
+            notify "❌ Self deploy FAILED" 10 \
+              "Last 20 lines of log:\n$ERROR_SUMMARY"
             exit 1
           fi
         fi
@@ -297,6 +309,9 @@ let
     HOSTNAME=$(hostname)
 
     cd "${repoPath}"
+
+    echo "--- Updating flake ---"
+    ${pkgs.nix}/bin/nix flake update --flake "${flakePath}"
 
     echo "--- Committing pre-deploy state ---"
     ${pkgs.git}/bin/git add -A

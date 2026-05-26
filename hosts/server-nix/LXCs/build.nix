@@ -1,8 +1,9 @@
-{ self, inputs, ... }:
+{ self, config, inputs, ... }:
 {
   imports = [
     ./base
     "${self}/modules/software/services/rebuild-scripts.nix"
+    "${self}/modules/monitoring"
 
     # Secrets (SOPS)
     inputs.sops-nix-stable.nixosModules.sops
@@ -17,6 +18,25 @@
   '';
   my.secrets.sshclientkey.build-nix-root.enable = true;
   my.secrets.github_access_token_public.enable = true;
+  my.secrets.smtp_password_server.enable = true;
+  my.secrets.gotify_token_deploy.enable = true;
+  my.monitoring = {
+    deployAlerts.enable = true;
+    notifications = {
+      recipientEmail = "me@tsawhill.org";
+      smtp = {
+        host = "smtp.purelymail.com";
+        port = 587;
+        user = "server@tsawhill.org";
+        from = "server@tsawhill.org";
+        passwordFile = config.sops.secrets.smtp_password_server.path;
+      };
+      gotify = {
+        url = "https://gotify.tsawhill.org/message";
+        tokenFile = config.sops.secrets.gotify_token_deploy.path;
+      };
+    };
+  };
   my.groups = {
     code = {
       enable = true;

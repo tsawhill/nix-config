@@ -1,14 +1,7 @@
 { self, pkgs, ... }:
-let
-  acmeSSHUsers = [
-    "nginx"
-    "root"
-  ];
-in
 {
   imports = [
     ./base
-    (import "${self}/modules/ssh/pubkeys/acme-nix-root.nix" acmeSSHUsers)
 
     "${self}/modules/software/services/nginx/nginx.nix"
     "${self}/modules/software/services/nginx/proxies"

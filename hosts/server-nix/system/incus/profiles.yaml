@@ -64,6 +64,16 @@ gameserver-mount:
       source: "/mnt/zpool/gameservers"
       shift: "true"
 
+immich-mount:
+  description: "Disk passthrough for immich directory"
+  config: {}
+  devices:
+    downloadHDD:
+      type: "disk"
+      path: "/mnt/zpool/immich"
+      source: "/mnt/zpool/immich"
+      shift: "true"
+
 media-mount:
   description: "Disk passthrough for media directory"
   config: {}

@@ -136,7 +136,6 @@ in
     "socks5-vpn-eu-nix" =
       mkHost "weekly" "socks5-vpn-eu-nix.lan"
         "${self}/hosts/server-nix/LXCs/socks5-vpn-eu.nix";
-    "acme-nix" = mkHost "weekly" "acme-nix.lan" "${self}/hosts/server-nix/LXCs/acme.nix";
     "sunshine-nix" = mkHost "weekly" "sunshine-nix.lan" "${self}/hosts/server-nix/LXCs/sunshine.nix";
 
     # --- monthly ---

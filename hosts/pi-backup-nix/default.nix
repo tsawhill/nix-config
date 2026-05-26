@@ -13,10 +13,6 @@ let
   serverSSHUsers = [ "root" ];
   buildSSHUsers = [ "root" ];
   phoneSSHUsers = [ "taylor" ];
-  acmeSSHUsers = [
-    "nginx"
-    "root"
-  ];
 in
 {
   networking.hostName = "pi-backup-nix";
@@ -52,7 +48,6 @@ in
     (import "${self}/modules/ssh/pubkeys/server-nix-root.nix" serverSSHUsers)
     (import "${self}/modules/ssh/pubkeys/build-nix-root.nix" buildSSHUsers)
     (import "${self}/modules/ssh/pubkeys/phone-taylor.nix" phoneSSHUsers)
-    (import "${self}/modules/ssh/pubkeys/acme-nix-root.nix" acmeSSHUsers)
 
     # Software
     # "${self}/modules/software/bundles/all.nix"

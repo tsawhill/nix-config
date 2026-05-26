@@ -8,7 +8,7 @@ let
 
   # The SMTP account is only needed when at least one alerting feature is
   # enabled. ZFS maintenance can use this module tree without configuring mail.
-  alertsEnabled = cfg.zfsAlerts.enable || cfg.smartAlerts.enable;
+  alertsEnabled = cfg.zfsAlerts.enable || cfg.smartAlerts.enable || cfg.deployAlerts.enable;
 
   secretPathType = with lib.types; nullOr (coercedTo path toString str);
 in
@@ -86,6 +86,10 @@ in
         description = "File containing the Gotify application token.";
       };
     };
+  };
+
+  options.my.monitoring.deployAlerts = {
+    enable = lib.mkEnableOption "deploy email notifications";
   };
 
   config = lib.mkIf alertsEnabled {

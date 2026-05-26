@@ -251,10 +251,6 @@
             answer = "10.73.73.9";
           }
           {
-            domain = "acme-nix.lan";
-            answer = "10.73.73.10";
-          }
-          {
             domain = "socks5-vpn-eunix.lan";
             answer = "10.73.73.11";
           }
