@@ -58,14 +58,14 @@ in
           #   };
           # }
           {
-            name = "White Dot";
+            name = "Yellow Dot";
             settings = {
               outputName = cfg.monitor;
               shape = "dot";
               color = {
                 red = 1.0;
                 green = 1.0;
-                blue = 1.0;
+                blue = 0.0;
               };
               dot.size = 2.5;
               outline = {
@@ -76,14 +76,14 @@ in
             };
           }
           {
-            name = "Green Cross";
+            name = "Yellow Cross";
             settings = {
               outputName = cfg.monitor;
               shape = "cross";
               color = {
                 red = 1.0;
                 green = 1.0;
-                blue = 1.0;
+                blue = 0.0;
               };
               cross.thickness = 2.5;
               cross.length = 9.0;

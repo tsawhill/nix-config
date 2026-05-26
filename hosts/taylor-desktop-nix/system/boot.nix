@@ -1,19 +1,4 @@
-{ pkgs, lib, ... }:
-let
-  # Use the latest ZFS-compatible kernel
-  zfsCompatibleKernelPackages = lib.filterAttrs (
-    name: kernelPackages:
-    let
-      zfsCheck = builtins.tryEval kernelPackages.${pkgs.zfs_unstable.kernelModuleAttribute}.meta.broken;
-    in
-    (builtins.match "linux_[0-9]+_[0-9]+" name) != null && zfsCheck.success && (!zfsCheck.value)
-  ) pkgs.linuxKernel.packages;
-  latestKernelPackage = lib.last (
-    lib.sort (a: b: lib.versionOlder a.kernel.version b.kernel.version) (
-      builtins.attrValues zfsCompatibleKernelPackages
-    )
-  );
-in
+{ ... }:
 {
   boot.loader.efi.canTouchEfiVariables = true;
   boot.zfs.devNodes = "/dev/disk/by-partuuid";
@@ -52,7 +37,5 @@ in
     RebootWatchdogSec = "2min";
     DefaultTimeoutStopSec = "30s";
   };
-
-  boot.kernelPackages = latestKernelPackage;
 
 }
