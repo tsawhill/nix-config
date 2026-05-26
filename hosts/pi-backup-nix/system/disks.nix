@@ -21,7 +21,6 @@ in
   services.udev.extraRules = lib.concatMapStringsSep "\n" spindownRule backupDriveSerials;
 
   boot.supportedFilesystems = [ "zfs" ];
-  boot.zfs.package = config.boot.kernelPackages.${pkgs.zfs.kernelModuleAttribute}.userspaceTools;
   boot.zfs.extraPools = [ "backup" ];
   boot.zfs.devNodes = "/dev/disk/by-id";
 

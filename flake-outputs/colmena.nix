@@ -36,7 +36,7 @@ let
     localSystem = "x86_64-linux";
     config.allowUnfree = true;
   };
-  piPkgs = import nixpkgs-stable { localSystem = "aarch64-linux"; };
+  piPkgs = import inputs.nixos-raspberrypi.inputs.nixpkgs { localSystem = "aarch64-linux"; };
 
   unstableArgs = sharedArgs // {
     home-manager-input = inputs.home-manager-unstable;
