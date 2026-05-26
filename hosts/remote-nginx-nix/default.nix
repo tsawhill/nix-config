@@ -1,5 +1,6 @@
 {
   self,
+  inputs,
   modulesPath,
   pkgs,
   ...
@@ -19,6 +20,10 @@ in
   networking.hostName = "remote-nginx-nix";
   system.stateVersion = "25.11";
   imports = [
+    # Secrets (SOPS)
+    inputs.sops-nix-stable.nixosModules.sops
+    "${self}/modules/secrets"
+
     # Home Manager
     ./home-manager.nix
     # Boot

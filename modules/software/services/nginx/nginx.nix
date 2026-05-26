@@ -6,34 +6,69 @@
 }:
 
 let
-  cfg = config.my.nginx.geoblock;
+  acmeCfg = config.my.nginx.acme;
+  geoblockCfg = config.my.nginx.geoblock;
 in
 {
-  options.my.nginx.geoblock = {
-    enable = lib.mkEnableOption "country-based blocking for nginx proxy virtual hosts";
+  options.my.nginx = {
+    acme = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Issue and renew the shared wildcard certificate locally on this nginx host.";
+      };
 
-    allowedCountryCodes = lib.mkOption {
-      type = lib.types.listOf lib.types.str;
-      default = [ "US" ];
-      description = "ISO country codes allowed through nginx proxy virtual hosts.";
+      certificateName = lib.mkOption {
+        type = lib.types.str;
+        default = "tsawhill";
+        description = "Name of the local ACME certificate under /var/lib/acme.";
+      };
+
+      domain = lib.mkOption {
+        type = lib.types.str;
+        default = "tsawhill.org";
+        description = "Primary domain for the local ACME certificate.";
+      };
+
+      extraDomainNames = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [ "*.tsawhill.org" ];
+        description = "Additional domain names for the local ACME certificate.";
+      };
+
+      email = lib.mkOption {
+        type = lib.types.str;
+        default = "me@tsawhill.org";
+        description = "Email address used for ACME account registration.";
+      };
     };
 
-    allowPrivateNetworks = lib.mkOption {
-      type = lib.types.bool;
-      default = true;
-      description = "Allow RFC1918, loopback, link-local, and ULA clients even when no country is known.";
-    };
+    geoblock = {
+      enable = lib.mkEnableOption "country-based blocking for nginx proxy virtual hosts";
 
-    database = lib.mkOption {
-      type = lib.types.path;
-      default = "${pkgs.dbip-country-lite}/share/dbip/dbip-country-lite.mmdb";
-      description = "MaxMind-compatible country database used by ngx_http_geoip2_module.";
-    };
+      allowedCountryCodes = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [ "US" ];
+        description = "ISO country codes allowed through nginx proxy virtual hosts.";
+      };
 
-    blockStatus = lib.mkOption {
-      type = lib.types.int;
-      default = 444;
-      description = "HTTP status returned for blocked countries. Nginx status 444 closes the connection.";
+      allowPrivateNetworks = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Allow RFC1918, loopback, link-local, and ULA clients even when no country is known.";
+      };
+
+      database = lib.mkOption {
+        type = lib.types.path;
+        default = "${pkgs.dbip-country-lite}/share/dbip/dbip-country-lite.mmdb";
+        description = "MaxMind-compatible country database used by ngx_http_geoip2_module.";
+      };
+
+      blockStatus = lib.mkOption {
+        type = lib.types.int;
+        default = 444;
+        description = "HTTP status returned for blocked countries. Nginx status 444 closes the connection.";
+      };
     };
   };
 
@@ -45,16 +80,40 @@ in
         recommendedTlsSettings = true;
         recommendedProxySettings = true;
       };
-      systemd.services.nginx.serviceConfig.ReadWritePaths = [ "/Certs/" ];
       networking.firewall.allowedTCPPorts = [ 443 ];
     }
 
-    (lib.mkIf cfg.enable {
+    (lib.mkIf acmeCfg.enable {
+      my.secrets.acme_env.enable = true;
+
+      security.acme = {
+        acceptTerms = true;
+        defaults = {
+          email = acmeCfg.email;
+          dnsResolver = "9.9.9.9:53";
+        };
+        certs.${acmeCfg.certificateName} = {
+          domain = acmeCfg.domain;
+          inherit (acmeCfg) extraDomainNames;
+          dnsProvider = "cloudflare";
+          environmentFile = config.sops.secrets.acme_env.path;
+          group = "nginx";
+          reloadServices = [ "nginx.service" ];
+        };
+      };
+
+      systemd.services.nginx = {
+        wants = [ "acme-${acmeCfg.certificateName}.service" ];
+        after = [ "acme-${acmeCfg.certificateName}.service" ];
+      };
+    })
+
+    (lib.mkIf geoblockCfg.enable {
       services.nginx = {
         additionalModules = [ pkgs.nginxModules.geoip2 ];
 
         commonHttpConfig = ''
-          geoip2 ${cfg.database} {
+          geoip2 ${geoblockCfg.database} {
             $geoip2_country_code country iso_code;
           }
 
@@ -72,14 +131,14 @@ in
 
           map $geoip2_country_code $nginx_geoblock_allowed_country {
             default 0;
-            ${lib.concatMapStringsSep "\n" (country: "${country} 1;") cfg.allowedCountryCodes}
+            ${lib.concatMapStringsSep "\n" (country: "${country} 1;") geoblockCfg.allowedCountryCodes}
           }
 
           map "$nginx_geoblock_allowed_country:$nginx_geoblock_private_network" $nginx_geoblock_deny {
             default 1;
             "1:0" 0;
             "1:1" 0;
-            ${lib.optionalString cfg.allowPrivateNetworks ''"0:1" 0;''}
+            ${lib.optionalString geoblockCfg.allowPrivateNetworks ''"0:1" 0;''}
           }
         '';
       };

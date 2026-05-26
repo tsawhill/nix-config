@@ -190,6 +190,9 @@ creation_rules:
       - age:
         - *build-nix
         - *acme-nix
+        - *remote-nginx-nix
+        - *local-nginx-nix
+        - *pi-backup-nix
   ##############################################################################
   #
   #                             vaultwarden env file

@@ -57,8 +57,16 @@
     in
     {
       forceSSL = true;
-      sslCertificate = "/Certs/fullchain.pem";
-      sslCertificateKey = "/Certs/key.pem";
+      sslCertificate =
+        if config.my.nginx.acme.enable then
+          "/var/lib/acme/${config.my.nginx.acme.certificateName}/fullchain.pem"
+        else
+          "/Certs/fullchain.pem";
+      sslCertificateKey =
+        if config.my.nginx.acme.enable then
+          "/var/lib/acme/${config.my.nginx.acme.certificateName}/key.pem"
+        else
+          "/Certs/key.pem";
       listen = [
         {
           addr = "0.0.0.0";
