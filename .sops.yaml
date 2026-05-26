@@ -13,7 +13,6 @@ keys:
   - &local-nginx-nix age16hhtega9xw3qp9xlwf899hy6a7jqgv8cvexpuaf4j72r8n3avcxqvgn9k4
 
   # Weekly services
-  - &acme-nix age1vv402yraaklyrg0k5t4ckvnxy5pgasrdkkffvrjma5um2eespahsp76dqv
   - &adguard-nix age1u96ec563v3cth2j7pjkjdj9cza70766uv50nzae9lg3geuxa49tqwqhstp
   - &arrs-nix age1sc4raxfl89mlnc4tjy9lny8zt4du59d4f6dmkvwnhlfhzts3s4jsvdd7s2
   - &gotify-nix age14qvg2gfkta6njmctl3cnkytu9spwwkjp8hx5mzcjhn5mjzzd9e4qcayh28

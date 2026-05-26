@@ -12,15 +12,6 @@ OPNSense:
     root: { type: "disk", path: "/", pool: "rpool", size: "16GiB" }
     lan0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "14:29:0d:71:37:00" }
     wan0: { type: "nic", nictype: "bridged", parent: "br1", hwaddr: "14:29:0d:71:37:01" }
-
-acme-nix:
-  type: "container"
-  profiles: ["nixos-lxc"]
-  config: {}
-  devices:
-    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/acme-nix" }
-    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:d5:6e:ab" }
-
 adguard-nix:
   type: "container"
   profiles: ["nixos-lxc"]
