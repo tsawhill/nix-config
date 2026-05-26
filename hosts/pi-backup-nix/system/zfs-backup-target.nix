@@ -1,11 +1,15 @@
-{ pkgs, ... }:
+{ config, pkgs, ... }:
+
+let
+  zfs = config.boot.zfs.package;
+in
 
 {
   # Receiver-side tools for Syncoid/Sanoid. This host accepts replicated
   # datasets into the local `backup` zpool; server-nix initiates the sends.
   environment.systemPackages = [
     pkgs.sanoid
-    pkgs.zfs
+    zfs
   ];
 
   # Non-root receive account. Its SSH key is the public half of the SOPS-managed
@@ -31,7 +35,7 @@
     serviceConfig.Type = "oneshot";
     path = [
       pkgs.coreutils
-      pkgs.zfs
+      zfs
     ];
     script = ''
       if zfs list backup >/dev/null 2>&1; then

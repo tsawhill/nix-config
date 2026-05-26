@@ -1,7 +1,13 @@
-{ lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   hdparm = lib.getExe pkgs.hdparm;
+  zfs = config.boot.zfs.package;
   # Backup pool drives — spin down after 30 min idle (hdparm -S 241).
   backupDriveSerials = [
     "Hitachi_HUA723030ALA640_MK0371YHK6P13A"
@@ -15,6 +21,7 @@ in
   services.udev.extraRules = lib.concatMapStringsSep "\n" spindownRule backupDriveSerials;
 
   boot.supportedFilesystems = [ "zfs" ];
+  boot.zfs.package = config.boot.kernelPackages.${pkgs.zfs.kernelModuleAttribute}.userspaceTools;
   boot.zfs.extraPools = [ "backup" ];
   boot.zfs.devNodes = "/dev/disk/by-id";
 
@@ -30,8 +37,8 @@ in
     after = [ "zfs-import.target" ];
     serviceConfig.Type = "oneshot";
     script = ''
-      if [ "$(${pkgs.zfs}/bin/zfs get -H -o value mountpoint backup)" != "/mnt/backup" ]; then
-        ${pkgs.zfs}/bin/zfs set -u mountpoint=/mnt/backup backup
+      if [ "$(${zfs}/bin/zfs get -H -o value mountpoint backup)" != "/mnt/backup" ]; then
+        ${zfs}/bin/zfs set -u mountpoint=/mnt/backup backup
       fi
     '';
   };
