@@ -3,6 +3,7 @@
   lib,
   modulesPath,
   inputs,
+  pkgs,
   ...
 }:
 
@@ -12,6 +13,10 @@ let
   serverSSHUsers = [ "root" ];
   buildSSHUsers = [ "root" ];
   phoneSSHUsers = [ "taylor" ];
+  acmeSSHUsers = [
+    "nginx"
+    "root"
+  ];
 in
 {
   networking.hostName = "pi-backup-nix";
@@ -47,11 +52,20 @@ in
     (import "${self}/modules/ssh/pubkeys/server-nix-root.nix" serverSSHUsers)
     (import "${self}/modules/ssh/pubkeys/build-nix-root.nix" buildSSHUsers)
     (import "${self}/modules/ssh/pubkeys/phone-taylor.nix" phoneSSHUsers)
+    (import "${self}/modules/ssh/pubkeys/acme-nix-root.nix" acmeSSHUsers)
 
     # Software
     # "${self}/modules/software/bundles/all.nix"
     "${self}/modules/software/packages/zsh.nix"
     # "${self}/modules/software/services/incus.nix"
+
+    # Nginx
+    "${self}/modules/software/services/nginx/nginx.nix"
+    "${self}/modules/software/services/nginx/proxies"
+    "${self}/modules/software/services/nginx/streams/minecraft.nix"
+
+    # fail2ban
+    "${self}/modules/software/services/fail2ban"
 
   ];
   # NixOS defaults include x86-only modules (e.g. i8042) that don't exist
@@ -99,7 +113,19 @@ in
     };
   };
 
+  networking.firewall.allowedTCPPorts = [
+    80
+    443
+    25565
+  ];
+  networking.firewall.allowedUDPPorts = [ 27017 ];
+
   my.secrets.wireguard.pi-backup-nix.enable = true;
+
+  users.users.nginx = {
+    # This tells NixOS not to use the 'nologin' shell
+    shell = pkgs.zsh;
+  };
 
   my.users.taylor = {
     enable = true;
@@ -146,5 +172,72 @@ in
       ];
       gid = 1004;
     };
+  };
+
+  proxy.authentik = {
+    enable = true;
+    domain = "auth.tsawhill.org";
+  };
+
+  proxy.vaultwarden = {
+    enable = true;
+    domain = "vault.tsawhill.org";
+  };
+  proxy.immich = {
+    enable = true;
+    domain = "immich.tsawhill.org";
+  };
+  proxy.jellyfin = {
+    enable = true;
+    domain = "jelly.tsawhill.org";
+  };
+  proxy.nextcloud = {
+    enable = true;
+    domain = "nc.tsawhill.org";
+  };
+  proxy.open-webui = {
+    enable = true;
+    domain = "llm.tsawhill.org";
+    mTLSCert = "mTLS-CA";
+  };
+  proxy.gotify = {
+    enable = true;
+    domain = "gotify.tsawhill.org";
+    mTLSCert = "mTLS-CA";
+  };
+  proxy.radarr = {
+    enable = true;
+    domain = "rad.tsawhill.org";
+    mTLSCert = "mTLS-CA";
+  };
+  proxy.sonarr = {
+    enable = true;
+    domain = "son.tsawhill.org";
+    # mTLSCert = "mTLS-CA";
+    enableAuthentik = true;
+  };
+  proxy.lidarr = {
+    enable = true;
+    domain = "lid.tsawhill.org";
+    mTLSCert = "mTLS-CA";
+  };
+  proxy.prowlarr = {
+    enable = true;
+    domain = "pro.tsawhill.org";
+    mTLSCert = "mTLS-CA";
+  };
+  proxy.seerr = {
+    enable = true;
+    domain = "request.tsawhill.org";
+  };
+  proxy.unifi = {
+    enable = true;
+    domain = "unifi.tsawhill.org";
+    mTLSCert = "mTLS-CA";
+  };
+  proxy.searx = {
+    enable = true;
+    domain = "searx.tsawhill.org";
+    mTLSCert = "mTLS-CA";
   };
 }

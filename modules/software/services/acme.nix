@@ -12,7 +12,7 @@
       dnsProvider = "cloudflare";
 
       environmentFile = config.sops.secrets.acme_env.path;
-      postRun = "(echo 'The current date and time is: $(date)' && /usr/bin/env scp /var/lib/acme/tsawhill/fullchain.pem /var/lib/acme/tsawhill/key.pem nginx@remote-nginx-nix.lan:/Certs/ && /usr/bin/env ssh nginx@remote-nginx-nix.lan 'chown -R nginx:nginx /Certs && chmod -R 770 /Certs && systemctl restart nginx'; /usr/bin/env scp /var/lib/acme/tsawhill/fullchain.pem /var/lib/acme/tsawhill/key.pem nginx@local-nginx-nix.lan:/Certs/ && /usr/bin/env ssh nginx@local-nginx-nix.lan 'chown -R nginx:nginx /Certs && chmod -R 770 /Certs && systemctl restart nginx') >> /root/postrun.log";
+      postRun = "(echo 'The current date and time is: $(date)' && /usr/bin/env scp /var/lib/acme/tsawhill/fullchain.pem /var/lib/acme/tsawhill/key.pem nginx@remote-nginx-nix.lan:/Certs/ && /usr/bin/env ssh nginx@remote-nginx-nix.lan 'chown -R nginx:nginx /Certs && chmod -R 770 /Certs && systemctl restart nginx'; /usr/bin/env scp /var/lib/acme/tsawhill/fullchain.pem /var/lib/acme/tsawhill/key.pem nginx@local-nginx-nix.lan:/Certs/ && /usr/bin/env ssh nginx@local-nginx-nix.lan 'chown -R nginx:nginx /Certs && chmod -R 770 /Certs && systemctl restart nginx'; /usr/bin/env scp /var/lib/acme/tsawhill/fullchain.pem /var/lib/acme/tsawhill/key.pem nginx@pi-backup-nix.lan:/Certs/ && /usr/bin/env ssh nginx@pi-backup-nix.lan 'chown -R nginx:nginx /Certs && chmod -R 770 /Certs && systemctl restart nginx') >> /root/postrun.log";
     };
   };
 }
