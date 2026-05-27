@@ -87,7 +87,20 @@ in
   software.fonts.enable = true;
   software.apps.config.enable = true;
   software.apps.web.enable = true;
-  software.apps.communication.enable = true;
+  software.apps.communication = {
+    enable = true;
+    vesktop = {
+      env = {
+        DRI_PRIME = "pci-0000_6f_00_0";
+        LIBVA_DRIVER_NAME = "radeonsi";
+        NIXOS_OZONE_WL = "1";
+      };
+      extraFlags = [
+        "--enable-features=VaapiVideoEncoder,WebRTCPipeWireCapturer"
+        "--ignore-gpu-blocklist"
+      ];
+    };
+  };
   software.apps.media-playback.enable = true;
   software.apps.media-creation.enable = true;
   software.apps.gaming.enable = true;
