@@ -36,6 +36,14 @@ in
 
   networking.useNetworkd = true;
 
+  # Ensure main ethernet gets DHCP under systemd-networkd
+  systemd.network.networks."40-ethernet" = {
+    matchConfig.Type = "ether";
+    matchConfig.Name = "!wg* veth*";
+    networkConfig.DHCP = "ipv4";
+    dhcpV4Config.RouteMetric = 1024;
+  };
+
   systemd.network.netdevs."50-${wireguard.interface}" = lib.mkIf wireguard.enable {
     netdevConfig = {
       Name = wireguard.interface;
