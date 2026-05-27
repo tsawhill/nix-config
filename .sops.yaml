@@ -11,6 +11,7 @@ keys:
 
   # Daily services
   - &local-nginx-nix age16hhtega9xw3qp9xlwf899hy6a7jqgv8cvexpuaf4j72r8n3avcxqvgn9k4
+  - &router-nix age187j2penptrt0upt6x02axrsz50jrztqruusd2jzdxwwfq27xkfgs2sgp6h
 
   # Weekly services
   - &adguard-nix age1u96ec563v3cth2j7pjkjdj9cza70766uv50nzae9lg3geuxa49tqwqhstp

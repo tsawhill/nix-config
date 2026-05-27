@@ -10,6 +10,7 @@ taylor-laptop-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEx3Xl0lyXZOOVy/SP/YOS
 
 # Daily services
 local-nginx-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGFonmIrhprZuHGhPrIh9UQmj8t4+6unrRQMW8X9G29B
+router-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIX8OSBQYcZbQm2EaNfacCZdlyD8hUy4xOyZluXH9UQp root@accepted-shark
 
 # Weekly services
 adguard-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMwxal6ziKK7ogvDJtisUkgAqfcUazrGZCvD0PaFx4nT
