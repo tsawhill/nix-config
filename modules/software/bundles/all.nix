@@ -12,6 +12,7 @@
   };
 
   config = lib.mkIf config.software.all.enable {
+    software.lan-launch.enable = true;
     # AppImage support
     programs.appimage = {
       enable = true;
