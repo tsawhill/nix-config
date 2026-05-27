@@ -78,6 +78,11 @@ in
     quantum = 128;
   };
 
+  software.lan-launch = {
+    interfaces = [ "eno2" ];
+    users = [ "taylor" ];
+  };
+
   software.dev.enable = true;
   software.fonts.enable = true;
   software.apps.config.enable = true;
