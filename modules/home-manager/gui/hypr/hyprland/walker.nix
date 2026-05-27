@@ -2,6 +2,7 @@
   lib,
   inputs,
   osConfig,
+  pkgs,
   ...
 }:
 {
@@ -9,6 +10,7 @@
 
   programs.walker = lib.mkIf (osConfig.my.hypr.launcher == "walker") {
     enable = true;
+    package = pkgs.walker;
     runAsService = true;
     config = {
       app_launch_prefix = lib.mkIf osConfig.programs.hyprland.withUWSM "uwsm app --";
