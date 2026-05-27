@@ -18,12 +18,12 @@
       cookie_domain = "tsawhill.org";
       authentik_host_browser = "https://auth.tsawhill.org";
       email = {
-        host = "smtp.example.com";
+        host = "smtp.purelymail.com";
         port = 587;
-        username = "authentik@example.com";
+        username = "authentik@tsawhill.org";
         use_tls = true;
         use_ssl = false;
-        from = "authentik@example.com";
+        from = "authentik@tsawhill.org";
       };
       listen = {
         http = "0.0.0.0:9000";
