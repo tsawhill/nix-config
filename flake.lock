@@ -1304,11 +1304,11 @@
         "systems": "systems_7"
       },
       "locked": {
-        "lastModified": 1777299395,
-        "narHash": "sha256-ZoLkqwPVw8SdW+f9Raf15/ttyKqmC6vtKd5R+orNN/g=",
+        "lastModified": 1777789924,
+        "narHash": "sha256-fX3ErzTmHRO9z1SzHC2VZUgKOgRfO13X/joC5a3QN7Q=",
         "owner": "abenz1267",
         "repo": "walker",
-        "rev": "7b0cb0fd1f8b0a60b241081483aea4277f0b4500",
+        "rev": "93d44d1cb41732e1370e4b949429ae8e34ea05a4",
         "type": "github"
       },
       "original": {
