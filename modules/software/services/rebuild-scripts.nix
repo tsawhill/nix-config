@@ -1,7 +1,12 @@
-{ config, pkgs, lib, ... }:
+{
+  config,
+  pkgs,
+  lib,
+  ...
+}:
 
 let
-  keepRoots = 14; # number of per-host deploy GC roots to retain on the build machine
+  keepRoots = 5; # number of per-host deploy GC roots to retain on the build machine
   repoPath = "/mnt/zpool/code/nix-config";
   flakePath = "path://${repoPath}";
   notifications = config.my.monitoring.notifications;
@@ -14,8 +19,9 @@ let
     # "pi-backup-nix" = "aa:bb:cc:dd:ee:ff";
   };
 
-  wolCases = lib.concatStringsSep "\n      "
-    (lib.mapAttrsToList (host: mac: ''${host}) echo "${mac}" ;;'') wolMacs);
+  wolCases = lib.concatStringsSep "\n      " (
+    lib.mapAttrsToList (host: mac: ''${host}) echo "${mac}" ;;'') wolMacs
+  );
 
   # Bash helpers shared across all deploy scripts.
   # notify "Title" <priority> "gotify body" ["extended email body"]
@@ -424,7 +430,10 @@ in
       description = "Update nix flake inputs";
       restartIfChanged = false;
       stopIfChanged = false;
-      path = [ pkgs.git pkgs.nix ];
+      path = [
+        pkgs.git
+        pkgs.nix
+      ];
       serviceConfig = {
         Type = "oneshot";
         User = "root";

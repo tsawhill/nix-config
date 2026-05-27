@@ -20,5 +20,8 @@ in
   services.udev.packages = [ igpu dgpu ];
 
   # ROCm OpenCL runtime — required for GPU compute in DaVinci Resolve
-  hardware.graphics.extraPackages = [ pkgs.rocmPackages.clr ];
+  hardware.graphics.extraPackages = [ pkgs.rocmPackages.clr.icd ];
+
+  # RDNA 3 (gfx1100) — explicit version so ROCm/DaVinci Resolve detect GPU
+  environment.variables.HSA_OVERRIDE_GFX_VERSION = "11.0.0";
 }
