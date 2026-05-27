@@ -2,9 +2,13 @@
   pkgs,
   lib,
   config,
+  self,
   ...
 }:
 {
+  imports = [
+    "${self}/modules/software/packages/lan-launch.nix"
+  ];
   options.software.all.enable = lib.mkOption {
     type = lib.types.bool;
     default = true;
