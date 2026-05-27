@@ -109,6 +109,7 @@ in
 
     # --- local deploy (no SSH, uses apply-local) ---
     "build-nix" = mkHost "daily" null "${self}/hosts/server-nix/LXCs/build.nix";
+    "router-nix" = mkHost null "router-nix.lan" "${self}/hosts/server-nix/LXCs/router.nix";
 
     # --- daily ---
     "local-nginx-nix" =
