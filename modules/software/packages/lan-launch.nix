@@ -90,6 +90,12 @@ in
               set -e
               rt_table=${toString (200 + i)}
 
+              # Clean up stale namespace if it exists
+              ${ip} netns delete lan-${iface} 2>/dev/null || true
+              ${ip} link delete ${veth} 2>/dev/null || true
+              ${ip} rule del from ${subnet}.0/24 table $rt_table 2>/dev/null || true
+              ${ip} route flush table $rt_table 2>/dev/null || true
+
               ${ip} netns add lan-${iface}
               ${ip} link add ${veth} type veth peer name veth-ns
               ${ip} link set veth-ns netns lan-${iface}
