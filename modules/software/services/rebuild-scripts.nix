@@ -101,8 +101,13 @@ let
       for host in $hosts; do
         local hdir="$base/$host"
         mkdir -p "$hdir"
+        # Only pin nixos-system-* closures, not every store path from logs
         for p in $store_paths; do
           [ -z "$p" ] && continue
+          case "$(basename "$p")" in
+            nixos-system-*) ;;
+            *) continue ;;
+          esac
           if [ -e "$p" ]; then
             ${pkgs.nix}/bin/nix-store --add-root "$hdir/$timestamp-$(basename "$p")" --indirect --realise "$p" || true
           fi
@@ -112,12 +117,14 @@ let
           rm -f "$hdir/$f" || true
         done || true
       done
-      # Prune GC root dirs for hosts no longer in the repo
+      # Prune GC root dirs for hosts no longer in the Colmena hive
       local known
-      known=$(find "${repoPath}/hosts" -mindepth 1 -maxdepth 1 -printf '%f\n' 2>/dev/null || true)
+      known=$(${pkgs.nix}/bin/nix eval --json "${flakePath}#colmena" \
+        --apply 'hive: builtins.filter (n: n != "meta") (builtins.attrNames hive)' \
+        2>/dev/null | ${pkgs.jq}/bin/jq -r '.[]' || true)
       for d in "$base"/*; do
         [ -d "$d" ] || continue
-        if ! echo "$known" | grep -xq "$(basename "$d")"; then
+        if [ -n "$known" ] && ! echo "$known" | grep -xq "$(basename "$d")"; then
           rm -rf "$d" || true
         fi
       done || true

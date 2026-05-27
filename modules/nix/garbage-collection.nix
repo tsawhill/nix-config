@@ -38,6 +38,12 @@ in
       default = "daily";
       description = "How often to run the pruning (systemd calendar format).";
     };
+
+    prunePerHostProfiles = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Also prune /nix/var/nix/profiles/per-host/*/system (Colmena builder machines).";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -54,8 +60,21 @@ in
       before = [ "nix-gc.service" ];
       serviceConfig = {
         Type = "oneshot";
-        ExecStart = "${pkgs.nix}/bin/nix-env -p /nix/var/nix/profiles/system --delete-generations +${toString cfg.generations}";
       };
+      script = let
+        nix-env = "${pkgs.nix}/bin/nix-env";
+        keep = "+${toString cfg.generations}";
+      in ''
+        # Prune local system profile
+        ${nix-env} -p /nix/var/nix/profiles/system --delete-generations ${keep}
+      '' + lib.optionalString cfg.prunePerHostProfiles ''
+        # Prune Colmena per-host profiles (builder machine)
+        for prof in /nix/var/nix/profiles/per-host/*/system; do
+          [ -e "$prof" ] || continue
+          echo "Pruning $prof"
+          ${nix-env} -p "$prof" --delete-generations ${keep} || true
+        done
+      '';
       wantedBy = [ "multi-user.target" ];
     };
   };

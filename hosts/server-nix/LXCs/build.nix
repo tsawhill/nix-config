@@ -57,5 +57,6 @@
       "kopuz.cachix.org-1:J2X3AnAYhKTJW5S3aCLoA1ckonQXVNZMQvhZA0YAufw="
     ];
   };
+  my.garbage.collection.prunePerHostProfiles = true;
   networking.hostName = "build-nix";
 }
