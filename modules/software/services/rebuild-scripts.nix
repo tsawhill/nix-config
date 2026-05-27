@@ -50,6 +50,23 @@ let
       } | ${pkgs.msmtp}/bin/msmtp "${notifications.recipientEmail}" || true
     }
 
+    deploy_log_email_body() {
+      local log="$1"
+      local heading="$2"
+      local tail_lines="''${3:-120}"
+      local failures
+      failures=$(grep -E '^(error: Cannot build|error: builder for|error: cannot download|error: .*failed|Build failed:|Failed:|[[:space:]]*Reason:|[[:space:]]*For full logs, run:|[[:space:]]*nix log /nix/store/.*\.drv|curl: \([0-9]+\))' "$log" | tail -n 80 || true)
+
+      {
+        printf '%s\n\n' "$heading"
+        if [ -n "$failures" ]; then
+          printf 'Failure highlights:\n%s\n\n' "$failures"
+        fi
+        printf 'Last %s log lines:\n' "$tail_lines"
+        tail -n "$tail_lines" "$log"
+      }
+    }
+
     get_wol_mac() {
       case "$1" in
         ${wolCases}
@@ -175,14 +192,14 @@ let
           SUCCEEDED_HOSTS="$SUCCEEDED_HOSTS $host"
         else
           ERROR_SUMMARY=$(tail -n 20 "$LOG")
-          FULL_LOG=$(cat "$LOG")
           if grep -qE 'ssh: connect|Connection refused|No route to host|Connection timed out|Network is unreachable|Could not connect|ssh_exchange_identification' "$LOG"; then
             CONN_FAIL_HOSTS="$CONN_FAIL_HOSTS $host"
           else
             HARD_FAIL_HOSTS="$HARD_FAIL_HOSTS $host"
+            EMAIL_BODY=$(deploy_log_email_body "$LOG" "Build log excerpt for $host (${name}).")
             notify_email "❌ ${name}: $host FAILED" 10 \
               "Last 20 lines:\n$ERROR_SUMMARY" \
-              "Full build log for $host:\n\n$FULL_LOG"
+              "$EMAIL_BODY"
           fi
         fi
         rm "$LOG"
@@ -330,10 +347,10 @@ let
       ${pkgs.git}/bin/git commit -m "auto: manual deploy $TARGET $(date '+%Y-%m-%d %H:%M')" || true
     else
       ERROR_SUMMARY=$(tail -n 20 "$LOG")
-      FULL_LOG=$(cat "$LOG")
+      EMAIL_BODY=$(deploy_log_email_body "$LOG" "Build log excerpt for manual deploy $TARGET (goal=$GOAL).")
       notify_email "❌ Manual deploy $TARGET FAILED" 10 \
         "Last 20 lines:\n$ERROR_SUMMARY" \
-        "Full log for manual deploy $TARGET (goal=$GOAL):\n\n$FULL_LOG"
+        "$EMAIL_BODY"
     fi
 
     rm "$LOG"
