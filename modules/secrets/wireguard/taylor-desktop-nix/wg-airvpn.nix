@@ -16,5 +16,13 @@ in
       group = "root";
       mode = "0400";
     };
+
+    sops.secrets.wg_airvpn_preshared_key = {
+      sopsFile = ./wg-airvpn.yaml;
+      key = "preshared_key";
+      owner = "root";
+      group = "root";
+      mode = "0400";
+    };
   };
 }

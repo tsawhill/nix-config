@@ -1,14 +1,62 @@
-{ config, lib, ... }:
+{ self, config, lib, ... }:
+
+let
+  airvpn = import "${self}/modules/network/wireguard/airvpn-servers.nix";
+
+  # Select AirVPN servers by country code, city name, or server name.
+  # All three lists are combined with OR logic.
+  airvpnCountries = [ "US" "CA" ];
+  airvpnCities = [ ];
+  airvpnServers = [ ];
+
+  selectedServers = lib.filterAttrs (
+    name: srv:
+    builtins.elem srv.country airvpnCountries
+    || builtins.elem srv.city airvpnCities
+    || builtins.elem name airvpnServers
+  ) airvpn.servers;
+
+  mkAirvpnProfile = name: srv: {
+    connection = {
+      id = "wg-airvpn-${name}";
+      type = "wireguard";
+      interface-name = "wg-airvpn";
+      autoconnect = "false";
+    };
+    wireguard = {
+      private-key = "$WG_AIRVPN_PRIVATE_KEY";
+    };
+    "wireguard-peer.${airvpn.publicKey}" = {
+      preshared-key = "$WG_AIRVPN_PRESHARED_KEY";
+      endpoint = "${srv.ip}:${toString airvpn.port}";
+      allowed-ips = "0.0.0.0/0;::/0;";
+      persistent-keepalive = "15";
+    };
+    ipv4 = {
+      method = "manual";
+      # address1 = "10.x.x.x/32"; # Set to your AirVPN device address
+      dns = "${airvpn.dns.ipv4};";
+    };
+    ipv6 = {
+      method = "disabled";
+    };
+  };
+
+  airvpnProfiles = lib.mapAttrs' (
+    name: srv: lib.nameValuePair "wg-airvpn-${name}" (mkAirvpnProfile name srv)
+  ) selectedServers;
+in
 {
   networking.useDHCP = lib.mkDefault true;
   networking.networkmanager.enable = true;
   networking.interfaces.eno2.wakeOnLan.enable = true;
 
-  # WireGuard private keys injected into NM profiles via SOPS template
+  # WireGuard secrets injected into NM profiles via SOPS template
   sops.templates."nm-wireguard-env" = {
     content = ''
       WG_REMOTE_PRIVATE_KEY=${config.sops.placeholder.wg_remote_private_key}
       WG_AIRVPN_PRIVATE_KEY=${config.sops.placeholder.wg_airvpn_private_key}
+      WG_AIRVPN_PRESHARED_KEY=${config.sops.placeholder.wg_airvpn_preshared_key}
     '';
   };
 
@@ -41,31 +89,7 @@
           method = "disabled";
         };
       };
-
-      wg-airvpn = {
-        connection = {
-          id = "wg-airvpn";
-          type = "wireguard";
-          interface-name = "wg-airvpn";
-          autoconnect = "false";
-        };
-        wireguard = {
-          private-key = "$WG_AIRVPN_PRIVATE_KEY";
-        };
-        # "wireguard-peer.PEER_PUBLIC_KEY_BASE64=" = {
-        #   endpoint = "host:1637";
-        #   allowed-ips = "0.0.0.0/0;::/0;";
-        #   persistent-keepalive = "25";
-        # };
-        ipv4 = {
-          method = "manual";
-          # address1 = "10.x.x.x/32";
-        };
-        ipv6 = {
-          method = "disabled";
-        };
-      };
-    };
+    } // airvpnProfiles;
   };
 
   hardware.bluetooth = {
