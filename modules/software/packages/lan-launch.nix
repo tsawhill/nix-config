@@ -85,8 +85,11 @@ in
               Type = "oneshot";
               RemainAfterExit = true;
             };
+            path = [ pkgs.gawk ];
             script = ''
               set -e
+              rt_table=${toString (200 + i)}
+
               ${ip} netns add lan-${iface}
               ${ip} link add ${veth} type veth peer name veth-ns
               ${ip} link set veth-ns netns lan-${iface}
@@ -99,11 +102,25 @@ in
               ${ip} netns exec lan-${iface} ${ip} link set veth-ns up
               ${ip} netns exec lan-${iface} ${ip} route add default via ${subnet}.1
 
+              # Policy routing: force namespace traffic out ${iface}, bypassing VPN
+              gateway=$(${ip} route show dev ${iface} default 2>/dev/null | head -1 | awk '{print $3}')
+              if [ -z "$gateway" ]; then
+                gateway=$(${pkgs.networkmanager}/bin/nmcli -g IP4.GATEWAY device show ${iface} 2>/dev/null | head -1)
+              fi
+              if [ -n "$gateway" ]; then
+                ${ip} rule add from ${subnet}.0/24 table $rt_table
+                ${ip} route add default via "$gateway" dev ${iface} table $rt_table
+              else
+                echo "WARNING: could not detect gateway for ${iface}, LAN routing may not work" >&2
+              fi
+
               mkdir -p /run/netns-dns/lan-${iface}
               printf '%s\n' ${lib.concatMapStringsSep " " (d: "'nameserver ${d}'") cfg.dns} \
                 > /run/netns-dns/lan-${iface}/resolv.conf
             '';
             preStop = ''
+              ${ip} rule del from ${subnet}.0/24 table ${toString (200 + i)} 2>/dev/null || true
+              ${ip} route flush table ${toString (200 + i)} 2>/dev/null || true
               ${ip} netns delete lan-${iface} || true
               rm -rf /run/netns-dns/lan-${iface}
             '';
