@@ -20,9 +20,11 @@ let
     };
     wireguard = {
       private-key = "$WG_AIRVPN_PRIVATE_KEY";
+      private-key-flags = "0";
     };
     "wireguard-peer.${airvpn.publicKey}" = {
       preshared-key = "$WG_AIRVPN_PRESHARED_KEY";
+      preshared-key-flags = "0";
       endpoint = "${srv.ip}:${toString airvpn.port}";
       allowed-ips = "0.0.0.0/0;::/0;";
       persistent-keepalive = "15";
