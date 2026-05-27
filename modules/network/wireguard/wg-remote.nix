@@ -40,6 +40,24 @@ in
         default = "25";
       };
     };
+
+    dns = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = "DNS server to use when connected (e.g. 10.73.73.6)";
+    };
+
+    dnsPriority = lib.mkOption {
+      type = lib.types.int;
+      default = 100;
+      description = "DNS priority. Negative = exclusive (only this DNS used when active)";
+    };
+
+    routeMetric = lib.mkOption {
+      type = lib.types.nullOr lib.types.int;
+      default = null;
+      description = "Route metric. Higher = lower priority, so LAN routes win";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -72,6 +90,11 @@ in
         ipv4 = {
           method = "manual";
           address1 = cfg.address;
+        } // lib.optionalAttrs (cfg.dns != null) {
+          dns = "${cfg.dns};";
+          dns-priority = toString cfg.dnsPriority;
+        } // lib.optionalAttrs (cfg.routeMetric != null) {
+          route-metric = toString cfg.routeMetric;
         };
         ipv6 = {
           method = "disabled";

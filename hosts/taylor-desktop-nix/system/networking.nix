@@ -8,10 +8,13 @@
     enable = true;
     address = "10.50.50.2/32";
     autoconnect = "true";
+    dns = "10.73.73.6";
+    dnsPriority = -1;
+    routeMetric = 50000;
     peer = {
       publicKey = "***REDACTED_WG_PUBKEY***";
       endpoint = "taylordnsfree.zapto.org:51820";
-      allowedIPs = "10.50.50.0/24;";
+      allowedIPs = "10.50.50.0/24;10.73.73.0/24;";
     };
   };
 
