@@ -57,6 +57,10 @@ in
     # Desktop
     "${self}/modules/software/desktop"
 
+    # WireGuard
+    "${self}/modules/network/wireguard/wg-remote.nix"
+    "${self}/modules/network/wireguard/airvpn.nix"
+
     # Hardware services
     # "${self}/modules/software/services/openrgb.nix"
     "${self}/modules/hardware/udev"
