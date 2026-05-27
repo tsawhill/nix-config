@@ -81,7 +81,7 @@ let
         for p in $store_paths; do
           [ -z "$p" ] && continue
           if [ -e "$p" ]; then
-            ${pkgs.nix}/bin/nix-store --add-root "$hdir/$timestamp-$(basename "$p")" --indirect "$p" || true
+            ${pkgs.nix}/bin/nix-store --add-root "$hdir/$timestamp-$(basename "$p")" --indirect --realise "$p" || true
           fi
         done
         local keep=${toString keepRoots}
