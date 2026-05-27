@@ -88,6 +88,8 @@ in
 
   my.secrets.syncthing.desktop-nix.enable = true;
   my.secrets.sshclientkey.taylor-desktop-nix-taylor.enable = true;
+  my.secrets.wireguard.taylor-desktop-nix.wg-remote.enable = true;
+  my.secrets.wireguard.taylor-desktop-nix.wg-airvpn.enable = true;
 
   my.users.taylor = {
     enable = true;
