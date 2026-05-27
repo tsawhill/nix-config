@@ -75,6 +75,11 @@ creation_rules:
       - age:
         - *build-nix
         - *pi-backup-nix
+  - path_regex: modules/secrets/wireguard/pi-backup-nix/wg-remote\.yaml$
+    key_groups:
+      - age:
+        - *build-nix
+        - *pi-backup-nix
   - path_regex: modules/secrets/wireguard/taylor-desktop-nix/wg-remote\.yaml$
     key_groups:
       - age:

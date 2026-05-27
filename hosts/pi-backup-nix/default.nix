@@ -26,6 +26,7 @@ in
     ./home-manager.nix
     ./system/disks.nix
     ./system/networking.nix
+    "${self}/modules/network/wireguard/wg-remote.nix"
     ./system/cloudflare-ddns.nix
     ./system/zfs-backup-target.nix
     # Locale
@@ -118,6 +119,7 @@ in
   my.nginx.geoblock.enable = true;
 
   my.secrets.wireguard.pi-backup-nix.enable = true;
+  my.secrets.wireguard.pi-backup-nix.wg-remote.enable = true;
 
   users.users.nginx = {
     # This tells NixOS not to use the 'nologin' shell
