@@ -50,29 +50,20 @@ in
     boot.kernel.sysctl."net.ipv4.ip_forward" = 1;
 
     networking.firewall.extraCommands = lib.mkIf (cfg.interfaces != [ ]) (
-      let
-        rules = lib.concatStrings (
-          lib.imap0 (
-            i: iface:
-            let
-              subnet = "10.200.${toString (200 + i)}";
-              veth = "veth-lan-${iface}";
-            in
-            ''
-              iptables -A LAN-LAUNCH -i ${veth} -o ${iface} -j ACCEPT
-              iptables -A LAN-LAUNCH -i ${iface} -o ${veth} -m state --state RELATED,ESTABLISHED -j ACCEPT
-              iptables -t nat -A LAN-LAUNCH -s ${subnet}.0/24 -o ${iface} -j MASQUERADE
-            ''
-          ) cfg.interfaces
-        );
-      in
-      ''
-        iptables -N LAN-LAUNCH 2>/dev/null || iptables -F LAN-LAUNCH
-        iptables -t nat -N LAN-LAUNCH 2>/dev/null || iptables -t nat -F LAN-LAUNCH
-        iptables -C FORWARD -j LAN-LAUNCH 2>/dev/null || iptables -A FORWARD -j LAN-LAUNCH
-        iptables -t nat -C POSTROUTING -j LAN-LAUNCH 2>/dev/null || iptables -t nat -A POSTROUTING -j LAN-LAUNCH
-        ${rules}
-      ''
+      lib.concatStrings (
+        lib.imap0 (
+          i: iface:
+          let
+            subnet = "10.200.${toString (200 + i)}";
+            veth = "veth-lan-${iface}";
+          in
+          ''
+            iptables -w -I FORWARD 1 -i ${iface} -o ${veth} -m state --state RELATED,ESTABLISHED -j ACCEPT
+            iptables -w -I FORWARD 1 -i ${veth} -o ${iface} -j ACCEPT
+            iptables -w -t nat -A POSTROUTING -s ${subnet}.0/24 -o ${iface} -j MASQUERADE
+          ''
+        ) cfg.interfaces
+      )
     );
 
     systemd.services = builtins.listToAttrs (
