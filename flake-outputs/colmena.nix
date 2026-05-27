@@ -107,8 +107,8 @@ in
       };
     };
 
-    # --- self (local deploy, no SSH) ---
-    "build-nix" = mkHost "self" null "${self}/hosts/server-nix/LXCs/build.nix";
+    # --- local deploy (no SSH, uses apply-local) ---
+    "build-nix" = mkHost "daily" null "${self}/hosts/server-nix/LXCs/build.nix";
 
     # --- daily ---
     "local-nginx-nix" =

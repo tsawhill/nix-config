@@ -146,12 +146,18 @@ let
       ALL_STORE_PATHS=""
       HAD_WARNINGS=false
 
+      SELF_HOSTNAME=$(hostname)
+
       # --- First pass: each host individually so one build failure can't abort others ---
       for host in $ALL_HOSTS; do
         echo "--- [$host] deploying ---"
         LOG=$(mktemp)
         colmena_exit=0
-        ${pkgs.colmena}/bin/colmena apply --on "$host" switch --no-substitute 2>&1 | tee "$LOG" || colmena_exit=$?
+        if [ "$host" = "$SELF_HOSTNAME" ]; then
+          ${pkgs.colmena}/bin/colmena apply-local switch 2>&1 | tee "$LOG" || colmena_exit=$?
+        else
+          ${pkgs.colmena}/bin/colmena apply --on "$host" switch --no-substitute 2>&1 | tee "$LOG" || colmena_exit=$?
+        fi
 
         NEW_PATHS=$(grep -oE '/nix/store/[a-z0-9]+[^[:space:]]*' "$LOG" | sort -u || true)
         [ -n "$NEW_PATHS" ] && ALL_STORE_PATHS=$(printf '%s\n%s' "$ALL_STORE_PATHS" "$NEW_PATHS" | sort -u | grep -v '^$') || true
@@ -194,7 +200,11 @@ let
           sleep $RETRY_DELAY
           LOG=$(mktemp)
           colmena_exit=0
-          ${pkgs.colmena}/bin/colmena apply --on "$host" switch --no-substitute 2>&1 | tee "$LOG" || colmena_exit=$?
+          if [ "$host" = "$SELF_HOSTNAME" ]; then
+            ${pkgs.colmena}/bin/colmena apply-local switch 2>&1 | tee "$LOG" || colmena_exit=$?
+          else
+            ${pkgs.colmena}/bin/colmena apply --on "$host" switch --no-substitute 2>&1 | tee "$LOG" || colmena_exit=$?
+          fi
 
           NEW_PATHS=$(grep -oE '/nix/store/[a-z0-9]+[^[:space:]]*' "$LOG" | sort -u || true)
           [ -n "$NEW_PATHS" ] && ALL_STORE_PATHS=$(printf '%s\n%s' "$ALL_STORE_PATHS" "$NEW_PATHS" | sort -u | grep -v '^$') || true
@@ -241,7 +251,11 @@ let
       if [ -n "$SUCCEEDED_HOSTS" ]; then
         REVISIONS=""
         for host in $SUCCEEDED_HOSTS; do
-          VER=$(${pkgs.openssh}/bin/ssh -o ConnectTimeout=5 -o BatchMode=yes "root@$host" nixos-version 2>/dev/null || echo "unreachable")
+          if [ "$host" = "$SELF_HOSTNAME" ]; then
+            VER=$(nixos-version 2>/dev/null || echo "unknown")
+          else
+            VER=$(${pkgs.openssh}/bin/ssh -o ConnectTimeout=5 -o BatchMode=yes "root@$host" nixos-version 2>/dev/null || echo "unreachable")
+          fi
           REVISIONS+="$host: $VER\n"
         done
         COMMIT_MSG=$(printf 'auto: ${name} deploy %s\n\n%b' "$(date '+%Y-%m-%d %H:%M')" "$REVISIONS")
@@ -252,69 +266,6 @@ let
       fi
 
       [ -z "$HARD_FAIL_HOSTS" ] || exit 1
-    '';
-  };
-
-  mkSelfDeployService = selfHostname: {
-    description = "Self Colmena Deploy";
-    restartIfChanged = false;
-    stopIfChanged = false;
-    wants = [ "flake-update.service" ];
-    after = [ "flake-update.service" ];
-    path = servicePath;
-    serviceConfig = {
-      Type = "oneshot";
-      User = "root";
-    };
-    script = ''
-      set -euo pipefail
-      ${sharedFns}
-
-      echo "--- Committing pre-deploy state ---"
-      ${pkgs.git}/bin/git -C "${repoPath}" add -A
-      ${pkgs.git}/bin/git -C "${repoPath}" commit -m "auto: Self pre-deploy $(date '+%Y-%m-%d %H:%M')" || true
-
-      echo "--- Deploying Self (${selfHostname}) ---"
-      RETRY_DELAY=300
-      MAX_RETRIES=3
-      for attempt in $(seq 1 $MAX_RETRIES); do
-        echo "Attempt $attempt/$MAX_RETRIES..."
-        LOG=$(mktemp)
-        cd "${repoPath}"
-        if ${pkgs.colmena}/bin/colmena apply-local switch 2>&1 | tee "$LOG"; then
-          WARNINGS=$(grep -E '\[WARN\]|warning:' "$LOG" || true)
-          if [ -n "$WARNINGS" ]; then
-            notify "⚠️ Self deploy succeeded (with warnings)" 4 \
-              "Warnings:\n$WARNINGS"
-          else
-            notify "✅ Self deploy succeeded" 3 \
-              "${selfHostname} deployed successfully."
-          fi
-          VER=$(nixos-version 2>/dev/null || echo "unknown")
-          COMMIT_MSG=$(printf 'auto: Self deploy %s\n\n${selfHostname}: %s' "$(date '+%Y-%m-%d %H:%M')" "$VER")
-          ${pkgs.git}/bin/git -C "${repoPath}" add flake.lock
-          ${pkgs.git}/bin/git -C "${repoPath}" commit -m "$COMMIT_MSG" || true
-
-          # GC roots for self
-          STORE_PATHS=$(grep -oE '/nix/store/[a-z0-9]+[^[:space:]]*' "$LOG" | sort -u || true)
-          pin_gc_roots "self" "$STORE_PATHS"
-          rm "$LOG"
-          break
-        else
-          FULL_LOG=$(cat "$LOG")
-          ERROR_SUMMARY=$(tail -n 20 "$LOG")
-          rm "$LOG"
-          if [ $attempt -lt $MAX_RETRIES ]; then
-            echo "Deploy failed, retrying in $((RETRY_DELAY / 60)) minutes (attempt $attempt/$MAX_RETRIES)..."
-            sleep $RETRY_DELAY
-          else
-            notify "❌ Self deploy FAILED" 10 \
-              "Last 20 lines:\n$ERROR_SUMMARY" \
-              "Full build log for ${selfHostname}:\n\n$FULL_LOG"
-            exit 1
-          fi
-        fi
-      done
     '';
   };
 
@@ -467,13 +418,11 @@ in
     "deploy-Daily" = mkDeployService "Daily" "@daily";
     "deploy-Weekly" = mkDeployService "Weekly" "@weekly";
     "deploy-Monthly" = mkDeployService "Monthly" "@monthly";
-    "deploy-Self" = mkSelfDeployService "build-nix";
   };
 
   systemd.timers = {
-    "deploy-Daily" = mkTimer "Daily" "Sun,Mon..Fri *-*-* 00:00";
-    "deploy-Weekly" = mkTimer "Weekly" "Sat *-*-8..31 00:00";
-    "deploy-Monthly" = mkTimer "Monthly" "Sat *-*-1..7 00:00";
-    "deploy-Self" = mkTimer "Self" "Sat *-*-* 01:00";
+    "deploy-Daily" = mkTimer "Daily" "*-*-* 00:00";
+    "deploy-Weekly" = mkTimer "Weekly" "Sat *-*-* 01:00";
+    "deploy-Monthly" = mkTimer "Monthly" "Sat *-*-1..7 02:00";
   };
 }
