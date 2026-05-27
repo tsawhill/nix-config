@@ -9,65 +9,101 @@ let
   cfg = config.my.router;
 
   inherit (lib)
+    concatStringsSep
     filterAttrs
     mapAttrs'
+    mapAttrsToList
     mkIf
     nameValuePair
+    optional
     optionalAttrs
     ;
 
-  mkPeer =
-    peer:
-    {
-      publicKey = peer.publicKey;
-      allowedIPs = peer.allowedIPs;
-    }
-    // optionalAttrs (peer.name != null) { name = peer.name; }
-    // optionalAttrs (peer.endpoint != null) { endpoint = peer.endpoint; }
-    // optionalAttrs (peer.persistentKeepalive != null) {
-      persistentKeepalive = peer.persistentKeepalive;
-    }
-    // optionalAttrs (peer.presharedKeyFile != null) {
-      presharedKeyFile = peer.presharedKeyFile;
+  # ── Server helpers ───────────────────────────────────────────────────
+
+  mkServerNetdev = name: server: {
+    netdevConfig = {
+      Name = name;
+      Kind = "wireguard";
+      MTUBytes = toString (if server.mtu != null then server.mtu else 1420);
     };
+    wireguardConfig = {
+      PrivateKeyFile = server.privateKeyFile;
+      ListenPort = server.listenPort;
+    };
+    wireguardPeers = map (peer:
+      {
+        AllowedIPs = peer.allowedIPs;
+      }
+      // optionalAttrs (peer.publicKey != null) { PublicKey = peer.publicKey; }
+      // optionalAttrs (peer.publicKeyFile != null) { PublicKeyFile = peer.publicKeyFile; }
+      // optionalAttrs (peer.endpoint != null) { Endpoint = peer.endpoint; }
+      // optionalAttrs (peer.persistentKeepalive != null) {
+        PersistentKeepalive = peer.persistentKeepalive;
+      }
+      // optionalAttrs (peer.presharedKeyFile != null) {
+        PresharedKeyFile = peer.presharedKeyFile;
+      }
+      // optionalAttrs (peer.name != null) { Name = peer.name; }
+    ) server.peers;
+  };
 
-  mkServer = _name: server: {
-    ips = [ server.address ];
-    listenPort = server.listenPort;
-    privateKeyFile = server.privateKeyFile;
-    peers = map mkPeer server.peers;
-  } // optionalAttrs (server.mtu != null) { mtu = server.mtu; };
+  mkServerNetwork = name: server: {
+    matchConfig.Name = name;
+    address = [ server.address ];
+    networkConfig = {
+      IPv4Forwarding = true;
+    };
+  };
 
-  # Client/provider tunnels do not install 0.0.0.0/0 automatically. Policy
-  # routing below decides which marked flows use which provider table.
-  mkClient =
-    name: client:
-    {
-      ips = [ client.address ];
-      privateKeyFile = client.privateKeyFile;
-      allowedIPsAsRoutes = false;
-      peers = [
-        (mkPeer {
-          inherit (client)
-            publicKey
-            allowedIPs
-            endpoint
-            persistentKeepalive
-            presharedKeyFile
-            ;
-          name = name;
-        })
-      ];
-    }
-    // optionalAttrs (client.mtu != null) { mtu = client.mtu; }
-    // optionalAttrs (client.fwMark != null) { fwMark = toString client.fwMark; };
+  # ── Client helpers ───────────────────────────────────────────────────
+
+  mkClientNetdev = name: client: {
+    netdevConfig = {
+      Name = name;
+      Kind = "wireguard";
+      MTUBytes = toString (if client.mtu != null then client.mtu else 1420);
+    };
+    wireguardConfig = {
+      PrivateKeyFile = client.privateKeyFile;
+    } // optionalAttrs (client.fwMark != null) {
+      FirewallMark = client.fwMark;
+    };
+    wireguardPeers = [
+      ({
+        AllowedIPs = client.allowedIPs;
+      }
+      // optionalAttrs (client.publicKey != null) { PublicKey = client.publicKey; }
+      // optionalAttrs (client.publicKeyFile != null) { PublicKeyFile = client.publicKeyFile; }
+      // optionalAttrs (client.endpoint != null) { Endpoint = client.endpoint; }
+      // optionalAttrs (client.persistentKeepalive != null) {
+        PersistentKeepalive = client.persistentKeepalive;
+      }
+      // optionalAttrs (client.presharedKeyFile != null) {
+        PresharedKeyFile = client.presharedKeyFile;
+      })
+    ];
+  };
+
+  mkClientNetwork = name: client: {
+    matchConfig.Name = name;
+    address = [ client.address ];
+    networkConfig = {
+      IPv4Forwarding = true;
+    };
+    routes = optional (client.allowedIPs != [ "0.0.0.0/0" ]) {
+      Destination = builtins.head client.allowedIPs;
+    };
+  };
+
+  # ── Policy routing ───────────────────────────────────────────────────
 
   routedWireguardClients = filterAttrs (
     _name: client: client.gateway != null && client.routeTable != null && client.fwMark != null
   ) cfg.wireguard.clients;
 
-  policyRouteSetup = lib.concatStringsSep "\n" (
-    lib.mapAttrsToList (
+  policyRouteSetup = concatStringsSep "\n" (
+    mapAttrsToList (
       name: client:
       ''
         until ${pkgs.iproute2}/bin/ip link show ${name} >/dev/null 2>&1; do
@@ -79,8 +115,8 @@ let
     ) routedWireguardClients
   );
 
-  policyRouteCleanup = lib.concatStringsSep "\n" (
-    lib.mapAttrsToList (
+  policyRouteCleanup = concatStringsSep "\n" (
+    mapAttrsToList (
       _name: client:
       ''
         ${pkgs.iproute2}/bin/ip rule del fwmark ${toString client.fwMark} table ${toString client.routeTable} priority ${toString client.routePriority} 2>/dev/null || true
@@ -91,9 +127,13 @@ let
 in
 {
   config = mkIf cfg.enable {
-    networking.wireguard.interfaces =
-      (mapAttrs' (name: server: nameValuePair name (mkServer name server)) cfg.wireguard.servers)
-      // (mapAttrs' (name: client: nameValuePair name (mkClient name client)) cfg.wireguard.clients);
+    systemd.network.netdevs =
+      (mapAttrs' (name: server: nameValuePair "50-${name}" (mkServerNetdev name server)) cfg.wireguard.servers)
+      // (mapAttrs' (name: client: nameValuePair "50-${name}" (mkClientNetdev name client)) cfg.wireguard.clients);
+
+    systemd.network.networks =
+      (mapAttrs' (name: server: nameValuePair "50-${name}" (mkServerNetwork name server)) cfg.wireguard.servers)
+      // (mapAttrs' (name: client: nameValuePair "50-${name}" (mkClientNetwork name client)) cfg.wireguard.clients);
 
     systemd.services.router-wireguard-policy-routes = mkIf (routedWireguardClients != { }) {
       description = "Router WireGuard policy routing tables";

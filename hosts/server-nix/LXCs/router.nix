@@ -95,6 +95,7 @@ in
 
   networking.hostName = "router-nix";
   my.secrets.wireguard.router-nix.enable = true;
+  my.secrets.wireguard.pubkeys.enable = true;
 
   # The base LXC profile configures eth0 with DHCP. The router container owns
   # its interfaces explicitly so LAN/WAN naming stays stable and auditable.
@@ -138,28 +139,28 @@ in
         peers = [
           {
             name = "Oracle-Rocky-Proxy";
-            publicKey = "***REDACTED_WG_PUBKEY***";
+            publicKeyFile = secrets.wg_pubkey_oracle_rocky_proxy.path;
             allowedIPs = [ "${wgRemoteClients.oracle-rocky-proxy}/32" ];
             persistentKeepalive = 25;
           }
           {
             name = "Pixel7Pro";
-            publicKey = "***REDACTED_WG_PUBKEY***";
+            publicKeyFile = secrets.wg_pubkey_pixel7pro.path;
             allowedIPs = [ "${wgRemoteClients.pixel7pro}/32" ];
           }
           {
             name = "FWLaptop";
-            publicKey = "***REDACTED_WG_PUBKEY***";
+            publicKeyFile = secrets.wg_pubkey_fwlaptop.path;
             allowedIPs = [ "${wgRemoteClients.fwlaptop}/32" ];
           }
           {
             name = "pi-backup-nix";
-            publicKey = "***REDACTED_WG_PUBKEY***";
+            publicKeyFile = secrets.wg_pubkey_pi_backup_nix.path;
             allowedIPs = [ "${wgRemoteClients.pi-backup-nix}/32" ];
           }
           {
             name = "taylor-desktop-nix";
-            publicKey = "***REDACTED_WG_PUBKEY***";
+            publicKeyFile = secrets.wg_pubkey_taylor_desktop_nix.path;
             allowedIPs = [ "${wgRemoteClients.taylor-desktop-nix}/32" ];
           }
         ];
@@ -169,7 +170,7 @@ in
         wg-airvpn-ch = {
           address = "10.134.43.233/32";
           privateKeyFile = secrets.router_wg_airvpn_ch_private_key.path;
-          publicKey = "***REDACTED_WG_PUBKEY***";
+          publicKeyFile = secrets.wg_pubkey_airvpn.path;
           presharedKeyFile = secrets.router_wg_airvpn_ch_preshared_key.path;
           endpoint = "62.102.148.218:1637";
           mtu = 1320;
@@ -182,7 +183,7 @@ in
         wg-airvpn-na = {
           address = "10.172.0.216/32";
           privateKeyFile = secrets.router_wg_airvpn_na_private_key.path;
-          publicKey = "***REDACTED_WG_PUBKEY***";
+          publicKeyFile = secrets.wg_pubkey_airvpn.path;
           presharedKeyFile = secrets.router_wg_airvpn_na_preshared_key.path;
           endpoint = "198.44.134.6:1637";
           gateway = "10.172.0.215";
@@ -252,12 +253,6 @@ in
               to = "!@local_addresses";
               outInterface = "wan0";
               comment = "Kill switch: San Jose VPN clients never exit WAN";
-            }
-            {
-              from = "@local_addresses";
-              to = "***REDACTED_IP***";
-              outInterface = "wan0";
-              comment = "Do not send seedbox traffic over WAN";
             }
           ];
 
@@ -377,12 +372,6 @@ in
           to = "!@local_addresses";
           via = "wg-airvpn-na";
           comment = "US VPN clients exit via San Jose";
-        }
-        {
-          from = "@local_addresses";
-          to = "***REDACTED_IP***";
-          via = "wg-airvpn-na";
-          comment = "Seedbox traffic exits via San Jose";
         }
       ];
     };

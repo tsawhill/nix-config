@@ -64,6 +64,12 @@ creation_rules:
   #                             WireGuard keys
   #
   ##############################################################################
+  - path_regex: modules/secrets/wireguard/pubkeys\.yaml$
+    key_groups:
+      - age:
+        - *build-nix
+        - *taylor-desktop-nix
+        - *pi-backup-nix
   - path_regex: modules/secrets/wireguard/pi-backup-nix\.yaml$
     key_groups:
       - age:

@@ -126,7 +126,16 @@ let
         type = types.nullOr types.str;
         default = null;
       };
-      publicKey = mkOption { type = types.str; };
+      publicKey = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "Peer public key (literal). Mutually exclusive with publicKeyFile.";
+      };
+      publicKeyFile = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "Path to file containing peer public key. Used with systemd-networkd PublicKeyFile.";
+      };
       allowedIPs = mkOption { type = types.listOf types.str; };
       endpoint = mkOption {
         type = types.nullOr types.str;
@@ -338,7 +347,16 @@ in
             options = {
               address = mkOption { type = types.str; };
               privateKeyFile = mkOption { type = types.str; };
-              publicKey = mkOption { type = types.str; };
+              publicKey = mkOption {
+                type = types.nullOr types.str;
+                default = null;
+                description = "Peer public key (literal). Mutually exclusive with publicKeyFile.";
+              };
+              publicKeyFile = mkOption {
+                type = types.nullOr types.str;
+                default = null;
+                description = "Path to file containing peer public key.";
+              };
               presharedKeyFile = mkOption {
                 type = types.nullOr types.str;
                 default = null;

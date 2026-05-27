@@ -1,5 +1,4 @@
 {
-  publicKey = "***REDACTED_WG_PUBKEY***";
   port = 1637;
   mtu = 1320;
   dns = {

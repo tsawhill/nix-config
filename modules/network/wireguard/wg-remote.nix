@@ -2,6 +2,15 @@
 
 let
   cfg = config.my.network.wg-remote;
+
+  dnsSection = lib.optionalString (cfg.dns != null) ''
+    dns=${cfg.dns};
+    dns-priority=${toString cfg.dnsPriority}
+  '';
+
+  metricSection = lib.optionalString (cfg.routeMetric != null) ''
+    route-metric=${toString cfg.routeMetric}
+  '';
 in
 {
   options.my.network.wg-remote = {
@@ -19,11 +28,6 @@ in
     };
 
     peer = {
-      publicKey = lib.mkOption {
-        type = lib.types.str;
-        description = "Peer public key";
-      };
-
       endpoint = lib.mkOption {
         type = lib.types.str;
         description = "Peer endpoint (host:port)";
@@ -61,45 +65,37 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    sops.templates."nm-wg-remote-env" = {
+    sops.templates."nm-wg-remote" = {
+      path = "/etc/NetworkManager/system-connections/wg-remote.nmconnection";
+      owner = "root";
+      group = "root";
+      mode = "0600";
       content = ''
-        WG_REMOTE_PRIVATE_KEY=${config.sops.placeholder.wg_remote_private_key}
+        [connection]
+        id=wg-remote
+        type=wireguard
+        interface-name=wg-remote
+        autoconnect=${cfg.autoconnect}
+
+        [wireguard]
+        private-key=${config.sops.placeholder.wg_remote_private_key}
+
+        [wireguard-peer.${config.sops.placeholder.wg_pubkey_router_wg_remote}]
+        endpoint=${cfg.peer.endpoint}
+        allowed-ips=${cfg.peer.allowedIPs}
+        persistent-keepalive=${cfg.peer.persistentKeepalive}
+
+        [ipv4]
+        method=manual
+        address1=${cfg.address}
+        ${dnsSection}${metricSection}
+        [ipv6]
+        method=disabled
       '';
     };
 
-    networking.networkmanager.ensureProfiles = {
-      environmentFiles = [
-        config.sops.templates."nm-wg-remote-env".path
-      ];
-
-      profiles.wg-remote = {
-        connection = {
-          id = "wg-remote";
-          type = "wireguard";
-          interface-name = "wg-remote";
-          autoconnect = cfg.autoconnect;
-        };
-        wireguard = {
-          private-key = "$WG_REMOTE_PRIVATE_KEY";
-        };
-        "wireguard-peer.${cfg.peer.publicKey}" = {
-          endpoint = cfg.peer.endpoint;
-          allowed-ips = cfg.peer.allowedIPs;
-          persistent-keepalive = cfg.peer.persistentKeepalive;
-        };
-        ipv4 = {
-          method = "manual";
-          address1 = cfg.address;
-        } // lib.optionalAttrs (cfg.dns != null) {
-          dns = "${cfg.dns};";
-          dns-priority = toString cfg.dnsPriority;
-        } // lib.optionalAttrs (cfg.routeMetric != null) {
-          route-metric = toString cfg.routeMetric;
-        };
-        ipv6 = {
-          method = "disabled";
-        };
-      };
-    };
+    systemd.services.NetworkManager.restartTriggers = [
+      config.sops.templates."nm-wg-remote".content
+    ];
   };
 }

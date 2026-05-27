@@ -14,7 +14,6 @@ let
     address = "10.50.50.5/32";
     peer = {
       name = "server";
-      publicKey = "***REDACTED_WG_PUBKEY***";
       allowedIPs = [
         "10.73.73.0/24"
         "10.50.0.0/16"
@@ -26,51 +25,53 @@ let
   wireguardTarget = "wireguard-${wireguard.interface}.target";
   peerUnit = "wireguard-${wireguard.interface}-peer-${wireguard.peer.name}";
   peerService = "${peerUnit}.service";
+
+  pubkeyPath = config.sops.secrets.wg_pubkey_router_wg_remote.path;
 in
 {
   networking.useDHCP = lib.mkDefault true;
   networking.firewall.checkReversePath = "loose";
 
-  networking.wireguard.interfaces = lib.mkIf wireguard.enable {
-    ${wireguard.interface} = {
-      ips = [ wireguard.address ];
-      privateKeyFile = config.sops.secrets.pi_backup_wireguard_private_key.path;
-      listenPort = wireguard.listenPort;
-      mtu = 1280;
-      # Keep VPN routes as fallbacks when the Pi is directly on the same LAN.
-      metric = 50000;
+  my.secrets.wireguard.pubkeys.enable = true;
 
-      peers = [
-        {
-          inherit (wireguard.peer)
-            name
-            publicKey
-            allowedIPs
-            endpoint
-            ;
-          persistentKeepalive = 25;
-        }
-      ];
+  networking.useNetworkd = true;
+
+  systemd.network.netdevs."50-${wireguard.interface}" = lib.mkIf wireguard.enable {
+    netdevConfig = {
+      Name = wireguard.interface;
+      Kind = "wireguard";
+      MTUBytes = "1280";
     };
+    wireguardConfig = {
+      PrivateKeyFile = config.sops.secrets.pi_backup_wireguard_private_key.path;
+      ListenPort = wireguard.listenPort;
+    };
+    wireguardPeers = [
+      {
+        PublicKeyFile = pubkeyPath;
+        AllowedIPs = wireguard.peer.allowedIPs;
+        Endpoint = wireguard.peer.endpoint;
+        PersistentKeepalive = 25;
+      }
+    ];
   };
 
-  systemd.services.${peerUnit} = lib.mkIf wireguard.enable {
-    unitConfig.StartLimitIntervalSec = 0;
-    serviceConfig = {
-      Restart = "on-failure";
-      RestartSec = "15s";
-    };
+  systemd.network.networks."50-${wireguard.interface}" = lib.mkIf wireguard.enable {
+    matchConfig.Name = wireguard.interface;
+    address = [ wireguard.address ];
+    routes = [
+      { Destination = "10.73.73.0/24"; Metric = 50000; }
+      { Destination = "10.50.0.0/16"; Metric = 50000; }
+    ];
   };
 
   systemd.services."wireguard-${wireguard.interface}-dns" = lib.mkIf wireguard.enable {
     description = "Prefer VPN DNS when ${wireguard.interface} can reach home DNS";
-    wants = [ peerService ];
     after = [
-      "wireguard-${wireguard.interface}.service"
-      peerService
+      "systemd-networkd.service"
     ];
-    wantedBy = [ wireguardTarget ];
-    unitConfig.PartOf = [ wireguardTarget ];
+    wants = [ "systemd-networkd.service" ];
+    wantedBy = [ "multi-user.target" ];
 
     serviceConfig = {
       Type = "simple";

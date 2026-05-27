@@ -11,33 +11,38 @@ let
     || builtins.elem name cfg.servers
   ) airvpn.servers;
 
-  mkProfile = name: srv: {
-    connection = {
-      id = "wg-airvpn-${name}";
-      type = "wireguard";
-      interface-name = "wg-airvpn";
-      autoconnect = if cfg.autoconnect == name then "true" else "false";
-    };
-    wireguard = {
-      private-key = "$WG_AIRVPN_PRIVATE_KEY";
-      private-key-flags = "0";
-      mtu = toString airvpn.mtu;
-    };
-    "wireguard-peer.${airvpn.publicKey}" = {
-      preshared-key = "$WG_AIRVPN_PRESHARED_KEY";
-      preshared-key-flags = "0";
-      endpoint = "${srv.ip}:${toString airvpn.port}";
-      allowed-ips = "0.0.0.0/0;::/0;";
-      persistent-keepalive = "15";
-    };
-    ipv4 = {
-      method = "manual";
-      address1 = cfg.address;
-      dns = "${airvpn.dns.ipv4};";
-    };
-    ipv6 = {
-      method = "disabled";
-    };
+  mkTemplate = name: srv: {
+    path = "/etc/NetworkManager/system-connections/wg-airvpn-${name}.nmconnection";
+    owner = "root";
+    group = "root";
+    mode = "0600";
+    content = ''
+      [connection]
+      id=wg-airvpn-${name}
+      type=wireguard
+      interface-name=wg-airvpn
+      autoconnect=${if cfg.autoconnect == name then "true" else "false"}
+
+      [wireguard]
+      private-key=${config.sops.placeholder.wg_airvpn_private_key}
+      private-key-flags=0
+      mtu=${toString airvpn.mtu}
+
+      [wireguard-peer.${config.sops.placeholder.wg_pubkey_airvpn}]
+      preshared-key=${config.sops.placeholder.wg_airvpn_preshared_key}
+      preshared-key-flags=0
+      endpoint=${srv.ip}:${toString airvpn.port}
+      allowed-ips=0.0.0.0/0;::/0;
+      persistent-keepalive=15
+
+      [ipv4]
+      method=manual
+      address1=${cfg.address}
+      dns=${airvpn.dns.ipv4};
+
+      [ipv6]
+      method=disabled
+    '';
   };
 in
 {
@@ -72,7 +77,7 @@ in
       default = null;
       description = "Server name to autoconnect to (must be in selection)";
     };
-};
+  };
 
   config = lib.mkIf cfg.enable {
     assertions = [
@@ -81,20 +86,14 @@ in
         message = "my.network.airvpn.autoconnect: server \"${toString cfg.autoconnect}\" is not in the selected servers";
       }
     ];
-    sops.templates."nm-airvpn-env" = {
-      content = ''
-        WG_AIRVPN_PRIVATE_KEY=${config.sops.placeholder.wg_airvpn_private_key}
-        WG_AIRVPN_PRESHARED_KEY=${config.sops.placeholder.wg_airvpn_preshared_key}
-      '';
-    };
 
-    networking.networkmanager.ensureProfiles = {
-      environmentFiles = [
-        config.sops.templates."nm-airvpn-env".path
-      ];
-      profiles = lib.mapAttrs' (
-        name: srv: lib.nameValuePair "wg-airvpn-${name}" (mkProfile name srv)
+    sops.templates = lib.mapAttrs' (
+      name: srv: lib.nameValuePair "nm-wg-airvpn-${name}" (mkTemplate name srv)
+    ) selectedServers;
+
+    systemd.services.NetworkManager.restartTriggers =
+      lib.mapAttrsToList (
+        name: _srv: config.sops.templates."nm-wg-airvpn-${name}".content
       ) selectedServers;
-    };
   };
 }
