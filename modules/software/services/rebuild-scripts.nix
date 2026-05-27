@@ -26,13 +26,21 @@ let
       local title="$1"
       local priority="$2"
       local body="$3"
-      local email_body="''${4:-$3}"
 
       ${pkgs.curl}/bin/curl -s -X POST "${notifications.gotify.url}" \
         -H "X-Gotify-Key: $GOTIFY_KEY" \
         -F "title=$title" \
         -F "message=$(printf '%b' "$body")" \
         -F "priority=$priority" > /dev/null || true
+    }
+
+    notify_email() {
+      local title="$1"
+      local priority="$2"
+      local body="$3"
+      local email_body="''${4:-$3}"
+
+      notify "$title" "$priority" "$body"
 
       {
         printf 'To: ${notifications.recipientEmail}\n'
@@ -172,7 +180,7 @@ let
             CONN_FAIL_HOSTS="$CONN_FAIL_HOSTS $host"
           else
             HARD_FAIL_HOSTS="$HARD_FAIL_HOSTS $host"
-            notify "❌ ${name}: $host FAILED" 10 \
+            notify_email "❌ ${name}: $host FAILED" 10 \
               "Last 20 lines:\n$ERROR_SUMMARY" \
               "Full build log for $host:\n\n$FULL_LOG"
           fi
@@ -225,7 +233,7 @@ let
 
         if [ "$host_ok" = false ]; then
           HARD_FAIL_HOSTS="$HARD_FAIL_HOSTS $host"
-          notify "❌ ${name}: $host FAILED (retries exhausted)" 10 \
+          notify_email "❌ ${name}: $host FAILED (retries exhausted)" 10 \
             "All $MAX_RETRIES connection retries exhausted for $host"
         fi
       done
@@ -323,7 +331,7 @@ let
     else
       ERROR_SUMMARY=$(tail -n 20 "$LOG")
       FULL_LOG=$(cat "$LOG")
-      notify "❌ Manual deploy $TARGET FAILED" 10 \
+      notify_email "❌ Manual deploy $TARGET FAILED" 10 \
         "Last 20 lines:\n$ERROR_SUMMARY" \
         "Full log for manual deploy $TARGET (goal=$GOAL):\n\n$FULL_LOG"
     fi
@@ -375,7 +383,7 @@ let
         "$HOST switched to generation $GEN"
       echo "deploy-old completed for $HOST -> generation $GEN"
     else
-      notify "❌ Rollback FAILED: $HOST → gen $GEN" 10 \
+      notify_email "❌ Rollback FAILED: $HOST → gen $GEN" 10 \
         "Remote activation failed on $HOST for generation $GEN.\nIf the activation failed due to missing store paths, run 'nix copy' from a machine that has the closures."
       echo "Remote activation failed on $HOST. If the activation failed due to missing store paths, run 'nix copy' from a machine that has the closures."
       exit 1
