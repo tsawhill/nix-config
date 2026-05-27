@@ -23,12 +23,7 @@
         address = "0.0.0.0:80";
         session_ttl = "720h";
       };
-      users = [
-        {
-          name = "***REDACTED_USERNAME***";
-          password = "***REDACTED_BCRYPT_HASH***";
-        }
-      ];
+      users = [ ];
       auth_attempts = 5;
       block_auth_min = 15;
       http_proxy = "";
