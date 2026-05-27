@@ -223,6 +223,10 @@
         safebrowsing_block_host = "standard-block.dns.adguard.com";
         rewrites = map (r: r // { enabled = true; }) [
           {
+            domain = "router-nix.lan";
+            answer = "10.73.73.135";
+          }
+          {
             domain = "server-nix.lan";
             answer = "10.73.73.3";
           }
