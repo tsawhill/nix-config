@@ -133,8 +133,6 @@ let
     description = "${name} Colmena Deploy";
     restartIfChanged = false;
     stopIfChanged = false;
-    wants = [ "flake-update.service" ];
-    after = [ "flake-update.service" ];
     path = servicePath;
     serviceConfig = {
       Type = "oneshot";
@@ -314,9 +312,6 @@ let
 
     cd "${repoPath}"
 
-    echo "--- Updating flake ---"
-    ${pkgs.nix}/bin/nix flake update --flake "${flakePath}"
-
     echo "--- Committing pre-deploy state ---"
     ${pkgs.git}/bin/git add -A
     ${pkgs.git}/bin/git commit -m "auto: manual deploy $TARGET $(date '+%Y-%m-%d %H:%M')" || true
@@ -437,7 +432,10 @@ in
       script = ''
         set -euo pipefail
         echo "--- Updating flake ---"
+        cd "${repoPath}"
         ${pkgs.nix}/bin/nix flake update --flake "${flakePath}"
+        ${pkgs.git}/bin/git add flake.lock
+        ${pkgs.git}/bin/git commit -m "auto: flake update $(date '+%Y-%m-%d %H:%M')" || true
       '';
     };
     "deploy-Daily" = mkDeployService "Daily" "@daily";
@@ -446,6 +444,15 @@ in
   };
 
   systemd.timers = {
+    "flake-update" = {
+      description = "Update nix flake inputs every 6 hours";
+      wantedBy = [ "timers.target" ];
+      timerConfig = {
+        OnCalendar = "*-*-* 00/6:00:00";
+        Persistent = true;
+        Unit = "flake-update.service";
+      };
+    };
     "deploy-Daily" = mkTimer "Daily" "*-*-* 00:00";
     "deploy-Weekly" = mkTimer "Weekly" "Sat *-*-* 01:00";
     "deploy-Monthly" = mkTimer "Monthly" "Sat *-*-1..7 02:00";
