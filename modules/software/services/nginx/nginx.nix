@@ -48,7 +48,10 @@ in
 
       allowedCountryCodes = lib.mkOption {
         type = lib.types.listOf lib.types.str;
-        default = [ "US" ];
+        default = [
+          "US"
+          "CA"
+        ];
         description = "ISO country codes allowed through nginx proxy virtual hosts.";
       };
 
