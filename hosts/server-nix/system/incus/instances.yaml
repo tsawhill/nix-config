@@ -182,12 +182,3 @@ vaultwarden-nix:
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/vaultwarden-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:f5:ac:e2" }
 
-
-router-nix:
-  type: "container"
-  profiles: ["nixos-lxc"]
-  config: {}
-  devices:
-    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
-    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/router-nix" }
-    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "02:6D:89:05:F7:01" }
