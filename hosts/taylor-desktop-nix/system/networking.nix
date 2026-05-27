@@ -20,7 +20,7 @@
 
   my.network.airvpn = {
     enable = true;
-    address = "10.134.209.24/32";
+    address = "10.150.209.24/32";
     cities = [
       "SanJose-California"
       "Fremont-California"

@@ -21,6 +21,7 @@ let
     wireguard = {
       private-key = "$WG_AIRVPN_PRIVATE_KEY";
       private-key-flags = "0";
+      mtu = toString airvpn.mtu;
     };
     "wireguard-peer.${airvpn.publicKey}" = {
       preshared-key = "$WG_AIRVPN_PRESHARED_KEY";
