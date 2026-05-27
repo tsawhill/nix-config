@@ -49,6 +49,10 @@ in
   config = lib.mkIf cfg.enable {
     boot.kernel.sysctl."net.ipv4.ip_forward" = 1;
 
+    # Loose rpfilter: return packets arrive on eno2 but default route is VPN.
+    # Strict mode drops them; loose allows as long as source is routable.
+    networking.firewall.checkReversePath = "loose";
+
     networking.firewall.extraCommands = lib.mkIf (cfg.interfaces != [ ]) (
       lib.concatStrings (
         lib.imap0 (

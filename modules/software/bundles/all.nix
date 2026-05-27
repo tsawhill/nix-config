@@ -30,8 +30,6 @@
       # System
       linux-firmware
       wireguard-tools
-      mesa
-      mesa-demos
 
       # File tools
       rsync

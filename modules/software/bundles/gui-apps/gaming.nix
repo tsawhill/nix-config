@@ -31,6 +31,8 @@
     };
 
     environment.systemPackages = with pkgs; [
+      mesa
+      mesa-demos
       # Launchers
       heroic
       faugus-launcher
