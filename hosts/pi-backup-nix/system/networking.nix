@@ -1,5 +1,29 @@
-{ lib, ... }:
+{ lib, pkgs, ... }:
 {
+  # Temporary watchdog: revert to gen 33 if WireGuard doesn't come up
+  systemd.services.wg-boot-watchdog = {
+    description = "Revert to gen 33 if WireGuard fails to connect after boot";
+    after = [ "network-online.target" "NetworkManager.service" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    path = [ pkgs.wireguard-tools ];
+    script = ''
+      for i in $(seq 1 30); do
+        if wg show wg-remote 2>/dev/null | grep -q "latest handshake"; then
+          echo "WireGuard connected, all good"
+          exit 0
+        fi
+        sleep 10
+      done
+      echo "WireGuard failed to connect in 5 minutes, reverting to gen 33"
+      /nix/var/nix/profiles/system-33-link/bin/switch-to-configuration boot
+      reboot
+    '';
+  };
+
   networking.useDHCP = lib.mkDefault true;
   networking.networkmanager.enable = true;
   networking.firewall.checkReversePath = "loose";
