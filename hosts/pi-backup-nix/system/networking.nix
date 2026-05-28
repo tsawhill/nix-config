@@ -11,7 +11,7 @@
     address = "10.50.50.5/32";
     autoconnect = "true";
     dns = "10.73.73.6";
-    dnsPriority = -1;
+    dnsPriority = 50;
     routeMetric = 50000;
     peer = {
       endpoint = "taylordnsfree.zapto.org:51820";
