@@ -19,7 +19,7 @@
         sleep 10
       done
       echo "WireGuard failed to connect in 5 minutes, reverting to gen 33"
-      /nix/var/nix/profiles/system-33-link/bin/switch-to-configuration boot
+      /nix/var/nix/gcroots/gen-33-backup/bin/switch-to-configuration boot
       reboot
     '';
   };
