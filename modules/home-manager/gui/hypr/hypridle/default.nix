@@ -1,6 +1,7 @@
 { lib, config, ... }:
 let
   cfg = config.my.hypr.idle;
+  lockCommand = "hyprlock --grace 5";
   enabled = t: t > 0;
   toSec = m: m * 60;
 in
@@ -28,7 +29,7 @@ in
       enable = true;
       settings = {
         general = {
-          lock_cmd = "hyprlock";
+          lock_cmd = lockCommand;
           after_sleep_cmd = "hyprctl dispatch dpms on";
         };
         listener = lib.filter (x: x != null) [
@@ -39,7 +40,7 @@ in
           } else null)
           (if enabled cfg.lock.time then {
             timeout = toSec cfg.lock.time;
-            on-timeout = "hyprlock";
+            on-timeout = lockCommand;
           } else null)
           (if enabled cfg.sleep.time then {
             timeout = toSec cfg.sleep.time;

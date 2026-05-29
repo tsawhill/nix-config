@@ -12,7 +12,6 @@ lib.mkIf (config.my.hypr.lock.theme == "pink") {
   programs.hyprlock.settings = {
     general = {
       hide_cursor = true;
-      grace = 5;
     };
 
     background = [
