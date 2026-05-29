@@ -82,6 +82,34 @@ in
         logError = "/var/log/nginx/error.log warn";
         recommendedTlsSettings = true;
         recommendedProxySettings = true;
+        virtualHosts."_" = {
+          default = true;
+          sslCertificate =
+            if acmeCfg.enable then
+              "/var/lib/acme/${acmeCfg.certificateName}/fullchain.pem"
+            else
+              "/Certs/fullchain.pem";
+          sslCertificateKey =
+            if acmeCfg.enable then
+              "/var/lib/acme/${acmeCfg.certificateName}/key.pem"
+            else
+              "/Certs/key.pem";
+          listen = [
+            {
+              addr = "0.0.0.0";
+              port = 80;
+            }
+            {
+              addr = "0.0.0.0";
+              port = 443;
+              ssl = true;
+            }
+          ];
+          extraConfig = ''
+            access_log /var/log/nginx/unknown-host-access.log combined;
+            return 444;
+          '';
+        };
       };
       networking.firewall.allowedTCPPorts = [ 443 ];
     }

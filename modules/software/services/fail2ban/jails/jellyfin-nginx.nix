@@ -213,14 +213,17 @@ in
     # Temporary hardening for unauthenticated or weakly-authenticated Jellyfin
     # media surfaces. This targets scanner traffic against stream/image/download
     # endpoints that have appeared in Jellyfin advisories; known clients are
-    # ignored so normal playback remains usable.
+    # ignored so normal playback remains usable. Requests carrying an API key in
+    # the URL are also ignored here so an expired-token playback retry from a
+    # new IP does not immediately ban a real user.
     "jellyfin-api-scanner" = {
       settings = {
         enabled = true;
         backend = "polling";
-        maxretry = 1;
-        findtime = "1h";
+        maxretry = 3;
+        findtime = "15m";
         failregex = ''^<HOST> - - \[[^\]]+\] "(GET|POST|HEAD) (/(?i:videos|audio)/[^ /?]+/[^ ]*(?:stream|hls|master|main|live\.m3u8)[^ ]*|/(?i:items)/[^ /?]+/(?i:images|download|file|playbackinfo)[^ ]*|/(?i:images)/(?i:remote)[^ ]*|/.*[?&](?i:imageUrl|StreamOptions|mediaSourceId|deviceProfile|ApiKey)=[^ ]*) HTTP/[0-9.]+" [1-5][0-9]{2}\b.*'';
+        ignoreregex = ''^<HOST> - - \[[^\]]+\] "[^"]*[?&](?i:ApiKey|api_key)=[^ "]+ HTTP/[0-9.]+" .*'';
         ignorecommand = "${jellyfinKnownIp}/bin/jellyfin-known-ip check <HOST>";
         action = ''iptables-multiport[name=jellyfin-api-scanner, port="http,https", protocol=tcp]'';
         logpath = "/var/log/nginx/access.log";

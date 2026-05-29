@@ -4,6 +4,8 @@
       settings = {
         enabled = true;
         backend = "polling";
+        maxretry = 2;
+        findtime = "1h";
         failregex = ''.*no required SSL.*client: <HOST>.*'';
         action = ''iptables-multiport[name=client-cert, port="http,https", protocol=tcp]'';
         logpath = "/var/log/nginx/error.log";
