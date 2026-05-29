@@ -2,8 +2,12 @@
   pkgs,
   lib,
   config,
+  inputs,
   ...
 }:
+let
+  hyprlandPkgs = inputs.hyprland.packages.${pkgs.stdenv.hostPlatform.system};
+in
 {
   options = {
     desktop.hyprland.enable = lib.mkEnableOption "Hyprland wayland compositor";
@@ -31,8 +35,8 @@
 
     programs.hyprland = {
       enable = true;
-      package = pkgs.hyprland;
-      portalPackage = pkgs.xdg-desktop-portal-hyprland;
+      package = hyprlandPkgs.hyprland;
+      portalPackage = hyprlandPkgs.xdg-desktop-portal-hyprland;
       withUWSM = true;
       xwayland.enable = true;
     };
