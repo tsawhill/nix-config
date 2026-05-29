@@ -66,8 +66,16 @@ let
                 }
 
                 while (my $line = <$fh>) {
-                  next unless $line =~ m{^(\S+) - - \[([^\]]+)\] "(?:(?:GET|POST|HEAD) /Users/Me(?:\?[^ ]*)?|POST /Users/Authenticate[^ ]*) HTTP/[0-9.]+" 200 \S+ };
-                  my ($ip, $stamp) = ($1, $2);
+                  next unless $line =~ m{^(\S+) - - \[([^\]]+)\] "(\S+) ([^ ]+) HTTP/[0-9.]+" (200|204) \S+ };
+                  my ($ip, $stamp, $method, $uri) = ($1, $2, $3, $4);
+                  next unless
+                    $uri =~ m{^/Users/Me(?:\?|$)}i
+                    || ($method eq "POST" && $uri =~ m{^/Users/Authenticate}i)
+                    || $uri =~ m{^/Users/[0-9a-f]{32}(?:[/?]|$)}i
+                    || ($method eq "POST" && $uri =~ m{^/Sessions/(?:Capabilities/Full|Playing/Progress)(?:\?|$)}i)
+                    || $uri =~ m{^/DisplayPreferences/[^ ]*[?&]userId=[0-9a-f]{32}}i
+                    || $uri =~ m{[?&]api_key=[0-9a-f]{32}}i
+                    || $uri =~ m{[?&]ApiKey=[0-9a-f]{32}};
                   my $epoch = eval {
                     Time::Piece->strptime($stamp, "%d/%b/%Y:%H:%M:%S %z")->epoch;
                   };
@@ -124,9 +132,18 @@ let
                 }
 
                 while (my $line = <$fh>) {
-                  next unless $line =~ m{^\Q$ip\E - - \[([^\]]+)\] "(?:(?:GET|POST|HEAD) /Users/Me(?:\?[^ ]*)?|POST /Users/Authenticate[^ ]*) HTTP/[0-9.]+" 200 \S+ };
+                  next unless $line =~ m{^\Q$ip\E - - \[([^\]]+)\] "(\S+) ([^ ]+) HTTP/[0-9.]+" (200|204) \S+ };
+                  my ($stamp, $method, $uri) = ($1, $2, $3);
+                  next unless
+                    $uri =~ m{^/Users/Me(?:\?|$)}i
+                    || ($method eq "POST" && $uri =~ m{^/Users/Authenticate}i)
+                    || $uri =~ m{^/Users/[0-9a-f]{32}(?:[/?]|$)}i
+                    || ($method eq "POST" && $uri =~ m{^/Sessions/(?:Capabilities/Full|Playing/Progress)(?:\?|$)}i)
+                    || $uri =~ m{^/DisplayPreferences/[^ ]*[?&]userId=[0-9a-f]{32}}i
+                    || $uri =~ m{[?&]api_key=[0-9a-f]{32}}i
+                    || $uri =~ m{[?&]ApiKey=[0-9a-f]{32}};
                   my $epoch = eval {
-                    Time::Piece->strptime($1, "%d/%b/%Y:%H:%M:%S %z")->epoch;
+                    Time::Piece->strptime($stamp, "%d/%b/%Y:%H:%M:%S %z")->epoch;
                   };
                   exit 0 if defined $epoch && $epoch >= $cutoff;
                 }
@@ -185,7 +202,7 @@ in
         backend = "polling";
         maxretry = 3;
         findtime = "10m";
-        failregex = ''^<HOST> - - \[[^\]]+\] "(GET|POST|HEAD) /Users/Me(?:\?[^ ]*)? HTTP/[0-9.]+" 401 \S+ "[^"]*" "[^"]*Jellyfin[^"]*".*'';
+        failregex = ''^<HOST> - - \[[^\]]+\] "(GET|POST|HEAD) /(?:Users/Me(?:\?[^ ]*)?|Users/[0-9a-fA-F]{32}(?:[/?][^ ]*)?|Users/Authenticate[^ ]*) HTTP/[0-9.]+" 401\b.*'';
         ignorecommand = "${jellyfinKnownIp}/bin/jellyfin-known-ip check <HOST>";
         action = ''iptables-multiport[name=jellyfin-nginx, port="http,https", protocol=tcp]'';
         logpath = "/var/log/nginx/access.log";
@@ -203,7 +220,7 @@ in
         backend = "polling";
         maxretry = 1;
         findtime = "1h";
-        failregex = ''^<HOST> - - \[[^\]]+\] "(GET|POST|HEAD) (/(Videos|Audio)/[^ /?]+/(stream|hls|master|main|live\.m3u8)[^ ]*|/Items/[^ /?]+/(Images|Download|File|PlaybackInfo)[^ ]*|/Images/Remote[^ ]*|/.*[?&](imageUrl|StreamOptions|mediaSourceId|deviceProfile)=[^ ]*) HTTP/[0-9.]+" [1-5][0-9]{2}\b.*'';
+        failregex = ''^<HOST> - - \[[^\]]+\] "(GET|POST|HEAD) (/(?i:videos|audio)/[^ /?]+/[^ ]*(?:stream|hls|master|main|live\.m3u8)[^ ]*|/(?i:items)/[^ /?]+/(?i:images|download|file|playbackinfo)[^ ]*|/(?i:images)/(?i:remote)[^ ]*|/.*[?&](?i:imageUrl|StreamOptions|mediaSourceId|deviceProfile|ApiKey)=[^ ]*) HTTP/[0-9.]+" [1-5][0-9]{2}\b.*'';
         ignorecommand = "${jellyfinKnownIp}/bin/jellyfin-known-ip check <HOST>";
         action = ''iptables-multiport[name=jellyfin-api-scanner, port="http,https", protocol=tcp]'';
         logpath = "/var/log/nginx/access.log";
