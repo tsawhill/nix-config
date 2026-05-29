@@ -3,6 +3,8 @@
   self,
   home-manager-input,
   nixvim-input,
+  lib,
+  pkgs,
   ...
 }:
 {
@@ -76,6 +78,15 @@
 
       systemd.user.sessionVariables = {
         AQ_DRM_DEVICES = "/dev/dri/amd-dgpu";
+      };
+
+      # GPU flags for vesktop streaming (service defined in autostart.nix)
+      systemd.user.services.vesktop.Service = {
+        ExecStart = lib.mkForce "${pkgs.vesktop}/bin/vesktop --enable-features=VaapiVideoEncoder,WebRTCPipeWireCapturer --ignore-gpu-blocklist";
+        Environment = [
+          "DRI_PRIME=pci-0000_6f_00_0"
+          "LIBVA_DRIVER_NAME=radeonsi"
+        ];
       };
     };
 

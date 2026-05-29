@@ -2,13 +2,10 @@
 {
   wayland.windowManager.hyprland.settings.exec-once = [
     # One-shot setup commands (not app launches)
-    # xrandr --primary is now set dynamically by workspaces.nix/swap-monitors.nix
-    # based on which monitor is currently hosting workspaces 1-5.
     "rfkill unblock 0; sleep 15; rfkill unblock 0"
 
-    # App launches via uwsm for proper systemd session scoping
-    "uwsm app -- steam"
-    "sleep 10; uwsm app -- vesktop"
+    # App launches (vesktop managed as systemd service below for portal ordering)
+    "steam"
     "sleep 15; uwsm app -- heroic"
     "sleep 15; uwsm app -- feishin"
   ];
@@ -35,6 +32,22 @@
         ExecStart = "${pkgs.hyprpolkitagent}/libexec/hyprpolkitagent";
         Restart = "on-failure";
         RestartSec = "3s";
+      };
+      Install.WantedBy = [ "wayland-session@hyprland.desktop.target" ];
+    };
+
+    vesktop = {
+      Unit = {
+        Description = "Vesktop Discord client";
+        After = [ "wayland-session@hyprland.desktop.target" "xdg-desktop-portal-hyprland.service" ];
+        PartOf = [ "wayland-session@hyprland.desktop.target" ];
+        Wants = [ "xdg-desktop-portal-hyprland.service" ];
+      };
+      Service = {
+        ExecStart = "${pkgs.vesktop}/bin/vesktop";
+        Environment = [ "NIXOS_OZONE_WL=1" ];
+        Restart = "on-failure";
+        RestartSec = "5s";
       };
       Install.WantedBy = [ "wayland-session@hyprland.desktop.target" ];
     };
