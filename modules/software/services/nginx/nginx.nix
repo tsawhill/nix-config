@@ -84,6 +84,7 @@ in
         recommendedProxySettings = true;
         virtualHosts."_" = {
           default = true;
+          onlySSL = true;
           sslCertificate =
             if acmeCfg.enable then
               "/var/lib/acme/${acmeCfg.certificateName}/fullchain.pem"
@@ -94,17 +95,6 @@ in
               "/var/lib/acme/${acmeCfg.certificateName}/key.pem"
             else
               "/Certs/key.pem";
-          listen = [
-            {
-              addr = "0.0.0.0";
-              port = 80;
-            }
-            {
-              addr = "0.0.0.0";
-              port = 443;
-              ssl = true;
-            }
-          ];
           extraConfig = ''
             access_log /var/log/nginx/unknown-host-access.log combined;
             return 444;
