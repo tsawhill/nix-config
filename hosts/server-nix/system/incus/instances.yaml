@@ -158,6 +158,19 @@ socks5-vpn-eu-nix:
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/socks5-vpn-eu-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:51:dd:4e" }
 
+sunshine-nix:
+  type: "container"
+  profiles: ["nixos-lxc"]
+  config:
+    limits.cpu: "8"
+    limits.memory: "16GiB"
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "32GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/sunshine-nix" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "02:7d:da:73:cc:0d" }
+    gpu-1: { type: "gpu", gputype: "physical", pci: "0000:0b:00.0" }
+    uinput: { type: "unix-char", path: "/dev/uinput", source: "/dev/uinput" }
+
 syncthing-nix:
   type: "container"
   profiles: ["nixos-lxc", "roms-mount", "gamesaves-mount"]
@@ -181,4 +194,3 @@ vaultwarden-nix:
   devices:
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/vaultwarden-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:f5:ac:e2" }
-

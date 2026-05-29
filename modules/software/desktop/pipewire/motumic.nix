@@ -6,12 +6,6 @@
 }:
 #
 # Native PipeWire processing chain for the MOTU M2 microphone.
-# Replicates the active EasyEffects input chain:
-#
-#   [gate]       → LSP SC Gate Mono (LADSPA)
-#   [deepfilternet] → RNNoise (LADSPA, closest available native equivalent)
-#   [compressor] → LSP SC Compressor Mono (LADSPA)
-#   [speex/reverb] → bypassed in EasyEffects, skipped
 #
 # All plugins use LADSPA with absolute nix store paths — no LV2_PATH
 # discovery needed, works correctly in socket-activated pipewire.service.
@@ -45,7 +39,7 @@
 
             "filter.graph" = {
               "nodes" = [
-{
+                {
                   type = "ladspa";
                   name = "gate";
                   plugin = "lsp-plugins-ladspa";
@@ -130,12 +124,30 @@
                 }
               ];
               "links" = [
-{ output = "gate:Output"; input = "hpf:In"; }
-                { output = "hpf:Out"; input = "rnnoise:Input"; }
-                { output = "rnnoise:Output"; input = "eq_presence:In"; }
-                { output = "eq_presence:Out"; input = "eq_air:In"; }
-                { output = "eq_air:Out"; input = "compressor:Input"; }
-                { output = "compressor:Output"; input = "limiter:Input"; }
+                {
+                  output = "gate:Output";
+                  input = "hpf:In";
+                }
+                {
+                  output = "hpf:Out";
+                  input = "rnnoise:Input";
+                }
+                {
+                  output = "rnnoise:Output";
+                  input = "eq_presence:In";
+                }
+                {
+                  output = "eq_presence:Out";
+                  input = "eq_air:In";
+                }
+                {
+                  output = "eq_air:Out";
+                  input = "compressor:Input";
+                }
+                {
+                  output = "compressor:Output";
+                  input = "limiter:Input";
+                }
               ];
               "inputs" = [ "gate:Input" ];
               "outputs" = [ "limiter:Output" ];
