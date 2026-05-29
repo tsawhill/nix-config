@@ -2,8 +2,10 @@
   imports = [ ./jails ];
   services.fail2ban = {
     enable = true;
-    # Ban IP after 8 failures
-    maxretry = 8;
+    # Default jail policy. Noisy scanner/auth jails override retry windows where
+    # the signal is sharper.
+    maxretry = 5;
+    jails.DEFAULT.settings.findtime = "15m";
     ignoreIP = [
       # Whitelist some subnets
       "10.0.0.0/8"
