@@ -16,11 +16,10 @@ let
       usage() {
         cat <<'EOF'
       Usage:
-        minihost-wine-guitar-fix [--raw|--mapped-gamepad] [path/to/wine-prefix]
+        minihost-wine-guitar-fix [--steam-input|--raw] [path/to/wine-prefix]
 
       Applies WineBus controller settings for the RetroCultMods MiniHost GH Guitar.
-      The default --raw mode keeps Wine on the raw HID/DirectInput path and disables
-      Wine's SDL controller-to-XInput gamepad mapping.
+      The default --steam-input mode lets Wine use SDL/Steam Input mapping.
       Set WINE=/path/to/wine first if you want to use a specific Wine/Proton wine binary.
       EOF
       }
@@ -30,14 +29,14 @@ let
         exit 0
       fi
 
-      mode="raw"
+      mode="steam-input"
       case "''${1:-}" in
-        --raw)
-          mode="raw"
+        --steam-input)
+          mode="steam-input"
           shift
           ;;
-        --mapped-gamepad)
-          mode="mapped-gamepad"
+        --raw)
+          mode="raw"
           shift
           ;;
       esac
@@ -54,14 +53,14 @@ let
       wine_cmd="''${WINE:-wine}"
       winebus_key='HKEY_LOCAL_MACHINE\System\CurrentControlSet\Services\winebus'
 
-      if [ "$mode" = "raw" ]; then
-        "$wine_cmd" reg add "$winebus_key" /v "Enable SDL" /t REG_DWORD /d 0 /f
-        "$wine_cmd" reg add "$winebus_key" /v "DisableHidraw" /t REG_DWORD /d 0 /f
-        "$wine_cmd" reg add "$winebus_key" /v "Map Controllers" /t REG_DWORD /d 0 /f
-      else
+      if [ "$mode" = "steam-input" ]; then
         "$wine_cmd" reg add "$winebus_key" /v "Enable SDL" /t REG_DWORD /d 1 /f
         "$wine_cmd" reg add "$winebus_key" /v "DisableHidraw" /t REG_DWORD /d 1 /f
         "$wine_cmd" reg add "$winebus_key" /v "Map Controllers" /t REG_DWORD /d 1 /f
+      else
+        "$wine_cmd" reg add "$winebus_key" /v "Enable SDL" /t REG_DWORD /d 0 /f
+        "$wine_cmd" reg add "$winebus_key" /v "DisableHidraw" /t REG_DWORD /d 0 /f
+        "$wine_cmd" reg add "$winebus_key" /v "Map Controllers" /t REG_DWORD /d 0 /f
       fi
 
       echo "Applied MiniHost WineBus $mode settings to ''${WINEPREFIX:-$HOME/.wine}."
@@ -92,6 +91,8 @@ in
 
     programs.gpu-screen-recorder.enable = true;
 
+    boot.kernelModules = [ "uinput" ];
+
     services.udev = {
       packages = [ pkgs.game-devices-udev-rules ];
       extraRules = ''
@@ -102,7 +103,7 @@ in
 
     # MiniHost GH Guitar controller mapping
     environment.sessionVariables = {
-      SDL_GAMECONTROLLERCONFIG = "03000000091200008228000001010000,MiniHost GH Guitar,platform:Linux,a:b0,b:b1,x:b3,y:b4,leftshoulder:b6,back:b10,start:b11,dpup:h0.1,dpdown:h0.4,leftx:a0,righty:a2";
+      SDL_GAMECONTROLLERCONFIG = "0300bf27091200008228000001010000,MiniHost GH Guitar,a:b0,b:b1,x:b3,y:b4,back:b10,guide:b12,start:b11,leftshoulder:b6,rightshoulder:b7,dpup:h0.1,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,leftx:a0,lefty:a1,lefttrigger:b8,righttrigger:b9,platform:Linux";
     }
     // lib.optionalAttrs cfg.lsfgVk.enable {
       DISABLE_LSFG = "1";
