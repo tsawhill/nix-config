@@ -6,6 +6,8 @@
 }:
 let
   cfg = config.software.apps.gaming;
+  minihostSdlMapping =
+    "0300bf27091200008228000001010000,MiniHost GH Guitar,a:b0,b:b1,x:b3,y:b4,back:b10,guide:b12,start:b11,leftshoulder:b6,rightshoulder:b7,dpup:h0.1,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,leftx:a0,lefty:a1,lefttrigger:b8,righttrigger:b9,platform:Linux";
 
   minihostWineGuitarFix = pkgs.writeShellApplication {
     name = "minihost-wine-guitar-fix";
@@ -16,11 +18,11 @@ let
       usage() {
         cat <<'EOF'
       Usage:
-        minihost-wine-guitar-fix [--steam-input|--raw] [path/to/wine-prefix]
+        minihost-wine-guitar-fix [--wine-sdl|--raw] [path/to/wine-prefix]
 
       Applies WineBus controller settings for the RetroCultMods MiniHost GH Guitar.
-      The default --steam-input mode lets Wine use SDL/Steam Input mapping.
-      Set WINE=/path/to/wine first if you want to use a specific Wine/Proton wine binary.
+      The default --wine-sdl mode uses Wine's SDL controller backend without Steam.
+      Set WINE=/path/to/wine first if you want a specific Wine binary.
       EOF
       }
 
@@ -29,10 +31,10 @@ let
         exit 0
       fi
 
-      mode="steam-input"
+      mode="wine-sdl"
       case "''${1:-}" in
-        --steam-input)
-          mode="steam-input"
+        --wine-sdl)
+          mode="wine-sdl"
           shift
           ;;
         --raw)
@@ -53,7 +55,7 @@ let
       wine_cmd="''${WINE:-wine}"
       winebus_key='HKEY_LOCAL_MACHINE\System\CurrentControlSet\Services\winebus'
 
-      if [ "$mode" = "steam-input" ]; then
+      if [ "$mode" = "wine-sdl" ]; then
         "$wine_cmd" reg add "$winebus_key" /v "Enable SDL" /t REG_DWORD /d 1 /f
         "$wine_cmd" reg add "$winebus_key" /v "DisableHidraw" /t REG_DWORD /d 1 /f
         "$wine_cmd" reg add "$winebus_key" /v "Map Controllers" /t REG_DWORD /d 1 /f
@@ -65,6 +67,17 @@ let
 
       echo "Applied MiniHost WineBus $mode settings to ''${WINEPREFIX:-$HOME/.wine}."
       echo "Restart the game or run: WINEPREFIX=\"''${WINEPREFIX:-$HOME/.wine}\" wineserver -k"
+    '';
+  };
+
+  minihostWine = pkgs.writeShellApplication {
+    name = "minihost-wine";
+    runtimeInputs = [ pkgs.wineWow64Packages.stable ];
+    text = ''
+      set -euo pipefail
+
+      export SDL_GAMECONTROLLERCONFIG="${minihostSdlMapping}"
+      exec "''${WINE:-wine}" "$@"
     '';
   };
 in
@@ -91,8 +104,6 @@ in
 
     programs.gpu-screen-recorder.enable = true;
 
-    boot.kernelModules = [ "uinput" ];
-
     services.udev = {
       packages = [ pkgs.game-devices-udev-rules ];
       extraRules = ''
@@ -103,7 +114,7 @@ in
 
     # MiniHost GH Guitar controller mapping
     environment.sessionVariables = {
-      SDL_GAMECONTROLLERCONFIG = "0300bf27091200008228000001010000,MiniHost GH Guitar,a:b0,b:b1,x:b3,y:b4,back:b10,guide:b12,start:b11,leftshoulder:b6,rightshoulder:b7,dpup:h0.1,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,leftx:a0,lefty:a1,lefttrigger:b8,righttrigger:b9,platform:Linux";
+      SDL_GAMECONTROLLERCONFIG = minihostSdlMapping;
     }
     // lib.optionalAttrs cfg.lsfgVk.enable {
       DISABLE_LSFG = "1";
@@ -126,6 +137,9 @@ in
         prismlauncher
         gpu-screen-recorder
         minihostWineGuitarFix
+        minihostWine
+        wineWow64Packages.stable
+        winetricks
 
         # Performance
         gamemode
