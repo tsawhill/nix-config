@@ -57,14 +57,9 @@
       "kopuz.cachix.org-1:J2X3AnAYhKTJW5S3aCLoA1ckonQXVNZMQvhZA0YAufw="
     ];
   };
-  environment.systemPackages =
-    let
-      pkgs-master = import inputs.nixpkgs-master {
-        system = "x86_64-linux";
-        config.allowUnfree = true;
-      };
-    in
-    [ pkgs-master.claude-code ];
+  # Allow VS Code Remote SSH server to run
+  programs.nix-ld.enable = true;
+  software.dev.enable = true;
   my.garbage.collection.prunePerHostProfiles = true;
   networking.hostName = "build-nix";
 }

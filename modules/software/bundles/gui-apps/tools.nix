@@ -9,6 +9,9 @@
 
   config = lib.mkIf config.software.apps.tools.enable {
     environment.systemPackages = with pkgs; [
+      # Brightness
+      brightnessctl
+
       # Disk management
       gparted
 
