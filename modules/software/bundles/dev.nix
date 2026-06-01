@@ -60,6 +60,7 @@ in
           jnoortheen.nix-ide
           esbenp.prettier-vscode
           ms-python.vscode-pylance
+          ms-vscode-remote.remote-ssh
           github.copilot-chat
         ])
         ++ [
