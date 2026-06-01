@@ -7,7 +7,7 @@
 let
   cfg = config.software.apps.gaming;
   minihostSdlMapping =
-    "0300bf27091200008228000001010000,MiniHost GH Guitar,a:b0,b:b3,x:b6,y:b4,back:b10,guide:b12,start:b11,leftshoulder:b1,rightshoulder:b7,dpup:h0.1,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,leftx:a0,lefty:a1,lefttrigger:b8,righttrigger:b9,platform:Linux";
+    "0300bf27091200008228000001010000,MiniHost GH Guitar,type:guitar,a:b0,b:b1,x:b3,y:b4,back:b10,guide:b12,start:b11,leftshoulder:b6,rightshoulder:b7,dpup:h0.1,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,leftx:a0,lefty:a1,lefttrigger:b8,righttrigger:b9,platform:Linux";
 
   minihostWineGuitarFix = pkgs.writeShellApplication {
     name = "minihost-wine-guitar-fix";
@@ -18,10 +18,11 @@ let
       usage() {
         cat <<'EOF'
       Usage:
-        minihost-wine-guitar-fix [--wine-sdl|--raw] [path/to/wine-prefix]
+        minihost-wine-guitar-fix [--xinput-guitar|--raw] [path/to/wine-prefix]
 
       Applies WineBus controller settings for the RetroCultMods MiniHost GH Guitar.
-      The default --wine-sdl mode uses Wine's SDL controller backend without Steam.
+      The default --xinput-guitar mode uses Wine's SDL controller backend and
+      exposes the MiniHost as an XInput guitar instead of a normal gamepad.
       Set WINE=/path/to/wine first if you want a specific Wine binary.
       EOF
       }
@@ -31,10 +32,10 @@ let
         exit 0
       fi
 
-      mode="wine-sdl"
+      mode="xinput-guitar"
       case "''${1:-}" in
-        --wine-sdl)
-          mode="wine-sdl"
+        --xinput-guitar)
+          mode="xinput-guitar"
           shift
           ;;
         --raw)
@@ -54,11 +55,13 @@ let
 
       wine_cmd="''${WINE:-wine}"
       winebus_key='HKEY_LOCAL_MACHINE\System\CurrentControlSet\Services\winebus'
+      dll_overrides_key='HKEY_CURRENT_USER\Software\Wine\DllOverrides'
 
-      if [ "$mode" = "wine-sdl" ]; then
+      if [ "$mode" = "xinput-guitar" ]; then
         "$wine_cmd" reg add "$winebus_key" /v "Enable SDL" /t REG_DWORD /d 1 /f
         "$wine_cmd" reg add "$winebus_key" /v "DisableHidraw" /t REG_DWORD /d 1 /f
         "$wine_cmd" reg add "$winebus_key" /v "Map Controllers" /t REG_DWORD /d 1 /f
+        "$wine_cmd" reg delete "$dll_overrides_key" /v "xinput1_3" /f || true
       else
         "$wine_cmd" reg add "$winebus_key" /v "Enable SDL" /t REG_DWORD /d 0 /f
         "$wine_cmd" reg add "$winebus_key" /v "DisableHidraw" /t REG_DWORD /d 0 /f

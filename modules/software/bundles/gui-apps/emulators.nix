@@ -14,6 +14,7 @@
       (rpcs3.overrideAttrs (prev: {
         cmakeFlags = prev.cmakeFlags ++ [ (lib.cmakeBool "BUILD_SHARED_LIBS" false) ];
       })) # PS3
+      ps3-disc-dumper
       pcsx2 # PS2
       ryubing # Switch
     ];
