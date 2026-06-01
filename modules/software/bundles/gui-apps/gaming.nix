@@ -7,7 +7,7 @@
 let
   cfg = config.software.apps.gaming;
   minihostSdlMapping =
-    "0300bf27091200008228000001010000,MiniHost GH Guitar,a:b0,b:b1,x:b3,y:b4,back:b10,guide:b12,start:b11,leftshoulder:b6,rightshoulder:b7,dpup:h0.1,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,leftx:a0,lefty:a1,lefttrigger:b8,righttrigger:b9,platform:Linux";
+    "0300bf27091200008228000001010000,MiniHost GH Guitar,a:b0,b:b3,x:b6,y:b4,back:b10,guide:b12,start:b11,leftshoulder:b1,rightshoulder:b7,dpup:h0.1,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,leftx:a0,lefty:a1,lefttrigger:b8,righttrigger:b9,platform:Linux";
 
   minihostWineGuitarFix = pkgs.writeShellApplication {
     name = "minihost-wine-guitar-fix";
