@@ -10,12 +10,12 @@
 
 let
   latestVersion = {
-    packageVersion = "11.0.20260506-2";
-    sha256 = "e85076c9f06bb08a637d8f90af425b5c7424ccc8e596408ba6faced9b83aff50";
+    packageVersion = "11.0.20260521-3";
+    sha256 = "088a56cfa6ebf8b305fef3e7b25c267d5a17e1cdc6429300197358c2b643dce8";
   };
   knownVersions = {
     latest = latestVersion;
-    "11.0.20260506-2" = latestVersion;
+    "11.0.20260521-3" = latestVersion;
   };
   selectedVersion =
     knownVersions.${version}

@@ -38,7 +38,7 @@
   protonVersion = lib.mkOption {
     type = lib.types.enum [
       "latest"
-      "11.0.20260506-2"
+      "11.0.20260521-3"
     ];
     default = protonVersion;
     description = "proton-cachyos package version for this game launcher.";
