@@ -7,6 +7,7 @@
   my.secrets.immobile0783-pass.enable = true;
   my.shares = {
     users = {
+      # taylor-desktop-nix
       immobile0783 = {
         enable = true;
         passwordSecretPath = config.sops.secrets.immobile0783-pass.path;

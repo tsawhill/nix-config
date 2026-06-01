@@ -108,6 +108,17 @@ in
     enable = true;
     lsfgVk.enable = true;
   };
+  software.games.guitarHero3.lsfgVk.enable = true;
+  software.games.guitarHero3.gamescopeArgs = [
+    "-W"
+    "2560"
+    "-H"
+    "1440"
+    "-w"
+    "2560"
+    "-h"
+    "1440"
+  ];
   software.apps.emulators.enable = true;
   software.apps.printing.enable = true;
   software.apps.tools.enable = true;

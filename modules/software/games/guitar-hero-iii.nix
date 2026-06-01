@@ -25,17 +25,17 @@ let
       env
       ;
     name = cfg.command;
+    lsfgVkEnable = cfg.lsfgVk.enable;
   };
 in
 {
   options.software.games.${gameId} = mkProtonCachyosOptions {
     command = "gh3";
     desktopName = "Guitar Hero III";
-    env = {
-      DISABLE_LSFG = "0";
-      WINEDLLOVERRIDES = "xinput1_3=n,b";
-      vblank_mode = "0";
-    };
+    env = [
+      "WINEDLLOVERRIDES=xinput1_3=n,b"
+      "vblank_mode=0"
+    ];
   };
 
   config = lib.mkIf (!(builtins.elem gameId config.software.games.exclude)) {

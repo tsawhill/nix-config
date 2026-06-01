@@ -14,11 +14,13 @@
   exePath,
   prefixPath,
   gamescopeArgs ? null,
-  env ? { },
+  env ? [ ],
+  lsfgVkEnable ? false,
 }:
 let
+  effectiveEnv = env ++ lib.optionals lsfgVkEnable [ "DISABLE_LSFG=0" ];
   envExports = lib.concatStringsSep "\n" (
-    lib.mapAttrsToList (name: value: "export ${name}=${lib.escapeShellArg value}") env
+    map (assignment: "export ${lib.escapeShellArg assignment}") effectiveEnv
   );
   runCommand =
     if gamescopeArgs == null then

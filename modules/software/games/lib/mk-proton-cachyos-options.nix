@@ -7,7 +7,8 @@
   prefixPath ? "~/Games/Wine/default",
   protonVersion ? "latest",
   gamescopeArgs ? null,
-  env ? { },
+  env ? [ ],
+  lsfgVkEnable ? false,
 }:
 {
   command = lib.mkOption {
@@ -50,8 +51,16 @@
   };
 
   env = lib.mkOption {
-    type = lib.types.attrsOf lib.types.str;
+    type = lib.types.listOf lib.types.str;
     default = env;
-    description = "Environment variables to set for this game launcher.";
+    example = [
+      "VAR1=aaa"
+      "VAR2=bbb"
+    ];
+    description = "Environment variable assignments to set for this game launcher.";
+  };
+
+  lsfgVk.enable = lib.mkEnableOption "lsfg-vk for this game launcher" // {
+    default = lsfgVkEnable;
   };
 }
