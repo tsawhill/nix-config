@@ -30,6 +30,11 @@
         users = [ "immobile0783" ];
         readOnly = true;
       };
+      gameSSD = {
+        enable = true;
+        path = "/mnt/gameSSD";
+        users = [ "immobile0783" ];
+      };
     };
   };
   my.groups = {

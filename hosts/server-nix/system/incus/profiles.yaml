@@ -81,6 +81,16 @@ gameserver-mount:
       source: "/mnt/zpool/gameservers"
       shift: "true"
 
+gameSSD-mount:
+  description: "Disk passthrough for gameSSD directory"
+  config: {}
+  devices:
+    gameSSD:
+      type: "disk"
+      path: "/mnt/gameSSD"
+      source: "/mnt/gameSSD"
+      shift: "true"
+
 immich-mount:
   description: "Disk passthrough for immich directory"
   config: {}

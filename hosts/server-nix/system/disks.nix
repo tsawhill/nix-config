@@ -93,6 +93,13 @@
         "nofail"
       ]; # Still boot if the zpool is not available.
     };
+
+    "/mnt/gameSSD" = {
+      device = "/dev/sdc1";
+      options = [
+        "nofail"
+      ];
+    };
   };
   swapDevices = [
     {

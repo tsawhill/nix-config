@@ -53,6 +53,7 @@ in
 
     # Software
     "${self}/modules/software/bundles"
+    "${self}/modules/software/games"
 
     # Desktop
     "${self}/modules/software/desktop"

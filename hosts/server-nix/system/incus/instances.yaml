@@ -136,7 +136,7 @@ romm-nix:
 
 samba-nix:
   type: "container"
-  profiles: ["nixos-lxc", "nix-config-mount", "media-mount"]
+  profiles: ["nixos-lxc", "nix-config-mount", "media-mount", "gameSSD-mount"]
   config: {}
   devices:
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/samba-nix" }
