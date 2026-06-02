@@ -83,6 +83,8 @@ let
       exec "''${WINE:-wine}" "$@"
     '';
   };
+
+  protonDefault = pkgs.callPackage ../../../../pkgs/games/proton-default.nix { };
 in
 {
   options.software.apps.gaming.enable = lib.mkEnableOption "gaming tools and launchers";
@@ -148,6 +150,7 @@ in
         gpu-screen-recorder
         minihostWineGuitarFix
         minihostWine
+        protonDefault
         wineWow64Packages.stable
         winetricks
 
