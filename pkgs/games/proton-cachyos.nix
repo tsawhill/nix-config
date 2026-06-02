@@ -48,6 +48,14 @@ stdenvNoCC.mkDerivation rec {
     mkdir -p "$out/bin" "$out/share/steam/compatibilitytools.d"
     cp -a usr/share/steam/compatibilitytools.d/proton-cachyos "$out/share/steam/compatibilitytools.d/"
     patchShebangs "$out/share/steam/compatibilitytools.d/proton-cachyos/proton"
+
+    # The CachyOS package targets a CachyOS host and omits the runtime
+    # requirement, so umu runs it bare on the host ("runtime host") with no
+    # Steam Runtime container. That leaves 32-bit games unable to reach the GPU
+    # driver and missing fonts. Declare the sniper (steamrt3) requirement so umu
+    # runs it inside pressure-vessel, the same way GE-Proton does.
+    sed -i 's|"commandline"|"require_tool_appid" "1628350"\n  "commandline"|' \
+      "$out/share/steam/compatibilitytools.d/proton-cachyos/toolmanifest.vdf"
     cat > "$out/bin/proton-cachyos" <<EOF
     #!/bin/sh
     exec "$out/share/steam/compatibilitytools.d/proton-cachyos/proton" "\$@"
