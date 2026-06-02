@@ -107,6 +107,13 @@ in
 
     programs.gpu-screen-recorder.enable = true;
 
+    hardware.graphics = {
+      enable = true;
+      enable32Bit = true;
+      extraPackages = lib.optionals cfg.lsfgVk.enable [ pkgs.lsfg-vk ];
+      extraPackages32 = lib.optionals cfg.lsfgVk.enable [ pkgs.pkgsi686Linux.lsfg-vk ];
+    };
+
     services.udev = {
       packages = [ pkgs.game-devices-udev-rules ];
       extraRules = ''
