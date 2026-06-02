@@ -26,12 +26,20 @@ let
   # Bash helpers shared across all deploy scripts.
   # notify "Title" <priority> "gotify body" ["extended email body"]
   sharedFns = ''
-    GOTIFY_KEY=$(${pkgs.coreutils}/bin/cat ${notifications.gotify.tokenFile})
+    GOTIFY_KEY=""
+    if [ -r ${notifications.gotify.tokenFile} ]; then
+      GOTIFY_KEY=$(${pkgs.coreutils}/bin/cat ${notifications.gotify.tokenFile} || true)
+    fi
 
     notify() {
       local title="$1"
       local priority="$2"
       local body="$3"
+
+      if [ -z "$GOTIFY_KEY" ]; then
+        echo "Gotify token unavailable; skipping notification: $title"
+        return 0
+      fi
 
       ${pkgs.curl}/bin/curl -s -X POST "${notifications.gotify.url}" \
         -H "X-Gotify-Key: $GOTIFY_KEY" \
@@ -73,6 +81,60 @@ let
       }
     }
 
+    list_colmena_hosts_for_tag() {
+      local tag_name="$1"
+      ${pkgs.nix}/bin/nix eval --json "${flakePath}#colmena" \
+        --apply "hive: builtins.filter (n: n != \"meta\" && builtins.elem \"$tag_name\" ((builtins.getAttr n hive).deployment.tags or [])) (builtins.attrNames hive)" \
+        | ${pkgs.jq}/bin/jq -r '.[]' | tr '\n' ' ' | xargs
+    }
+
+    deployed_system_path() {
+      local host="$1"
+      local self_hostname="$2"
+      if [ "$host" = "$self_hostname" ]; then
+        ${pkgs.coreutils}/bin/readlink -f /nix/var/nix/profiles/system
+      else
+        ${pkgs.openssh}/bin/ssh -o ConnectTimeout=5 -o BatchMode=yes "root@$host" \
+          "readlink -f /nix/var/nix/profiles/system"
+      fi
+    }
+
+    deployed_system_generation() {
+      local host="$1"
+      local self_hostname="$2"
+      if [ "$host" = "$self_hostname" ]; then
+        ${pkgs.nix}/bin/nix-env -p /nix/var/nix/profiles/system --list-generations \
+          | awk '$NF == "(current)" { print $1 }'
+      else
+        ${pkgs.openssh}/bin/ssh -o ConnectTimeout=5 -o BatchMode=yes "root@$host" \
+          "nix-env -p /nix/var/nix/profiles/system --list-generations | awk '\$NF == \"(current)\" { print \$1 }'"
+      fi
+    }
+
+    sanitize_gcroot_label() {
+      tr -c '[:alnum:]._+-' '-' | sed 's/^-*//; s/-*$//'
+    }
+
+    pin_deployed_system() {
+      local host="$1"
+      local self_hostname="$2"
+      local profile
+      local generation
+      local root_label
+      profile=$(deployed_system_path "$host" "$self_hostname" 2>/dev/null || true)
+      if [ -z "$profile" ]; then
+        echo "Unable to determine deployed system path for $host; skipping GC root."
+        return 1
+      fi
+      if [ ! -e "$profile" ]; then
+        echo "Deployed system path for $host is not present locally ($profile); skipping GC root."
+        return 1
+      fi
+      generation=$(deployed_system_generation "$host" "$self_hostname" 2>/dev/null || true)
+      root_label=$(printf 'gen%s-%s' "''${generation:-unknown}" "$(basename "$profile")" | sanitize_gcroot_label)
+      pin_gc_roots "$host" "$profile" "$root_label"
+    }
+
     get_wol_mac() {
       case "$1" in
         ${wolCases}
@@ -94,6 +156,7 @@ let
     pin_gc_roots() {
       local hosts="$1"
       local store_paths="$2"
+      local root_label="''${3:-}"
       local timestamp
       timestamp=$(date -u +%Y%m%d%H%M%S)
       local base=/nix/var/nix/gcroots/colmena-hosts
@@ -109,7 +172,13 @@ let
             *) continue ;;
           esac
           if [ -e "$p" ]; then
-            ${pkgs.nix}/bin/nix-store --add-root "$hdir/$timestamp-$(basename "$p")" --indirect --realise "$p" || true
+            local name
+            if [ -n "$root_label" ]; then
+              name="$timestamp-$root_label"
+            else
+              name="$timestamp-$(basename "$p")"
+            fi
+            ${pkgs.nix}/bin/nix-store --add-root "$hdir/$name" --indirect --realise "$p" || true
           fi
         done
         local keep=${toString keepRoots}
@@ -132,6 +201,12 @@ let
   '';
 
   servicePath = [
+    pkgs.coreutils
+    pkgs.findutils
+    pkgs.gawk
+    pkgs.gnugrep
+    pkgs.gnused
+    pkgs.hostname
     pkgs.git
     pkgs.nix
     pkgs.colmena
@@ -146,6 +221,11 @@ let
     description = "${name} Colmena Deploy";
     restartIfChanged = false;
     stopIfChanged = false;
+    wants = [ "network-online.target" ];
+    after = [
+      "network-online.target"
+      "sops-nix.service"
+    ];
     path = servicePath;
     serviceConfig = {
       Type = "oneshot";
@@ -163,12 +243,11 @@ let
       cd "${repoPath}"
       RETRY_DELAY=1800
       MAX_RETRIES=46
+      BUILD_PARALLELISM=4
 
       # Enumerate all hosts for this tag
-      TAG_NAME=$(echo '${tags}' | sed 's/^@//')
-      ALL_HOSTS=$(${pkgs.nix}/bin/nix eval --json "${flakePath}#colmena" \
-        --apply "hive: builtins.filter (n: n != \"meta\" && builtins.elem \"$TAG_NAME\" ((builtins.getAttr n hive).deployment.tags or [])) (builtins.attrNames hive)" \
-        | ${pkgs.jq}/bin/jq -r '.[]' | tr '\n' ' ' | xargs)
+      TAG_NAME="${lib.removePrefix "@" tags}"
+      ALL_HOSTS=$(list_colmena_hosts_for_tag "$TAG_NAME")
 
       if [ -z "$ALL_HOSTS" ]; then
         echo "No hosts found for tag '${tags}'"
@@ -176,15 +255,29 @@ let
       fi
       echo "Hosts to deploy: $ALL_HOSTS"
 
+      echo "--- Building ${name} (${tags}) profiles locally ---"
+      BUILD_LOG=$(mktemp)
+      build_exit=0
+      ${pkgs.colmena}/bin/colmena build --on '${tags}' --no-build-on-target --parallel "$BUILD_PARALLELISM" 2>&1 | tee "$BUILD_LOG" || build_exit=$?
+      if [ $build_exit -ne 0 ]; then
+        ERROR_SUMMARY=$(tail -n 20 "$BUILD_LOG")
+        EMAIL_BODY=$(deploy_log_email_body "$BUILD_LOG" "Build log excerpt for ${name} (${tags}).")
+        notify_email "❌ ${name}: build FAILED" 10 \
+          "Last 20 lines:\n$ERROR_SUMMARY" \
+          "$EMAIL_BODY"
+        rm "$BUILD_LOG"
+        exit $build_exit
+      fi
+      rm "$BUILD_LOG"
+
       SUCCEEDED_HOSTS=""
       HARD_FAIL_HOSTS=""
       CONN_FAIL_HOSTS=""
-      ALL_STORE_PATHS=""
       HAD_WARNINGS=false
 
       SELF_HOSTNAME=$(hostname)
 
-      # --- First pass: each host individually so one build failure can't abort others ---
+      # --- First pass: deploy each already-built host individually so one offline host can't abort others ---
       for host in $ALL_HOSTS; do
         echo "--- [$host] deploying ---"
         LOG=$(mktemp)
@@ -192,15 +285,14 @@ let
         if [ "$host" = "$SELF_HOSTNAME" ]; then
           ${pkgs.colmena}/bin/colmena apply-local switch 2>&1 | tee "$LOG" || colmena_exit=$?
         else
-          ${pkgs.colmena}/bin/colmena apply --on "$host" switch --no-substitute 2>&1 | tee "$LOG" || colmena_exit=$?
+          ${pkgs.colmena}/bin/colmena apply --on "$host" --no-build-on-target --no-substitute switch 2>&1 | tee "$LOG" || colmena_exit=$?
         fi
 
-        NEW_PATHS=$(grep -oE '/nix/store/[a-z0-9]+[^[:space:]]*' "$LOG" | sort -u || true)
-        [ -n "$NEW_PATHS" ] && ALL_STORE_PATHS=$(printf '%s\n%s' "$ALL_STORE_PATHS" "$NEW_PATHS" | sort -u | grep -v '^$') || true
         grep -qE '\[WARN\]|warning:' "$LOG" && HAD_WARNINGS=true || true
 
         if [ $colmena_exit -eq 0 ]; then
           SUCCEEDED_HOSTS="$SUCCEEDED_HOSTS $host"
+          pin_deployed_system "$host" "$SELF_HOSTNAME" || true
         else
           ERROR_SUMMARY=$(tail -n 20 "$LOG")
           if grep -qE 'ssh: connect|Connection refused|No route to host|Connection timed out|Network is unreachable|Could not connect|ssh_exchange_identification' "$LOG"; then
@@ -239,16 +331,15 @@ let
           if [ "$host" = "$SELF_HOSTNAME" ]; then
             ${pkgs.colmena}/bin/colmena apply-local switch 2>&1 | tee "$LOG" || colmena_exit=$?
           else
-            ${pkgs.colmena}/bin/colmena apply --on "$host" switch --no-substitute 2>&1 | tee "$LOG" || colmena_exit=$?
+            ${pkgs.colmena}/bin/colmena apply --on "$host" --no-build-on-target --no-substitute switch 2>&1 | tee "$LOG" || colmena_exit=$?
           fi
 
-          NEW_PATHS=$(grep -oE '/nix/store/[a-z0-9]+[^[:space:]]*' "$LOG" | sort -u || true)
-          [ -n "$NEW_PATHS" ] && ALL_STORE_PATHS=$(printf '%s\n%s' "$ALL_STORE_PATHS" "$NEW_PATHS" | sort -u | grep -v '^$') || true
           grep -qE '\[WARN\]|warning:' "$LOG" && HAD_WARNINGS=true || true
           rm "$LOG"
 
           if [ $colmena_exit -eq 0 ]; then
             SUCCEEDED_HOSTS="$SUCCEEDED_HOSTS $host"
+            pin_deployed_system "$host" "$SELF_HOSTNAME" || true
             host_ok=true
             break
           fi
@@ -283,7 +374,7 @@ let
           "All hosts: $SUCC_DISP"
       fi
 
-      # --- Version commit and GC roots for succeeded hosts ---
+      # --- Version commit for succeeded hosts ---
       if [ -n "$SUCCEEDED_HOSTS" ]; then
         REVISIONS=""
         for host in $SUCCEEDED_HOSTS; do
@@ -297,8 +388,6 @@ let
         COMMIT_MSG=$(printf 'auto: ${name} deploy %s\n\n%b' "$(date '+%Y-%m-%d %H:%M')" "$REVISIONS")
         ${pkgs.git}/bin/git -C "${repoPath}" add flake.lock
         ${pkgs.git}/bin/git -C "${repoPath}" commit -m "$COMMIT_MSG" || true
-
-        pin_gc_roots "$SUCCEEDED_HOSTS" "$ALL_STORE_PATHS"
       fi
 
       [ -z "$HARD_FAIL_HOSTS" ] || exit 1
@@ -322,6 +411,7 @@ let
     TARGET="$1"
     GOAL="''${2:-switch}"
     HOSTNAME=$(hostname)
+    BUILD_PARALLELISM=4
 
     cd "${repoPath}"
 
@@ -329,40 +419,106 @@ let
     ${pkgs.git}/bin/git add -A
     ${pkgs.git}/bin/git commit -m "auto: manual deploy $TARGET $(date '+%Y-%m-%d %H:%M')" || true
 
-    LOG=$(mktemp)
-    DEPLOY_EXIT=0
-
-    if [[ "$TARGET" == "$HOSTNAME" ]] || [[ "$TARGET" == "build-nix" && "$HOSTNAME" == "build-nix" ]]; then
-      echo "--- Local deploy (apply-local $GOAL) ---"
-      ${pkgs.colmena}/bin/colmena apply-local "$GOAL" 2>&1 | tee "$LOG" || DEPLOY_EXIT=$?
+    if [[ "$TARGET" == @* ]]; then
+      SELECTED_HOSTS=$(list_colmena_hosts_for_tag "''${TARGET#@}")
     else
-      echo "--- Deploying $TARGET ($GOAL) ---"
-      ${pkgs.colmena}/bin/colmena apply --on "$TARGET" --parallel 4 "$GOAL" 2>&1 | tee "$LOG" || DEPLOY_EXIT=$?
+      SELECTED_HOSTS="$TARGET"
     fi
 
-    STORE_PATHS=$(grep -oE '/nix/store/[a-z0-9]+[^[:space:]]*' "$LOG" | sort -u || true)
+    echo "--- Building $TARGET profiles locally ---"
+    BUILD_LOG=$(mktemp)
+    BUILD_EXIT=0
+    ${pkgs.colmena}/bin/colmena build --on "$TARGET" --no-build-on-target --parallel "$BUILD_PARALLELISM" 2>&1 | tee "$BUILD_LOG" || BUILD_EXIT=$?
+    if [ $BUILD_EXIT -ne 0 ]; then
+      ERROR_SUMMARY=$(tail -n 20 "$BUILD_LOG")
+      EMAIL_BODY=$(deploy_log_email_body "$BUILD_LOG" "Build log excerpt for manual deploy $TARGET (goal=$GOAL).")
+      notify_email "❌ Manual deploy $TARGET build FAILED" 10 \
+        "Last 20 lines:\n$ERROR_SUMMARY" \
+        "$EMAIL_BODY"
+      rm "$BUILD_LOG"
+      exit $BUILD_EXIT
+    fi
+    rm "$BUILD_LOG"
 
-    if [ $DEPLOY_EXIT -eq 0 ]; then
-      notify "✅ Manual deploy $TARGET succeeded" 3 \
-        "$TARGET deployed with goal=$GOAL"
+    SUCCEEDED_HOSTS=""
+    FAILED_HOSTS=""
+    HAD_WARNINGS=false
 
-      # Pin GC roots for single-host targets (not @tags)
-      if [[ "$TARGET" != @* ]]; then
-        pin_gc_roots "$TARGET" "$STORE_PATHS"
+    if [[ "$TARGET" == @* ]]; then
+      for host in $SELECTED_HOSTS; do
+        LOG=$(mktemp)
+        host_exit=0
+        echo "--- Deploying $host ($GOAL) ---"
+        if [[ "$host" == "$HOSTNAME" ]] || [[ "$host" == "build-nix" && "$HOSTNAME" == "build-nix" ]]; then
+          ${pkgs.colmena}/bin/colmena apply-local "$GOAL" 2>&1 | tee "$LOG" || host_exit=$?
+        else
+          ${pkgs.colmena}/bin/colmena apply --on "$host" --parallel 1 --no-build-on-target "$GOAL" 2>&1 | tee "$LOG" || host_exit=$?
+        fi
+
+        grep -qE '\[WARN\]|warning:' "$LOG" && HAD_WARNINGS=true || true
+
+        if [ $host_exit -eq 0 ]; then
+          SUCCEEDED_HOSTS="$SUCCEEDED_HOSTS $host"
+          pin_deployed_system "$host" "$HOSTNAME" || true
+        else
+          FAILED_HOSTS="$FAILED_HOSTS $host"
+          ERROR_SUMMARY=$(tail -n 20 "$LOG")
+          EMAIL_BODY=$(deploy_log_email_body "$LOG" "Build log excerpt for manual deploy $host (goal=$GOAL).")
+          notify_email "❌ Manual deploy $host FAILED" 10 \
+            "Last 20 lines:\n$ERROR_SUMMARY" \
+            "$EMAIL_BODY"
+        fi
+        rm "$LOG"
+      done
+    else
+      LOG=$(mktemp)
+      host_exit=0
+
+      if [[ "$TARGET" == "$HOSTNAME" ]] || [[ "$TARGET" == "build-nix" && "$HOSTNAME" == "build-nix" ]]; then
+        echo "--- Local deploy (apply-local $GOAL) ---"
+        ${pkgs.colmena}/bin/colmena apply-local "$GOAL" 2>&1 | tee "$LOG" || host_exit=$?
+      else
+        echo "--- Deploying $TARGET ($GOAL) ---"
+        ${pkgs.colmena}/bin/colmena apply --on "$TARGET" --parallel 4 --no-build-on-target "$GOAL" 2>&1 | tee "$LOG" || host_exit=$?
       fi
 
+      grep -qE '\[WARN\]|warning:' "$LOG" && HAD_WARNINGS=true || true
+
+      if [ $host_exit -eq 0 ]; then
+        SUCCEEDED_HOSTS="$TARGET"
+        pin_deployed_system "$TARGET" "$HOSTNAME" || true
+      else
+        FAILED_HOSTS="$TARGET"
+        ERROR_SUMMARY=$(tail -n 20 "$LOG")
+        EMAIL_BODY=$(deploy_log_email_body "$LOG" "Build log excerpt for manual deploy $TARGET (goal=$GOAL).")
+        notify_email "❌ Manual deploy $TARGET FAILED" 10 \
+          "Last 20 lines:\n$ERROR_SUMMARY" \
+          "$EMAIL_BODY"
+      fi
+      rm "$LOG"
+    fi
+
+    SUCCEEDED_HOSTS=$(echo "$SUCCEEDED_HOSTS" | tr ' ' '\n' | sort -u | grep -v '^$' | tr '\n' ' ' | xargs || true)
+    FAILED_HOSTS=$(echo "$FAILED_HOSTS" | tr ' ' '\n' | sort -u | grep -v '^$' | tr '\n' ' ' | xargs || true)
+    SUCC_DISP=$SUCCEEDED_HOSTS; [ -n "$SUCC_DISP" ] || SUCC_DISP="none"
+    FAIL_DISP=$FAILED_HOSTS; [ -n "$FAIL_DISP" ] || FAIL_DISP="none"
+
+    if [ -z "$FAILED_HOSTS" ]; then
+      if [ "$HAD_WARNINGS" = true ]; then
+        notify "⚠️ Manual deploy $TARGET succeeded (with warnings)" 4 \
+          "Succeeded: $SUCC_DISP\nGoal: $GOAL"
+      else
+        notify "✅ Manual deploy $TARGET succeeded" 3 \
+          "Succeeded: $SUCC_DISP\nGoal: $GOAL"
+      fi
       ${pkgs.git}/bin/git add flake.lock
       ${pkgs.git}/bin/git commit -m "auto: manual deploy $TARGET $(date '+%Y-%m-%d %H:%M')" || true
     else
-      ERROR_SUMMARY=$(tail -n 20 "$LOG")
-      EMAIL_BODY=$(deploy_log_email_body "$LOG" "Build log excerpt for manual deploy $TARGET (goal=$GOAL).")
-      notify_email "❌ Manual deploy $TARGET FAILED" 10 \
-        "Last 20 lines:\n$ERROR_SUMMARY" \
-        "$EMAIL_BODY"
+      notify "⚠️ Manual deploy $TARGET partial" 6 \
+        "Succeeded: $SUCC_DISP\nFailed: $FAIL_DISP\nGoal: $GOAL"
     fi
 
-    rm "$LOG"
-    [ $DEPLOY_EXIT -eq 0 ] || exit 1
+    [ -z "$FAILED_HOSTS" ] || exit 1
   '';
 
   deployOldCmd = pkgs.writeShellScriptBin "deploy-old" ''
@@ -416,6 +572,7 @@ let
   '';
 
   mkTimer = name: onCalendar: {
+    enable = true;
     description = "Run ${name} Colmena Deploy";
     wantedBy = [ "timers.target" ];
     timerConfig = {
@@ -437,6 +594,8 @@ in
       description = "Update nix flake inputs";
       restartIfChanged = false;
       stopIfChanged = false;
+      wants = [ "network-online.target" ];
+      after = [ "network-online.target" ];
       path = [
         pkgs.git
         pkgs.nix
@@ -461,6 +620,7 @@ in
 
   systemd.timers = {
     "flake-update" = {
+      enable = true;
       description = "Update nix flake inputs every 6 hours";
       wantedBy = [ "timers.target" ];
       timerConfig = {
