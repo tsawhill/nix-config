@@ -6,6 +6,9 @@
   gamescope,
   steam-run,
   protonCachyos,
+  freetype,
+  fontconfig,
+  pkgsi686Linux,
 }:
 
 {
@@ -30,6 +33,12 @@ let
   envExports = lib.concatStringsSep "\n" (
     map (assignment: "export ${lib.escapeShellArg assignment}") effectiveEnv
   );
+  runtimeLibraryPath = lib.makeLibraryPath [
+    freetype
+    fontconfig
+    pkgsi686Linux.freetype
+    pkgsi686Linux.fontconfig
+  ];
   runCommand =
     if gamescopeArgs == null then
       ''
@@ -60,6 +69,7 @@ let
       export WINEPREFIX="$STEAM_COMPAT_DATA_PATH/pfx"
       export STEAM_COMPAT_INSTALL_PATH="$game_dir"
       export STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.steam/steam"
+      export LD_LIBRARY_PATH=${lib.escapeShellArg runtimeLibraryPath}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
       ${envExports}
 
       ${runCommand}
