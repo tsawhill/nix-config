@@ -12,6 +12,7 @@ let
     wg_pubkey_fwlaptop = "fwlaptop";
     wg_pubkey_pi_backup_nix = "pi_backup_nix";
     wg_pubkey_taylor_desktop_nix = "taylor_desktop_nix";
+    wg_pubkey_taylor_laptop_nix = "taylor_laptop_nix";
     wg_pubkey_airvpn = "airvpn";
   };
 in

@@ -47,10 +47,12 @@ let
     fwlaptop = "10.50.50.15";
     pi-backup-nix = "10.50.50.5";
     taylor-desktop-nix = "10.50.50.2";
+    taylor-laptop-nix = "10.50.50.3";
   };
 
   trustedWgRemoteClients = [
     wgRemoteClients.taylor-desktop-nix
+    wgRemoteClients.taylor-laptop-nix
     wgRemoteClients.pixel7pro
     wgRemoteClients.fwlaptop
   ];
@@ -162,6 +164,11 @@ in
             name = "taylor-desktop-nix";
             publicKeyFile = secrets.wg_pubkey_taylor_desktop_nix.path;
             allowedIPs = [ "${wgRemoteClients.taylor-desktop-nix}/32" ];
+          }
+          {
+            name = "taylor-laptop-nix";
+            publicKeyFile = secrets.wg_pubkey_taylor_laptop_nix.path;
+            allowedIPs = [ "${wgRemoteClients.taylor-laptop-nix}/32" ];
           }
         ];
       };

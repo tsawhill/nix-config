@@ -61,6 +61,9 @@ in
     # Desktop
     "${self}/modules/software/desktop"
 
+    # WireGuard
+    "${self}/modules/network/wireguard/wg-remote.nix"
+
     # Hardware
     "${self}/modules/software/services/openrgb.nix"
     "${self}/modules/hardware/udev"
@@ -89,6 +92,7 @@ in
   software.apps.tools.enable = true;
 
   my.secrets.sshclientkey.taylor-laptop-nix-taylor.enable = true;
+  my.secrets.wireguard.taylor-laptop-nix.wg-remote.enable = true;
   my.users.taylor = {
     enable = true;
     extraGroups = [

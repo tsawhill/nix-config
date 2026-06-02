@@ -85,6 +85,11 @@ creation_rules:
       - age:
         - *build-nix
         - *taylor-desktop-nix
+  - path_regex: modules/secrets/wireguard/taylor-laptop-nix/wg-remote\.yaml$
+    key_groups:
+      - age:
+        - *build-nix
+        - *taylor-laptop-nix
   - path_regex: modules/secrets/wireguard/taylor-desktop-nix/wg-airvpn\.yaml$
     key_groups:
       - age:
