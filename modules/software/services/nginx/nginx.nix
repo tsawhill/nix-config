@@ -85,6 +85,13 @@ in
         virtualHosts."_" = {
           default = true;
           onlySSL = true;
+          listen = [
+            {
+              addr = "0.0.0.0";
+              port = 443;
+              ssl = true;
+            }
+          ];
           sslCertificate =
             if acmeCfg.enable then
               "/var/lib/acme/${acmeCfg.certificateName}/fullchain.pem"
