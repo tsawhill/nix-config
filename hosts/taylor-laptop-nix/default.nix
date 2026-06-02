@@ -13,6 +13,9 @@ in
 {
   networking.hostName = "taylor-laptop-nix";
   system.stateVersion = "25.11";
+  nixpkgs.config.permittedInsecurePackages = [
+    "electron-39.8.10"
+  ];
   imports = [
     # Secrets (SOPS)
     inputs.sops-nix-stable.nixosModules.sops
@@ -53,6 +56,7 @@ in
 
     # Software
     "${self}/modules/software/bundles"
+    "${self}/modules/software/games"
 
     # Desktop
     "${self}/modules/software/desktop"
@@ -79,6 +83,7 @@ in
   software.apps.media-playback.enable = true;
   software.apps.media-creation.enable = true;
   software.apps.gaming.enable = true;
+  software.games.guitarHero3.lsfgVk.enable = true;
   software.apps.emulators.enable = true;
   software.apps.printing.enable = true;
   software.apps.tools.enable = true;
