@@ -110,7 +110,7 @@ in
     };
 
     # --- local deploy (no SSH, uses apply-local) ---
-    "build-nix" = mkHost "daily" null "${self}/hosts/server-nix/LXCs/build.nix";
+    "build-nix" = mkHost "weekly" null "${self}/hosts/server-nix/LXCs/build.nix";
     # "router-nix" = mkHost null "router-nix.lan" "${self}/hosts/server-nix/LXCs/router.nix";
 
     # --- daily ---
@@ -120,6 +120,7 @@ in
     "remote-nginx-nix" = mkHost "daily" "remote-nginx-nix.lan" "${self}/hosts/remote-nginx-nix";
 
     # --- weekly ---
+    "immich-nix" = mkHost "weekly" "immich-nix.lan" "${self}/hosts/server-nix/LXCs/immich.nix";
     "vaultwarden-nix" =
       mkHost "weekly" "vaultwarden-nix.lan"
         "${self}/hosts/server-nix/LXCs/vaultwarden.nix";
@@ -144,7 +145,6 @@ in
     # --- monthly ---
     "unifi-nix" = mkHost "monthly" "unifi-nix.lan" "${self}/hosts/server-nix/LXCs/unifi.nix";
     "samba-nix" = mkHost "monthly" "samba-nix.lan" "${self}/hosts/server-nix/LXCs/samba.nix";
-    "immich-nix" = mkHost "monthly" "immich-nix.lan" "${self}/hosts/server-nix/LXCs/immich.nix";
     "pufferpanel-nix" =
       mkHost "monthly" "pufferpanel-nix.lan"
         "${self}/hosts/server-nix/LXCs/pufferpanel.nix";
