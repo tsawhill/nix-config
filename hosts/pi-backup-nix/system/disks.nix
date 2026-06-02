@@ -14,8 +14,9 @@ let
     "WDC_WD30EZRZ-00WN9B0_WD-WCC4E7KF51NR"
     "Hitachi_HUA723030ALA640_MK0371YHJZLJ0A"
   ];
-  spindownRule = serial:
-    ''ACTION=="add|change", SUBSYSTEM=="block", ENV{DEVTYPE}=="disk", ENV{ID_SERIAL}=="${serial}", RUN+="${hdparm} -S 241 /dev/%k"'';
+  spindownRule =
+    serial:
+    ''ACTION=="add|change", SUBSYSTEM=="block", ENV{DEVTYPE}=="disk", ENV{ID_SERIAL}=="${serial}", RUN+="${hdparm} -S 120 /dev/%k"'';
 in
 {
   services.udev.extraRules = lib.concatMapStringsSep "\n" spindownRule backupDriveSerials;
