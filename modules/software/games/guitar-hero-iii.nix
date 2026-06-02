@@ -16,11 +16,16 @@ let
 
   useGeProton = cfg.proton == "ge-proton";
 
-  # umu PROTONPATH: the codename "GE-Proton" (umu downloads/runs it in the sniper
-  # container), or the packaged proton-cachyos install dir for host-native runs.
+  geProton = pkgs.callPackage ../../../pkgs/games/proton-ge.nix {
+    version = cfg.protonVersion;
+  };
+
+  # umu PROTONPATH for "ge-proton": a pinned GE-Proton install dir (fetched at
+  # build time), or the codename "GE-Proton" which umu downloads/auto-updates at
+  # runtime. For "cachyos", the packaged proton-cachyos install dir (host-native).
   protonPath =
     if useGeProton then
-      "GE-Proton"
+      (if cfg.protonVersion == "latest" then "GE-Proton" else "${geProton}")
     else
       "${protonCachyos}/share/steam/compatibilitytools.d/proton-cachyos";
 
@@ -43,8 +48,9 @@ in
     desktopName = "Guitar Hero III";
     # GH3 is 32-bit: its GPU drivers and fonts only resolve inside umu's sniper
     # container, which proton-cachyos (host-native, missing libunwind in sniper)
-    # can't run in. GE-Proton is built for sniper, so use it here.
+    # can't run in. GE-Proton is built for sniper, so use it here, pinned.
     proton = "ge-proton";
+    protonVersion = "10-34";
     env = [
       "WINEDLLOVERRIDES=xinput1_3=n,b"
       "vblank_mode=0"

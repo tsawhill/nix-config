@@ -36,15 +36,6 @@
     description = "Steam compatibility data path to use for the game's Proton prefix.";
   };
 
-  protonVersion = lib.mkOption {
-    type = lib.types.enum [
-      "latest"
-      "11.0.20260521-3"
-    ];
-    default = protonVersion;
-    description = "proton-cachyos package version (only used when proton = \"cachyos\").";
-  };
-
   proton = lib.mkOption {
     type = lib.types.enum [
       "cachyos"
@@ -54,9 +45,20 @@
     description = ''
       Which Proton build umu runs for this game.
       "cachyos" uses the packaged proton-cachyos, which runs host-native (good for
-      64-bit titles). "ge-proton" uses GE-Proton, which umu auto-downloads and runs
-      inside the Steam Runtime sniper container -- required for 32-bit titles, whose
-      GPU drivers and fonts only resolve inside that container.
+      64-bit titles). "ge-proton" uses GE-Proton, which runs inside the Steam Runtime
+      sniper container -- required for 32-bit titles, whose GPU drivers and fonts only
+      resolve inside that container.
+    '';
+  };
+
+  protonVersion = lib.mkOption {
+    type = lib.types.str;
+    default = protonVersion;
+    description = ''
+      Version of the selected Proton, fetched into the nix store at build time.
+      For proton = "cachyos": "latest" or e.g. "11.0.20260521-3".
+      For proton = "ge-proton": "8-32" / "9-25" / "10-34", or "latest" to let umu
+      download and auto-update GE-Proton at runtime instead of pinning.
     '';
   };
 
