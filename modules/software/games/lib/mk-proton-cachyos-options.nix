@@ -6,6 +6,7 @@
   exePath ? "/mnt/gameSSD/Games/GH3/GH3.exe",
   prefixPath ? "~/Games/Wine/default",
   protonVersion ? "latest",
+  proton ? "cachyos",
   gamescopeArgs ? null,
   env ? [ ],
   lsfgVkEnable ? false,
@@ -41,7 +42,22 @@
       "11.0.20260521-3"
     ];
     default = protonVersion;
-    description = "proton-cachyos package version for this game launcher.";
+    description = "proton-cachyos package version (only used when proton = \"cachyos\").";
+  };
+
+  proton = lib.mkOption {
+    type = lib.types.enum [
+      "cachyos"
+      "ge-proton"
+    ];
+    default = proton;
+    description = ''
+      Which Proton build umu runs for this game.
+      "cachyos" uses the packaged proton-cachyos, which runs host-native (good for
+      64-bit titles). "ge-proton" uses GE-Proton, which umu auto-downloads and runs
+      inside the Steam Runtime sniper container -- required for 32-bit titles, whose
+      GPU drivers and fonts only resolve inside that container.
+    '';
   };
 
   gamescopeArgs = lib.mkOption {

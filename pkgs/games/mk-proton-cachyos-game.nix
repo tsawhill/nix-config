@@ -5,7 +5,6 @@
   symlinkJoin,
   gamescope,
   umu-launcher,
-  protonCachyos,
 }:
 
 {
@@ -13,6 +12,9 @@
   desktopName,
   exePath,
   prefixPath,
+  # umu PROTONPATH: either an absolute path to a Proton install, or a umu
+  # codename like "GE-Proton" that umu downloads and manages itself.
+  protonPath,
   gamescopeArgs ? null,
   env ? [ ],
   lsfgVkEnable ? false,
@@ -30,9 +32,6 @@ let
   envExports = lib.concatStringsSep "\n" (
     map (assignment: "export ${lib.escapeShellArg assignment}") effectiveEnv
   );
-  # umu wants the Proton install directory (the one containing the `proton`
-  # script), not the wrapper binary.
-  protonPath = "${protonCachyos}/share/steam/compatibilitytools.d/proton-cachyos";
   umuRun = "${umu-launcher}/bin/umu-run";
   runCommand =
     if gamescopeArgs == null then
