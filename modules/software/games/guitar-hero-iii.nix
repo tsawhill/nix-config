@@ -50,7 +50,7 @@ in
     # container, which proton-cachyos (host-native, missing libunwind in sniper)
     # can't run in. GE-Proton is built for sniper, so use it here, pinned.
     proton = "ge-proton";
-    protonVersion = "10-34";
+    protonVersion = "9-25";
     env = [
       "WINEDLLOVERRIDES=xinput1_3=n,b"
       "vblank_mode=0"
