@@ -749,6 +749,46 @@
         "type": "github"
       }
     },
+    "nix-vscode-extensions-stable": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs-stable"
+        ]
+      },
+      "locked": {
+        "lastModified": 1780289349,
+        "narHash": "sha256-WtFLQ7R2bErvItKRgkYXqsm0s/cvDnx9fF4XniD3QxQ=",
+        "owner": "nix-community",
+        "repo": "nix-vscode-extensions",
+        "rev": "f4e7a3b814e1df64804cc211f657e65a1e618695",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "nix-vscode-extensions",
+        "type": "github"
+      }
+    },
+    "nix-vscode-extensions-unstable": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs-unstable"
+        ]
+      },
+      "locked": {
+        "lastModified": 1780289349,
+        "narHash": "sha256-WtFLQ7R2bErvItKRgkYXqsm0s/cvDnx9fF4XniD3QxQ=",
+        "owner": "nix-community",
+        "repo": "nix-vscode-extensions",
+        "rev": "f4e7a3b814e1df64804cc211f657e65a1e618695",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "nix-vscode-extensions",
+        "type": "github"
+      }
+    },
     "nixos-images": {
       "inputs": {
         "nixos-stable": [
@@ -1090,6 +1130,8 @@
         "home-manager-unstable": "home-manager-unstable",
         "hyprland": "hyprland",
         "kopuz": "kopuz",
+        "nix-vscode-extensions-stable": "nix-vscode-extensions-stable",
+        "nix-vscode-extensions-unstable": "nix-vscode-extensions-unstable",
         "nixos-raspberrypi": "nixos-raspberrypi",
         "nixpkgs-master": "nixpkgs-master",
         "nixpkgs-stable": "nixpkgs-stable",

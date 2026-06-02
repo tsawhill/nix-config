@@ -29,6 +29,10 @@
       url = "github:youwen5/zen-browser-flake";
       inputs.nixpkgs.follows = "nixpkgs-stable";
     };
+    nix-vscode-extensions-stable = {
+      url = "github:nix-community/nix-vscode-extensions";
+      inputs.nixpkgs.follows = "nixpkgs-stable";
+    };
 
     nixpkgs-master.url = "github:NixOS/nixpkgs/33d37b339dba37885ea13a77f01576af358791fb"; # pin: last working deploy 2026-04-07
 
@@ -47,6 +51,10 @@
     };
     zen-browser-unstable = {
       url = "github:youwen5/zen-browser-flake";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
+    nix-vscode-extensions-unstable = {
+      url = "github:nix-community/nix-vscode-extensions";
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
 

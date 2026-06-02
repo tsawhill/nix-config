@@ -11,6 +11,7 @@ let
     home-manager-input = inputs.home-manager-stable;
     nixvim-input = inputs.nixvim-stable;
     sops-input = inputs.sops-nix-stable;
+    nix-vscode-extensions-input = inputs.nix-vscode-extensions-stable;
   };
 
   # tag:       schedule tag used by timers (null = manual-only)
@@ -43,6 +44,7 @@ let
     nixvim-input = inputs.nixvim-unstable;
     sops-input = inputs.sops-nix-unstable;
     zen-input = inputs.zen-browser-unstable;
+    nix-vscode-extensions-input = inputs.nix-vscode-extensions-unstable;
   };
 
   mkPiHost = tag: targetHost: {
