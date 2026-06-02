@@ -8,6 +8,7 @@
 let
   gameId = "guitarHeroWorldTourDefinitiveEdition";
   launcherId = "guitarHeroWorldTourDefinitiveEditionLauncher";
+  updaterId = "guitarHeroWorldTourDefinitiveEditionUpdater";
   mkProtonCachyosOptions = import ./lib/mk-proton-cachyos-options.nix { inherit lib; };
 
   mkLauncher =
@@ -48,9 +49,11 @@ let
 
   gameCfg = config.software.games.${gameId};
   launcherCfg = config.software.games.${launcherId};
+  updaterCfg = config.software.games.${updaterId};
 
   gameLauncher = mkLauncher gameCfg;
   configLauncher = mkLauncher launcherCfg;
+  updaterLauncher = mkLauncher updaterCfg;
 in
 {
   options.software.games.${gameId} = mkProtonCachyosOptions {
@@ -77,6 +80,18 @@ in
     ];
   };
 
+  options.software.games.${updaterId} = mkProtonCachyosOptions {
+    command = "ghwtde-updater";
+    desktopName = "Guitar Hero World Tour: Definitive Edition Updater";
+    exePath = "/mnt/gameSSD/Games/GHWTDE/Updater.exe";
+    proton = "ge-proton";
+    protonVersion = "9-25";
+    env = [
+      "vblank_mode=0"
+      "PULSE_LATENCY_MSEC=60"
+    ];
+  };
+
   config = lib.mkMerge [
     (lib.mkIf (!(builtins.elem gameId config.software.games.exclude)) {
       environment.systemPackages =
@@ -91,6 +106,13 @@ in
           configLauncher.package
         ]
         ++ lib.optionals (launcherCfg.proton == "cachyos") [ configLauncher.protonPackage ];
+    })
+    (lib.mkIf (!(builtins.elem updaterId config.software.games.exclude)) {
+      environment.systemPackages =
+        [
+          updaterLauncher.package
+        ]
+        ++ lib.optionals (updaterCfg.proton == "cachyos") [ updaterLauncher.protonPackage ];
     })
   ];
 }
