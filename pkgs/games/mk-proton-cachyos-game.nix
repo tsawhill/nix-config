@@ -4,11 +4,8 @@
   makeDesktopItem,
   symlinkJoin,
   gamescope,
-  steam-run,
+  umu-launcher,
   protonCachyos,
-  freetype,
-  fontconfig,
-  pkgsi686Linux,
 }:
 
 {
@@ -33,21 +30,19 @@ let
   envExports = lib.concatStringsSep "\n" (
     map (assignment: "export ${lib.escapeShellArg assignment}") effectiveEnv
   );
-  runtimeLibraryPath = lib.makeLibraryPath [
-    freetype
-    fontconfig
-    pkgsi686Linux.freetype
-    pkgsi686Linux.fontconfig
-  ];
+  # umu wants the Proton install directory (the one containing the `proton`
+  # script), not the wrapper binary.
+  protonPath = "${protonCachyos}/share/steam/compatibilitytools.d/proton-cachyos";
+  umuRun = "${umu-launcher}/bin/umu-run";
   runCommand =
     if gamescopeArgs == null then
       ''
-        exec ${lib.getExe steam-run} ${lib.getExe protonCachyos} run "$exe_path"
+        exec ${umuRun} "$exe_path"
       ''
     else
       ''
         exec ${lib.getExe gamescope} ${lib.escapeShellArgs gamescopeArgs} -- \
-          ${lib.getExe steam-run} ${lib.getExe protonCachyos} run "$exe_path"
+          ${umuRun} "$exe_path"
       '';
 
   launcher = writeShellApplication {
@@ -65,11 +60,12 @@ let
 
       cd "$game_dir"
 
-      export STEAM_COMPAT_DATA_PATH="$prefix_path"
-      export WINEPREFIX="$STEAM_COMPAT_DATA_PATH/pfx"
-      export STEAM_COMPAT_INSTALL_PATH="$game_dir"
-      export STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.steam/steam"
-      export LD_LIBRARY_PATH=${lib.escapeShellArg runtimeLibraryPath}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+      # Run Proton through umu (Steam Runtime "sniper" / pressure-vessel). Unlike
+      # the steam-run FHS shim this provides a working 32-bit GPU driver stack,
+      # which 32-bit titles need to enumerate the GPU.
+      export GAMEID=0
+      export PROTONPATH=${lib.escapeShellArg protonPath}
+      export WINEPREFIX="$prefix_path"
       ${envExports}
 
       ${runCommand}
