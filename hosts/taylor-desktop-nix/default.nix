@@ -124,6 +124,8 @@ in
     "2560"
     "-h"
     "1440"
+    "-r"
+    "60"
   ];
   software.apps.emulators.enable = true;
   software.apps.printing.enable = true;
