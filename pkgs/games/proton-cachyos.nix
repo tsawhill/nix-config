@@ -48,7 +48,11 @@ stdenvNoCC.mkDerivation rec {
     mkdir -p "$out/bin" "$out/share/steam/compatibilitytools.d"
     cp -a usr/share/steam/compatibilitytools.d/proton-cachyos "$out/share/steam/compatibilitytools.d/"
     patchShebangs "$out/share/steam/compatibilitytools.d/proton-cachyos/proton"
-    ln -s "$out/share/steam/compatibilitytools.d/proton-cachyos/proton" "$out/bin/proton-cachyos"
+    cat > "$out/bin/proton-cachyos" <<EOF
+    #!/bin/sh
+    exec "$out/share/steam/compatibilitytools.d/proton-cachyos/proton" "\$@"
+    EOF
+    chmod +x "$out/bin/proton-cachyos"
 
     runHook postInstall
   '';
