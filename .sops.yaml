@@ -111,6 +111,12 @@ creation_rules:
         - *build-nix
         - *samba-nix
         - *taylor-desktop-nix
+  - path_regex: modules/secrets/server/LXCs/samba/umbriel\.yaml$
+    key_groups:
+      - age:
+        - *build-nix
+        - *samba-nix
+        - *taylor-laptop-nix
   ##############################################################################
   #
   #                             Gotify tokens

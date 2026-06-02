@@ -5,7 +5,12 @@
     "${self}/modules/software/services/samba"
   ];
   my.secrets.immobile0783-pass.enable = true;
+  my.secrets.umbriel-pass.enable = true;
   my.shares = {
+    defaultUsers = [
+      "immobile0783"
+      "umbriel"
+    ];
     users = {
       # taylor-desktop-nix
       immobile0783 = {
@@ -18,23 +23,31 @@
           "code"
         ];
       };
+      # taylor-laptop-nix
+      umbriel = {
+        enable = true;
+        passwordSecretPath = config.sops.secrets.umbriel-pass.path;
+        extraGroups = [
+          "media"
+          "download"
+          "gameservers"
+          "code"
+        ];
+      };
     };
     definitions = {
       nix-configs = {
         enable = true;
         path = "/mnt/zpool/code/nix-config";
-        users = [ "immobile0783" ];
       };
       media = {
         enable = true;
         path = "/mnt/zpool/media";
-        users = [ "immobile0783" ];
         readOnly = true;
       };
       gameSSD = {
         enable = true;
         path = "/mnt/gameSSD";
-        users = [ "immobile0783" ];
       };
     };
   };

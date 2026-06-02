@@ -30,6 +30,12 @@ in
       );
     };
 
+    defaultUsers = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      description = "Default Samba users allowed to access shares when a share does not override users.";
+    };
+
     # Share definition
     definitions = lib.mkOption {
       default = { };
@@ -39,8 +45,9 @@ in
             enable = lib.mkEnableOption "Enable this samba share";
             path = lib.mkOption { type = lib.types.path; };
             users = lib.mkOption {
-              type = lib.types.listOf lib.types.str;
-              default = [ ];
+              type = lib.types.nullOr (lib.types.listOf lib.types.str);
+              default = null;
+              description = "Users allowed to access this share. Defaults to my.shares.defaultUsers when unset.";
             };
             readOnly = lib.mkOption {
               type = lib.types.bool;
@@ -66,7 +73,7 @@ in
       "browseable" = "yes";
       "read only" = if scfg.readOnly then "yes" else "no";
       "guest ok" = "no";
-      "valid users" = lib.concatStringsSep " " scfg.users;
+      "valid users" = lib.concatStringsSep " " (if scfg.users == null then cfg.defaultUsers else scfg.users);
       "create mask" = "0644";
       "directory mask" = "0755";
     }) (lib.filterAttrs (n: v: v.enable) cfg.definitions);
