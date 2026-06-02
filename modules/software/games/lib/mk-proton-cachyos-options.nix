@@ -4,7 +4,7 @@
   command,
   desktopName,
   exePath ? "/mnt/gameSSD/Games/GH3/GH3.exe",
-  prefixPath ? "~/Games/Wine/default",
+  prefixPath ? "$HOME/Games/saves/wine/default",
   protonVersion ? "latest",
   proton ? "cachyos",
   gamescopeArgs ? null,

@@ -11,7 +11,7 @@
   name,
   desktopName,
   exePath,
-  prefixPath,
+  prefixPath ? "$HOME/Games/saves/wine/default",
   # umu PROTONPATH: either an absolute path to a Proton install, or a umu
   # codename like "GE-Proton" that umu downloads and manages itself.
   protonPath,
@@ -26,6 +26,10 @@ let
       "$HOME"
     else if lib.hasPrefix "~/" path then
       "$HOME/${lib.escapeShellArg (lib.removePrefix "~/" path)}"
+    else if path == "$HOME" then
+      "$HOME"
+    else if lib.hasPrefix "$HOME/" path then
+      "$HOME/${lib.escapeShellArg (lib.removePrefix "$HOME/" path)}"
     else
       lib.escapeShellArg path;
   effectiveEnv = env ++ lib.optionals lsfgVkEnable [ "DISABLE_LSFG=0" ];
