@@ -88,6 +88,58 @@ let
         | ${pkgs.jq}/bin/jq -r '.[]' | tr '\n' ' ' | xargs
     }
 
+    list_colmena_hosts() {
+      ${pkgs.nix}/bin/nix eval --json "${flakePath}#colmena" \
+        --apply 'hive: builtins.filter (n: n != "meta") (builtins.attrNames hive)' \
+        | ${pkgs.jq}/bin/jq -r '.[]' | tr '\n' ' ' | xargs
+    }
+
+    expand_colmena_selector() {
+      local selector="$1"
+      local item
+      local hosts
+      local host
+      local expanded=""
+      local -a selectors
+      IFS=',' read -ra selectors <<< "$selector"
+      for item in "''${selectors[@]}"; do
+        [ -n "$item" ] || continue
+        if [[ "$item" == @* ]]; then
+          hosts=$(list_colmena_hosts_for_tag "''${item#@}")
+          expanded=$(printf '%s\n%s\n' "$expanded" "$hosts")
+        else
+          hosts=$(list_colmena_hosts)
+          for host in $hosts; do
+            if [[ "$host" == $item ]]; then
+              expanded=$(printf '%s\n%s\n' "$expanded" "$host")
+            fi
+          done
+        fi
+      done
+      printf '%s\n' "$expanded" | tr ' ' '\n' | sort -u | grep -v '^$' | tr '\n' ' ' | xargs
+    }
+
+    prebuild_colmena_selection() {
+      local target="$1"
+      local title="$2"
+      local log
+      local build_exit
+      log=$(mktemp)
+      build_exit=0
+      ${pkgs.colmena}/bin/colmena build --on "$target" --no-build-on-target --parallel "''${BUILD_PARALLELISM:-4}" 2>&1 | tee "$log" || build_exit=$?
+      if [ $build_exit -ne 0 ]; then
+        local error_summary
+        local email_body
+        error_summary=$(tail -n 20 "$log")
+        email_body=$(deploy_log_email_body "$log" "Build log excerpt for $title.")
+        notify_email "⚠️ $title batch build failed" 6 \
+          "Continuing with per-host builds.\nLast 20 lines:\n$error_summary" \
+          "$email_body"
+      fi
+      rm "$log"
+      return $build_exit
+    }
+
     deployed_system_path() {
       local host="$1"
       local self_hostname="$2"
@@ -256,24 +308,12 @@ let
       echo "Hosts to deploy: $ALL_HOSTS"
 
       echo "--- Building ${name} (${tags}) profiles locally ---"
-      BUILD_LOG=$(mktemp)
-      build_exit=0
-      ${pkgs.colmena}/bin/colmena build --on '${tags}' --no-build-on-target --parallel "$BUILD_PARALLELISM" 2>&1 | tee "$BUILD_LOG" || build_exit=$?
-      if [ $build_exit -ne 0 ]; then
-        ERROR_SUMMARY=$(tail -n 20 "$BUILD_LOG")
-        EMAIL_BODY=$(deploy_log_email_body "$BUILD_LOG" "Build log excerpt for ${name} (${tags}).")
-        notify_email "❌ ${name}: build FAILED" 10 \
-          "Last 20 lines:\n$ERROR_SUMMARY" \
-          "$EMAIL_BODY"
-        rm "$BUILD_LOG"
-        exit $build_exit
-      fi
-      rm "$BUILD_LOG"
+      HAD_WARNINGS=false
+      prebuild_colmena_selection '${tags}' "${name} (${tags})" || HAD_WARNINGS=true
 
       SUCCEEDED_HOSTS=""
       HARD_FAIL_HOSTS=""
       CONN_FAIL_HOSTS=""
-      HAD_WARNINGS=false
 
       SELF_HOSTNAME=$(hostname)
 
@@ -419,84 +459,45 @@ let
     ${pkgs.git}/bin/git add -A
     ${pkgs.git}/bin/git commit -m "auto: manual deploy $TARGET $(date '+%Y-%m-%d %H:%M')" || true
 
-    if [[ "$TARGET" == @* ]]; then
-      SELECTED_HOSTS=$(list_colmena_hosts_for_tag "''${TARGET#@}")
-    else
-      SELECTED_HOSTS="$TARGET"
+    SELECTED_HOSTS=$(expand_colmena_selector "$TARGET")
+    if [ -z "$SELECTED_HOSTS" ]; then
+      echo "No hosts matched selector '$TARGET'"
+      exit 1
     fi
+    echo "Hosts to deploy: $SELECTED_HOSTS"
 
     echo "--- Building $TARGET profiles locally ---"
-    BUILD_LOG=$(mktemp)
-    BUILD_EXIT=0
-    ${pkgs.colmena}/bin/colmena build --on "$TARGET" --no-build-on-target --parallel "$BUILD_PARALLELISM" 2>&1 | tee "$BUILD_LOG" || BUILD_EXIT=$?
-    if [ $BUILD_EXIT -ne 0 ]; then
-      ERROR_SUMMARY=$(tail -n 20 "$BUILD_LOG")
-      EMAIL_BODY=$(deploy_log_email_body "$BUILD_LOG" "Build log excerpt for manual deploy $TARGET (goal=$GOAL).")
-      notify_email "❌ Manual deploy $TARGET build FAILED" 10 \
-        "Last 20 lines:\n$ERROR_SUMMARY" \
-        "$EMAIL_BODY"
-      rm "$BUILD_LOG"
-      exit $BUILD_EXIT
-    fi
-    rm "$BUILD_LOG"
+    HAD_WARNINGS=false
+    prebuild_colmena_selection "$TARGET" "manual deploy $TARGET (goal=$GOAL)" || HAD_WARNINGS=true
 
     SUCCEEDED_HOSTS=""
     FAILED_HOSTS=""
-    HAD_WARNINGS=false
 
-    if [[ "$TARGET" == @* ]]; then
-      for host in $SELECTED_HOSTS; do
-        LOG=$(mktemp)
-        host_exit=0
-        echo "--- Deploying $host ($GOAL) ---"
-        if [[ "$host" == "$HOSTNAME" ]] || [[ "$host" == "build-nix" && "$HOSTNAME" == "build-nix" ]]; then
-          ${pkgs.colmena}/bin/colmena apply-local "$GOAL" 2>&1 | tee "$LOG" || host_exit=$?
-        else
-          ${pkgs.colmena}/bin/colmena apply --on "$host" --parallel 1 --no-build-on-target "$GOAL" 2>&1 | tee "$LOG" || host_exit=$?
-        fi
-
-        grep -qE '\[WARN\]|warning:' "$LOG" && HAD_WARNINGS=true || true
-
-        if [ $host_exit -eq 0 ]; then
-          SUCCEEDED_HOSTS="$SUCCEEDED_HOSTS $host"
-          pin_deployed_system "$host" "$HOSTNAME" || true
-        else
-          FAILED_HOSTS="$FAILED_HOSTS $host"
-          ERROR_SUMMARY=$(tail -n 20 "$LOG")
-          EMAIL_BODY=$(deploy_log_email_body "$LOG" "Build log excerpt for manual deploy $host (goal=$GOAL).")
-          notify_email "❌ Manual deploy $host FAILED" 10 \
-            "Last 20 lines:\n$ERROR_SUMMARY" \
-            "$EMAIL_BODY"
-        fi
-        rm "$LOG"
-      done
-    else
+    for host in $SELECTED_HOSTS; do
       LOG=$(mktemp)
       host_exit=0
-
-      if [[ "$TARGET" == "$HOSTNAME" ]] || [[ "$TARGET" == "build-nix" && "$HOSTNAME" == "build-nix" ]]; then
-        echo "--- Local deploy (apply-local $GOAL) ---"
+      echo "--- Deploying $host ($GOAL) ---"
+      if [[ "$host" == "$HOSTNAME" ]] || [[ "$host" == "build-nix" && "$HOSTNAME" == "build-nix" ]]; then
         ${pkgs.colmena}/bin/colmena apply-local "$GOAL" 2>&1 | tee "$LOG" || host_exit=$?
       else
-        echo "--- Deploying $TARGET ($GOAL) ---"
-        ${pkgs.colmena}/bin/colmena apply --on "$TARGET" --parallel 4 --no-build-on-target "$GOAL" 2>&1 | tee "$LOG" || host_exit=$?
+        ${pkgs.colmena}/bin/colmena apply --on "$host" --parallel 1 --no-build-on-target "$GOAL" 2>&1 | tee "$LOG" || host_exit=$?
       fi
 
       grep -qE '\[WARN\]|warning:' "$LOG" && HAD_WARNINGS=true || true
 
       if [ $host_exit -eq 0 ]; then
-        SUCCEEDED_HOSTS="$TARGET"
-        pin_deployed_system "$TARGET" "$HOSTNAME" || true
+        SUCCEEDED_HOSTS="$SUCCEEDED_HOSTS $host"
+        pin_deployed_system "$host" "$HOSTNAME" || true
       else
-        FAILED_HOSTS="$TARGET"
+        FAILED_HOSTS="$FAILED_HOSTS $host"
         ERROR_SUMMARY=$(tail -n 20 "$LOG")
-        EMAIL_BODY=$(deploy_log_email_body "$LOG" "Build log excerpt for manual deploy $TARGET (goal=$GOAL).")
-        notify_email "❌ Manual deploy $TARGET FAILED" 10 \
+        EMAIL_BODY=$(deploy_log_email_body "$LOG" "Build log excerpt for manual deploy $host (goal=$GOAL).")
+        notify_email "❌ Manual deploy $host FAILED" 10 \
           "Last 20 lines:\n$ERROR_SUMMARY" \
           "$EMAIL_BODY"
       fi
       rm "$LOG"
-    fi
+    done
 
     SUCCEEDED_HOSTS=$(echo "$SUCCEEDED_HOSTS" | tr ' ' '\n' | sort -u | grep -v '^$' | tr '\n' ' ' | xargs || true)
     FAILED_HOSTS=$(echo "$FAILED_HOSTS" | tr ' ' '\n' | sort -u | grep -v '^$' | tr '\n' ' ' | xargs || true)
