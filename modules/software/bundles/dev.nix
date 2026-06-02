@@ -7,7 +7,9 @@
 }:
 let
   cfg = config.software.dev;
-  marketplace = nix-vscode-extensions-input.extensions.${pkgs.stdenv.hostPlatform.system}.vscode-marketplace;
+  exts = nix-vscode-extensions-input.extensions.${pkgs.stdenv.hostPlatform.system};
+  marketplace = exts.vscode-marketplace;
+  openvsx = exts.open-vsx;
 in
 {
   options.software.dev.enable = lib.mkEnableOption "development tools";
@@ -20,7 +22,7 @@ in
         marketplace.jnoortheen.nix-ide
         marketplace.esbenp.prettier-vscode
         marketplace.ms-python.vscode-pylance
-        marketplace.jeanp413.open-remote-ssh
+        openvsx.jeanp413.open-remote-ssh
         marketplace.github.copilot-chat
         marketplace.anthropic.claude-code
         marketplace.openai.chatgpt
