@@ -6,20 +6,24 @@
 }:
 
 let
-  hdparm = lib.getExe pkgs.hdparm;
   zfs = config.boot.zfs.package;
-  # Backup pool drives — spin down after 30 min idle (hdparm -S 241).
-  backupDriveSerials = [
+  # Backup pool drives — spin down after 1 min idle while testing.
+  backupDriveIds = [
     "Hitachi_HUA723030ALA640_MK0371YHK6P13A"
     "WDC_WD30EZRZ-00WN9B0_WD-WCC4E7KF51NR"
     "Hitachi_HUA723030ALA640_MK0371YHJZLJ0A"
   ];
-  spindownRule =
-    serial:
-    ''ACTION=="add|change", SUBSYSTEM=="block", ENV{DEVTYPE}=="disk", ENV{ID_SERIAL}=="${serial}", RUN+="${hdparm} -S 120 /dev/%k"'';
+  hdIdleArgs = lib.concatMapStringsSep " " (id: "-a /dev/disk/by-id/ata-${id} -i 60") backupDriveIds;
 in
 {
-  services.udev.extraRules = lib.concatMapStringsSep "\n" spindownRule backupDriveSerials;
+  systemd.services.hd-idle = {
+    description = "Spin down backup pool drives after idle";
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "forking";
+      ExecStart = "${pkgs.hd-idle}/bin/hd-idle -i 0 ${hdIdleArgs}";
+    };
+  };
 
   boot.supportedFilesystems = [ "zfs" ];
   boot.zfs.extraPools = [ "backup" ];
