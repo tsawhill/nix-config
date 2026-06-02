@@ -7,6 +7,7 @@
 
 let
   keepRoots = 5; # number of per-host deploy GC roots to retain on the build machine
+  keepBuildRootsHours = 24; # temporary roots for built-but-not-yet-deployed systems
   repoPath = "/mnt/zpool/code/nix-config";
   flakePath = "path://${repoPath}";
   notifications = config.my.monitoring.notifications;
@@ -140,6 +141,26 @@ let
       return $build_exit
     }
 
+    local_build_system_path() {
+      local host="$1"
+      local log="$2"
+      local build_exit
+      local profile
+      build_exit=0
+      ${pkgs.colmena}/bin/colmena build --on "$host" --no-build-on-target --parallel 1 2>&1 | tee "$log" >&2 || build_exit=$?
+      if [ $build_exit -eq 0 ]; then
+        profile=$(grep -oE '/nix/store/[a-z0-9]+-nixos-system-[^[:space:]]+' "$log" | tail -n 1 || true)
+        if [ -z "$profile" ]; then
+          profile=$(grep -oE '/nix/store/[a-z0-9]+[^[:space:]]*' "$log" | grep '/nixos-system-' | tail -n 1 || true)
+        fi
+      fi
+      if [ $build_exit -ne 0 ]; then
+        return $build_exit
+      fi
+      [ -n "$profile" ] || return 1
+      printf '%s\n' "$profile"
+    }
+
     deployed_system_path() {
       local host="$1"
       local self_hostname="$2"
@@ -185,6 +206,38 @@ let
       generation=$(deployed_system_generation "$host" "$self_hostname" 2>/dev/null || true)
       root_label=$(printf 'gen%s-%s' "''${generation:-unknown}" "$(basename "$profile")" | sanitize_gcroot_label)
       pin_gc_roots "$host" "$profile" "$root_label"
+    }
+
+    pin_build_gc_root() {
+      local host="$1"
+      local store_path="$2"
+      local timestamp
+      local base=/nix/var/nix/gcroots/colmena-builds
+      local hdir="$base/$host"
+      local root_label
+      [ -n "$store_path" ] || return 1
+      [ -e "$store_path" ] || return 1
+      timestamp=$(date -u +%Y%m%d%H%M%S)
+      mkdir -p "$hdir"
+      root_label=$(printf '%s' "$(basename "$store_path")" | sanitize_gcroot_label)
+      ${pkgs.nix}/bin/nix-store --add-root "$hdir/$timestamp-$root_label" --indirect --realise "$store_path" || true
+    }
+
+    clear_build_gc_roots() {
+      local host="$1"
+      local hdir="/nix/var/nix/gcroots/colmena-builds/$host"
+      [ -d "$hdir" ] || return 0
+      rm -f "$hdir"/* || true
+      rmdir "$hdir" 2>/dev/null || true
+    }
+
+    prune_build_gc_roots() {
+      local base=/nix/var/nix/gcroots/colmena-builds
+      [ -d "$base" ] || return 0
+      find "$base" -mindepth 2 -maxdepth 2 -type l -mmin +${
+        toString (keepBuildRootsHours * 60)
+      } -delete || true
+      find "$base" -type d -empty -delete || true
     }
 
     get_wol_mac() {
@@ -286,6 +339,7 @@ let
     script = ''
       set -euo pipefail
       ${sharedFns}
+      prune_build_gc_roots
 
       echo "--- Committing pre-deploy state ---"
       ${pkgs.git}/bin/git -C "${repoPath}" add -A
@@ -319,9 +373,24 @@ let
 
       # --- First pass: deploy each already-built host individually so one offline host can't abort others ---
       for host in $ALL_HOSTS; do
-        echo "--- [$host] deploying ---"
+        echo "--- [$host] building ---"
         LOG=$(mktemp)
+        build_exit=0
         colmena_exit=0
+        system_path=$(local_build_system_path "$host" "$LOG") || build_exit=$?
+        if [ $build_exit -eq 0 ]; then
+          pin_build_gc_root "$host" "$system_path" || true
+        else
+          HARD_FAIL_HOSTS="$HARD_FAIL_HOSTS $host"
+          EMAIL_BODY=$(deploy_log_email_body "$LOG" "Build log excerpt for $host (${name}).")
+          notify_email "❌ ${name}: $host build FAILED" 10 \
+            "Per-host build failed for $host." \
+            "$EMAIL_BODY"
+          rm "$LOG"
+          continue
+        fi
+
+        echo "--- [$host] deploying ---"
         if [ "$host" = "$SELF_HOSTNAME" ]; then
           ${pkgs.colmena}/bin/colmena apply-local switch 2>&1 | tee "$LOG" || colmena_exit=$?
         else
@@ -333,6 +402,7 @@ let
         if [ $colmena_exit -eq 0 ]; then
           SUCCEEDED_HOSTS="$SUCCEEDED_HOSTS $host"
           pin_deployed_system "$host" "$SELF_HOSTNAME" || true
+          clear_build_gc_roots "$host"
         else
           ERROR_SUMMARY=$(tail -n 20 "$LOG")
           if grep -qE 'ssh: connect|Connection refused|No route to host|Connection timed out|Network is unreachable|Could not connect|ssh_exchange_identification' "$LOG"; then
@@ -380,6 +450,7 @@ let
           if [ $colmena_exit -eq 0 ]; then
             SUCCEEDED_HOSTS="$SUCCEEDED_HOSTS $host"
             pin_deployed_system "$host" "$SELF_HOSTNAME" || true
+            clear_build_gc_roots "$host"
             host_ok=true
             break
           fi
@@ -437,6 +508,7 @@ let
   deployCmd = pkgs.writeShellScriptBin "deploy" ''
     set -euo pipefail
     ${sharedFns}
+    prune_build_gc_roots
 
     if [ $# -lt 1 ]; then
       echo "Usage: deploy <host|@tag> [goal]"
@@ -475,7 +547,22 @@ let
 
     for host in $SELECTED_HOSTS; do
       LOG=$(mktemp)
+      build_exit=0
       host_exit=0
+      echo "--- Building $host ($GOAL) ---"
+      system_path=$(local_build_system_path "$host" "$LOG") || build_exit=$?
+      if [ $build_exit -eq 0 ]; then
+        pin_build_gc_root "$host" "$system_path" || true
+      else
+        FAILED_HOSTS="$FAILED_HOSTS $host"
+        EMAIL_BODY=$(deploy_log_email_body "$LOG" "Build log excerpt for manual deploy $host (goal=$GOAL).")
+        notify_email "❌ Manual deploy $host build FAILED" 10 \
+          "Per-host build failed for $host." \
+          "$EMAIL_BODY"
+        rm "$LOG"
+        continue
+      fi
+
       echo "--- Deploying $host ($GOAL) ---"
       if [[ "$host" == "$HOSTNAME" ]] || [[ "$host" == "build-nix" && "$HOSTNAME" == "build-nix" ]]; then
         ${pkgs.colmena}/bin/colmena apply-local "$GOAL" 2>&1 | tee "$LOG" || host_exit=$?
@@ -488,6 +575,7 @@ let
       if [ $host_exit -eq 0 ]; then
         SUCCEEDED_HOSTS="$SUCCEEDED_HOSTS $host"
         pin_deployed_system "$host" "$HOSTNAME" || true
+        clear_build_gc_roots "$host"
       else
         FAILED_HOSTS="$FAILED_HOSTS $host"
         ERROR_SUMMARY=$(tail -n 20 "$LOG")
