@@ -63,7 +63,7 @@
   };
 
   gamescopeArgs = lib.mkOption {
-    type = lib.types.nullOr (lib.types.listOf lib.types.str);
+    type = lib.types.nullOr lib.types.str;
     default = gamescopeArgs;
     description = "Optional gamescope arguments. Set to null to launch without gamescope.";
   };

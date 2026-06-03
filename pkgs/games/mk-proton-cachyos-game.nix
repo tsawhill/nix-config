@@ -44,7 +44,7 @@ let
       ''
     else
       ''
-        exec ${lib.getExe gamescope} ${lib.escapeShellArgs gamescopeArgs} -- \
+        exec ${lib.getExe gamescope} ${gamescopeArgs} -- \
           ${umuRun} "$exe_path"
       '';
 
