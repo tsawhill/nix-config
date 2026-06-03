@@ -194,3 +194,12 @@ vaultwarden-nix:
   devices:
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/vaultwarden-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:f5:ac:e2" }
+
+syncthing-nix:
+  type: "container"
+  profiles: ["nixos-lxc"]
+  config: {}
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/syncthing-nix" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "10:66:6a:aa:e3:ba" }
