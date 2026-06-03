@@ -41,6 +41,11 @@ let
           ;
         inherit protonPath;
         name = cfg.command;
+        gamescopeMode =
+          if cfg.gamescope.mode == null then
+            config.software.games.gamescope.mode
+          else
+            cfg.gamescope.mode;
         gamescopeResolutions =
           if cfg.gamescope.resolutions == null then
             config.software.games.gamescope.resolutions

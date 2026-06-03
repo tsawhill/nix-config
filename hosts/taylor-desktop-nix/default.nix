@@ -111,6 +111,7 @@ in
     enable = true;
     lsfgVk.enable = true;
   };
+  software.games.lsfgVk.enable = true;
   software.games.gamescope.resolutions = [
     {
       width = 1920;

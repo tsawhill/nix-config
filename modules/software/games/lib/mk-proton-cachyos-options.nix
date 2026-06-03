@@ -7,6 +7,7 @@
   prefixPath ? "$HOME/Games/saves/wine/default",
   protonVersion ? "latest",
   proton ? "cachyos",
+  gamescopeMode ? null,
   gamescopeArgs ? null,
   gamescopeResolutions ? null,
   env ? [ ],
@@ -67,6 +68,21 @@
     type = lib.types.nullOr lib.types.str;
     default = gamescopeArgs;
     description = "Optional gamescope arguments. Set to null to launch without gamescope.";
+  };
+
+  gamescope.mode = lib.mkOption {
+    type = lib.types.nullOr (
+      lib.types.enum [
+        "session"
+        "direct"
+      ]
+    );
+    default = gamescopeMode;
+    description = ''
+      Gamescope wrapping mode. Null inherits software.games.gamescope.mode.
+      "session" starts gamescope first and launches the game into its nested display.
+      "direct" runs gamescope directly around the game command.
+    '';
   };
 
   gamescope.resolutions = lib.mkOption {
