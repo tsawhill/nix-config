@@ -112,6 +112,13 @@ static DWORD poll_state(DIJOYSTATE2 *js)
     return FAILED(hr) ? ERROR_DEVICE_NOT_CONNECTED : ERROR_SUCCESS;
 }
 
+static SHORT whammy_axis_value(LONG value)
+{
+    if (value <= 0) return -32768;
+    if (value >= 65535) return 32767;
+    return (SHORT)(value - 32768);
+}
+
 BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID reserved)
 {
     (void)inst;
@@ -162,9 +169,9 @@ __declspec(dllexport) DWORD WINAPI XInputGetState(DWORD index, XINPUT_STATE_LOCA
     if (js.rgdwPOV[0] == 27000) state->Gamepad.wButtons |= 0x0004;  /* dpad left */
     if (js.rgdwPOV[0] == 9000) state->Gamepad.wButtons |= 0x0008;   /* dpad right */
 
-    state->Gamepad.sThumbLX = (SHORT)((js.lX > 65534 ? 65534 : js.lX) - 32768);
+    state->Gamepad.sThumbLX = 0;
     state->Gamepad.sThumbLY = 0;
-    state->Gamepad.sThumbRX = 0;
+    state->Gamepad.sThumbRX = whammy_axis_value(js.lX);
     state->Gamepad.sThumbRY = 0;
 
     return ERROR_SUCCESS;
@@ -189,11 +196,11 @@ __declspec(dllexport) DWORD WINAPI XInputGetCapabilities(DWORD index, DWORD flag
     caps->Gamepad.wButtons = 0xf13f;
     caps->Gamepad.bLeftTrigger = 0;
     caps->Gamepad.bRightTrigger = 0;
-    caps->Gamepad.sThumbLX = 32767;
+    caps->Gamepad.sThumbRX = 32767;
     if (!logged_caps)
     {
         logged_caps = TRUE;
-        trace_line("XInputGetCapabilities index=0 type=1 subtype=7 buttons=0xf13f lt=0 rt=0\n");
+        trace_line("XInputGetCapabilities index=0 type=1 subtype=7 buttons=0xf13f lt=0 rt=0 rx=32767\n");
     }
     return ERROR_SUCCESS;
 }
