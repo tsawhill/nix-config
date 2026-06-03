@@ -17,10 +17,15 @@
   lsfgVkEnable ? false,
 }:
 let
-  effectiveEnv = env ++ lib.optionals lsfgVkEnable [ "DISABLE_LSFG=0" ];
   envExports = lib.concatStringsSep "\n" (
-    map (assignment: "export ${lib.escapeShellArg assignment}") effectiveEnv
+    map (assignment: "export ${lib.escapeShellArg assignment}") env
   );
+  # The lsfg-vk implicit layer is gated by disable_environment = { DISABLE_LSFG = "1"; }.
+  # The Vulkan loader disables an implicit layer whenever that variable is
+  # *defined at all* — it never compares the value — so exporting DISABLE_LSFG=0
+  # still disables it. The system-wide default defines DISABLE_LSFG to keep lsfg
+  # off everywhere; to actually enable it for this launcher we must unset it.
+  lsfgSetup = lib.optionalString lsfgVkEnable "unset DISABLE_LSFG";
 
   resolutionLabel = resolution: "${toString resolution.width}x${toString resolution.height}";
   resolutionArgs =
@@ -69,6 +74,7 @@ let
 
       ${setupScript}
       ${envExports}
+      ${lsfgSetup}
 
       ${runCommand entry}
     '';
