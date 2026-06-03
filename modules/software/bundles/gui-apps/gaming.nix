@@ -112,8 +112,14 @@ in
     hardware.graphics = {
       enable = true;
       enable32Bit = true;
-      extraPackages = lib.optionals cfg.lsfgVk.enable [ pkgs.lsfg-vk ];
-      extraPackages32 = lib.optionals cfg.lsfgVk.enable [ pkgs.pkgsi686Linux.lsfg-vk ];
+      # MangoHud's Vulkan layer must be on the host driver path (both bitnesses)
+      # for pressure-vessel to import it into umu/Proton containers; it stays
+      # dormant unless MANGOHUD=1. systemPackages alone doesn't reach the
+      # in-container loader. GHWTDE is 32-bit, so the i686 layer is required.
+      extraPackages = [ pkgs.mangohud ] ++ lib.optionals cfg.lsfgVk.enable [ pkgs.lsfg-vk ];
+      extraPackages32 =
+        [ pkgs.pkgsi686Linux.mangohud ]
+        ++ lib.optionals cfg.lsfgVk.enable [ pkgs.pkgsi686Linux.lsfg-vk ];
     };
 
     services.udev = {

@@ -25,7 +25,18 @@ let
   # *defined at all* — it never compares the value — so exporting DISABLE_LSFG=0
   # still disables it. The system-wide default defines DISABLE_LSFG to keep lsfg
   # off everywhere; to actually enable it for this launcher we must unset it.
-  lsfgSetup = lib.optionalString lsfgVkEnable "unset DISABLE_LSFG";
+  #
+  # Under Proton, lsfg-vk sees the wine/preloader process name rather than the
+  # Windows exe, so a conf.toml `exe = "Game.exe"` entry never matches. Derive
+  # LSFG_PROCESS from the launched exe's basename so the matching [[game]] block
+  # applies automatically for every Proton/umu title. (exe_path is set by the
+  # runner's setupScript; guarded so non-exe runners are unaffected.)
+  lsfgSetup = lib.optionalString lsfgVkEnable ''
+    unset DISABLE_LSFG
+    if [ -n "''${exe_path:-}" ]; then
+      export LSFG_PROCESS="''${exe_path##*/}"
+    fi
+  '';
 
   resolutionLabel = resolution: "${toString resolution.width}x${toString resolution.height}";
   resolutionArgs =
