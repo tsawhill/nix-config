@@ -67,6 +67,9 @@ in
     exePath = "/mnt/gameSSD/Games/GHWTDE/GHWT_Definitive.exe";
     proton = "ge-proton";
     protonVersion = "9-25";
+    # Inherit the global lsfg-vk default; the bespoke module doesn't go through
+    # the generic handler that would otherwise wire this up.
+    lsfgVkEnable = config.software.games.lsfgVk.enable;
     # GHWTDE manages its own window; gamescope just leaves it stuck, so run it raw.
     gamescopeResolutions = [ ];
     env = [
