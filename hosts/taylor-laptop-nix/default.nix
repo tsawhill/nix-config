@@ -86,7 +86,7 @@ in
   software.apps.media-playback.enable = true;
   software.apps.media-creation.enable = true;
   software.apps.gaming.enable = true;
-  software.games.guitarHero3.lsfgVk.enable = true;
+  software.games.entries.guitarHero3.lsfgVk.enable = true;
   software.apps.emulators.enable = true;
   software.apps.printing.enable = true;
   software.apps.tools.enable = true;

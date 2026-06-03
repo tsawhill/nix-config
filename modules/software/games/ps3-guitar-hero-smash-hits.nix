@@ -1,40 +1,17 @@
 {
-  config,
-  pkgs,
-  lib,
-  ...
-}:
-
-let
-  gameId = "ps3GuitarHeroSmashHits";
-  cfg = config.software.games.${gameId};
-  mkRpcs3Options = import ./lib/mk-rpcs3-options.nix { inherit lib; };
-
-  launcher = pkgs.callPackage ../../../pkgs/games/mk-rpcs3-game.nix { } {
-    inherit (cfg)
-      desktopName
-      gamePath
-      args
-      gamescopeArgs
-      env
-      ;
-    name = cfg.command;
-    gamescopeResolutions =
-      if cfg.gamescope.resolutions == null then
-        config.software.games.gamescope.resolutions
-      else
-        cfg.gamescope.resolutions;
-    lsfgVkEnable = cfg.lsfgVk.enable;
-  };
-in
-{
-  options.software.games.${gameId} = mkRpcs3Options {
+  software.games.entries.ps3GuitarHeroSmashHits = {
     command = "gh-smash-hits-ps3";
     desktopName = "Guitar Hero: Smash Hits (PS3)";
-    gamePath = "Guitar Hero - Smash Hits (USA) (En,Fr).iso";
-  };
-
-  config = lib.mkIf (!(builtins.elem gameId config.software.games.exclude)) {
-    environment.systemPackages = [ launcher ];
+    category = "Guitar Hero";
+    gamescope.resolutions = [
+      {
+        width = 2560;
+        height = 1440;
+      }
+    ];
+    runner.emulator = {
+      type = "rpcs3";
+      gamePath = "Guitar Hero - Smash Hits (USA) (En,Fr).iso";
+    };
   };
 }

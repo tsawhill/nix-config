@@ -68,6 +68,11 @@ in
         boilr
         (pkgs.callPackage ../../../../pkgs/yarc-launcher.nix { })
 
+        # Couch frontends for the software.games.* library
+        pegasus-frontend # declarative, non-Steam gamepad frontend
+        steam-rom-manager # syncs games into Steam as categorized non-Steam shortcuts
+        sgdboop # SteamGridDB artwork fetcher
+
         # Mod / config tools
         protonplus
         prismlauncher

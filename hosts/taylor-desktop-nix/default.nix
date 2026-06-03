@@ -123,7 +123,7 @@ in
     }
   ];
   # GH3 stays on its prior resolutions rather than following the global default.
-  software.games.guitarHero3.gamescope.resolutions = [
+  software.games.entries.guitarHero3.gamescope.resolutions = [
     {
       width = 1920;
       height = 1440;

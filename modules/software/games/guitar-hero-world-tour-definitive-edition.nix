@@ -1,108 +1,37 @@
 {
-  config,
-  pkgs,
-  lib,
-  ...
-}:
-
-let
-  gameId = "guitarHeroWorldTourDefinitiveEdition";
-  updaterId = "guitarHeroWorldTourDefinitiveEditionUpdater";
-  mkProtonCachyosOptions = import ./lib/mk-proton-cachyos-options.nix { inherit lib; };
-
-  mkLauncher =
-    cfg:
-    let
-      protonCachyos = pkgs.callPackage ../../../pkgs/games/proton-cachyos.nix {
-        version = cfg.protonVersion;
+  software.games.entries = {
+    guitarHeroWorldTourDefinitiveEdition = {
+      command = "ghwtde";
+      desktopName = "Guitar Hero World Tour: Definitive Edition";
+      category = "Guitar Hero";
+      # GHWTDE manages its own window; gamescope just leaves it stuck, so run it raw.
+      gamescope.resolutions = [ ];
+      env = [
+        "WINEDLLOVERRIDES=xinput1_3=n,b"
+        "vblank_mode=0"
+        "PULSE_LATENCY_MSEC=60"
+      ];
+      runner.umu = {
+        exePath = "/mnt/gameSSD/Games/GHWTDE/GHWT_Definitive.exe";
+        proton = "ge-proton";
+        protonVersion = "9-25";
       };
-
-      useGeProton = cfg.proton == "ge-proton";
-
-      geProton = pkgs.callPackage ../../../pkgs/games/proton-ge.nix {
-        version = cfg.protonVersion;
-      };
-
-      protonPath =
-        if useGeProton then
-          (if cfg.protonVersion == "latest" then "GE-Proton" else "${geProton}")
-        else
-          "${protonCachyos}/share/steam/compatibilitytools.d/proton-cachyos";
-    in
-    {
-      package = pkgs.callPackage ../../../pkgs/games/mk-proton-cachyos-game.nix { } {
-        inherit (cfg)
-          desktopName
-          exePath
-          prefixPath
-          gamescopeArgs
-          env
-          ;
-        inherit protonPath;
-        name = cfg.command;
-        gamescopeResolutions =
-          if cfg.gamescope.resolutions == null then
-            config.software.games.gamescope.resolutions
-          else
-            cfg.gamescope.resolutions;
-        lsfgVkEnable = cfg.lsfgVk.enable;
-      };
-
-      protonPackage = protonCachyos;
     };
 
-  gameCfg = config.software.games.${gameId};
-  updaterCfg = config.software.games.${updaterId};
-
-  gameLauncher = mkLauncher gameCfg;
-  updaterLauncher = mkLauncher updaterCfg;
-in
-{
-  options.software.games.${gameId} = mkProtonCachyosOptions {
-    command = "ghwtde";
-    desktopName = "Guitar Hero World Tour: Definitive Edition";
-    exePath = "/mnt/gameSSD/Games/GHWTDE/GHWT_Definitive.exe";
-    proton = "ge-proton";
-    protonVersion = "9-25";
-    # Inherit the global lsfg-vk default; the bespoke module doesn't go through
-    # the generic handler that would otherwise wire this up.
-    lsfgVkEnable = config.software.games.lsfgVk.enable;
-    # GHWTDE manages its own window; gamescope just leaves it stuck, so run it raw.
-    gamescopeResolutions = [ ];
-    env = [
-      "WINEDLLOVERRIDES=xinput1_3=n,b"
-      "vblank_mode=0"
-      "PULSE_LATENCY_MSEC=60"
-    ];
+    guitarHeroWorldTourDefinitiveEditionUpdater = {
+      command = "ghwtde-updater";
+      desktopName = "Guitar Hero World Tour: Definitive Edition Updater";
+      category = "Guitar Hero";
+      gamescope.resolutions = [ ];
+      env = [
+        "vblank_mode=0"
+        "PULSE_LATENCY_MSEC=60"
+      ];
+      runner.umu = {
+        exePath = "/mnt/gameSSD/Games/GHWTDE/Updater.exe";
+        proton = "ge-proton";
+        protonVersion = "9-25";
+      };
+    };
   };
-
-  options.software.games.${updaterId} = mkProtonCachyosOptions {
-    command = "ghwtde-updater";
-    desktopName = "Guitar Hero World Tour: Definitive Edition Updater";
-    exePath = "/mnt/gameSSD/Games/GHWTDE/Updater.exe";
-    proton = "ge-proton";
-    protonVersion = "9-25";
-    gamescopeResolutions = [ ];
-    env = [
-      "vblank_mode=0"
-      "PULSE_LATENCY_MSEC=60"
-    ];
-  };
-
-  config = lib.mkMerge [
-    (lib.mkIf (!(builtins.elem gameId config.software.games.exclude)) {
-      environment.systemPackages =
-        [
-          gameLauncher.package
-        ]
-        ++ lib.optionals (gameCfg.proton == "cachyos") [ gameLauncher.protonPackage ];
-    })
-    (lib.mkIf (!(builtins.elem updaterId config.software.games.exclude)) {
-      environment.systemPackages =
-        [
-          updaterLauncher.package
-        ]
-        ++ lib.optionals (updaterCfg.proton == "cachyos") [ updaterLauncher.protonPackage ];
-    })
-  ];
 }

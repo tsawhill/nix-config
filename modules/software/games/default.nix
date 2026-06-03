@@ -66,9 +66,18 @@ let
       extraPackages = lib.optionals (runnerCfg.proton == "cachyos") [ protonCachyos ];
     };
 
+  # PS3 titles need rpcs3 built with static libs, matching the emulators bundle
+  # (modules/software/bundles/gui-apps/emulators.nix). Without this the entries
+  # rpcs3 runner would silently use the stock dynamic build.
+  rpcs3Static = pkgs.rpcs3.overrideAttrs (prev: {
+    cmakeFlags = prev.cmakeFlags ++ [ (lib.cmakeBool "BUILD_SHARED_LIBS" false) ];
+  });
+
   mkEmulatorRunner =
     runnerCfg:
-    pkgs.callPackage ../../../pkgs/games/runners/emulators/${runnerCfg.type}.nix { } (
+    pkgs.callPackage ../../../pkgs/games/runners/emulators/${runnerCfg.type}.nix (
+      lib.optionalAttrs (runnerCfg.type == "rpcs3") { rpcs3 = rpcs3Static; }
+    ) (
       {
         inherit (runnerCfg) gamePath args;
       }
@@ -116,7 +125,35 @@ let
       extraPackages = runner.extraPackages or [ ];
     };
 
-  entryPackages = map mkEntryPackage (lib.attrValues cfg.entries);
+  includedEntries = lib.filterAttrs (name: _: !(lib.elem name cfg.exclude)) cfg.entries;
+  entryPackages = map mkEntryPackage (lib.attrValues includedEntries);
+
+  # Human-facing platform category per game, derived from its runner. Used to
+  # group games into collections in frontends (Pegasus, Steam shortcuts).
+  emulatorCategories = {
+    rpcs3 = "PS3";
+    dolphin = "GameCube/Wii";
+    pcsx2 = "PS2";
+    retroarch = "RetroArch";
+  };
+  entryCategory =
+    entryCfg:
+    if entryCfg.category != null then
+      entryCfg.category
+    else if entryCfg.runner.umu != null then
+      "Proton"
+    else if entryCfg.runner.native != null then
+      "Native"
+    else
+      emulatorCategories.${entryCfg.runner.emulator.type};
+
+  # Read-only manifest of enabled games for frontends. One attrset per game.
+  gamesManifest = lib.mapAttrsToList (id: entryCfg: {
+    inherit id;
+    name = entryCfg.desktopName;
+    command = entryCfg.command;
+    category = entryCategory entryCfg;
+  }) includedEntries;
 in
 {
   imports = importPaths;
@@ -126,6 +163,14 @@ in
     default = [ ];
     example = [ "guitarHero3" ];
     description = "Game launcher module ids to exclude from the default game library.";
+  };
+
+  # Internal: consumed by frontend home-manager modules via osConfig.
+  options.software.games.manifest = lib.mkOption {
+    type = lib.types.listOf (lib.types.attrsOf lib.types.str);
+    internal = true;
+    default = [ ];
+    description = "Enabled game launchers as {id,name,command,category} for frontends (Pegasus, Steam).";
   };
 
   options.software.games.gamescope.resolutions = lib.mkOption {
@@ -148,6 +193,17 @@ in
           desktopName = lib.mkOption {
             type = lib.types.str;
             description = "Desktop entry display name for this game launcher.";
+          };
+
+          category = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            default = null;
+            example = "Guitar Hero";
+            description = ''
+              Custom frontend category for this game (groups it in Pegasus
+              collections and Steam categories). When null, the runner type is
+              used: Proton, PS3, GameCube/Wii, PS2, RetroArch, or Native.
+            '';
           };
 
           env = lib.mkOption {
@@ -308,6 +364,8 @@ in
         ]
       ) cfg.entries
     );
+
+    software.games.manifest = gamesManifest;
 
     environment.systemPackages =
       (map (entryPackage: entryPackage.package) entryPackages)
