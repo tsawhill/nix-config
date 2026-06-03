@@ -7,7 +7,6 @@
 
 let
   gameId = "guitarHeroWorldTourDefinitiveEdition";
-  launcherId = "guitarHeroWorldTourDefinitiveEditionLauncher";
   updaterId = "guitarHeroWorldTourDefinitiveEditionUpdater";
   mkProtonCachyosOptions = import ./lib/mk-proton-cachyos-options.nix { inherit lib; };
 
@@ -53,11 +52,9 @@ let
     };
 
   gameCfg = config.software.games.${gameId};
-  launcherCfg = config.software.games.${launcherId};
   updaterCfg = config.software.games.${updaterId};
 
   gameLauncher = mkLauncher gameCfg;
-  configLauncher = mkLauncher launcherCfg;
   updaterLauncher = mkLauncher updaterCfg;
 in
 {
@@ -73,19 +70,7 @@ in
     # GHWTDE manages its own window; gamescope just leaves it stuck, so run it raw.
     gamescopeResolutions = [ ];
     env = [
-      "vblank_mode=0"
-      "PULSE_LATENCY_MSEC=60"
-    ];
-  };
-
-  options.software.games.${launcherId} = mkProtonCachyosOptions {
-    command = "ghwtde-launcher";
-    desktopName = "Guitar Hero World Tour: Definitive Edition Launcher";
-    exePath = "/mnt/gameSSD/Games/GHWTDE/GHWT_Definitive_Launcher.exe";
-    proton = "ge-proton";
-    protonVersion = "9-25";
-    gamescopeResolutions = [ ];
-    env = [
+      "WINEDLLOVERRIDES=xinput1_3=n,b"
       "vblank_mode=0"
       "PULSE_LATENCY_MSEC=60"
     ];
@@ -111,13 +96,6 @@ in
           gameLauncher.package
         ]
         ++ lib.optionals (gameCfg.proton == "cachyos") [ gameLauncher.protonPackage ];
-    })
-    (lib.mkIf (!(builtins.elem launcherId config.software.games.exclude)) {
-      environment.systemPackages =
-        [
-          configLauncher.package
-        ]
-        ++ lib.optionals (launcherCfg.proton == "cachyos") [ configLauncher.protonPackage ];
     })
     (lib.mkIf (!(builtins.elem updaterId config.software.games.exclude)) {
       environment.systemPackages =
