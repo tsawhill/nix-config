@@ -146,6 +146,12 @@ let
       coreutils
       gnugrep
     ];
+    # SC2329: cleanup_gamescope is invoked indirectly via `trap`.
+    # SC2016: the inner `${runtimeShell} -c '...'` expands these, not us.
+    excludeShellChecks = [
+      "SC2016"
+      "SC2329"
+    ];
     text = ''
       set -euo pipefail
 
