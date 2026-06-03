@@ -114,6 +114,17 @@ in
   software.games.lsfgVk.enable = true;
   software.games.gamescope.resolutions = [
     {
+      width = 2560;
+      height = 1440;
+    }
+    {
+      width = 3440;
+      height = 1440;
+    }
+  ];
+  # GH3 stays on its prior resolutions rather than following the global default.
+  software.games.guitarHero3.gamescope.resolutions = [
+    {
       width = 1920;
       height = 1440;
     }
