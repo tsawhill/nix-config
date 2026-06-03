@@ -12,7 +12,6 @@
   # umu PROTONPATH: either an absolute path to a Proton install, or a umu
   # codename like "GE-Proton" that umu downloads and manages itself.
   protonPath,
-  gamescopeMode ? "session",
   gamescopeArgs ? null,
   gamescopeResolutions ? [ ],
   env ? [ ],
@@ -57,7 +56,6 @@ mkGameLauncher {
     name
     desktopName
     setupScript
-    gamescopeMode
     gamescopeArgs
     gamescopeResolutions
     env

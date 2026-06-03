@@ -89,11 +89,6 @@ let
           cfg.gamescope.resolutions
         else
           entryCfg.gamescope.resolutions;
-      gamescopeMode =
-        if entryCfg.gamescope.mode == null then
-          cfg.gamescope.mode
-        else
-          entryCfg.gamescope.mode;
       lsfgVkEnable =
         if entryCfg.lsfgVk.enable == null then
           cfg.lsfgVk.enable
@@ -110,7 +105,7 @@ let
         inherit (runner) runnerCommand;
         setupScript = runner.setupScript or "";
         name = entryCfg.command;
-        inherit gamescopeMode gamescopeResolutions lsfgVkEnable;
+        inherit gamescopeResolutions lsfgVkEnable;
       };
       extraPackages = runner.extraPackages or [ ];
     };
@@ -131,19 +126,6 @@ in
     type = lib.types.listOf resolutionType;
     default = [ ];
     description = "Default gamescope resolutions to generate launchers for.";
-  };
-
-  options.software.games.gamescope.mode = lib.mkOption {
-    type = lib.types.enum [
-      "session"
-      "direct"
-    ];
-    default = "session";
-    description = ''
-      Default gamescope wrapping mode. "session" starts gamescope first and
-      launches the game into its nested display. "direct" runs gamescope directly
-      around the game command.
-    '';
   };
 
   options.software.games.lsfgVk.enable = lib.mkEnableOption "lsfg-vk for game launchers";
@@ -178,17 +160,6 @@ in
             type = lib.types.nullOr (lib.types.listOf resolutionType);
             default = null;
             description = "Gamescope resolutions for this game. Null inherits the global default; an empty list disables gamescope.";
-          };
-
-          gamescope.mode = lib.mkOption {
-            type = lib.types.nullOr (
-              lib.types.enum [
-                "session"
-                "direct"
-              ]
-            );
-            default = null;
-            description = "Gamescope wrapping mode for this game. Null inherits the global default.";
           };
 
           lsfgVk.enable = lib.mkOption {

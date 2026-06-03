@@ -41,11 +41,6 @@ let
           ;
         inherit protonPath;
         name = cfg.command;
-        gamescopeMode =
-          if cfg.gamescope.mode == null then
-            config.software.games.gamescope.mode
-          else
-            cfg.gamescope.mode;
         gamescopeResolutions =
           if cfg.gamescope.resolutions == null then
             config.software.games.gamescope.resolutions
@@ -72,6 +67,8 @@ in
     exePath = "/mnt/gameSSD/Games/GHWTDE/GHWT_Definitive.exe";
     proton = "ge-proton";
     protonVersion = "9-25";
+    # GHWTDE manages its own window; gamescope just leaves it stuck, so run it raw.
+    gamescopeResolutions = [ ];
     env = [
       "vblank_mode=0"
       "PULSE_LATENCY_MSEC=60"
