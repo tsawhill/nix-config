@@ -133,14 +133,6 @@ in
       height = 1440;
     }
   ];
-  # GH3 is 32-bit; the lsfg-vk implicit layer crashes its Vulkan instance
-  # creation. Heroic only "works" because its Steam Runtime container hides the
-  # layer (frame-gen was never actually active on GH3). Keep it disabled here.
-  software.games.guitarHero3.lsfgVk.enable = false;
-  # GHWTDE: frame-gen works, but optical-flow interpolation mangles the
-  # fast-scrolling note highway (the gameplay-critical element), so it's not
-  # worth it for this title. Disabled per-game; global default stays on.
-  software.games.guitarHeroWorldTourDefinitiveEdition.lsfgVk.enable = false;
   software.apps.emulators.enable = true;
   software.apps.printing.enable = true;
   software.apps.tools.enable = true;
