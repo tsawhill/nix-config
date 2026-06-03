@@ -40,6 +40,10 @@ stdenvNoCC.mkDerivation {
     install -Dm0644 xinput1_3.dll "$out/share/games/xinput-guitar-dll/xinput1_3.dll"
     install -Dm0644 xinput-guitar-dll.c "$out/share/games/xinput-guitar-dll/source/xinput-guitar-dll.c"
     install -Dm0644 xinput-guitar-dll.def "$out/share/games/xinput-guitar-dll/source/xinput-guitar-dll.def"
+    install -Dm0755 /dev/stdin "$out/bin/xinput-guitar-dll-path" <<EOF
+    #!/bin/sh
+    printf '%s\n' "$out/share/games/xinput-guitar-dll/xinput1_3.dll"
+    EOF
 
     runHook postInstall
   '';
