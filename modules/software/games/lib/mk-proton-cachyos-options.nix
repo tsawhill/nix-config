@@ -8,6 +8,7 @@
   protonVersion ? "latest",
   proton ? "cachyos",
   gamescopeArgs ? null,
+  gamescopeResolutions ? null,
   env ? [ ],
   lsfgVkEnable ? false,
 }:
@@ -66,6 +67,32 @@
     type = lib.types.nullOr lib.types.str;
     default = gamescopeArgs;
     description = "Optional gamescope arguments. Set to null to launch without gamescope.";
+  };
+
+  gamescope.resolutions = lib.mkOption {
+    type = lib.types.nullOr (
+      lib.types.listOf (
+        lib.types.submodule {
+          options = {
+            width = lib.mkOption {
+              type = lib.types.int;
+              description = "Gamescope output and game width.";
+            };
+
+            height = lib.mkOption {
+              type = lib.types.int;
+              description = "Gamescope output and game height.";
+            };
+          };
+        }
+      )
+    );
+    default = gamescopeResolutions;
+    description = ''
+      Gamescope resolutions to generate launchers for. When null, uses
+      software.games.gamescope.resolutions. When multiple resolutions are used,
+      launcher commands and desktop entry names include the resolution.
+    '';
   };
 
   env = lib.mkOption {

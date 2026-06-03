@@ -16,6 +16,7 @@
   # codename like "GE-Proton" that umu downloads and manages itself.
   protonPath,
   gamescopeArgs ? null,
+  gamescopeResolutions ? [ ],
   env ? [ ],
   lsfgVkEnable ? false,
 }:
@@ -37,19 +38,49 @@ let
     map (assignment: "export ${lib.escapeShellArg assignment}") effectiveEnv
   );
   umuRun = "${umu-launcher}/bin/umu-run";
+
+  resolutionLabel = resolution: "${toString resolution.width}x${toString resolution.height}";
+  resolutionArgs =
+    resolution:
+    "-W ${toString resolution.width} -H ${toString resolution.height} -w ${toString resolution.width} -h ${toString resolution.height}";
+
+  hasMultipleResolutions = builtins.length gamescopeResolutions > 1;
+  entries =
+    if gamescopeResolutions == [ ] then
+      [
+        {
+          inherit name desktopName gamescopeArgs;
+        }
+      ]
+    else
+      map (
+        resolution:
+        let
+          label = resolutionLabel resolution;
+        in
+        {
+          name = name + lib.optionalString hasMultipleResolutions "-${label}";
+          desktopName = desktopName + lib.optionalString hasMultipleResolutions " (${label})";
+          gamescopeArgs =
+            resolutionArgs resolution
+            + lib.optionalString (gamescopeArgs != null) " ${gamescopeArgs}";
+        }
+      ) gamescopeResolutions;
+
   runCommand =
-    if gamescopeArgs == null then
+    entry:
+    if entry.gamescopeArgs == null then
       ''
         exec ${umuRun} "$exe_path"
       ''
     else
       ''
-        exec ${lib.getExe gamescope} ${gamescopeArgs} -- \
+        exec ${lib.getExe gamescope} ${entry.gamescopeArgs} -- \
           ${umuRun} "$exe_path"
       '';
 
-  launcher = writeShellApplication {
-    inherit name;
+  mkLauncher = entry: writeShellApplication {
+    inherit (entry) name;
     text = ''
       set -euo pipefail
 
@@ -71,21 +102,31 @@ let
       export WINEPREFIX="$prefix_path"
       ${envExports}
 
-      ${runCommand}
+      ${runCommand entry}
     '';
   };
 
-  desktopItem = makeDesktopItem {
-    inherit name desktopName;
+  mkDesktopItem = entry: launcher: makeDesktopItem {
+    inherit (entry) name desktopName;
     exec = lib.getExe launcher;
     terminal = false;
     categories = [ "Game" ];
   };
+
+  packages = lib.flatten (
+    map (
+      entry:
+      let
+        launcher = mkLauncher entry;
+      in
+      [
+        launcher
+        (mkDesktopItem entry launcher)
+      ]
+    ) entries
+  );
 in
 symlinkJoin {
   name = "${name}-launcher";
-  paths = [
-    launcher
-    desktopItem
-  ];
+  paths = packages;
 }

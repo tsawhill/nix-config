@@ -39,6 +39,11 @@ let
       ;
     inherit protonPath;
     name = cfg.command;
+    gamescopeResolutions =
+      if cfg.gamescope.resolutions == null then
+        config.software.games.gamescope.resolutions
+      else
+        cfg.gamescope.resolutions;
     lsfgVkEnable = cfg.lsfgVk.enable;
   };
 in

@@ -111,13 +111,20 @@ in
     enable = true;
     lsfgVk.enable = true;
   };
+  software.games.gamescope.resolutions = [
+    {
+      width = 1920;
+      height = 1440;
+    }
+    {
+      width = 2560;
+      height = 1440;
+    }
+  ];
   # GH3 is 32-bit; the lsfg-vk implicit layer crashes its Vulkan instance
   # creation. Heroic only "works" because its Steam Runtime container hides the
   # layer (frame-gen was never actually active on GH3). Keep it disabled here.
   software.games.guitarHero3.lsfgVk.enable = false;
-  software.games.guitarHero3.gamescopeArgs = "-W 2560 -H 1440 -w 2560 -h 1440";
-  software.games.guitarHeroWorldTourDefinitiveEdition.gamescopeArgs =
-    "-W 2560 -H 1440 -w 2560 -h 1440";
   software.apps.emulators.enable = true;
   software.apps.printing.enable = true;
   software.apps.tools.enable = true;

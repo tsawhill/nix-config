@@ -41,6 +41,11 @@ let
           ;
         inherit protonPath;
         name = cfg.command;
+        gamescopeResolutions =
+          if cfg.gamescope.resolutions == null then
+            config.software.games.gamescope.resolutions
+          else
+            cfg.gamescope.resolutions;
         lsfgVkEnable = cfg.lsfgVk.enable;
       };
 
@@ -74,6 +79,7 @@ in
     exePath = "/mnt/gameSSD/Games/GHWTDE/GHWT_Definitive_Launcher.exe";
     proton = "ge-proton";
     protonVersion = "9-25";
+    gamescopeResolutions = [ ];
     env = [
       "vblank_mode=0"
       "PULSE_LATENCY_MSEC=60"
@@ -86,6 +92,7 @@ in
     exePath = "/mnt/gameSSD/Games/GHWTDE/Updater.exe";
     proton = "ge-proton";
     protonVersion = "9-25";
+    gamescopeResolutions = [ ];
     env = [
       "vblank_mode=0"
       "PULSE_LATENCY_MSEC=60"

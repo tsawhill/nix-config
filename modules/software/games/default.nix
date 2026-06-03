@@ -18,4 +18,24 @@ in
     example = [ "guitarHero3" ];
     description = "Game launcher module ids to exclude from the default game library.";
   };
+
+  options.software.games.gamescope.resolutions = lib.mkOption {
+    type = lib.types.listOf (
+      lib.types.submodule {
+        options = {
+          width = lib.mkOption {
+            type = lib.types.int;
+            description = "Gamescope output and game width.";
+          };
+
+          height = lib.mkOption {
+            type = lib.types.int;
+            description = "Gamescope output and game height.";
+          };
+        };
+      }
+    );
+    default = [ ];
+    description = "Default gamescope resolutions to generate launchers for.";
+  };
 }
