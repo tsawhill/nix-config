@@ -41,30 +41,33 @@ let
   resolutionLabel = resolution: "${toString resolution.width}x${toString resolution.height}";
   resolutionArgs =
     resolution:
-    "-W ${toString resolution.width} -H ${toString resolution.height} -w ${toString resolution.width} -h ${toString resolution.height}";
+    let
+      scale = resolution.scale or 1.0;
+      gameWidth = builtins.floor (resolution.width * scale);
+      gameHeight = builtins.floor (resolution.height * scale);
+    in
+    "-W ${toString resolution.width} -H ${toString resolution.height} -w ${toString gameWidth} -h ${toString gameHeight}";
 
-  hasMultipleResolutions = builtins.length gamescopeResolutions > 1;
   entries =
-    if gamescopeResolutions == [ ] then
-      [
-        {
-          inherit name desktopName gamescopeArgs;
-        }
-      ]
-    else
-      map (
+    [
+      {
+        inherit name desktopName;
+        gamescopeArgs = null;
+      }
+    ]
+    ++ map (
         resolution:
         let
           label = resolutionLabel resolution;
         in
         {
-          name = name + lib.optionalString hasMultipleResolutions "-${label}";
-          desktopName = desktopName + lib.optionalString hasMultipleResolutions " (${label})";
+          name = "${name}-${label}";
+          desktopName = "${desktopName} (${label})";
           gamescopeArgs =
             resolutionArgs resolution
             + lib.optionalString (gamescopeArgs != null) " ${gamescopeArgs}";
         }
-      ) gamescopeResolutions;
+    ) gamescopeResolutions;
 
   runCommand =
     entry:

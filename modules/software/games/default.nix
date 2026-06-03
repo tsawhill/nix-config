@@ -26,6 +26,12 @@ let
         type = lib.types.int;
         description = "Gamescope output and game height.";
       };
+
+      scale = lib.mkOption {
+        type = lib.types.number;
+        default = 1.0;
+        description = "Scale applied to the in-game gamescope width and height.";
+      };
     };
   };
 
