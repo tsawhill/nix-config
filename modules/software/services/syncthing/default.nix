@@ -106,6 +106,14 @@ in
       };
       description = "Per-share extra .stignore lines this host applies, on top of the share's common ignores in fleet.nix.";
     };
+
+    resolvedPaths = lib.mkOption {
+      type = lib.types.attrsOf lib.types.str;
+      internal = true;
+      readOnly = true;
+      default = lib.genAttrs myShareNames effPath;
+      description = "Resolved local path of each share this host participates in. Set by the module; read by consumers (e.g. emulator-saves) that need a share's on-disk location.";
+    };
   };
 
   config = lib.mkIf cfg.enable {
