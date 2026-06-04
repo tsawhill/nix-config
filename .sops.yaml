@@ -69,6 +69,7 @@ creation_rules:
       - age:
         - *build-nix
         - *taylor-desktop-nix
+        - *taylor-laptop-nix
         - *pi-backup-nix
   - path_regex: modules/secrets/wireguard/pi-backup-nix\.yaml$
     key_groups:
