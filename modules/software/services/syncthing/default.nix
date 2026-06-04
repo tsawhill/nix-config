@@ -56,11 +56,12 @@ let
     devices = folderPeers name; # self is implicit in syncthing
   };
 
-  # Per-host ignore patterns (raw .stignore lines) from this device's fleet
-  # entry, written into every folder this host participates in.
-  myIgnores = fleet.devices.${me}.ignores or [ ];
-  stignoreFile = pkgs.writeText "syncthing-stignore-${me}" (lib.concatStringsSep "\n" myIgnores + "\n");
-  myFolderPaths = map effPath myShareNames;
+  # Effective ignore patterns for a share on this host: the share's common
+  # ignores from fleet.nix, plus any host-specific extras for that share.
+  shareIgnores = name: (fleet.shares.${name}.ignores or [ ]) ++ (cfg.extraIgnores.${name} or [ ]);
+  ignoredShares = lib.filter (name: shareIgnores name != [ ]) myShareNames;
+  mkStignore =
+    name: pkgs.writeText "syncthing-stignore-${me}-${name}" (lib.concatStringsSep "\n" (shareIgnores name) + "\n");
 in
 {
   options.my.syncthing = {
@@ -95,6 +96,15 @@ in
         roms = "/data/roms";
       };
       description = "Per-host overrides of a share's local path, replacing the fleet.nix default.";
+    };
+
+    extraIgnores = lib.mkOption {
+      type = lib.types.attrsOf (lib.types.listOf lib.types.str);
+      default = { };
+      example = {
+        gamesaves = [ "cache" ];
+      };
+      description = "Per-share extra .stignore lines this host applies, on top of the share's common ignores in fleet.nix.";
     };
   };
 
@@ -135,9 +145,9 @@ in
       };
     };
 
-    # Write this host's ignore patterns into each folder's .stignore before
+    # Write each share's ignore patterns into its folder's .stignore before
     # syncthing starts, so it never indexes/syncs the excluded directories.
-    systemd.services.syncthing-stignore = lib.mkIf (myIgnores != [ ]) {
+    systemd.services.syncthing-stignore = lib.mkIf (ignoredShares != [ ]) {
       description = "Write Syncthing .stignore files for ${me}";
       wantedBy = [ "multi-user.target" ];
       requiredBy = [ "syncthing.service" ];
@@ -149,11 +159,17 @@ in
         Type = "oneshot";
         RemainAfterExit = true;
       };
-      script = lib.concatMapStringsSep "\n" (path: ''
-        if [ -d ${lib.escapeShellArg path} ]; then
-          install -m 0644 -o ${cfg.user} -g ${cfg.group} ${stignoreFile} ${lib.escapeShellArg (path + "/.stignore")}
-        fi
-      '') myFolderPaths;
+      script = lib.concatMapStringsSep "\n" (
+        name:
+        let
+          path = effPath name;
+        in
+        ''
+          if [ -d ${lib.escapeShellArg path} ]; then
+            install -m 0644 -o ${cfg.user} -g ${cfg.group} ${mkStignore name} ${lib.escapeShellArg (path + "/.stignore")}
+          fi
+        ''
+      ) ignoredShares;
     };
   };
 }

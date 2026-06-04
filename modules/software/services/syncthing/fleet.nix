@@ -31,20 +31,14 @@ in
   #
   # External (non-NixOS) devices set `external = true`, have no managed path,
   # and list the `shares` they join. `addresses = [ ]` means dynamic discovery.
-  #
-  # `ignores` is an optional list of raw .stignore lines (folder-root relative,
-  # glob/regex per syncthing) written into every folder this device syncs, so
-  # the excluded directories are never indexed or synced on that host.
   devices = {
     desktop = {
       id = "IDOGGQJ-Z4EVOPR-E3J6QOF-W6HBIG6-5TKLON4-IAS7VFU-3S65YAN-OLGOPQT";
       addresses = [ "tcp://taylor-desktop-nix.lan:22000" ];
-      ignores = wineSystemIgnores;
     };
     laptop = {
       id = "HOCFK67-H47WRO3-OJXHUQU-3LPLSPT-WNTINEJ-V5GO3RF-CAZBSWS-6Q4ZOQH";
       addresses = [ "tcp://taylor-laptop-nix.lan:22000" ];
-      ignores = wineSystemIgnores;
     };
     server = {
       id = "DGGC7I2-VTFNYNL-QVTE4EQ-NXNJ4CH-HBI3XUR-4RE77KN-WLYCQ35-3R7UBAX";
@@ -63,6 +57,11 @@ in
 
   # Shares (syncthing folders). `path` is the default local path for every
   # member; `overrides.<device>` replaces it for members that differ.
+  #
+  # `ignores` is an optional list of raw .stignore lines (folder-root relative,
+  # glob/regex per syncthing) common to every member of the share — those paths
+  # are never synced by anyone. A host can add its own extra patterns on top via
+  # `my.syncthing.extraIgnores.<share>`.
   shares = {
     roms = {
       path = "/home/taylor/Games/roms";
@@ -81,6 +80,7 @@ in
         "server"
       ];
       overrides.server = "/mnt/zpool/gamesaves";
+      ignores = wineSystemIgnores;
     };
   };
 }
