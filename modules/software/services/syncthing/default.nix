@@ -3,7 +3,12 @@
 # A host enables it, declares which device in the fleet it is, and the module
 # derives its peers and folders from ./fleet.nix. Every device that shares a
 # folder with this host is added as a trusted device automatically.
-{ config, lib, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   cfg = config.my.syncthing;
@@ -50,6 +55,12 @@ let
     path = effPath name;
     devices = folderPeers name; # self is implicit in syncthing
   };
+
+  # Per-host ignore patterns (raw .stignore lines) from this device's fleet
+  # entry, written into every folder this host participates in.
+  myIgnores = fleet.devices.${me}.ignores or [ ];
+  stignoreFile = pkgs.writeText "syncthing-stignore-${me}" (lib.concatStringsSep "\n" myIgnores + "\n");
+  myFolderPaths = map effPath myShareNames;
 in
 {
   options.my.syncthing = {
@@ -122,6 +133,27 @@ in
         devices = lib.genAttrs peerNames mkDevice;
         folders = lib.genAttrs myShareNames mkFolder;
       };
+    };
+
+    # Write this host's ignore patterns into each folder's .stignore before
+    # syncthing starts, so it never indexes/syncs the excluded directories.
+    systemd.services.syncthing-stignore = lib.mkIf (myIgnores != [ ]) {
+      description = "Write Syncthing .stignore files for ${me}";
+      wantedBy = [ "multi-user.target" ];
+      requiredBy = [ "syncthing.service" ];
+      before = [
+        "syncthing.service"
+        "syncthing-init.service"
+      ];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+      };
+      script = lib.concatMapStringsSep "\n" (path: ''
+        if [ -d ${lib.escapeShellArg path} ]; then
+          install -m 0644 -o ${cfg.user} -g ${cfg.group} ${stignoreFile} ${lib.escapeShellArg (path + "/.stignore")}
+        fi
+      '') myFolderPaths;
     };
   };
 }

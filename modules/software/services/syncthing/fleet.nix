@@ -8,20 +8,43 @@
 # NixOS `members`, and add an `overrides.<device>` only for members whose local
 # path differs from the default. External (non-NixOS) devices are not listed in
 # shares — they declare which shares they join on their own device entry.
+let
+  # Wine-prefix system directories that regenerate on every run and cause
+  # endless sync conflicts. Excluding them keeps the actual game saves under
+  # drive_c/users in sync while dropping the noise.
+  wineSystemIgnores = [
+    "wine/*/drive_c/windows"
+    "wine/*/drive_c/Program Files"
+    # "wine/*/drive_c/Program Files (x86)"
+    "wine/*/drive_c/ProgramData"
+    "wine/*/drive_c/vrclient"
+    "wine/*/*.reg"
+    "wine/*/version"
+    "wine/*/config_info"
+    "wine/*/tracked_files"
+    "wine/*/.update-timestamp"
+  ];
+in
 {
   # Devices in the fleet. IDs are public (derived from the device's public
   # cert) so they live here in the repo; only the private key.pem is a secret.
   #
   # External (non-NixOS) devices set `external = true`, have no managed path,
   # and list the `shares` they join. `addresses = [ ]` means dynamic discovery.
+  #
+  # `ignores` is an optional list of raw .stignore lines (folder-root relative,
+  # glob/regex per syncthing) written into every folder this device syncs, so
+  # the excluded directories are never indexed or synced on that host.
   devices = {
     desktop = {
       id = "IDOGGQJ-Z4EVOPR-E3J6QOF-W6HBIG6-5TKLON4-IAS7VFU-3S65YAN-OLGOPQT";
       addresses = [ "tcp://taylor-desktop-nix.lan:22000" ];
+      ignores = wineSystemIgnores;
     };
     laptop = {
       id = "HOCFK67-H47WRO3-OJXHUQU-3LPLSPT-WNTINEJ-V5GO3RF-CAZBSWS-6Q4ZOQH";
       addresses = [ "tcp://taylor-laptop-nix.lan:22000" ];
+      ignores = wineSystemIgnores;
     };
     server = {
       id = "DGGC7I2-VTFNYNL-QVTE4EQ-NXNJ4CH-HBI3XUR-4RE77KN-WLYCQ35-3R7UBAX";
