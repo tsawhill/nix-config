@@ -46,12 +46,86 @@ let
     general.theme: ${pegasusConfigDir}/themes/gameOS
   '';
 
+  # ---------------------------------------------------------------------------
+  # Box art: fetch cover / logo / background from SteamGridDB into ~/Games/art/<id>/.
+  # Needs a (free) SteamGridDB API key — read from $STEAMGRIDDB_API_KEY or the
+  # sops secret at /run/secrets/steamgriddb_api_key. Run `fetch-game-art`
+  # (add --force to refetch existing). No good keyless art source exists for
+  # non-Steam games, so this is the automated alternative to manual files.
+  # ---------------------------------------------------------------------------
+  artGamesJson = pkgs.writeText "game-art-games.json" (
+    builtins.toJSON (map (g: { inherit (g) id name; }) games)
+  );
+
+  fetchGameArt = pkgs.writeShellApplication {
+    name = "fetch-game-art";
+    runtimeInputs = [
+      pkgs.curl
+      pkgs.jq
+      pkgs.coreutils
+      pkgs.gnused
+    ];
+    text = ''
+      set -euo pipefail
+      art_base=${lib.escapeShellArg artBase}
+      games=${artGamesJson}
+
+      key="''${STEAMGRIDDB_API_KEY:-}"
+      if [ -z "$key" ] && [ -r /run/secrets/steamgriddb_api_key ]; then
+        key="$(cat /run/secrets/steamgriddb_api_key)"
+      fi
+      if [ -z "$key" ]; then
+        echo "No SteamGridDB API key. Set STEAMGRIDDB_API_KEY or enable the sops secret." >&2
+        exit 1
+      fi
+
+      force=0
+      if [ "''${1:-}" = "--force" ]; then force=1; fi
+
+      api() { curl -fsSL -H "Authorization: Bearer $key" "$@"; }
+      first_url() { jq -r '.data[0].url // empty'; }
+
+      while read -r g; do
+        id="$(jq -r '.id' <<<"$g")"
+        name="$(jq -r '.name' <<<"$g")"
+        # Drop a trailing platform suffix like " (PS3)" for a cleaner search.
+        term="$(sed -E 's/ *\([^)]*\)$//' <<<"$name")"
+        dir="$art_base/$id"
+
+        if [ -f "$dir/boxFront.png" ] && [ "$force" -eq 0 ]; then
+          echo "skip (have art): $name"
+          continue
+        fi
+
+        enc="$(jq -rn --arg s "$term" '$s|@uri')"
+        sid="$(api "https://www.steamgriddb.com/api/v2/search/autocomplete/$enc" \
+          | jq -r '.data[0].id // empty')" || sid=""
+        if [ -z "$sid" ]; then
+          echo "no SteamGridDB match: $name" >&2
+          continue
+        fi
+
+        mkdir -p "$dir"
+        box="$(api "https://www.steamgriddb.com/api/v2/grids/game/$sid?dimensions=600x900&types=static&limit=1" | first_url)" || box=""
+        if [ -n "$box" ]; then curl -fsSL -o "$dir/boxFront.png" "$box"; fi
+        logo="$(api "https://www.steamgriddb.com/api/v2/logos/game/$sid?limit=1" | first_url)" || logo=""
+        if [ -n "$logo" ]; then curl -fsSL -o "$dir/logo.png" "$logo"; fi
+        hero="$(api "https://www.steamgriddb.com/api/v2/heroes/game/$sid?limit=1" | first_url)" || hero=""
+        if [ -n "$hero" ]; then curl -fsSL -o "$dir/background.png" "$hero"; fi
+        echo "art: $name"
+      done < <(jq -c '.[]' "$games")
+
+      echo "Done. Restart Pegasus to see new art."
+    '';
+  };
+
   gameBlock = g: ''
     game: ${g.name}
     file: launchers/${g.command}
     launch: ${binDir}/${g.command}
     assets.boxFront: ${artBase}/${g.id}/boxFront.png
     assets.logo: ${artBase}/${g.id}/logo.png
+    assets.background: ${artBase}/${g.id}/background.png
   '';
 
   # Canonical Pegasus layout: one directory per collection, each holding a
@@ -124,6 +198,8 @@ let
 in
 {
   config = lib.mkIf (games != [ ]) {
+    home.packages = [ fetchGameArt ];
+
     xdg.dataFile = pegasusMetadataFiles // pegasusMarkerFiles // srmManifestFiles // {
       "game-frontends/srm/README.txt".text = srmReadme;
     };

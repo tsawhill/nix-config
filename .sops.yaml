@@ -273,3 +273,14 @@ creation_rules:
       - age:
         - *build-nix
         - *nextcloud-nix
+  ##############################################################################
+  #
+  #                             SteamGridDB API key
+  #
+  ##############################################################################
+  - path_regex: modules/secrets/steamgriddb/steamgriddb_api_key\.yaml$
+    key_groups:
+      - age:
+        - *build-nix
+        - *taylor-desktop-nix
+        - *taylor-laptop-nix
