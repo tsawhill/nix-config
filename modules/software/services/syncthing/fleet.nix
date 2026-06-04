@@ -83,7 +83,12 @@ in
       # RetroArch keeps all config (incl. input binds) in one retroarch.cfg at
       # its dir root; saves/states live in subdirs. Excluding the cfg keeps
       # config per-host while still syncing the saves.
-      ignores = wineSystemIgnores ++ [ "Emulators/RetroArch/retroarch.cfg" ];
+      ignores = wineSystemIgnores ++ [
+        "Emulators/RetroArch/retroarch.cfg"
+        # RuneLite regenerable caches — no point syncing.
+        "runelite/cache"
+        "runelite/jagexcache"
+      ];
     };
   };
 }
