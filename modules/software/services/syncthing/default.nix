@@ -10,17 +10,33 @@ let
   fleet = import ./fleet.nix;
   me = cfg.device;
 
-  # Effective local path for a share: per-host override, else the fleet default.
-  effPath = name: cfg.sharePaths.${name} or (fleet.shares.${name}.devices.${me} or null);
+  # External (non-NixOS) devices, and the shares each of them joins.
+  externalNames = lib.attrNames (lib.filterAttrs (_: d: d.external or false) fleet.devices);
+  externalMembersOf =
+    name: lib.filter (e: lib.elem name (fleet.devices.${e}.shares or [ ])) externalNames;
 
-  # Shares this host actually participates in (has a non-null effective path).
+  # All members of a share = its NixOS members plus any external devices that
+  # declared it. Self is excluded (it is implicit to syncthing).
+  membersOf = name: fleet.shares.${name}.members ++ externalMembersOf name;
+  folderPeers = name: lib.subtractLists [ me ] (lib.unique (membersOf name));
+
+  # Effective local path for a share: per-host override, else the per-device
+  # override in the fleet, else the share's default path.
+  effPath =
+    name:
+    let
+      s = fleet.shares.${name};
+    in
+    if !(lib.elem me s.members) then
+      null
+    else
+      cfg.sharePaths.${name} or ((s.overrides or { }).${me} or s.path);
+
+  # Shares this host participates in (it is a member).
   myShareNames = lib.filter (name: effPath name != null) (lib.attrNames fleet.shares);
 
-  # Members of a share other than this host.
-  sharedevices = name: lib.subtractLists [ me ] (lib.attrNames fleet.shares.${name}.devices);
-
   # All peer devices this host shares at least one folder with -> trusted devices.
-  peerNames = lib.unique (lib.concatMap sharedevices myShareNames);
+  peerNames = lib.unique (lib.concatMap folderPeers myShareNames);
 
   mkDevice =
     name:
@@ -32,7 +48,7 @@ let
 
   mkFolder = name: {
     path = effPath name;
-    devices = sharedevices name; # self is implicit in syncthing
+    devices = folderPeers name; # self is implicit in syncthing
   };
 in
 {

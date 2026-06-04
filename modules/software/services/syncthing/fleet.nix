@@ -4,13 +4,16 @@
 # `my.syncthing` reads this file to learn the device IDs/addresses of its
 # peers and which shares it participates in.
 #
-# To add a share: add an entry under `shares` and map each participating
-# device to its default local path (or `null` for external/unmanaged devices).
-# Any host can override its own path via `my.syncthing.sharePaths.<share>`.
+# To add a share: add an entry under `shares` with a default `path`, list the
+# NixOS `members`, and add an `overrides.<device>` only for members whose local
+# path differs from the default. External (non-NixOS) devices are not listed in
+# shares — they declare which shares they join on their own device entry.
 {
   # Devices in the fleet. IDs are public (derived from the device's public
   # cert) so they live here in the repo; only the private key.pem is a secret.
-  # `addresses = [ ]` means dynamic discovery (used for external devices).
+  #
+  # External (non-NixOS) devices set `external = true`, have no managed path,
+  # and list the `shares` they join. `addresses = [ ]` means dynamic discovery.
   devices = {
     desktop = {
       id = "IDOGGQJ-Z4EVOPR-E3J6QOF-W6HBIG6-5TKLON4-IAS7VFU-3S65YAN-OLGOPQT";
@@ -24,32 +27,37 @@
       id = "DGGC7I2-VTFNYNL-QVTE4EQ-NXNJ4CH-HBI3XUR-4RE77KN-WLYCQ35-3R7UBAX";
       addresses = [ "tcp://syncthing-nix.lan:22000" ];
     };
-    # External (non-NixOS) device: Android phone. Not assigned to any host.
     thor = {
       id = "UZKUGQ5-YZUACUX-UM7UKVH-ODTT5B3-4SSZUJ6-YI7H4XH-WZXSJMM-3AWQOA6";
       addresses = [ ];
+      external = true;
+      shares = [
+        "roms"
+        "gamesaves"
+      ];
     };
   };
 
-  # Shares (syncthing folders). Each share maps the devices that participate
-  # to their default local path. `null` = a member for trust purposes whose
-  # path is managed elsewhere (e.g. on the phone).
+  # Shares (syncthing folders). `path` is the default local path for every
+  # member; `overrides.<device>` replaces it for members that differ.
   shares = {
     roms = {
-      devices = {
-        desktop = "/home/taylor/Games/roms";
-        laptop = "/home/taylor/Games/roms";
-        server = "/mnt/zpool/roms";
-        thor = null;
-      };
+      path = "/home/taylor/Games/roms";
+      members = [
+        "desktop"
+        "laptop"
+        "server"
+      ];
+      overrides.server = "/mnt/zpool/roms";
     };
     gamesaves = {
-      devices = {
-        desktop = "/home/taylor/Games/saves";
-        laptop = "/home/taylor/Games/saves";
-        server = "/mnt/zpool/gamesaves";
-        thor = null;
-      };
+      path = "/home/taylor/Games/saves";
+      members = [
+        "desktop"
+        "laptop"
+        "server"
+      ];
+      overrides.server = "/mnt/zpool/gamesaves";
     };
   };
 }
