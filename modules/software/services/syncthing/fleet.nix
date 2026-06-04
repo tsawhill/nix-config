@@ -84,10 +84,18 @@ in
       # its dir root; saves/states live in subdirs. Excluding the cfg keeps
       # config per-host while still syncing the saves.
       ignores = wineSystemIgnores ++ [
-        "Emulators/RetroArch/retroarch.cfg"
         # RuneLite regenerable caches — no point syncing.
         "runelite/cache"
         "runelite/jagexcache"
+        # RetroArch: sync only saves/states/config. Everything else is
+        # regenerable, downloadable, platform-specific (cores!), or path-bound
+        # (playlists). First match wins and `*` doesn't cross `/`, so these
+        # `!` includes keep those dirs (and their contents) while the trailing
+        # glob drops every other top-level RetroArch entry, incl. retroarch.cfg.
+        "!Emulators/RetroArch/saves"
+        "!Emulators/RetroArch/states"
+        "!Emulators/RetroArch/config"
+        "Emulators/RetroArch/*"
       ];
     };
   };
