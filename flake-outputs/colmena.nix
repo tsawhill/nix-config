@@ -117,7 +117,7 @@ in
     "local-nginx-nix" =
       mkHost "daily" "local-nginx-nix.lan"
         "${self}/hosts/server-nix/LXCs/local-nginx.nix";
-    "remote-nginx-nix" = mkHost "daily" "remote-nginx-nix.lan" "${self}/hosts/remote-nginx-nix";
+    # "remote-nginx-nix" = mkHost "daily" "remote-nginx-nix.lan" "${self}/hosts/remote-nginx-nix";
 
     # --- weekly ---
     "immich-nix" = mkHost "weekly" "immich-nix.lan" "${self}/hosts/server-nix/LXCs/immich.nix";

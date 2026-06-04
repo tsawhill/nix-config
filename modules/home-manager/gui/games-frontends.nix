@@ -200,6 +200,22 @@ in
   config = lib.mkIf (games != [ ]) {
     home.packages = [ fetchGameArt ];
 
+    systemd.user.services.fetch-game-art = {
+      Unit.Description = "Fetch game box art from SteamGridDB into ~/Games/art";
+      Service = {
+        Type = "oneshot";
+        ExecStart = lib.getExe fetchGameArt;
+      };
+    };
+
+    # Refresh art after each home-manager activation (i.e. every rebuild). The
+    # fetcher skips games that already have art, so this only pulls newly-added
+    # titles and makes no API calls otherwise. --no-block so activation never
+    # waits on the network.
+    home.activation.fetchGameArt = lib.hm.dag.entryAfter [ "reloadSystemd" ] ''
+      run ${pkgs.systemd}/bin/systemctl --user start --no-block fetch-game-art.service || true
+    '';
+
     xdg.dataFile = pegasusMetadataFiles // pegasusMarkerFiles // srmManifestFiles // {
       "game-frontends/srm/README.txt".text = srmReadme;
     };
