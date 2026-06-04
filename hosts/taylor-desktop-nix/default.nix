@@ -140,6 +140,7 @@ in
   my.secrets.sshclientkey.taylor-desktop-nix-taylor.enable = true;
   my.secrets.wireguard.taylor-desktop-nix.wg-remote.enable = true;
   my.secrets.wireguard.taylor-desktop-nix.wg-airvpn.enable = true;
+  my.secrets.steamgriddb_api_key.enable = true;
 
   my.users.taylor = {
     enable = true;
