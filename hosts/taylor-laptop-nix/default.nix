@@ -94,6 +94,7 @@ in
 
   my.secrets.sshclientkey.taylor-laptop-nix-taylor.enable = true;
   my.secrets.wireguard.taylor-laptop-nix.wg-remote.enable = true;
+  my.secrets.steamgriddb_api_key.enable = true;
   my.users.taylor = {
     enable = true;
     extraGroups = [
