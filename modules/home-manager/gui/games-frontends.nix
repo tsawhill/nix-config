@@ -157,48 +157,33 @@ let
   pegasusGameDirs = lib.concatMapStringsSep "\n" (c: "${pegasusGameDir}/${slug c}") categories + "\n";
 
   # ---------------------------------------------------------------------------
-  # Steam ROM Manager manifests (categorized non-Steam shortcuts)
-  # One manifest dir per category; SRM imports each as a "Manual" parser whose
-  # Steam Category becomes the platform. SRM owns its userConfigurations.json
-  # (it rewrites it), so only the manifests are managed declaratively here.
+  # Steam non-Steam shortcuts (categorized), written directly into shortcuts.vdf
+  # by sync-steam-shortcuts. Each game's category becomes a Steam tag, and the
+  # SteamGridDB art under ~/Games/art/<id>/ is copied into the account grid dir.
   # ---------------------------------------------------------------------------
-  srmEntry = g: {
-    title = g.name;
-    target = "${binDir}/${g.command}";
-    startIn = binDir;
-    launchOptions = "";
-  };
-  srmManifestFiles = lib.listToAttrs (
-    map (c: {
-      name = "game-frontends/srm/${slug c}/manifest.json";
-      value = {
-        text = builtins.toJSON (map srmEntry (catGames c));
-      };
-    }) categories
+  steamGamesJson = pkgs.writeText "steam-games.json" (
+    builtins.toJSON (
+      map (g: { inherit (g) id name command category; }) games
+    )
   );
 
-  srmReadme = ''
-    Steam ROM Manager — categorized non-Steam shortcuts
-    ===================================================
-    These manifests are generated from software.games.entries (NixOS) and stay
-    in sync on every rebuild. Each subdirectory below is one Steam category.
-
-    One-time setup in `steam-rom-manager` (GUI): add a "Manual" parser per
-    category, set its Steam Category, and point its manifests directory at the
-    matching folder:
-
-    ${lib.concatMapStringsSep "\n" (
-      c: "  • Steam Category: ${c}\n    Manifests dir:   ${config.xdg.dataHome}/game-frontends/srm/${slug c}"
-    ) categories}
-
-    Enable the SteamGridDB image provider for box art, then Preview → Save to
-    Steam and restart Steam. Re-run "Save to Steam" after adding/removing games;
-    the manifests update themselves.
-  '';
+  syncSteamShortcuts = pkgs.writeShellApplication {
+    name = "sync-steam-shortcuts";
+    runtimeInputs = [
+      (pkgs.python3.withPackages (p: [ p.vdf ]))
+      pkgs.procps # pgrep, to warn when Steam is running
+    ];
+    text = ''
+      exec python3 ${./sync-steam-shortcuts.py} ${steamGamesJson} ${lib.escapeShellArg artBase} ${binDir}
+    '';
+  };
 in
 {
   config = lib.mkIf (games != [ ]) {
-    home.packages = [ fetchGameArt ];
+    home.packages = [
+      fetchGameArt
+      syncSteamShortcuts
+    ];
 
     systemd.user.services.fetch-game-art = {
       Unit.Description = "Fetch game box art from SteamGridDB into ~/Games/art";
@@ -208,17 +193,27 @@ in
       };
     };
 
-    # Refresh art after each home-manager activation (i.e. every rebuild). The
-    # fetcher skips games that already have art, so this only pulls newly-added
-    # titles and makes no API calls otherwise. --no-block so activation never
-    # waits on the network.
-    home.activation.fetchGameArt = lib.hm.dag.entryAfter [ "reloadSystemd" ] ''
+    # Sync non-Steam shortcuts; ordered after art so the grid images exist to copy.
+    systemd.user.services.sync-steam-shortcuts = {
+      Unit = {
+        Description = "Sync software.games.* into Steam as non-Steam shortcuts";
+        After = [ "fetch-game-art.service" ];
+      };
+      Service = {
+        Type = "oneshot";
+        ExecStart = lib.getExe syncSteamShortcuts;
+      };
+    };
+
+    # Refresh art and Steam shortcuts after each home-manager activation (i.e.
+    # every rebuild). Both skip work that's already done, so they're cheap no-ops
+    # when nothing changed. --no-block so activation never waits.
+    home.activation.gameFrontendsSync = lib.hm.dag.entryAfter [ "reloadSystemd" ] ''
       run ${pkgs.systemd}/bin/systemctl --user start --no-block fetch-game-art.service || true
+      run ${pkgs.systemd}/bin/systemctl --user start --no-block sync-steam-shortcuts.service || true
     '';
 
-    xdg.dataFile = pegasusMetadataFiles // pegasusMarkerFiles // srmManifestFiles // {
-      "game-frontends/srm/README.txt".text = srmReadme;
-    };
+    xdg.dataFile = pegasusMetadataFiles // pegasusMarkerFiles;
 
     # Register each collection directory with Pegasus (one dir per line).
     xdg.configFile."pegasus-frontend/game_dirs.txt".text = pegasusGameDirs;
