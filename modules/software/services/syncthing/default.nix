@@ -54,6 +54,12 @@ let
   mkFolder = name: {
     path = effPath name;
     devices = folderPeers name; # self is implicit in syncthing
+    # Don't sync unix permission bits. The server's shares live on setgid,
+    # group-owned ZFS dirs (drwxrwsr-x, group `games`) whose setgid bit can't be
+    # cleared, so syncthing's attempt to chmod created dirs to the sender's mode
+    # fails (EPERM) and wedges the whole folder in a 60s retry loop. We don't
+    # care about perms travelling between hosts for game saves anyway.
+    ignorePerms = true;
   };
 
   # Effective ignore patterns for a share on this host: the share's common
