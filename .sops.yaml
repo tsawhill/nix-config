@@ -160,6 +160,16 @@ creation_rules:
       - age:
         - *build-nix
         - *taylor-desktop-nix
+  - path_regex: modules/secrets/syncthing/syncthing-nix\.yaml$
+    key_groups:
+      - age:
+        - *build-nix
+        - *syncthing-nix
+  - path_regex: modules/secrets/syncthing/taylor-laptop-nix\.yaml$
+    key_groups:
+      - age:
+        - *build-nix
+        - *taylor-laptop-nix
   ##############################################################################
   #
   #                             SMTP passwords

@@ -4,9 +4,9 @@
 
   my.syncthing = {
     enable = true;
-    device = "desktop";
+    device = "laptop";
     user = "taylor";
     group = "users";
-    credentialsFile = "${self}/modules/secrets/syncthing/desktop-nix.yaml";
+    credentialsFile = "${self}/modules/secrets/syncthing/taylor-laptop-nix.yaml";
   };
 }

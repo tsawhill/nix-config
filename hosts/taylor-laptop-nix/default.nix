@@ -29,6 +29,7 @@ in
     # Disks and alerts
     ./system/disks.nix
     ./system/samba.nix
+    ./system/syncthing.nix
     # ./system/smart-alerts.nix
     # ./system/zfs-alerts.nix
     # ./system/zfs-scrub-trim.nix
