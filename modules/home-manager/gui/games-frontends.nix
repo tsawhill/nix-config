@@ -53,21 +53,34 @@ let
     assets.boxFront: ${artBase}/${g.id}/boxFront.png
     assets.logo: ${artBase}/${g.id}/logo.png
   '';
-  collectionBlock =
+
+  # Canonical Pegasus layout: one directory per collection, each holding a
+  # single-collection metadata file. Multiple collections in one file is
+  # ambiguous and gameOS misgroups it (PS3 titles bleeding into the first
+  # collection), so keep each category isolated in its own game dir.
+  collectionMetadata =
     c:
     "collection: ${c}\nshortname: ${slug c}\n\n" + lib.concatMapStringsSep "\n" gameBlock (catGames c);
-  pegasusMetadata = lib.concatMapStringsSep "\n" collectionBlock categories + "\n";
+
+  pegasusMetadataFiles = lib.listToAttrs (
+    map (c: {
+      name = "pegasus-games/${slug c}/metadata.pegasus.txt";
+      value.text = collectionMetadata c;
+    }) categories
+  );
 
   # Pegasus needs an on-disk file per game as a stable identity; empty markers
-  # under launchers/ satisfy that while the real launch is the `launch:` command.
-  markerFiles = lib.listToAttrs (
+  # under <collection>/launchers/ satisfy that while the real launch is the
+  # `launch:` command.
+  pegasusMarkerFiles = lib.listToAttrs (
     map (g: {
-      name = "pegasus-games/launchers/${g.command}";
-      value = {
-        text = "";
-      };
+      name = "pegasus-games/${slug g.category}/launchers/${g.command}";
+      value.text = "";
     }) games
   );
+
+  # Register each collection directory with Pegasus (one per line).
+  pegasusGameDirs = lib.concatMapStringsSep "\n" (c: "${pegasusGameDir}/${slug c}") categories + "\n";
 
   # ---------------------------------------------------------------------------
   # Steam ROM Manager manifests (categorized non-Steam shortcuts)
@@ -111,13 +124,12 @@ let
 in
 {
   config = lib.mkIf (games != [ ]) {
-    xdg.dataFile = markerFiles // srmManifestFiles // {
-      "pegasus-games/metadata.pegasus.txt".text = pegasusMetadata;
+    xdg.dataFile = pegasusMetadataFiles // pegasusMarkerFiles // srmManifestFiles // {
       "game-frontends/srm/README.txt".text = srmReadme;
     };
 
-    # Register the generated collection with Pegasus (one dir per line).
-    xdg.configFile."pegasus-frontend/game_dirs.txt".text = "${pegasusGameDir}\n";
+    # Register each collection directory with Pegasus (one dir per line).
+    xdg.configFile."pegasus-frontend/game_dirs.txt".text = pegasusGameDirs;
 
     # Install the gameOS theme (read-only; Pegasus only reads themes).
     xdg.configFile."pegasus-frontend/themes/gameOS".source = gameOsTheme;
