@@ -87,7 +87,26 @@
       nixosConfigurations =
         (serverOutputs.nixosConfigurations or { })
         // (piOutputs.nixosConfigurations or { })
-        // (ociOutputs.nixosConfigurations or { });
+        // (ociOutputs.nixosConfigurations or { })
+        // {
+          # Exposed so the Steam Deck can be first-installed with
+          # `nixos-install --flake .#taylor-deck-nix`. Built with the same
+          # unstable inputs colmena uses; day-to-day updates still go through
+          # colmena (`deploy taylor-deck-nix`).
+          taylor-deck-nix = inputs.nixpkgs-unstable.lib.nixosSystem {
+            system = "x86_64-linux";
+            specialArgs = {
+              inherit inputs;
+              self = inputs.self;
+              home-manager-input = inputs.home-manager-unstable;
+              nixvim-input = inputs.nixvim-unstable;
+              sops-input = inputs.sops-nix-unstable;
+              zen-input = inputs.zen-browser-unstable;
+              nix-vscode-extensions-input = inputs.nix-vscode-extensions-unstable;
+            };
+            modules = [ "${inputs.self}/hosts/taylor-deck-nix" ];
+          };
+        };
 
       packages.x86_64-linux = {
         yarc-launcher = pkgs.callPackage ./pkgs/yarc-launcher.nix { };

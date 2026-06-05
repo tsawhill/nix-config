@@ -100,7 +100,6 @@ in
   # ---------------------------------------------------------------------------
   # Software set (follows the desktop/laptop, minus Hyprland)
   # ---------------------------------------------------------------------------
-  software.dev.enable = true;
   software.fonts.enable = true;
   software.apps.config.enable = true;
   software.apps.web.enable = true;
