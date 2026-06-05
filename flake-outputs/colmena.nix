@@ -102,10 +102,12 @@ in
         "pi-backup-nix" = piPkgs;
         "taylor-desktop-nix" = unstablePkgs;
         "taylor-laptop-nix" = unstablePkgs;
+        "taylor-deck-nix" = unstablePkgs;
       };
       nodeSpecialArgs = {
         "taylor-desktop-nix" = unstableArgs;
         "taylor-laptop-nix" = unstableArgs;
+        "taylor-deck-nix" = unstableArgs;
       };
     };
 
@@ -164,6 +166,10 @@ in
     "taylor-laptop-nix" =
       mkUnstableHost "daily" "taylor-laptop-nix.lan"
         "${self}/hosts/taylor-laptop-nix";
+    # Steam Deck: frequently asleep/off-LAN, so manual-only (no schedule tag).
+    "taylor-deck-nix" =
+      mkUnstableHost null "taylor-deck-nix.lan"
+        "${self}/hosts/taylor-deck-nix";
     # --- main server ---
     "server-nix" = mkHost "weekly" "server-nix.lan" "${self}/hosts/server-nix";
 

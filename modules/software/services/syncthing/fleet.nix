@@ -40,6 +40,12 @@ in
       id = "HOCFK67-H47WRO3-OJXHUQU-3LPLSPT-WNTINEJ-V5GO3RF-CAZBSWS-6Q4ZOQH";
       addresses = [ "tcp://taylor-laptop-nix.lan:22000" ];
     };
+    deck = {
+      # REPLACE with the deck's real device ID once its cert/key are generated
+      # (`syncthing generate` then read the id, or the Web UI -> Actions -> Show ID).
+      id = "5D7VEJQ-K26I3DA-IMVGXJM-JLNGOW3-5WF3OIF-2OEKC3D-OJBAEBM-MSSYUA5";
+      addresses = [ "tcp://taylor-deck-nix.lan:22000" ];
+    };
     server = {
       id = "DGGC7I2-VTFNYNL-QVTE4EQ-NXNJ4CH-HBI3XUR-4RE77KN-WLYCQ35-3R7UBAX";
       addresses = [ "tcp://syncthing-nix.lan:22000" ];
@@ -78,6 +84,7 @@ in
         "desktop"
         "laptop"
         "server"
+        "deck"
       ];
       overrides.server = "/mnt/zpool/gamesaves";
       # RetroArch keeps all config (incl. input binds) in one retroarch.cfg at

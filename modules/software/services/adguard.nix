@@ -326,7 +326,7 @@
             answer = "10.73.73.71";
           }
           {
-            domain = "deck-nix.lan";
+            domain = "taylor-deck-nix.lan";
             answer = "10.73.73.73";
           }
           {

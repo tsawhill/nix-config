@@ -6,10 +6,12 @@
   ];
   my.secrets.immobile0783-pass.enable = true;
   my.secrets.umbriel-pass.enable = true;
+  my.secrets.pelican8334-pass.enable = true;
   my.shares = {
     defaultUsers = [
       "immobile0783"
       "umbriel"
+      "pelican8334"
     ];
     users = {
       # taylor-desktop-nix
@@ -27,6 +29,17 @@
       umbriel = {
         enable = true;
         passwordSecretPath = config.sops.secrets.umbriel-pass.path;
+        extraGroups = [
+          "media"
+          "download"
+          "gameservers"
+          "code"
+        ];
+      };
+      # taylor-deck-nix
+      pelican8334 = {
+        enable = true;
+        passwordSecretPath = config.sops.secrets.pelican8334-pass.path;
         extraGroups = [
           "media"
           "download"

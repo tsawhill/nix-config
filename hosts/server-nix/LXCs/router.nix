@@ -37,7 +37,7 @@ let
     laptop-nix = "10.73.73.68";
     desktop-nix = "10.73.73.69";
     printer = "10.73.73.71";
-    deck-nix = "10.73.73.73";
+    taylor-deck-nix = "10.73.73.73";
     sunshine-nix = "10.73.73.140";
   };
 
@@ -48,11 +48,13 @@ let
     pi-backup-nix = "10.50.50.5";
     taylor-desktop-nix = "10.50.50.2";
     taylor-laptop-nix = "10.50.50.3";
+    taylor-deck-nix = "10.50.50.4";
   };
 
   trustedWgRemoteClients = [
     wgRemoteClients.taylor-desktop-nix
     wgRemoteClients.taylor-laptop-nix
+    wgRemoteClients.taylor-deck-nix
     wgRemoteClients.pixel7pro
     wgRemoteClients.fwlaptop
   ];
@@ -85,7 +87,7 @@ let
     { mac = "b0:dc:ef:20:5c:ba"; ip = hosts.laptop-nix; hostname = "laptop-nix"; description = "laptop-nix"; }
     { mac = "c8:7f:54:6c:e2:96"; ip = hosts.desktop-nix; hostname = "desktop-nix"; description = "desktop-nix"; }
     { mac = "38:7a:cc:42:d1:de"; ip = hosts.printer; hostname = "printer"; description = "printer"; }
-    { mac = "b4:8c:9d:7e:6d:73"; ip = hosts.deck-nix; hostname = "deck-nix"; description = "deck-nix"; }
+    { mac = "b4:8c:9d:7e:6d:73"; ip = hosts.taylor-deck-nix; hostname = "taylor-deck-nix"; description = "taylor-deck-nix"; }
     { mac = "02:7d:da:73:cc:0d"; ip = hosts.sunshine-nix; hostname = "sunshine-nix"; description = "sunshine-nix"; }
   ];
 in
@@ -169,6 +171,11 @@ in
             name = "taylor-laptop-nix";
             publicKeyFile = secrets.wg_pubkey_taylor_laptop_nix.path;
             allowedIPs = [ "${wgRemoteClients.taylor-laptop-nix}/32" ];
+          }
+          {
+            name = "taylor-deck-nix";
+            publicKeyFile = secrets.wg_pubkey_taylor_deck_nix.path;
+            allowedIPs = [ "${wgRemoteClients.taylor-deck-nix}/32" ];
           }
         ];
       };

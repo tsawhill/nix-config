@@ -8,6 +8,7 @@ keys:
   # Personal machines
   - &taylor-desktop-nix age1vveuej3d8caxg7ujud55uxhg4k5vj5ra7dj4cn3pp9xmhznjfgkq8jzk6c
   - &taylor-laptop-nix age12av6jq5yyrdljujqsg873q8yv7x39dsnqfz08ht7e0f40ldy753s3n9vaz
+  - &taylor-deck-nix age1mtdd9l0gc2p307wjsyysensappfgtap3dw27v3wcczr2pe7y9s4qz2zc65
 
   # Daily services
   - &local-nginx-nix age16hhtega9xw3qp9xlwf899hy6a7jqgv8cvexpuaf4j72r8n3avcxqvgn9k4
@@ -54,6 +55,11 @@ creation_rules:
       - age:
         - *build-nix
         - *taylor-laptop-nix
+  - path_regex: modules/secrets/ssh/client_keys/taylor-deck-nix-taylor\.yaml$
+    key_groups:
+      - age:
+        - *build-nix
+        - *taylor-deck-nix
   - path_regex: modules/secrets/ssh/client_keys/server-nix-syncoid\.yaml$
     key_groups:
       - age:
@@ -70,6 +76,7 @@ creation_rules:
         - *build-nix
         - *taylor-desktop-nix
         - *taylor-laptop-nix
+        - *taylor-deck-nix
         - *pi-backup-nix
   - path_regex: modules/secrets/wireguard/pi-backup-nix\.yaml$
     key_groups:
@@ -96,6 +103,16 @@ creation_rules:
       - age:
         - *build-nix
         - *taylor-desktop-nix
+  - path_regex: modules/secrets/wireguard/taylor-deck-nix/wg-remote\.yaml$
+    key_groups:
+      - age:
+        - *build-nix
+        - *taylor-deck-nix
+  - path_regex: modules/secrets/wireguard/taylor-deck-nix/wg-airvpn\.yaml$
+    key_groups:
+      - age:
+        - *build-nix
+        - *taylor-deck-nix
   ##############################################################################
   #
   #                             Cloudflare DDNS tokens
@@ -123,6 +140,12 @@ creation_rules:
         - *build-nix
         - *samba-nix
         - *taylor-laptop-nix
+  - path_regex: modules/secrets/server/LXCs/samba/pelican8334\.yaml$
+    key_groups:
+      - age:
+        - *build-nix
+        - *samba-nix
+        - *taylor-deck-nix
   ##############################################################################
   #
   #                             Gotify tokens
@@ -171,6 +194,11 @@ creation_rules:
       - age:
         - *build-nix
         - *taylor-laptop-nix
+  - path_regex: modules/secrets/syncthing/taylor-deck-nix\.yaml$
+    key_groups:
+      - age:
+        - *build-nix
+        - *taylor-deck-nix
   ##############################################################################
   #
   #                             SMTP passwords
@@ -284,3 +312,4 @@ creation_rules:
         - *build-nix
         - *taylor-desktop-nix
         - *taylor-laptop-nix
+        - *taylor-deck-nix

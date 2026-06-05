@@ -86,19 +86,35 @@ let
       }
     );
 
+  # When a host opts a game into local mode (software.games.localGames), the
+  # runner's game path is relocated under localPath, keeping the original
+  # filename. localPath is the *folder* holding the file, so the basename of the
+  # default (network-share) path is appended. Only umu and emulator runners
+  # reference on-disk game files; native commands are left untouched.
   mkRunner =
-    entryCfg:
+    useLocal: localPath: entryCfg:
     if entryCfg.runner.umu != null then
-      mkUmuRunner entryCfg.runner.umu
+      mkUmuRunner (
+        entryCfg.runner.umu
+        // lib.optionalAttrs useLocal {
+          exePath = "${localPath}/${baseNameOf entryCfg.runner.umu.exePath}";
+        }
+      )
     else if entryCfg.runner.native != null then
       pkgs.callPackage ../../../pkgs/games/runners/native.nix { } entryCfg.runner.native
     else
-      mkEmulatorRunner entryCfg.runner.emulator;
+      mkEmulatorRunner (
+        entryCfg.runner.emulator
+        // lib.optionalAttrs useLocal {
+          gamePath = "${localPath}/${baseNameOf entryCfg.runner.emulator.gamePath}";
+        }
+      );
 
   mkEntryPackage =
-    entryCfg:
+    id: entryCfg:
     let
-      runner = mkRunner entryCfg;
+      useLocal = lib.elem id cfg.localGames && entryCfg.localPath != null;
+      runner = mkRunner useLocal entryCfg.localPath entryCfg;
       gamescopeResolutions =
         if entryCfg.gamescope.resolutions == null then
           cfg.gamescope.resolutions
@@ -126,7 +142,7 @@ let
     };
 
   includedEntries = lib.filterAttrs (name: _: !(lib.elem name cfg.exclude)) cfg.entries;
-  entryPackages = map mkEntryPackage (lib.attrValues includedEntries);
+  entryPackages = lib.mapAttrsToList mkEntryPackage includedEntries;
 
   # Human-facing platform category per game, derived from its runner. Used to
   # group games into collections in frontends (Pegasus, Steam shortcuts).
@@ -163,6 +179,21 @@ in
     default = [ ];
     example = [ "guitarHero3" ];
     description = "Game launcher module ids to exclude from the default game library.";
+  };
+
+  options.software.games.localGames = lib.mkOption {
+    type = lib.types.listOf lib.types.str;
+    default = [ ];
+    example = [
+      "guitarHero3"
+      "ps3GuitarHero3"
+    ];
+    description = ''
+      Game entry ids to launch from their localPath instead of the default
+      (network share) path on this host. Each listed entry must define localPath
+      and use a umu or emulator runner. Useful for hosts (e.g. a Steam Deck) that
+      keep certain games on local disk and aren't always on the LAN.
+    '';
   };
 
   # Internal: consumed by frontend home-manager modules via osConfig.
@@ -222,6 +253,21 @@ in
             type = lib.types.nullOr (lib.types.listOf resolutionType);
             default = null;
             description = "Gamescope resolutions for this game. Null inherits the global default; an empty list disables gamescope.";
+          };
+
+          localPath = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            default = null;
+            example = "/home/taylor/Games/local/GH3";
+            description = ''
+              Local directory holding this game's files: the folder containing the
+              ROM/ISO for emulator runners, or the folder containing the .exe for
+              umu/Proton runners. On hosts that list this entry id in
+              software.games.localGames, the launcher loads the game from
+              "<localPath>/<basename of the default path>" instead of the default
+              (network share) path. Use an absolute path (dolphin/pcsx2/retroarch
+              do not expand $HOME).
+            '';
           };
 
           lsfgVk.enable = lib.mkOption {
@@ -363,7 +409,20 @@ in
           }
         ]
       ) cfg.entries
-    );
+    )
+    ++ map (
+      id:
+      let
+        entry = cfg.entries.${id} or null;
+      in
+      {
+        assertion =
+          entry != null
+          && entry.localPath != null
+          && (entry.runner.umu != null || entry.runner.emulator != null);
+        message = "software.games.localGames entry \"${id}\" must exist in software.games.entries, define localPath, and use a umu or emulator runner.";
+      }
+    ) cfg.localGames;
 
     software.games.manifest = gamesManifest;
 
