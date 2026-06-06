@@ -161,13 +161,23 @@ let
       printf '%s\n' "$profile"
     }
 
+    ssh_host_for_colmena_host() {
+      local host="$1"
+      case "$host" in
+        *.*) printf '%s\n' "$host" ;;
+        *) printf '%s.lan\n' "$host" ;;
+      esac
+    }
+
     deployed_system_path() {
       local host="$1"
       local self_hostname="$2"
       if [ "$host" = "$self_hostname" ]; then
         ${pkgs.coreutils}/bin/readlink -f /nix/var/nix/profiles/system
       else
-        ${pkgs.openssh}/bin/ssh -o ConnectTimeout=5 -o BatchMode=yes "root@$host" \
+        local ssh_host
+        ssh_host=$(ssh_host_for_colmena_host "$host")
+        ${pkgs.openssh}/bin/ssh -o ConnectTimeout=5 -o BatchMode=yes "root@$ssh_host" \
           "readlink -f /nix/var/nix/profiles/system"
       fi
     }
@@ -179,7 +189,9 @@ let
         ${pkgs.nix}/bin/nix-env -p /nix/var/nix/profiles/system --list-generations \
           | awk '$NF == "(current)" { print $1 }'
       else
-        ${pkgs.openssh}/bin/ssh -o ConnectTimeout=5 -o BatchMode=yes "root@$host" \
+        local ssh_host
+        ssh_host=$(ssh_host_for_colmena_host "$host")
+        ${pkgs.openssh}/bin/ssh -o ConnectTimeout=5 -o BatchMode=yes "root@$ssh_host" \
           "nix-env -p /nix/var/nix/profiles/system --list-generations | awk '\$NF == \"(current)\" { print \$1 }'"
       fi
     }
@@ -492,7 +504,8 @@ let
           if [ "$host" = "$SELF_HOSTNAME" ]; then
             VER=$(nixos-version 2>/dev/null || echo "unknown")
           else
-            VER=$(${pkgs.openssh}/bin/ssh -o ConnectTimeout=5 -o BatchMode=yes "root@$host" nixos-version 2>/dev/null || echo "unreachable")
+            ssh_host=$(ssh_host_for_colmena_host "$host")
+            VER=$(${pkgs.openssh}/bin/ssh -o ConnectTimeout=5 -o BatchMode=yes "root@$ssh_host" nixos-version 2>/dev/null || echo "unreachable")
           fi
           REVISIONS+="$host: $VER\n"
         done
@@ -620,6 +633,7 @@ let
     fi
 
     HOST="$1"
+    SSH_HOST=$(ssh_host_for_colmena_host "$HOST")
     OFFSET_RAW="$2"
     if [[ "$OFFSET_RAW" != -* ]]; then
       echo "Second arg must be a negative offset like -2"
@@ -635,20 +649,20 @@ let
         [ -L "$lnk" ] || continue
         PATH_TO_COPY=$(readlink -f "$lnk")
         if [ -e "$PATH_TO_COPY" ]; then
-          ${pkgs.nix}/bin/nix copy --to ssh://root@$HOST "$PATH_TO_COPY" || true
+          ${pkgs.nix}/bin/nix copy --to ssh://root@$SSH_HOST "$PATH_TO_COPY" || true
         fi
       done
     fi
 
     # determine target generation on remote
-    GEN=$(${pkgs.openssh}/bin/ssh -o BatchMode=yes root@"$HOST" "nix-env -p /nix/var/nix/profiles/system --list-generations | tail -n \"$OFFSET\" | head -n 1 | awk '{print \$1}'" || echo "")
+    GEN=$(${pkgs.openssh}/bin/ssh -o BatchMode=yes root@"$SSH_HOST" "nix-env -p /nix/var/nix/profiles/system --list-generations | tail -n \"$OFFSET\" | head -n 1 | awk '{print \$1}'" || echo "")
     if [ -z "$GEN" ]; then
       echo "Unable to determine target generation on $HOST"
       exit 1
     fi
 
     echo "Switching $HOST to generation $GEN"
-    if ${pkgs.openssh}/bin/ssh -o BatchMode=yes root@"$HOST" "sudo nix-env -p /nix/var/nix/profiles/system --switch-generation $GEN && sudo /nix/var/nix/profiles/system/activate"; then
+    if ${pkgs.openssh}/bin/ssh -o BatchMode=yes root@"$SSH_HOST" "sudo nix-env -p /nix/var/nix/profiles/system --switch-generation $GEN && sudo /nix/var/nix/profiles/system/activate"; then
       notify "🔄 Rollback: $HOST → gen $GEN" 5 \
         "$HOST switched to generation $GEN"
       echo "deploy-old completed for $HOST -> generation $GEN"
