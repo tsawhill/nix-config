@@ -17,6 +17,7 @@ in
         home-manager-input = inputs.home-manager-stable;
         nixvim-input = inputs.nixvim-stable;
         sops-input = inputs.sops-nix-stable;
+        nix-vscode-extensions-input = inputs.nix-vscode-extensions-stable;
       };
       modules = [ "${self}/hosts/server-nix" ];
     };
@@ -33,6 +34,7 @@ in
         home-manager-input = inputs.home-manager-stable;
         nixvim-input = inputs.nixvim-stable;
         sops-input = inputs.sops-nix-stable;
+        nix-vscode-extensions-input = inputs.nix-vscode-extensions-stable;
       };
       modules = [ "${self}/hosts/server-nix/LXCs/build.nix" ];
     };
@@ -49,6 +51,7 @@ in
         home-manager-input = inputs.home-manager-stable;
         nixvim-input = inputs.nixvim-stable;
         sops-input = inputs.sops-nix-stable;
+        nix-vscode-extensions-input = inputs.nix-vscode-extensions-stable;
       };
       modules = [ "${self}/hosts/server-nix/LXCs/router.nix" ];
     };
