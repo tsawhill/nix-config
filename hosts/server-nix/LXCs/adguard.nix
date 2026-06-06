@@ -10,7 +10,5 @@
     Disable resolved DNS listener
     This occupies port 53 and does not allow adguard to use it
   */
-  services.resolved.extraConfig = ''
-    DNSStubListener=no
-  '';
+  services.resolved.settings.Resolve.DNSStubListener = "no";
 }
