@@ -1,10 +1,17 @@
-{ inputs, nixvim-input, ... }:
+{
+  lib,
+  nixvim-input,
+  ...
+}:
 {
   imports = [
     nixvim-input.homeModules.nixvim
     ./plugins
     ./keymaps
   ];
+
+  options.my.nixvim.full = lib.mkEnableOption "the full Nixvim plugin set with LSPs and heavier language tooling";
+
   programs.nixvim = {
     enable = true;
     nixpkgs.useGlobalPackages = true;

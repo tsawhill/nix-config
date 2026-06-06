@@ -30,6 +30,7 @@
         (import "${self}/pkgs/hyprcrosshair/hm-module.nix" self)
       ];
       home.stateVersion = "25.11";
+      my.nixvim.full = true;
       my.shell.starshipTheme = "personal";
       my.yarg.enable = true;
 

@@ -23,6 +23,7 @@
     users.root = {
       imports = [ "${self}/modules/home-manager/bundles/all.nix" ];
       home.stateVersion = "25.11";
+      my.nixvim.full = true;
     };
 
     users.taylor = {
@@ -33,6 +34,7 @@
         (import "${self}/pkgs/hyprcrosshair/hm-module.nix" self)
       ];
       home.stateVersion = "25.11";
+      my.nixvim.full = true;
       my.shell.starshipTheme = "personal";
       my.yarg.enable = true;
       my.hypr.layout = "laptop";

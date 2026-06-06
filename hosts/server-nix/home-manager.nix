@@ -23,11 +23,13 @@
     users.root = {
       imports = [ "${self}/modules/home-manager/bundles/all.nix" ];
       home.stateVersion = "25.11";
+      my.nixvim.full = true;
     };
 
     users.taylor = {
       imports = [ "${self}/modules/home-manager/bundles/all.nix" ];
       home.stateVersion = "25.11";
+      my.nixvim.full = true;
     };
 
     backupFileExtension = "bak";
