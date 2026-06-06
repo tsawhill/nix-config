@@ -2,6 +2,7 @@
   config,
   lib,
   mkProxyVhost,
+  networkTopology,
   ...
 }:
 
@@ -18,7 +19,7 @@ in
   config = lib.mkIf cfg.enable {
     services.nginx.virtualHosts."${cfg.domain}" = mkProxyVhost {
       inherit cfg;
-      proxyPass = "http://vaultwarden-nix.lan:8000";
+      proxyPass = "http://${networkTopology.lib.fqdn "vaultwarden-nix"}:8000";
     };
   };
 }

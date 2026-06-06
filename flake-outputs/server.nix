@@ -1,4 +1,7 @@
 inputs@{ self, nixpkgs-stable, ... }:
+let
+  networkTopology = import "${self}/modules/network/topology.nix";
+in
 {
   nixosConfigurations = {
 
@@ -9,6 +12,7 @@ inputs@{ self, nixpkgs-stable, ... }:
       system = "x86_64-linux";
       specialArgs = {
         inherit inputs;
+        inherit networkTopology;
         self = self;
         home-manager-input = inputs.home-manager-stable;
         nixvim-input = inputs.nixvim-stable;
@@ -24,6 +28,7 @@ inputs@{ self, nixpkgs-stable, ... }:
       system = "x86_64-linux";
       specialArgs = {
         inherit inputs;
+        inherit networkTopology;
         self = self;
         home-manager-input = inputs.home-manager-stable;
         nixvim-input = inputs.nixvim-stable;
@@ -39,6 +44,7 @@ inputs@{ self, nixpkgs-stable, ... }:
       system = "x86_64-linux";
       specialArgs = {
         inherit inputs;
+        inherit networkTopology;
         self = self;
         home-manager-input = inputs.home-manager-stable;
         nixvim-input = inputs.nixvim-stable;

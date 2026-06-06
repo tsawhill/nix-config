@@ -1,3 +1,4 @@
+{ networkTopology, ... }:
 {
   imports = [ ./jails ];
   services.fail2ban = {
@@ -9,7 +10,7 @@
     ignoreIP = [
       # Whitelist some subnets
       "10.0.0.0/8"
-      "taylordnsfree.zapto.org" # resolve the IP via DNS
+      networkTopology.networks.wgRemote.endpoint # resolve the IP via DNS
     ];
     bantime = "24h"; # Ban IPs for one day on the first ban
     bantime-increment = {

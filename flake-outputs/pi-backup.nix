@@ -1,4 +1,7 @@
 inputs@{ self, ... }:
+let
+  networkTopology = import "${self}/modules/network/topology.nix";
+in
 {
   nixosConfigurations = {
 
@@ -8,6 +11,7 @@ inputs@{ self, ... }:
     pi-backup-nix = inputs.nixos-raspberrypi.lib.nixosSystem {
       specialArgs = {
         inherit inputs;
+        inherit networkTopology;
         self = self;
         nixvim-input = inputs.nixvim-stable;
         nixos-raspberrypi = inputs.nixos-raspberrypi;

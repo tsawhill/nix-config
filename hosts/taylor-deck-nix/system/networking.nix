@@ -1,4 +1,11 @@
-{ ... }:
+{ networkTopology, ... }:
+
+let
+  inherit (networkTopology.lib) lanIp wgAddress;
+  wgRemote = networkTopology.networks.wgRemote;
+  wgEndpoint = "${wgRemote.endpoint}:${toString wgRemote.port}";
+  wgAllowedIPs = "${wgRemote.cidr};${networkTopology.networks.lan.cidr};";
+in
 {
   networking.networkmanager.enable = true;
 
@@ -13,14 +20,14 @@
   my.secrets.wireguard.pubkeys.enable = true;
   my.network.wg-remote = {
     enable = true;
-    address = "10.50.50.4/32";
+    address = wgAddress "taylor-deck-nix";
     autoconnect = "true";
-    dns = "10.73.73.6";
+    dns = lanIp networkTopology.networks.lan.dnsHost;
     dnsPriority = 50;
     routeMetric = 50000;
     peer = {
-      endpoint = "taylordnsfree.zapto.org:51820";
-      allowedIPs = "10.50.50.0/24;10.73.73.0/24;";
+      endpoint = wgEndpoint;
+      allowedIPs = wgAllowedIPs;
     };
   };
 

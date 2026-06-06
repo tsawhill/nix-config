@@ -1,4 +1,13 @@
-{ config, lib, ... }:
+{
+  config,
+  lib,
+  networkTopology,
+  ...
+}:
+
+let
+  sambaHost = networkTopology.lib.fqdn "samba-nix";
+in
 {
   my.secrets.immobile0783-pass.enable = true;
   sops.secrets.immobile0783-pass.neededForUsers = lib.mkForce false;
@@ -14,7 +23,7 @@
   };
 
   fileSystems."/mnt/nix-config" = {
-    device = "//10.73.73.4/nix-configs/";
+    device = "//${sambaHost}/nix-configs/";
     fsType = "cifs";
     options =
       let
@@ -24,7 +33,7 @@
   };
 
   fileSystems."/mnt/gameSSD" = {
-    device = "//10.73.73.4/gameSSD/";
+    device = "//${sambaHost}/gameSSD/";
     fsType = "cifs";
     options =
       let

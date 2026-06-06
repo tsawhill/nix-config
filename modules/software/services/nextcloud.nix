@@ -1,13 +1,22 @@
-{ config, pkgs, ... }:
+{
+  config,
+  networkTopology,
+  pkgs,
+  ...
+}:
+
+let
+  nextcloudFqdn = networkTopology.lib.fqdn "nextcloud-nix";
+in
 {
   services.nextcloud = {
     enable = true;
-    hostName = "nextcloud-nix.lan";
+    hostName = nextcloudFqdn;
     home = "/mnt/zpool/nextcloud";
     settings = {
       trusted_domains = [
         "nc.tsawhill.org"
-        "nextcloud-nix.lan"
+        nextcloudFqdn
       ];
       allow_local_remote_servers = true;
       overwritehost = "nc.tsawhill.org";
@@ -40,7 +49,7 @@
     };
     extraAppsEnable = true;
   };
-  services.nginx.virtualHosts."nextcloud-nix.lan" = {
+  services.nginx.virtualHosts.${nextcloudFqdn} = {
     # This override removes the default IPv6 [::] listeners
     # Also only listens on port 80. Put behind a reverse proxy
     listen = [

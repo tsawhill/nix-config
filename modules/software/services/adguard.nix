@@ -1,4 +1,35 @@
 {
+  lib,
+  networkTopology,
+  ...
+}:
+
+let
+  inherit (networkTopology.lib)
+    dnsAnswer
+    fqdn
+    lanIp
+    ;
+
+  dnsHosts = lib.filterAttrs (_: host: host.dns.enable or false) networkTopology.hosts;
+  dnsAliasHosts = lib.filterAttrs (_: host: (host.dns.aliases or [ ]) != [ ]) networkTopology.hosts;
+
+  hostRewrites = lib.mapAttrsToList (name: _: {
+    domain = fqdn name;
+    answer = dnsAnswer name;
+  }) dnsHosts;
+
+  aliasRewrites = lib.concatLists (
+    lib.mapAttrsToList (
+      name: host:
+      map (domain: {
+        inherit domain;
+        answer = dnsAnswer name;
+      }) (host.dns.aliases or [ ])
+    ) dnsAliasHosts
+  );
+in
+{
   networking.firewall.allowedTCPPorts = [
     53
     80
@@ -40,7 +71,7 @@
         refuse_any = true;
         upstream_dns = [
           # "9.9.9.9"
-          "10.73.73.5:5335"
+          "${lanIp "unbound-vpn-na-nix"}:5335"
         ];
         upstream_dns_file = "";
         bootstrap_dns = [
@@ -216,136 +247,7 @@
         blocking_mode = "default";
         parental_block_host = "family-block.dns.adguard.com";
         safebrowsing_block_host = "standard-block.dns.adguard.com";
-        rewrites = map (r: r // { enabled = true; }) [
-          {
-            domain = "router-nix.lan";
-            answer = "10.73.73.135";
-          }
-          {
-            domain = "server-nix.lan";
-            answer = "10.73.73.3";
-          }
-          {
-            domain = "samba-nix.lan";
-            answer = "10.73.73.4";
-          }
-          {
-            domain = "unbound-vpn-na-nix.lan";
-            answer = "10.73.73.5";
-          }
-          {
-            domain = "adguard-nix.lan";
-            answer = "10.73.73.6";
-          }
-          {
-            domain = "llm-nix.lan";
-            answer = "10.73.73.7";
-          }
-          {
-            domain = "local-nginx-nix.lan";
-            answer = "10.73.73.8";
-          }
-          {
-            domain = "vaultwarden-nix.lan";
-            answer = "10.73.73.9";
-          }
-          {
-            domain = "socks5-vpn-eunix.lan";
-            answer = "10.73.73.11";
-          }
-          {
-            domain = "immich-nix.lan";
-            answer = "10.73.73.12";
-          }
-          {
-            domain = "arrs-nix.lan";
-            answer = "10.73.73.13";
-          }
-          {
-            domain = "syncthing-nix.lan";
-            answer = "10.73.73.14";
-          }
-          {
-            domain = "jellyfin-nix.lan";
-            answer = "10.73.73.15";
-          }
-          {
-            domain = "searx-nix.lan";
-            answer = "10.73.73.16";
-          }
-          {
-            domain = "nextcloud-nix.lan";
-            answer = "10.73.73.18";
-          }
-          {
-            domain = "romm-nix.lan";
-            answer = "10.73.73.19";
-          }
-          {
-            domain = "deluge-nix.lan";
-            answer = "10.73.73.20";
-          }
-          {
-            domain = "jellyseerr-nix.lan";
-            answer = "10.73.73.26";
-          }
-          {
-            domain = "gotify-nix.lan";
-            answer = "10.73.73.27";
-          }
-          {
-            domain = "authentik-nix.lan";
-            answer = "10.73.73.29";
-          }
-          {
-            domain = "pufferpanel-nix.lan";
-            answer = "10.73.73.30";
-          }
-          {
-            domain = "build-nix.lan";
-            answer = "10.73.73.40";
-          }
-          {
-            domain = "unifi-nix.lan";
-            answer = "10.73.73.41";
-          }
-          {
-            domain = "pi-backup-nix.lan";
-            answer = "10.50.50.5";
-          }
-          {
-            domain = "taylor-laptop-nix.lan";
-            answer = "10.73.73.68";
-          }
-          {
-            domain = "taylor-desktop-nix.lan";
-            answer = "10.73.73.69";
-          }
-          {
-            domain = "printer.lan";
-            answer = "10.73.73.71";
-          }
-          {
-            domain = "taylor-deck-nix.lan";
-            answer = "10.73.73.73";
-          }
-          {
-            domain = "sunshine-nix.lan";
-            answer = "10.73.73.140";
-          }
-          {
-            domain = "tsawhill.org";
-            answer = "10.73.73.8";
-          }
-          {
-            domain = "*.tsawhill.org";
-            answer = "10.73.73.8";
-          }
-          {
-            domain = "remote-nginx-nix.lan";
-            answer = "10.50.50.16";
-          }
-        ];
+        rewrites = map (r: r // { enabled = true; }) (hostRewrites ++ aliasRewrites);
         safe_fs_patterns = [ "/var/lib/private/AdGuardHome/userfilters/*" ];
         safebrowsing_cache_size = 1048576;
         safesearch_cache_size = 1048576;

@@ -6,13 +6,14 @@
 {
   config,
   lib,
+  networkTopology,
   pkgs,
   ...
 }:
 
 let
   cfg = config.my.syncthing;
-  fleet = import ./fleet.nix;
+  fleet = import ./fleet.nix { inherit networkTopology; };
   me = cfg.device;
 
   # External (non-NixOS) devices, and the shares each of them joins.
@@ -48,8 +49,7 @@ let
     let
       d = fleet.devices.${name};
     in
-    { inherit (d) id; }
-    // lib.optionalAttrs ((d.addresses or [ ]) != [ ]) { inherit (d) addresses; };
+    { inherit (d) id; } // lib.optionalAttrs ((d.addresses or [ ]) != [ ]) { inherit (d) addresses; };
 
   mkFolder = name: {
     path = effPath name;
@@ -67,7 +67,10 @@ let
   shareIgnores = name: (fleet.shares.${name}.ignores or [ ]) ++ (cfg.extraIgnores.${name} or [ ]);
   ignoredShares = lib.filter (name: shareIgnores name != [ ]) myShareNames;
   mkStignore =
-    name: pkgs.writeText "syncthing-stignore-${me}-${name}" (lib.concatStringsSep "\n" (shareIgnores name) + "\n");
+    name:
+    pkgs.writeText "syncthing-stignore-${me}-${name}" (
+      lib.concatStringsSep "\n" (shareIgnores name) + "\n"
+    );
 in
 {
   options.my.syncthing = {
@@ -180,7 +183,9 @@ in
         in
         ''
           if [ -d ${lib.escapeShellArg path} ]; then
-            install -m 0644 -o ${cfg.user} -g ${cfg.group} ${mkStignore name} ${lib.escapeShellArg (path + "/.stignore")}
+            install -m 0644 -o ${cfg.user} -g ${cfg.group} ${mkStignore name} ${
+              lib.escapeShellArg (path + "/.stignore")
+            }
           fi
         ''
       ) ignoredShares;

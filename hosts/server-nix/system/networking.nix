@@ -1,3 +1,7 @@
+{ networkTopology, ... }:
+let
+  inherit (networkTopology.lib) lanIp;
+in
 {
   services.resolved = {
     enable = true;
@@ -14,7 +18,7 @@
     useDHCP = false;
     useNetworkd = true;
     nameservers = [
-      "10.73.73.6"
+      (lanIp networkTopology.networks.lan.dnsHost)
     ];
   };
 
@@ -90,10 +94,10 @@
     networks."40-br0" = {
       matchConfig.Name = "br0";
       networkConfig = {
-        Address = "10.73.73.3/24";
-        Gateway = "10.73.73.1";
+        Address = "${lanIp "server-nix"}/24";
+        Gateway = networkTopology.networks.lan.gateway;
         DNS = [
-          "10.73.73.6"
+          (lanIp networkTopology.networks.lan.dnsHost)
         ];
       };
       linkConfig.RequiredForOnline = "routable";

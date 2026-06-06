@@ -1,3 +1,5 @@
+{ networkTopology }:
+
 # Syncthing fleet registry.
 #
 # Single source of truth for the whole fleet. Every host that enables
@@ -9,6 +11,8 @@
 # path differs from the default. External (non-NixOS) devices are not listed in
 # shares — they declare which shares they join on their own device entry.
 let
+  inherit (networkTopology.lib) fqdn;
+
   # Wine-prefix system directories that regenerate on every run and cause
   # endless sync conflicts. Excluding them keeps the actual game saves under
   # drive_c/users in sync while dropping the noise.
@@ -34,21 +38,21 @@ in
   devices = {
     desktop = {
       id = "IDOGGQJ-Z4EVOPR-E3J6QOF-W6HBIG6-5TKLON4-IAS7VFU-3S65YAN-OLGOPQT";
-      addresses = [ "tcp://taylor-desktop-nix.lan:22000" ];
+      addresses = [ "tcp://${fqdn "taylor-desktop-nix"}:22000" ];
     };
     laptop = {
       id = "HOCFK67-H47WRO3-OJXHUQU-3LPLSPT-WNTINEJ-V5GO3RF-CAZBSWS-6Q4ZOQH";
-      addresses = [ "tcp://taylor-laptop-nix.lan:22000" ];
+      addresses = [ "tcp://${fqdn "taylor-laptop-nix"}:22000" ];
     };
     deck = {
       # REPLACE with the deck's real device ID once its cert/key are generated
       # (`syncthing generate` then read the id, or the Web UI -> Actions -> Show ID).
       id = "5D7VEJQ-K26I3DA-IMVGXJM-JLNGOW3-5WF3OIF-2OEKC3D-OJBAEBM-MSSYUA5";
-      addresses = [ "tcp://taylor-deck-nix.lan:22000" ];
+      addresses = [ "tcp://${fqdn "taylor-deck-nix"}:22000" ];
     };
     server = {
       id = "DGGC7I2-VTFNYNL-QVTE4EQ-NXNJ4CH-HBI3XUR-4RE77KN-WLYCQ35-3R7UBAX";
-      addresses = [ "tcp://syncthing-nix.lan:22000" ];
+      addresses = [ "tcp://${fqdn "syncthing-nix"}:22000" ];
     };
     thor = {
       id = "UZKUGQ5-YZUACUX-UM7UKVH-ODTT5B3-4SSZUJ6-YI7H4XH-WZXSJMM-3AWQOA6";

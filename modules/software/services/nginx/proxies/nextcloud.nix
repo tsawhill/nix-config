@@ -1,6 +1,7 @@
 {
   config,
   lib,
+  networkTopology,
   pkgs,
   mkProxyVhost,
   ...
@@ -30,40 +31,41 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    services.nginx.virtualHosts."${cfg.domain}" = lib.recursiveUpdate
-      (mkProxyVhost {
-        inherit cfg;
-        proxyPass = "http://nextcloud-nix.lan:80";
+    services.nginx.virtualHosts."${cfg.domain}" =
+      lib.recursiveUpdate
+        (mkProxyVhost {
+          inherit cfg;
+          proxyPass = "http://${networkTopology.lib.fqdn "nextcloud-nix"}:80";
 
-        # Specific nextcloud config
-        extraExtraConfig = lib.concatStringsSep "\n" [
-          "client_max_body_size 10g;"
-          "client_body_buffer_size 400M;"
-        ];
-      })
-      {
-        # Serve OG video meta tags to Discord bot so share links embed.
-        # Points og:video at /public.php/dav/files/TOKEN/ which returns raw video.
-        # Normal users get the regular Nextcloud share page.
-        locations."~ ^/s/([\\w]+)$" = {
-          proxyPass = "http://nextcloud-nix.lan:80";
-          extraConfig = ''
-            set $nc_share_token $1;
-            error_page 418 = @nc_discord_embed;
-            if ($http_user_agent ~* "Discordbot") {
-              return 418;
-            }
-          '';
+          # Specific nextcloud config
+          extraExtraConfig = lib.concatStringsSep "\n" [
+            "client_max_body_size 10g;"
+            "client_body_buffer_size 400M;"
+          ];
+        })
+        {
+          # Serve OG video meta tags to Discord bot so share links embed.
+          # Points og:video at /public.php/dav/files/TOKEN/ which returns raw video.
+          # Normal users get the regular Nextcloud share page.
+          locations."~ ^/s/([\\w]+)$" = {
+            proxyPass = "http://${networkTopology.lib.fqdn "nextcloud-nix"}:80";
+            extraConfig = ''
+              set $nc_share_token $1;
+              error_page 418 = @nc_discord_embed;
+              if ($http_user_agent ~* "Discordbot") {
+                return 418;
+              }
+            '';
+          };
+          locations."@nc_discord_embed" = {
+            extraConfig = ''
+              internal;
+              ssi on;
+              default_type text/html;
+              root ${discordEmbedPage};
+              try_files /embed.html =404;
+            '';
+          };
         };
-        locations."@nc_discord_embed" = {
-          extraConfig = ''
-            internal;
-            ssi on;
-            default_type text/html;
-            root ${discordEmbedPage};
-            try_files /embed.html =404;
-          '';
-        };
-      };
   };
 }

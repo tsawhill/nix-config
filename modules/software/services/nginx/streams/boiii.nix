@@ -1,7 +1,8 @@
+{ networkTopology, ... }:
 {
   services.nginx.streamConfig = ''
     server {
-        proxy_pass 10.73.73.69:27017;
+        proxy_pass ${networkTopology.lib.lanIp "taylor-desktop-nix"}:27017;
         listen 27017;
       }
   '';

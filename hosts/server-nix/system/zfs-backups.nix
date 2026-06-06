@@ -1,6 +1,13 @@
-{ config, pkgs, ... }:
+{
+  config,
+  networkTopology,
+  pkgs,
+  ...
+}:
 
 let
+  piBackupFqdn = networkTopology.lib.fqdn "pi-backup-nix";
+
   # Source roots to protect. Syncoid receives each source under the same path
   # beneath the Pi's `backup` pool, e.g. `zpool/code` -> `backup/zpool/code`.
   #
@@ -38,7 +45,7 @@ let
   mkSyncoidCommand = dataset: {
     name = dataset;
     value = {
-      target = "syncoid-recv@pi-backup-nix.lan:backup/${dataset}";
+      target = "syncoid-recv@${piBackupFqdn}:backup/${dataset}";
       recursive = true;
       recvOptions = "u x mountpoint";
     };
@@ -79,7 +86,7 @@ in
     commands = builtins.listToAttrs (map mkSyncoidCommand backupDatasets);
   };
 
-  programs.ssh.knownHosts."pi-backup-nix.lan".publicKey =
+  programs.ssh.knownHosts.${piBackupFqdn}.publicKey =
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILWyZ/i1VfPZmQphX5HtPsO4DEd0YhHeut7BTTHd8znI";
 
   # Prune whole target datasets and stale target snapshots that no longer exist
@@ -100,7 +107,7 @@ in
     script = ''
       set -euo pipefail
 
-      ssh_remote="syncoid-recv@pi-backup-nix.lan"
+      ssh_remote="syncoid-recv@${piBackupFqdn}"
       # `ssh -n` matters here: the pruning loops read from temp files, and ssh
       # can otherwise consume stdin and stop the loop after the first remote
       # command.

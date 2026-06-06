@@ -81,6 +81,7 @@
       colmenaOutputs = import ./flake-outputs/colmena.nix inputs;
 
       pkgs = inputs.nixpkgs-unstable.legacyPackages.x86_64-linux;
+      networkTopology = import ./modules/network/topology.nix;
     in
     colmenaOutputs
     // {
@@ -97,6 +98,7 @@
             system = "x86_64-linux";
             specialArgs = {
               inherit inputs;
+              inherit networkTopology;
               self = inputs.self;
               home-manager-input = inputs.home-manager-unstable;
               nixvim-input = inputs.nixvim-unstable;

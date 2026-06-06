@@ -2,6 +2,7 @@
   config,
   lib,
   mkProxyVhost,
+  networkTopology,
   ...
 }:
 
@@ -18,7 +19,7 @@ in
   config = lib.mkIf cfg.enable {
     services.nginx.virtualHosts."${cfg.domain}" = mkProxyVhost {
       inherit cfg;
-      proxyPass = "http://immich-nix.lan:2283";
+      proxyPass = "http://${networkTopology.lib.fqdn "immich-nix"}:2283";
       proxyWebsockets = true;
 
       # Specific immich config

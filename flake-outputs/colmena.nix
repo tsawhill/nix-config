@@ -5,8 +5,11 @@ inputs@{
   ...
 }:
 let
+  networkTopology = import "${self}/modules/network/topology.nix";
+
   sharedArgs = {
     inherit inputs;
+    inherit networkTopology;
     self = self;
     home-manager-input = inputs.home-manager-stable;
     nixvim-input = inputs.nixvim-stable;
@@ -15,19 +18,21 @@ let
   };
 
   # tag:       schedule tag used by timers (null = manual-only)
-  # targetHost: SSH target, or null for local deployment (build-nix self-update)
-  mkHost = tag: targetHost: modulePath: {
+  targetHostFor = host: "${host}.${networkTopology.domains.lan}";
+
+  # local = true means no SSH, uses apply-local (build-nix self-update)
+  mkHost = tag: host: modulePath: {
     deployment = {
       targetUser = "root";
     }
     // (
-      if targetHost == null then
+      if host == null then
         {
           allowLocalDeployment = true;
           targetHost = null;
         }
       else
-        { inherit targetHost; }
+        { targetHost = targetHostFor host; }
     )
     // (if tag != null then { tags = [ tag ]; } else { });
     imports = [ modulePath ];
@@ -47,10 +52,10 @@ let
     nix-vscode-extensions-input = inputs.nix-vscode-extensions-unstable;
   };
 
-  mkPiHost = tag: targetHost: {
+  mkPiHost = tag: host: {
     deployment = {
       targetUser = "root";
-      inherit targetHost;
+      targetHost = targetHostFor host;
     }
     // (if tag != null then { tags = [ tag ]; } else { });
     _module.args = {
@@ -75,18 +80,18 @@ let
   };
 
   # For hosts using nixpkgs-unstable (desktop, laptop)
-  mkUnstableHost = tag: targetHost: modulePath: {
+  mkUnstableHost = tag: host: modulePath: {
     deployment = {
       targetUser = "root";
     }
     // (
-      if targetHost == null then
+      if host == null then
         {
           allowLocalDeployment = true;
           targetHost = null;
         }
       else
-        { inherit targetHost; }
+        { targetHost = targetHostFor host; }
     )
     // (if tag != null then { tags = [ tag ]; } else { });
     imports = [ modulePath ];
@@ -113,67 +118,57 @@ in
 
     # --- local deploy (no SSH, uses apply-local) ---
     "build-nix" = mkHost "weekly" null "${self}/hosts/server-nix/LXCs/build.nix";
-    # "router-nix" = mkHost null "router-nix.lan" "${self}/hosts/server-nix/LXCs/router.nix";
+    # "router-nix" = mkHost null "router-nix" "${self}/hosts/server-nix/LXCs/router.nix";
 
     # --- daily ---
     "local-nginx-nix" =
-      mkHost "daily" "local-nginx-nix.lan"
+      mkHost "daily" "local-nginx-nix"
         "${self}/hosts/server-nix/LXCs/local-nginx.nix";
-    # "remote-nginx-nix" = mkHost "daily" "remote-nginx-nix.lan" "${self}/hosts/remote-nginx-nix";
+    # "remote-nginx-nix" = mkHost "daily" "remote-nginx-nix" "${self}/hosts/remote-nginx-nix";
 
     # --- weekly ---
-    "immich-nix" = mkHost "weekly" "immich-nix.lan" "${self}/hosts/server-nix/LXCs/immich.nix";
+    "immich-nix" = mkHost "weekly" "immich-nix" "${self}/hosts/server-nix/LXCs/immich.nix";
     "vaultwarden-nix" =
-      mkHost "weekly" "vaultwarden-nix.lan"
+      mkHost "weekly" "vaultwarden-nix"
         "${self}/hosts/server-nix/LXCs/vaultwarden.nix";
     "unbound-vpn-na-nix" =
-      mkHost "weekly" "unbound-vpn-na-nix.lan"
+      mkHost "weekly" "unbound-vpn-na-nix"
         "${self}/hosts/server-nix/LXCs/unbound-vpn-na.nix";
-    "adguard-nix" = mkHost "weekly" "adguard-nix.lan" "${self}/hosts/server-nix/LXCs/adguard.nix";
-    "nextcloud-nix" = mkHost "weekly" "nextcloud-nix.lan" "${self}/hosts/server-nix/LXCs/nextcloud.nix";
-    "jellyseerr-nix" =
-      mkHost "weekly" "jellyseerr-nix.lan"
-        "${self}/hosts/server-nix/LXCs/jellyseerr.nix";
-    "jellyfin-nix" = mkHost "weekly" "jellyfin-nix.lan" "${self}/hosts/server-nix/LXCs/jellyfin.nix";
-    "gotify-nix" = mkHost "weekly" "gotify-nix.lan" "${self}/hosts/server-nix/LXCs/gotify.nix";
-    "llm-nix" = mkHost "weekly" "llm-nix.lan" "${self}/hosts/server-nix/LXCs/llm.nix";
-    "searx-nix" = mkHost "weekly" "searx-nix.lan" "${self}/hosts/server-nix/LXCs/searx.nix";
-    "arrs-nix" = mkHost "weekly" "arrs-nix.lan" "${self}/hosts/server-nix/LXCs/arrs.nix";
+    "adguard-nix" = mkHost "weekly" "adguard-nix" "${self}/hosts/server-nix/LXCs/adguard.nix";
+    "nextcloud-nix" = mkHost "weekly" "nextcloud-nix" "${self}/hosts/server-nix/LXCs/nextcloud.nix";
+    "jellyseerr-nix" = mkHost "weekly" "jellyseerr-nix" "${self}/hosts/server-nix/LXCs/jellyseerr.nix";
+    "jellyfin-nix" = mkHost "weekly" "jellyfin-nix" "${self}/hosts/server-nix/LXCs/jellyfin.nix";
+    "gotify-nix" = mkHost "weekly" "gotify-nix" "${self}/hosts/server-nix/LXCs/gotify.nix";
+    "llm-nix" = mkHost "weekly" "llm-nix" "${self}/hosts/server-nix/LXCs/llm.nix";
+    "searx-nix" = mkHost "weekly" "searx-nix" "${self}/hosts/server-nix/LXCs/searx.nix";
+    "arrs-nix" = mkHost "weekly" "arrs-nix" "${self}/hosts/server-nix/LXCs/arrs.nix";
     "socks5-vpn-eu-nix" =
-      mkHost "weekly" "socks5-vpn-eu-nix.lan"
+      mkHost "weekly" "socks5-vpn-eu-nix"
         "${self}/hosts/server-nix/LXCs/socks5-vpn-eu.nix";
-    "sunshine-nix" = mkHost "weekly" "sunshine-nix.lan" "${self}/hosts/server-nix/LXCs/sunshine.nix";
+    "sunshine-nix" = mkHost "weekly" "sunshine-nix" "${self}/hosts/server-nix/LXCs/sunshine.nix";
 
     # --- monthly ---
-    "unifi-nix" = mkHost "monthly" "unifi-nix.lan" "${self}/hosts/server-nix/LXCs/unifi.nix";
-    "samba-nix" = mkHost "monthly" "samba-nix.lan" "${self}/hosts/server-nix/LXCs/samba.nix";
+    "unifi-nix" = mkHost "monthly" "unifi-nix" "${self}/hosts/server-nix/LXCs/unifi.nix";
+    "samba-nix" = mkHost "monthly" "samba-nix" "${self}/hosts/server-nix/LXCs/samba.nix";
     "pufferpanel-nix" =
-      mkHost "monthly" "pufferpanel-nix.lan"
+      mkHost "monthly" "pufferpanel-nix"
         "${self}/hosts/server-nix/LXCs/pufferpanel.nix";
-    "deluge-nix" = mkHost "monthly" "deluge-nix.lan" "${self}/hosts/server-nix/LXCs/deluge.nix";
-    "authentik-nix" =
-      mkHost "monthly" "authentik-nix.lan"
-        "${self}/hosts/server-nix/LXCs/authentik.nix";
-    "romm-nix" = mkHost "monthly" "romm-nix.lan" "${self}/hosts/server-nix/LXCs/romm.nix";
-    "syncthing-nix" =
-      mkHost "monthly" "syncthing-nix.lan"
-        "${self}/hosts/server-nix/LXCs/syncthing.nix";
+    "deluge-nix" = mkHost "monthly" "deluge-nix" "${self}/hosts/server-nix/LXCs/deluge.nix";
+    "authentik-nix" = mkHost "monthly" "authentik-nix" "${self}/hosts/server-nix/LXCs/authentik.nix";
+    "romm-nix" = mkHost "monthly" "romm-nix" "${self}/hosts/server-nix/LXCs/romm.nix";
+    "syncthing-nix" = mkHost "monthly" "syncthing-nix" "${self}/hosts/server-nix/LXCs/syncthing.nix";
 
     # --- personal machines (unstable, manual-only) ---
     "taylor-desktop-nix" =
-      mkUnstableHost "daily" "taylor-desktop-nix.lan"
+      mkUnstableHost "daily" "taylor-desktop-nix"
         "${self}/hosts/taylor-desktop-nix";
-    "taylor-laptop-nix" =
-      mkUnstableHost "daily" "taylor-laptop-nix.lan"
-        "${self}/hosts/taylor-laptop-nix";
+    "taylor-laptop-nix" = mkUnstableHost "daily" "taylor-laptop-nix" "${self}/hosts/taylor-laptop-nix";
     # Steam Deck: frequently asleep/off-LAN, so manual-only (no schedule tag).
-    "taylor-deck-nix" =
-      mkUnstableHost null "taylor-deck-nix.lan"
-        "${self}/hosts/taylor-deck-nix";
+    "taylor-deck-nix" = mkUnstableHost null "taylor-deck-nix" "${self}/hosts/taylor-deck-nix";
     # --- main server ---
-    "server-nix" = mkHost "weekly" "server-nix.lan" "${self}/hosts/server-nix";
+    "server-nix" = mkHost "weekly" "server-nix" "${self}/hosts/server-nix";
 
     # --- backup target ---
-    "pi-backup-nix" = mkPiHost "weekly" "pi-backup-nix.lan";
+    "pi-backup-nix" = mkPiHost "weekly" "pi-backup-nix";
   };
 }

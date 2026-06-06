@@ -2,6 +2,7 @@
   config,
   pkgs,
   lib,
+  networkTopology,
   ...
 }:
 
@@ -165,7 +166,7 @@ let
       local host="$1"
       case "$host" in
         *.*) printf '%s\n' "$host" ;;
-        *) printf '%s.lan\n' "$host" ;;
+        *) printf '%s.${networkTopology.domains.lan}\n' "$host" ;;
       esac
     }
 

@@ -2,6 +2,7 @@
   config,
   lib,
   mkProxyVhost,
+  networkTopology,
   ...
 }:
 
@@ -18,7 +19,7 @@ in
   config = lib.mkIf cfg.enable {
     services.nginx.virtualHosts."${cfg.domain}" = mkProxyVhost {
       inherit cfg;
-      proxyPass = "https://unifi-nix.lan:8443";
+      proxyPass = "https://${networkTopology.lib.fqdn "unifi-nix"}:8443";
     };
   };
 }

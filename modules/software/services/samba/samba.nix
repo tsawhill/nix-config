@@ -1,3 +1,4 @@
+{ networkTopology, ... }:
 {
   services.samba = {
     enable = true;
@@ -14,7 +15,8 @@
         "interfaces" = "eth0";
         "bind interfaces only" = "yes";
 
-        "hosts allow" = "10.73.73.0/24 10.50.50.0/24 localhost";
+        "hosts allow" =
+          "${networkTopology.networks.lan.cidr} ${networkTopology.networks.wgRemote.cidr} localhost";
         "hosts deny" = "0.0.0.0/0";
         "guest account" = "nobody";
         "map to guest" = "bad user";

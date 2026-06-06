@@ -1,4 +1,9 @@
-{ config, lib, ... }:
+{
+  config,
+  lib,
+  networkTopology,
+  ...
+}:
 {
   _module.args.mkProxyVhost =
     {
@@ -7,7 +12,7 @@
       cfg,
       extraExtraConfig ? "",
       # Allow passing a different outpost URL, but default to main one
-      authentikOutpost ? "http://authentik-nix.lan:9000",
+      authentikOutpost ? "http://${networkTopology.lib.fqdn "authentik-nix"}:9000",
     }:
     let
       # --- Define Authentik Configuration Blocks Locally ---

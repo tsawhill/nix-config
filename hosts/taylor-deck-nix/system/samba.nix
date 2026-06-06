@@ -1,7 +1,13 @@
-{ config, lib, ... }:
+{
+  config,
+  lib,
+  networkTopology,
+  ...
+}:
 
 let
   credentialsPath = "/run/secrets/smb-deck-credentials";
+  sambaHost = networkTopology.lib.fqdn "samba-nix";
   # Lazy automount: only mounts on first access and never blocks boot, so the
   # deck still boots fine off-LAN. Games kept locally (software.games.localGames)
   # launch without ever touching this share.
@@ -23,7 +29,7 @@ in
   };
 
   fileSystems."/mnt/gameSSD" = {
-    device = "//10.73.73.4/gameSSD/";
+    device = "//${sambaHost}/gameSSD/";
     fsType = "cifs";
     options = [ mountOptions ];
   };
