@@ -1,3 +1,4 @@
+{ config, lib, ... }:
 {
   imports = [
     ./python.nix
@@ -7,12 +8,15 @@
     ./bash.nix
     ./json.nix
   ];
-  programs.nixvim.plugins = {
-    lsp-format = {
-      enable = true;
-    };
-    lsp = {
-      enable = true;
+
+  config = lib.mkIf config.my.nixvim.full {
+    programs.nixvim.plugins = {
+      lsp-format = {
+        enable = true;
+      };
+      lsp = {
+        enable = true;
+      };
     };
   };
 }

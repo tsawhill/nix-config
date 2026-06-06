@@ -1,7 +1,10 @@
+{ config, lib, ... }:
 {
-  programs.nixvim.plugins = {
-    treesitter = {
-      enable = true;
+  config = lib.mkIf config.my.nixvim.full {
+    programs.nixvim.plugins = {
+      treesitter = {
+        enable = true;
+      };
     };
   };
 }

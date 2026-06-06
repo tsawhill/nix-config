@@ -1,4 +1,9 @@
-{ pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   pylspPackage = pkgs.python3Packages.python-lsp-server.overridePythonAttrs (_old: {
     # 1.14.0 currently times out/hangs in pytest on Python 3.13, blocking deploys.
@@ -6,24 +11,26 @@ let
   });
 in
 {
-  programs.nixvim.plugins = {
-    lsp = {
-      servers = {
-        pylsp = {
-          enable = true;
-          package = pylspPackage;
-          settings.plugins = {
-            black.enabled = true;
-            flake8.enabled = false;
-            isort.enabled = true;
-            jedi.enabled = false;
-            mccabe.enabled = false;
-            pycodestyle.enabled = false;
-            pydocstyle.enabled = true;
-            pyflakes.enabled = false;
-            pylint.enabled = true;
-            rope.enabled = false;
-            yapf.enabled = false;
+  config = lib.mkIf config.my.nixvim.full {
+    programs.nixvim.plugins = {
+      lsp = {
+        servers = {
+          pylsp = {
+            enable = true;
+            package = pylspPackage;
+            settings.plugins = {
+              black.enabled = true;
+              flake8.enabled = false;
+              isort.enabled = true;
+              jedi.enabled = false;
+              mccabe.enabled = false;
+              pycodestyle.enabled = false;
+              pydocstyle.enabled = true;
+              pyflakes.enabled = false;
+              pylint.enabled = true;
+              rope.enabled = false;
+              yapf.enabled = false;
+            };
           };
         };
       };
