@@ -593,7 +593,7 @@ let
           ${pkgs.colmena}/bin/colmena apply-local "$GOAL" 2>&1 | timestamp_output | tee "$LOG" || host_exit=$?
       else
         ${pkgs.coreutils}/bin/timeout --foreground --kill-after=60s "$APPLY_TIMEOUT" \
-          ${pkgs.colmena}/bin/colmena apply --on "$host" --parallel 1 --no-build-on-target "$GOAL" \
+          ${pkgs.colmena}/bin/colmena apply --on "$host" --parallel 1 --no-build-on-target --no-substitute "$GOAL" \
           2>&1 | timestamp_output | tee "$LOG" || host_exit=$?
       fi
 
