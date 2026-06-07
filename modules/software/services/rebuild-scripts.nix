@@ -246,9 +246,9 @@ let
         ${pkgs.colmena}/bin/colmena build --on "$host" --no-build-on-target --parallel 1 \
         2>&1 | timestamp_output | tee "$log" >&2 || build_exit=$?
       if [ $build_exit -eq 0 ]; then
-        profile=$(grep -oE '/nix/store/[a-z0-9]+-nixos-system-[^[:space:]]+' "$log" | tail -n 1 || true)
+        profile=$(grep -oE '/nix/store/[a-z0-9]+-nixos-system-[^[:space:]"]+' "$log" | tail -n 1 || true)
         if [ -z "$profile" ]; then
-          profile=$(grep -oE '/nix/store/[a-z0-9]+[^[:space:]]*' "$log" | grep '/nixos-system-' | tail -n 1 || true)
+          profile=$(grep -oE '/nix/store/[a-z0-9]+[^[:space:]"]*' "$log" | grep '/nixos-system-' | tail -n 1 || true)
         fi
       fi
       if [ $build_exit -ne 0 ]; then
