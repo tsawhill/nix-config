@@ -40,6 +40,12 @@ let
       printf '[%s] --- %s ---\n' "$(date -Is)" "$*"
     }
 
+    timestamp_output() {
+      while IFS= read -r line; do
+        printf '[%s] %s\n' "$(date -Is)" "$line"
+      done
+    }
+
     acquire_deploy_lock() {
       local owner="$1"
       exec 9>"$DEPLOY_LOCK_PATH"
@@ -238,7 +244,7 @@ let
       log_phase "$host: per-host build started (timeout $PER_HOST_BUILD_TIMEOUT)" >&2
       ${pkgs.coreutils}/bin/timeout --foreground --kill-after=60s "$PER_HOST_BUILD_TIMEOUT" \
         ${pkgs.colmena}/bin/colmena build --on "$host" --no-build-on-target --parallel 1 \
-        2>&1 | tee "$log" >&2 || build_exit=$?
+        2>&1 | timestamp_output | tee "$log" >&2 || build_exit=$?
       if [ $build_exit -eq 0 ]; then
         profile=$(grep -oE '/nix/store/[a-z0-9]+-nixos-system-[^[:space:]]+' "$log" | tail -n 1 || true)
         if [ -z "$profile" ]; then
@@ -435,11 +441,11 @@ let
         log_phase "$host: first apply started (timeout $APPLY_TIMEOUT)"
         if [ "$host" = "$SELF_HOSTNAME" ]; then
           ${pkgs.coreutils}/bin/timeout --foreground --kill-after=60s "$APPLY_TIMEOUT" \
-            ${pkgs.colmena}/bin/colmena apply-local switch 2>&1 | tee "$LOG" || colmena_exit=$?
+            ${pkgs.colmena}/bin/colmena apply-local switch 2>&1 | timestamp_output | tee "$LOG" || colmena_exit=$?
         else
           ${pkgs.coreutils}/bin/timeout --foreground --kill-after=60s "$APPLY_TIMEOUT" \
             ${pkgs.colmena}/bin/colmena apply --on "$host" --no-build-on-target --no-substitute switch \
-            2>&1 | tee "$LOG" || colmena_exit=$?
+            2>&1 | timestamp_output | tee "$LOG" || colmena_exit=$?
         fi
 
         grep -qE '\[WARN\]|warning:' "$LOG" && HAD_WARNINGS=true || true
@@ -584,11 +590,11 @@ let
       log_phase "$host: manual apply started ($GOAL, timeout $APPLY_TIMEOUT)"
       if [[ "$host" == "$HOSTNAME" ]] || [[ "$host" == "build-nix" && "$HOSTNAME" == "build-nix" ]]; then
         ${pkgs.coreutils}/bin/timeout --foreground --kill-after=60s "$APPLY_TIMEOUT" \
-          ${pkgs.colmena}/bin/colmena apply-local "$GOAL" 2>&1 | tee "$LOG" || host_exit=$?
+          ${pkgs.colmena}/bin/colmena apply-local "$GOAL" 2>&1 | timestamp_output | tee "$LOG" || host_exit=$?
       else
         ${pkgs.coreutils}/bin/timeout --foreground --kill-after=60s "$APPLY_TIMEOUT" \
           ${pkgs.colmena}/bin/colmena apply --on "$host" --parallel 1 --no-build-on-target "$GOAL" \
-          2>&1 | tee "$LOG" || host_exit=$?
+          2>&1 | timestamp_output | tee "$LOG" || host_exit=$?
       fi
 
       grep -qE '\[WARN\]|warning:' "$LOG" && HAD_WARNINGS=true || true
@@ -739,7 +745,7 @@ let
             goal="$2"
             ${pkgs.nix}/bin/nix-env -p /nix/var/nix/profiles/system --set "$system_path"
             "$system_path/bin/switch-to-configuration" "$goal"
-          ' bash "$system_path" "$goal" 2>&1 | tee "$LOG" || retry_exit=$?
+          ' bash "$system_path" "$goal" 2>&1 | timestamp_output | tee "$LOG" || retry_exit=$?
       else
         ssh_host=$(ssh_host_for_colmena_host "$host")
         ${pkgs.coreutils}/bin/timeout --foreground --kill-after=60s "$APPLY_TIMEOUT" \
@@ -752,7 +758,7 @@ let
             ${pkgs.nix}/bin/nix copy --to "ssh://root@$ssh_host" "$system_path"
             ${pkgs.openssh}/bin/ssh -o ConnectTimeout=15 -o BatchMode=yes "root@$ssh_host" \
               "nix-env -p /nix/var/nix/profiles/system --set $system_path && $system_path/bin/switch-to-configuration $goal"
-          ' bash "$ssh_host" "$system_path" "$goal" 2>&1 | tee "$LOG" || retry_exit=$?
+          ' bash "$ssh_host" "$system_path" "$goal" 2>&1 | timestamp_output | tee "$LOG" || retry_exit=$?
       fi
 
       if [ $retry_exit -eq 0 ]; then
