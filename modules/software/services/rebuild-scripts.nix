@@ -300,6 +300,40 @@ let
       fi
     }
 
+    apply_system_path() {
+      local host="$1"
+      local system_path="$2"
+      local goal="$3"
+      local log="$4"
+      local self_hostname
+
+      self_hostname=$(hostname)
+      if [[ "$host" == "$self_hostname" ]] || [[ "$host" == "build-nix" && "$self_hostname" == "build-nix" ]]; then
+        ${pkgs.coreutils}/bin/timeout --foreground --kill-after=60s "$APPLY_TIMEOUT" \
+          ${pkgs.bash}/bin/bash -c '
+            set -euo pipefail
+            system_path="$1"
+            goal="$2"
+            ${pkgs.nix}/bin/nix-env -p /nix/var/nix/profiles/system --set "$system_path"
+            "$system_path/bin/switch-to-configuration" "$goal"
+          ' bash "$system_path" "$goal" 2>&1 | timestamp_output | tee "$log"
+      else
+        local ssh_host
+        ssh_host=$(ssh_host_for_colmena_host "$host")
+        ${pkgs.coreutils}/bin/timeout --foreground --kill-after=60s "$APPLY_TIMEOUT" \
+          ${pkgs.bash}/bin/bash -c '
+            set -euo pipefail
+            ssh_host="$1"
+            system_path="$2"
+            goal="$3"
+            export NIX_SSHOPTS="-o ConnectTimeout=15 -o BatchMode=yes"
+            ${pkgs.nix}/bin/nix copy --to "ssh://root@$ssh_host" "$system_path"
+            ${pkgs.openssh}/bin/ssh -o ConnectTimeout=15 -o BatchMode=yes "root@$ssh_host" \
+              "nix-env -p /nix/var/nix/profiles/system --set $system_path && $system_path/bin/switch-to-configuration $goal"
+          ' bash "$ssh_host" "$system_path" "$goal" 2>&1 | timestamp_output | tee "$log"
+      fi
+    }
+
     pin_gc_roots() {
       local hosts="$1"
       local store_paths="$2"
@@ -413,14 +447,12 @@ let
       HARD_FAIL_HOSTS=""
       DEFERRED_HOSTS=""
 
-      SELF_HOSTNAME=$(hostname)
-
       # --- First pass: deploy each already-built host individually so one offline host can't abort others ---
       for host in $ALL_HOSTS; do
         log_phase "$host: scheduled build phase"
         LOG=$(mktemp)
         build_exit=0
-        colmena_exit=0
+        apply_exit=0
         system_path=$(local_build_system_path "$host" "$LOG") || build_exit=$?
         if [ $build_exit -eq 0 ]; then
           log_phase "$host: pinning built system"
@@ -438,25 +470,18 @@ let
         log_phase "$host: queueing retry record for $system_path"
         write_retry_record "${name}" '${tags}' "$host" "$system_path" "switch" "$BUILD_ID"
 
-        log_phase "$host: first apply started (timeout $APPLY_TIMEOUT)"
-        if [ "$host" = "$SELF_HOSTNAME" ]; then
-          ${pkgs.coreutils}/bin/timeout --foreground --kill-after=60s "$APPLY_TIMEOUT" \
-            ${pkgs.colmena}/bin/colmena apply-local switch 2>&1 | timestamp_output | tee "$LOG" || colmena_exit=$?
-        else
-          ${pkgs.coreutils}/bin/timeout --foreground --kill-after=60s "$APPLY_TIMEOUT" \
-            ${pkgs.colmena}/bin/colmena apply --on "$host" --no-build-on-target --no-substitute switch \
-            2>&1 | timestamp_output | tee "$LOG" || colmena_exit=$?
-        fi
+        log_phase "$host: first exact-path apply started (timeout $APPLY_TIMEOUT)"
+        apply_system_path "$host" "$system_path" "switch" "$LOG" || apply_exit=$?
 
         grep -qE '\[WARN\]|warning:' "$LOG" && HAD_WARNINGS=true || true
 
-        if [ $colmena_exit -eq 0 ]; then
-          log_phase "$host: first apply completed"
+        if [ $apply_exit -eq 0 ]; then
+          log_phase "$host: first exact-path apply completed"
           SUCCEEDED_HOSTS="$SUCCEEDED_HOSTS $host"
           delete_retry_record "${name}" "$host"
         else
           ERROR_SUMMARY=$(tail -n 20 "$LOG")
-          if is_retryable_deploy_failure "$LOG" "$colmena_exit"; then
+          if is_retryable_deploy_failure "$LOG" "$apply_exit"; then
             DEFERRED_HOSTS="$DEFERRED_HOSTS $host"
             notify "⚠️ ${name}: $host deferred" 5 \
               "First apply failed or timed out; retrying every 30 minutes until the next ${name} build.\nSystem: $system_path\nLast 20 lines:\n$ERROR_SUMMARY"
@@ -509,6 +534,7 @@ let
       # --- Version commit for succeeded hosts ---
       if [ -n "$SUCCEEDED_HOSTS" ]; then
         REVISIONS=""
+        SELF_HOSTNAME=$(hostname)
         for host in $SUCCEEDED_HOSTS; do
           if [ "$host" = "$SELF_HOSTNAME" ]; then
             VER=$(nixos-version 2>/dev/null || echo "unknown")
@@ -541,13 +567,12 @@ let
       echo "    deploy laptop-nix"
       echo "    deploy desktop-nix boot"
       echo "    deploy @weekly"
-      echo "    deploy build-nix        (uses apply-local)"
+      echo "    deploy build-nix        (applies locally)"
       exit 1
     fi
 
     TARGET="$1"
     GOAL="''${2:-switch}"
-    HOSTNAME=$(hostname)
 
     cd "${repoPath}"
 
@@ -587,20 +612,13 @@ let
         continue
       fi
 
-      log_phase "$host: manual apply started ($GOAL, timeout $APPLY_TIMEOUT)"
-      if [[ "$host" == "$HOSTNAME" ]] || [[ "$host" == "build-nix" && "$HOSTNAME" == "build-nix" ]]; then
-        ${pkgs.coreutils}/bin/timeout --foreground --kill-after=60s "$APPLY_TIMEOUT" \
-          ${pkgs.colmena}/bin/colmena apply-local "$GOAL" 2>&1 | timestamp_output | tee "$LOG" || host_exit=$?
-      else
-        ${pkgs.coreutils}/bin/timeout --foreground --kill-after=60s "$APPLY_TIMEOUT" \
-          ${pkgs.colmena}/bin/colmena apply --on "$host" --parallel 1 --no-build-on-target --no-substitute "$GOAL" \
-          2>&1 | timestamp_output | tee "$LOG" || host_exit=$?
-      fi
+      log_phase "$host: manual exact-path apply started ($GOAL, timeout $APPLY_TIMEOUT)"
+      apply_system_path "$host" "$system_path" "$GOAL" "$LOG" || host_exit=$?
 
       grep -qE '\[WARN\]|warning:' "$LOG" && HAD_WARNINGS=true || true
 
       if [ $host_exit -eq 0 ]; then
-        log_phase "$host: manual apply completed"
+        log_phase "$host: manual exact-path apply completed"
         SUCCEEDED_HOSTS="$SUCCEEDED_HOSTS $host"
         clear_retry_host "$host"
       else
@@ -733,33 +751,9 @@ let
 
       LOG=$(mktemp)
       retry_exit=0
-      SELF_HOSTNAME=$(hostname)
-      log_phase "Deploy retry: $host from $schedule build $build_id started (timeout $APPLY_TIMEOUT)"
+      log_phase "Deploy retry: $host from $schedule build $build_id exact-path apply started (timeout $APPLY_TIMEOUT)"
       try_wol "$host"
-
-      if [[ "$host" == "$SELF_HOSTNAME" ]] || [[ "$host" == "build-nix" && "$SELF_HOSTNAME" == "build-nix" ]]; then
-        ${pkgs.coreutils}/bin/timeout --foreground --kill-after=60s "$APPLY_TIMEOUT" \
-          ${pkgs.bash}/bin/bash -c '
-            set -euo pipefail
-            system_path="$1"
-            goal="$2"
-            ${pkgs.nix}/bin/nix-env -p /nix/var/nix/profiles/system --set "$system_path"
-            "$system_path/bin/switch-to-configuration" "$goal"
-          ' bash "$system_path" "$goal" 2>&1 | timestamp_output | tee "$LOG" || retry_exit=$?
-      else
-        ssh_host=$(ssh_host_for_colmena_host "$host")
-        ${pkgs.coreutils}/bin/timeout --foreground --kill-after=60s "$APPLY_TIMEOUT" \
-          ${pkgs.bash}/bin/bash -c '
-            set -euo pipefail
-            ssh_host="$1"
-            system_path="$2"
-            goal="$3"
-            export NIX_SSHOPTS="-o ConnectTimeout=15 -o BatchMode=yes"
-            ${pkgs.nix}/bin/nix copy --to "ssh://root@$ssh_host" "$system_path"
-            ${pkgs.openssh}/bin/ssh -o ConnectTimeout=15 -o BatchMode=yes "root@$ssh_host" \
-              "nix-env -p /nix/var/nix/profiles/system --set $system_path && $system_path/bin/switch-to-configuration $goal"
-          ' bash "$ssh_host" "$system_path" "$goal" 2>&1 | timestamp_output | tee "$LOG" || retry_exit=$?
-      fi
+      apply_system_path "$host" "$system_path" "$goal" "$LOG" || retry_exit=$?
 
       if [ $retry_exit -eq 0 ]; then
         log_phase "Deploy retry: $host succeeded"
