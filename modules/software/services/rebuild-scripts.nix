@@ -12,7 +12,6 @@ let
   flakePath = "path://${repoPath}";
   retryStateDir = "/var/lib/colmena-deploy-retries";
   deployLockPath = "/run/lock/colmena-deploy.lock";
-  batchBuildTimeout = "6h";
   perHostBuildTimeout = "6h";
   applyTimeout = "90m";
   notifications = config.my.monitoring.notifications;
@@ -34,7 +33,6 @@ let
   sharedFns = ''
     RETRY_STATE_DIR="${retryStateDir}"
     DEPLOY_LOCK_PATH="${deployLockPath}"
-    BATCH_BUILD_TIMEOUT="${batchBuildTimeout}"
     PER_HOST_BUILD_TIMEOUT="${perHostBuildTimeout}"
     APPLY_TIMEOUT="${applyTimeout}"
 
@@ -231,32 +229,6 @@ let
       printf '%s\n' "$expanded" | tr ' ' '\n' | sort -u | grep -v '^$' | tr '\n' ' ' | xargs
     }
 
-    prebuild_colmena_selection() {
-      local target="$1"
-      local title="$2"
-      local log
-      local build_exit
-      log=$(mktemp)
-      build_exit=0
-      log_phase "$title: batch prebuild started (timeout $BATCH_BUILD_TIMEOUT)"
-      ${pkgs.coreutils}/bin/timeout --foreground --kill-after=60s "$BATCH_BUILD_TIMEOUT" \
-        ${pkgs.colmena}/bin/colmena build --on "$target" --no-build-on-target --parallel "''${BUILD_PARALLELISM:-4}" \
-        2>&1 | tee "$log" || build_exit=$?
-      if [ $build_exit -ne 0 ]; then
-        local error_summary
-        local email_body
-        error_summary=$(tail -n 20 "$log")
-        email_body=$(deploy_log_email_body "$log" "Build log excerpt for $title.")
-        notify_email "⚠️ $title batch build failed" 6 \
-          "Continuing with per-host builds.\nLast 20 lines:\n$error_summary" \
-          "$email_body"
-      else
-        log_phase "$title: batch prebuild completed"
-      fi
-      rm "$log"
-      return $build_exit
-    }
-
     local_build_system_path() {
       local host="$1"
       local log="$2"
@@ -415,7 +387,6 @@ let
 
       log_phase "Deploying ${name} (${tags})"
       cd "${repoPath}"
-      BUILD_PARALLELISM=4
       BUILD_ID=$(date -u +%Y%m%d%H%M%S)
 
       # Enumerate all hosts for this tag
@@ -430,9 +401,7 @@ let
       log_phase "${name}: hosts to deploy: $ALL_HOSTS"
       clear_retry_schedule "${name}"
 
-      log_phase "${name}: building ${tags} profiles locally"
       HAD_WARNINGS=false
-      prebuild_colmena_selection '${tags}' "${name} (${tags})" || HAD_WARNINGS=true
 
       SUCCEEDED_HOSTS=""
       HARD_FAIL_HOSTS=""
@@ -573,7 +542,6 @@ let
     TARGET="$1"
     GOAL="''${2:-switch}"
     HOSTNAME=$(hostname)
-    BUILD_PARALLELISM=4
 
     cd "${repoPath}"
 
@@ -589,9 +557,7 @@ let
     fi
     log_phase "Manual deploy $TARGET: hosts to deploy: $SELECTED_HOSTS"
 
-    log_phase "Manual deploy $TARGET: building profiles locally"
     HAD_WARNINGS=false
-    prebuild_colmena_selection "$TARGET" "manual deploy $TARGET (goal=$GOAL)" || HAD_WARNINGS=true
 
     SUCCEEDED_HOSTS=""
     FAILED_HOSTS=""
