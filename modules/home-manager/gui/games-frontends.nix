@@ -193,16 +193,18 @@ in
       };
     };
 
-    # Sync non-Steam shortcuts; ordered after art so the grid images exist to copy.
+    # Sync non-Steam shortcuts before Jovian starts Steam; Steam rewrites
+    # shortcuts.vdf on exit, so activation/manual runs skip while Steam is open.
     systemd.user.services.sync-steam-shortcuts = {
       Unit = {
         Description = "Sync software.games.* into Steam as non-Steam shortcuts";
-        After = [ "fetch-game-art.service" ];
+        Before = [ "gamescope-session.service" ];
       };
       Service = {
         Type = "oneshot";
         ExecStart = lib.getExe syncSteamShortcuts;
       };
+      Install.WantedBy = [ "default.target" ];
     };
 
     # Refresh art and Steam shortcuts after each home-manager activation (i.e.

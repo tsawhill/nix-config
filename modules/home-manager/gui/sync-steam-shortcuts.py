@@ -202,6 +202,15 @@ def main() -> int:
     home = os.path.expanduser("~")
     now = int(time.time())
 
+    if steam_running():
+        print(
+            "Steam is running; not touching shortcuts.vdf because Steam will "
+            "overwrite it on exit. Fully quit Steam, run `sync-steam-shortcuts`, "
+            "then reopen Steam.",
+            file=sys.stderr,
+        )
+        return 0
+
     accounts = find_accounts(home)
     if not accounts:
         print("No Steam account found; open Steam and log in once first.", file=sys.stderr)
@@ -215,12 +224,6 @@ def main() -> int:
         if by_category is not None:
             update_collections(config, by_category, now)
 
-    if steam_running():
-        print(
-            "\nSteam is running — it overwrites these files on exit. Fully quit "
-            "Steam, run `sync-steam-shortcuts`, then reopen Steam.",
-            file=sys.stderr,
-        )
     return 0
 
 

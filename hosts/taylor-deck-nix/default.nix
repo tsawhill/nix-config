@@ -61,9 +61,9 @@ in
     "${self}/modules/software/bundles"
     "${self}/modules/software/games"
 
-    # Desktop: GNOME only (the desktop/ dir auto-imports SDDM + Hyprland, which
+    # Desktop: Plasma only (the desktop/ dir auto-imports SDDM + Hyprland, which
     # we do not want — Jovian's autoStart is incompatible with a display manager).
-    "${self}/modules/software/desktop/gnome.nix"
+    "${self}/modules/software/desktop/kde.nix"
     "${self}/modules/software/desktop/pipewire/base.nix"
 
     # WireGuard (remote tunnel home). AirVPN scaffolding is present but disabled —
@@ -89,13 +89,13 @@ in
       enable = true;
       autoStart = true; # boot straight into the Steam Deck UI
       user = "taylor";
-      desktopSession = "gnome"; # "Switch to Desktop" lands in GNOME
+      desktopSession = "plasma"; # "Switch to Desktop" lands in SteamOS-like Plasma
     };
     devices.steamdeck.enable = true; # deck hardware: APU, controls, fan, backlight
     decky-loader.enable = true; # plugin loader
     # jovian.steamos.useSteamOSConfig defaults to jovian.steam.enable (true).
   };
-  desktop.gnome.enable = true;
+  desktop.kde.enable = true;
 
   # ---------------------------------------------------------------------------
   # Software set (follows the desktop/laptop, minus Hyprland)
