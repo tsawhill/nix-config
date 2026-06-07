@@ -91,7 +91,10 @@ in
       user = "taylor";
       desktopSession = "gnome"; # "Switch to Desktop" lands in GNOME
     };
-    devices.steamdeck.enable = true; # deck hardware: APU, controls, fan, backlight
+    devices.steamdeck = {
+      enable = true; # deck hardware: APU, controls, fan, backlight
+      enableFwupdBiosUpdates = false;
+    };
     decky-loader.enable = true; # plugin loader
     # jovian.steamos.useSteamOSConfig defaults to jovian.steam.enable (true).
   };
