@@ -95,7 +95,7 @@ in
     decky-loader.enable = true; # plugin loader
     # jovian.steamos.useSteamOSConfig defaults to jovian.steam.enable (true).
   };
-  # desktop.gnome.enable = true;
+  desktop.gnome.enable = true;
 
   # ---------------------------------------------------------------------------
   # Software set (follows the desktop/laptop, minus Hyprland)
