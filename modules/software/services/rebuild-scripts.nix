@@ -10,6 +10,11 @@ let
   keepRoots = 5; # number of per-host deploy GC roots to retain on the build machine
   repoPath = "/mnt/zpool/code/nix-config";
   flakePath = "path://${repoPath}";
+  retryStateDir = "/var/lib/colmena-deploy-retries";
+  deployLockPath = "/run/lock/colmena-deploy.lock";
+  batchBuildTimeout = "6h";
+  perHostBuildTimeout = "6h";
+  applyTimeout = "90m";
   notifications = config.my.monitoring.notifications;
 
   # Wake-on-LAN MAC addresses for physical hosts that might be powered off.
@@ -27,6 +32,25 @@ let
   # Bash helpers shared across all deploy scripts.
   # notify "Title" <priority> "gotify body" ["extended email body"]
   sharedFns = ''
+    RETRY_STATE_DIR="${retryStateDir}"
+    DEPLOY_LOCK_PATH="${deployLockPath}"
+    BATCH_BUILD_TIMEOUT="${batchBuildTimeout}"
+    PER_HOST_BUILD_TIMEOUT="${perHostBuildTimeout}"
+    APPLY_TIMEOUT="${applyTimeout}"
+
+    log_phase() {
+      printf '[%s] --- %s ---\n' "$(date -Is)" "$*"
+    }
+
+    acquire_deploy_lock() {
+      local owner="$1"
+      exec 9>"$DEPLOY_LOCK_PATH"
+      if ! ${pkgs.util-linux}/bin/flock -n 9; then
+        log_phase "Another deploy is already running; skipping $owner"
+        return 1
+      fi
+    }
+
     GOTIFY_KEY=""
     if [ -r ${notifications.gotify.tokenFile} ]; then
       GOTIFY_KEY=$(${pkgs.coreutils}/bin/cat ${notifications.gotify.tokenFile} || true)
@@ -82,6 +106,93 @@ let
       }
     }
 
+    is_retryable_deploy_failure() {
+      local log="$1"
+      local exit_code="''${2:-1}"
+
+      if [ "$exit_code" -eq 124 ] || [ "$exit_code" -eq 137 ]; then
+        return 0
+      fi
+
+      grep -qE '(ssh: connect|Connection refused|No route to host|Connection timed out|Network is unreachable|Could not connect|Could not resolve hostname|ssh_exchange_identification|kex_exchange_identification|Connection reset|Connection closed|Broken pipe|Host is down|Operation timed out|failed to connect|cannot connect)' "$log"
+    }
+
+    sanitize_state_label() {
+      tr -c '[:alnum:]._+-' '-' | sed 's/^-*//; s/-*$//'
+    }
+
+    retry_record_path() {
+      local schedule="$1"
+      local host="$2"
+      local schedule_label
+      local host_label
+      schedule_label=$(printf '%s' "$schedule" | sanitize_state_label)
+      host_label=$(printf '%s' "$host" | sanitize_state_label)
+      printf '%s/%s/%s.env\n' "$RETRY_STATE_DIR" "$schedule_label" "$host_label"
+    }
+
+    write_retry_record() {
+      local schedule="$1"
+      local tag="$2"
+      local host="$3"
+      local system_path="$4"
+      local goal="$5"
+      local build_id="$6"
+      local record
+      local dir
+      local tmp
+
+      [ -n "$host" ] || return 1
+      [ -n "$system_path" ] || return 1
+      record=$(retry_record_path "$schedule" "$host")
+      dir=$(dirname "$record")
+      mkdir -p "$dir"
+      tmp="$record.tmp.$$"
+      {
+        printf 'schedule=%q\n' "$schedule"
+        printf 'tag=%q\n' "$tag"
+        printf 'host=%q\n' "$host"
+        printf 'system_path=%q\n' "$system_path"
+        printf 'goal=%q\n' "$goal"
+        printf 'build_id=%q\n' "$build_id"
+        printf 'created_at=%q\n' "$(date -Is)"
+      } > "$tmp"
+      chmod 0600 "$tmp"
+      mv "$tmp" "$record"
+    }
+
+    delete_retry_record() {
+      local schedule="$1"
+      local host="$2"
+      local record
+      record=$(retry_record_path "$schedule" "$host")
+      rm -f "$record"
+    }
+
+    clear_retry_schedule() {
+      local schedule="$1"
+      local schedule_label
+      local dir
+      schedule_label=$(printf '%s' "$schedule" | sanitize_state_label)
+      dir="$RETRY_STATE_DIR/$schedule_label"
+      if [ -d "$dir" ]; then
+        log_phase "Clearing queued retries for $schedule"
+        find "$dir" -type f -name '*.env' -delete
+      fi
+    }
+
+    clear_retry_host() {
+      local host="$1"
+      local host_label
+      local record
+      host_label=$(printf '%s' "$host" | sanitize_state_label)
+      for record in "$RETRY_STATE_DIR"/*/"$host_label.env"; do
+        [ -e "$record" ] || continue
+        log_phase "Clearing queued retry for $host"
+        rm -f "$record"
+      done
+    }
+
     list_colmena_hosts_for_tag() {
       local tag_name="$1"
       ${pkgs.nix}/bin/nix eval --json "${flakePath}#colmena" \
@@ -127,7 +238,10 @@ let
       local build_exit
       log=$(mktemp)
       build_exit=0
-      ${pkgs.colmena}/bin/colmena build --on "$target" --no-build-on-target --parallel "''${BUILD_PARALLELISM:-4}" 2>&1 | tee "$log" || build_exit=$?
+      log_phase "$title: batch prebuild started (timeout $BATCH_BUILD_TIMEOUT)"
+      ${pkgs.coreutils}/bin/timeout --foreground --kill-after=60s "$BATCH_BUILD_TIMEOUT" \
+        ${pkgs.colmena}/bin/colmena build --on "$target" --no-build-on-target --parallel "''${BUILD_PARALLELISM:-4}" \
+        2>&1 | tee "$log" || build_exit=$?
       if [ $build_exit -ne 0 ]; then
         local error_summary
         local email_body
@@ -136,6 +250,8 @@ let
         notify_email "⚠️ $title batch build failed" 6 \
           "Continuing with per-host builds.\nLast 20 lines:\n$error_summary" \
           "$email_body"
+      else
+        log_phase "$title: batch prebuild completed"
       fi
       rm "$log"
       return $build_exit
@@ -147,7 +263,10 @@ let
       local build_exit
       local profile
       build_exit=0
-      ${pkgs.colmena}/bin/colmena build --on "$host" --no-build-on-target --parallel 1 2>&1 | tee "$log" >&2 || build_exit=$?
+      log_phase "$host: per-host build started (timeout $PER_HOST_BUILD_TIMEOUT)" >&2
+      ${pkgs.coreutils}/bin/timeout --foreground --kill-after=60s "$PER_HOST_BUILD_TIMEOUT" \
+        ${pkgs.colmena}/bin/colmena build --on "$host" --no-build-on-target --parallel 1 \
+        2>&1 | tee "$log" >&2 || build_exit=$?
       if [ $build_exit -eq 0 ]; then
         profile=$(grep -oE '/nix/store/[a-z0-9]+-nixos-system-[^[:space:]]+' "$log" | tail -n 1 || true)
         if [ -z "$profile" ]; then
@@ -158,6 +277,7 @@ let
         return $build_exit
       fi
       [ -n "$profile" ] || return 1
+      log_phase "$host: per-host build completed ($profile)" >&2
       printf '%s\n' "$profile"
     }
 
@@ -264,6 +384,7 @@ let
     pkgs.curl
     pkgs.msmtp
     pkgs.wol
+    pkgs.util-linux
   ];
 
   mkDeployService = name: tags: {
@@ -284,44 +405,50 @@ let
       set -euo pipefail
       ${sharedFns}
 
-      echo "--- Committing pre-deploy state ---"
+      if ! acquire_deploy_lock "${name} deploy"; then
+        exit 0
+      fi
+
+      log_phase "${name}: committing pre-deploy state"
       ${pkgs.git}/bin/git -C "${repoPath}" add -A
       ${pkgs.git}/bin/git -C "${repoPath}" commit -m "auto: ${name} pre-deploy $(date '+%Y-%m-%d %H:%M')" || true
 
-      echo "--- Deploying ${name} (${tags}) ---"
+      log_phase "Deploying ${name} (${tags})"
       cd "${repoPath}"
-      RETRY_DELAY=1800
-      MAX_RETRIES=46
       BUILD_PARALLELISM=4
+      BUILD_ID=$(date -u +%Y%m%d%H%M%S)
 
       # Enumerate all hosts for this tag
+      log_phase "${name}: resolving hosts for ${tags}"
       TAG_NAME="${lib.removePrefix "@" tags}"
       ALL_HOSTS=$(list_colmena_hosts_for_tag "$TAG_NAME")
 
       if [ -z "$ALL_HOSTS" ]; then
-        echo "No hosts found for tag '${tags}'"
+        log_phase "No hosts found for tag '${tags}'"
         exit 0
       fi
-      echo "Hosts to deploy: $ALL_HOSTS"
+      log_phase "${name}: hosts to deploy: $ALL_HOSTS"
+      clear_retry_schedule "${name}"
 
-      echo "--- Building ${name} (${tags}) profiles locally ---"
+      log_phase "${name}: building ${tags} profiles locally"
       HAD_WARNINGS=false
       prebuild_colmena_selection '${tags}' "${name} (${tags})" || HAD_WARNINGS=true
 
       SUCCEEDED_HOSTS=""
       HARD_FAIL_HOSTS=""
-      CONN_FAIL_HOSTS=""
+      DEFERRED_HOSTS=""
 
       SELF_HOSTNAME=$(hostname)
 
       # --- First pass: deploy each already-built host individually so one offline host can't abort others ---
       for host in $ALL_HOSTS; do
-        echo "--- [$host] building ---"
+        log_phase "$host: scheduled build phase"
         LOG=$(mktemp)
         build_exit=0
         colmena_exit=0
         system_path=$(local_build_system_path "$host" "$LOG") || build_exit=$?
         if [ $build_exit -eq 0 ]; then
+          log_phase "$host: pinning built system"
           pin_built_system "$host" "$system_path" || true
         else
           HARD_FAIL_HOSTS="$HARD_FAIL_HOSTS $host"
@@ -333,23 +460,34 @@ let
           continue
         fi
 
-        echo "--- [$host] deploying ---"
+        log_phase "$host: queueing retry record for $system_path"
+        write_retry_record "${name}" '${tags}' "$host" "$system_path" "switch" "$BUILD_ID"
+
+        log_phase "$host: first apply started (timeout $APPLY_TIMEOUT)"
         if [ "$host" = "$SELF_HOSTNAME" ]; then
-          ${pkgs.colmena}/bin/colmena apply-local switch 2>&1 | tee "$LOG" || colmena_exit=$?
+          ${pkgs.coreutils}/bin/timeout --foreground --kill-after=60s "$APPLY_TIMEOUT" \
+            ${pkgs.colmena}/bin/colmena apply-local switch 2>&1 | tee "$LOG" || colmena_exit=$?
         else
-          ${pkgs.colmena}/bin/colmena apply --on "$host" --no-build-on-target --no-substitute switch 2>&1 | tee "$LOG" || colmena_exit=$?
+          ${pkgs.coreutils}/bin/timeout --foreground --kill-after=60s "$APPLY_TIMEOUT" \
+            ${pkgs.colmena}/bin/colmena apply --on "$host" --no-build-on-target --no-substitute switch \
+            2>&1 | tee "$LOG" || colmena_exit=$?
         fi
 
         grep -qE '\[WARN\]|warning:' "$LOG" && HAD_WARNINGS=true || true
 
         if [ $colmena_exit -eq 0 ]; then
+          log_phase "$host: first apply completed"
           SUCCEEDED_HOSTS="$SUCCEEDED_HOSTS $host"
+          delete_retry_record "${name}" "$host"
         else
           ERROR_SUMMARY=$(tail -n 20 "$LOG")
-          if grep -qE 'ssh: connect|Connection refused|No route to host|Connection timed out|Network is unreachable|Could not connect|ssh_exchange_identification' "$LOG"; then
-            CONN_FAIL_HOSTS="$CONN_FAIL_HOSTS $host"
+          if is_retryable_deploy_failure "$LOG" "$colmena_exit"; then
+            DEFERRED_HOSTS="$DEFERRED_HOSTS $host"
+            notify "⚠️ ${name}: $host deferred" 5 \
+              "First apply failed or timed out; retrying every 30 minutes until the next ${name} build.\nSystem: $system_path\nLast 20 lines:\n$ERROR_SUMMARY"
           else
             HARD_FAIL_HOSTS="$HARD_FAIL_HOSTS $host"
+            delete_retry_record "${name}" "$host"
             EMAIL_BODY=$(deploy_log_email_body "$LOG" "Build log excerpt for $host (${name}).")
             notify_email "❌ ${name}: $host FAILED" 10 \
               "Last 20 lines:\n$ERROR_SUMMARY" \
@@ -361,61 +499,30 @@ let
 
       SUCCEEDED_HOSTS=$(echo "$SUCCEEDED_HOSTS" | xargs || true)
       HARD_FAIL_HOSTS=$(echo "$HARD_FAIL_HOSTS" | xargs || true)
-      CONN_FAIL_HOSTS=$(echo "$CONN_FAIL_HOSTS" | xargs || true)
+      DEFERRED_HOSTS=$(echo "$DEFERRED_HOSTS" | xargs || true)
 
       # --- First-pass summary ---
       SUCC_DISP=$SUCCEEDED_HOSTS;  [ -n "$SUCC_DISP" ] || SUCC_DISP="none"
       HARD_DISP=$HARD_FAIL_HOSTS;  [ -n "$HARD_DISP" ] || HARD_DISP="none"
-      CONN_DISP=$CONN_FAIL_HOSTS;  [ -n "$CONN_DISP" ] || CONN_DISP="none"
+      DEFER_DISP=$DEFERRED_HOSTS;  [ -n "$DEFER_DISP" ] || DEFER_DISP="none"
       notify "ℹ️ ${name} first-pass summary" 3 \
-        "Succeeded: $SUCC_DISP\nHard failed: $HARD_DISP\nRetrying (conn): $CONN_DISP"
-
-      # --- WoL + retry connection-failed hosts ---
-      for host in $CONN_FAIL_HOSTS; do
-        try_wol "$host"
-        host_ok=false
-        for attempt in $(seq 1 $MAX_RETRIES); do
-          echo "[$host] retry $attempt/$MAX_RETRIES, sleeping $((RETRY_DELAY / 60)) min..."
-          sleep $RETRY_DELAY
-          LOG=$(mktemp)
-          colmena_exit=0
-          if [ "$host" = "$SELF_HOSTNAME" ]; then
-            ${pkgs.colmena}/bin/colmena apply-local switch 2>&1 | tee "$LOG" || colmena_exit=$?
-          else
-            ${pkgs.colmena}/bin/colmena apply --on "$host" --no-build-on-target --no-substitute switch 2>&1 | tee "$LOG" || colmena_exit=$?
-          fi
-
-          grep -qE '\[WARN\]|warning:' "$LOG" && HAD_WARNINGS=true || true
-          rm "$LOG"
-
-          if [ $colmena_exit -eq 0 ]; then
-            SUCCEEDED_HOSTS="$SUCCEEDED_HOSTS $host"
-            host_ok=true
-            break
-          fi
-
-          # Re-send WoL every 5 retries in case machine went back to sleep
-          if [ $((attempt % 5)) -eq 0 ]; then
-            try_wol "$host"
-          fi
-        done
-
-        if [ "$host_ok" = false ]; then
-          HARD_FAIL_HOSTS="$HARD_FAIL_HOSTS $host"
-          notify_email "❌ ${name}: $host FAILED (retries exhausted)" 10 \
-            "All $MAX_RETRIES connection retries exhausted for $host"
-        fi
-      done
+        "Succeeded: $SUCC_DISP\nHard failed: $HARD_DISP\nDeferred: $DEFER_DISP"
 
       SUCCEEDED_HOSTS=$(echo "$SUCCEEDED_HOSTS" | tr ' ' '\n' | sort -u | grep -v '^$' | tr '\n' ' ' | xargs || true)
       HARD_FAIL_HOSTS=$(echo "$HARD_FAIL_HOSTS" | tr ' ' '\n' | sort -u | grep -v '^$' | tr '\n' ' ' | xargs || true)
+      DEFERRED_HOSTS=$(echo "$DEFERRED_HOSTS" | tr ' ' '\n' | sort -u | grep -v '^$' | tr '\n' ' ' | xargs || true)
 
       # --- Final summary ---
       SUCC_DISP=$SUCCEEDED_HOSTS; [ -n "$SUCC_DISP" ] || SUCC_DISP="none"
       FAIL_DISP=$HARD_FAIL_HOSTS; [ -n "$FAIL_DISP" ] || FAIL_DISP="none"
+      DEFER_DISP=$DEFERRED_HOSTS; [ -n "$DEFER_DISP" ] || DEFER_DISP="none"
+      log_phase "${name}: final summary; succeeded=$SUCC_DISP hard_failed=$FAIL_DISP deferred=$DEFER_DISP"
       if [ -n "$HARD_FAIL_HOSTS" ]; then
         notify "⚠️ ${name} deploy partial" 6 \
-          "Succeeded: $SUCC_DISP\nFailed: $FAIL_DISP"
+          "Succeeded: $SUCC_DISP\nFailed: $FAIL_DISP\nDeferred: $DEFER_DISP"
+      elif [ -n "$DEFERRED_HOSTS" ]; then
+        notify "⚠️ ${name} deploy deferred" 5 \
+          "Succeeded: $SUCC_DISP\nDeferred: $DEFER_DISP"
       elif [ "$HAD_WARNINGS" = true ]; then
         notify "⚠️ ${name} deploy succeeded (with warnings)" 4 \
           "All hosts: $SUCC_DISP"
@@ -449,6 +556,10 @@ let
     set -euo pipefail
     ${sharedFns}
 
+    if ! acquire_deploy_lock "manual deploy"; then
+      exit 1
+    fi
+
     if [ $# -lt 1 ]; then
       echo "Usage: deploy <host|@tag> [goal]"
       echo "  Examples:"
@@ -466,18 +577,19 @@ let
 
     cd "${repoPath}"
 
-    echo "--- Committing pre-deploy state ---"
+    log_phase "Manual deploy $TARGET: committing pre-deploy state"
     ${pkgs.git}/bin/git add -A
     ${pkgs.git}/bin/git commit -m "auto: manual deploy $TARGET $(date '+%Y-%m-%d %H:%M')" || true
 
+    log_phase "Manual deploy $TARGET: resolving hosts"
     SELECTED_HOSTS=$(expand_colmena_selector "$TARGET")
     if [ -z "$SELECTED_HOSTS" ]; then
       echo "No hosts matched selector '$TARGET'"
       exit 1
     fi
-    echo "Hosts to deploy: $SELECTED_HOSTS"
+    log_phase "Manual deploy $TARGET: hosts to deploy: $SELECTED_HOSTS"
 
-    echo "--- Building $TARGET profiles locally ---"
+    log_phase "Manual deploy $TARGET: building profiles locally"
     HAD_WARNINGS=false
     prebuild_colmena_selection "$TARGET" "manual deploy $TARGET (goal=$GOAL)" || HAD_WARNINGS=true
 
@@ -488,9 +600,10 @@ let
       LOG=$(mktemp)
       build_exit=0
       host_exit=0
-      echo "--- Building $host ($GOAL) ---"
+      log_phase "$host: manual build phase ($GOAL)"
       system_path=$(local_build_system_path "$host" "$LOG") || build_exit=$?
       if [ $build_exit -eq 0 ]; then
+        log_phase "$host: pinning built system"
         pin_built_system "$host" "$system_path" || true
       else
         FAILED_HOSTS="$FAILED_HOSTS $host"
@@ -502,17 +615,22 @@ let
         continue
       fi
 
-      echo "--- Deploying $host ($GOAL) ---"
+      log_phase "$host: manual apply started ($GOAL, timeout $APPLY_TIMEOUT)"
       if [[ "$host" == "$HOSTNAME" ]] || [[ "$host" == "build-nix" && "$HOSTNAME" == "build-nix" ]]; then
-        ${pkgs.colmena}/bin/colmena apply-local "$GOAL" 2>&1 | tee "$LOG" || host_exit=$?
+        ${pkgs.coreutils}/bin/timeout --foreground --kill-after=60s "$APPLY_TIMEOUT" \
+          ${pkgs.colmena}/bin/colmena apply-local "$GOAL" 2>&1 | tee "$LOG" || host_exit=$?
       else
-        ${pkgs.colmena}/bin/colmena apply --on "$host" --parallel 1 --no-build-on-target "$GOAL" 2>&1 | tee "$LOG" || host_exit=$?
+        ${pkgs.coreutils}/bin/timeout --foreground --kill-after=60s "$APPLY_TIMEOUT" \
+          ${pkgs.colmena}/bin/colmena apply --on "$host" --parallel 1 --no-build-on-target "$GOAL" \
+          2>&1 | tee "$LOG" || host_exit=$?
       fi
 
       grep -qE '\[WARN\]|warning:' "$LOG" && HAD_WARNINGS=true || true
 
       if [ $host_exit -eq 0 ]; then
+        log_phase "$host: manual apply completed"
         SUCCEEDED_HOSTS="$SUCCEEDED_HOSTS $host"
+        clear_retry_host "$host"
       else
         FAILED_HOSTS="$FAILED_HOSTS $host"
         ERROR_SUMMARY=$(tail -n 20 "$LOG")
@@ -528,6 +646,7 @@ let
     FAILED_HOSTS=$(echo "$FAILED_HOSTS" | tr ' ' '\n' | sort -u | grep -v '^$' | tr '\n' ' ' | xargs || true)
     SUCC_DISP=$SUCCEEDED_HOSTS; [ -n "$SUCC_DISP" ] || SUCC_DISP="none"
     FAIL_DISP=$FAILED_HOSTS; [ -n "$FAIL_DISP" ] || FAIL_DISP="none"
+    log_phase "Manual deploy $TARGET: final summary; succeeded=$SUCC_DISP failed=$FAIL_DISP goal=$GOAL"
 
     if [ -z "$FAILED_HOSTS" ]; then
       if [ "$HAD_WARNINGS" = true ]; then
@@ -598,6 +717,99 @@ let
     fi
   '';
 
+  deployRetryCmd = pkgs.writeShellScriptBin "deploy-retry" ''
+    set -euo pipefail
+    ${sharedFns}
+
+    if ! acquire_deploy_lock "deploy retry"; then
+      exit 0
+    fi
+
+    cd "${repoPath}"
+    mkdir -p "$RETRY_STATE_DIR"
+    shopt -s nullglob
+
+    log_phase "Deploy retry: scanning $RETRY_STATE_DIR"
+
+    for record in "$RETRY_STATE_DIR"/*/*.env; do
+      [ -e "$record" ] || continue
+
+      unset schedule tag host system_path goal build_id created_at
+      # shellcheck disable=SC1090
+      source "$record"
+
+      schedule="''${schedule:-}"
+      tag="''${tag:-}"
+      host="''${host:-}"
+      system_path="''${system_path:-}"
+      goal="''${goal:-switch}"
+      build_id="''${build_id:-unknown}"
+
+      if [ -z "$schedule" ] || [ -z "$host" ] || [ -z "$system_path" ]; then
+        log_phase "Deploy retry: removing invalid retry record $record"
+        rm -f "$record"
+        continue
+      fi
+
+      if [ ! -e "$system_path" ]; then
+        log_phase "Deploy retry: $host queued system path is missing: $system_path"
+        notify_email "❌ Deploy retry $host stale" 10 \
+          "Queued retry for $host cannot continue because the local system path no longer exists:\n$system_path"
+        rm -f "$record"
+        continue
+      fi
+
+      LOG=$(mktemp)
+      retry_exit=0
+      SELF_HOSTNAME=$(hostname)
+      log_phase "Deploy retry: $host from $schedule build $build_id started (timeout $APPLY_TIMEOUT)"
+      try_wol "$host"
+
+      if [[ "$host" == "$SELF_HOSTNAME" ]] || [[ "$host" == "build-nix" && "$SELF_HOSTNAME" == "build-nix" ]]; then
+        ${pkgs.coreutils}/bin/timeout --foreground --kill-after=60s "$APPLY_TIMEOUT" \
+          ${pkgs.bash}/bin/bash -c '
+            set -euo pipefail
+            system_path="$1"
+            goal="$2"
+            ${pkgs.nix}/bin/nix-env -p /nix/var/nix/profiles/system --set "$system_path"
+            "$system_path/bin/switch-to-configuration" "$goal"
+          ' bash "$system_path" "$goal" 2>&1 | tee "$LOG" || retry_exit=$?
+      else
+        ssh_host=$(ssh_host_for_colmena_host "$host")
+        ${pkgs.coreutils}/bin/timeout --foreground --kill-after=60s "$APPLY_TIMEOUT" \
+          ${pkgs.bash}/bin/bash -c '
+            set -euo pipefail
+            ssh_host="$1"
+            system_path="$2"
+            goal="$3"
+            export NIX_SSHOPTS="-o ConnectTimeout=15 -o BatchMode=yes"
+            ${pkgs.nix}/bin/nix copy --to "ssh://root@$ssh_host" "$system_path"
+            ${pkgs.openssh}/bin/ssh -o ConnectTimeout=15 -o BatchMode=yes "root@$ssh_host" \
+              "nix-env -p /nix/var/nix/profiles/system --set $system_path && $system_path/bin/switch-to-configuration $goal"
+          ' bash "$ssh_host" "$system_path" "$goal" 2>&1 | tee "$LOG" || retry_exit=$?
+      fi
+
+      if [ $retry_exit -eq 0 ]; then
+        log_phase "Deploy retry: $host succeeded"
+        rm -f "$record"
+        notify "✅ Deploy retry $host succeeded" 3 \
+          "$host applied queued $schedule build $build_id.\nSystem: $system_path"
+      elif is_retryable_deploy_failure "$LOG" "$retry_exit"; then
+        log_phase "Deploy retry: $host still unreachable or timed out; keeping queued retry"
+      else
+        ERROR_SUMMARY=$(tail -n 20 "$LOG")
+        EMAIL_BODY=$(deploy_log_email_body "$LOG" "Retry log excerpt for $host ($schedule build $build_id).")
+        log_phase "Deploy retry: $host failed hard; removing queued retry"
+        notify_email "❌ Deploy retry $host FAILED" 10 \
+          "Queued retry failed with a non-connection error and has been removed.\nLast 20 lines:\n$ERROR_SUMMARY" \
+          "$EMAIL_BODY"
+        rm -f "$record"
+      fi
+
+      rm "$LOG"
+    done
+  '';
+
   mkTimer = name: onCalendar: {
     enable = true;
     description = "Run ${name} Colmena Deploy";
@@ -614,6 +826,11 @@ in
   environment.systemPackages = [
     deployCmd
     deployOldCmd
+    deployRetryCmd
+  ];
+
+  systemd.tmpfiles.rules = [
+    "d ${retryStateDir} 0700 root root -"
   ];
 
   systemd.services = {
@@ -643,6 +860,25 @@ in
     "deploy-Daily" = mkDeployService "Daily" "@daily";
     "deploy-Weekly" = mkDeployService "Weekly" "@weekly";
     "deploy-Monthly" = mkDeployService "Monthly" "@monthly";
+    "deploy-retry" = {
+      description = "Retry deferred Colmena deploys";
+      restartIfChanged = false;
+      stopIfChanged = false;
+      wants = [ "network-online.target" ];
+      after = [
+        "network-online.target"
+        "sops-nix.service"
+      ];
+      path = servicePath;
+      serviceConfig = {
+        Type = "oneshot";
+        User = "root";
+      };
+      script = ''
+        set -euo pipefail
+        ${deployRetryCmd}/bin/deploy-retry
+      '';
+    };
   };
 
   systemd.timers = {
@@ -659,5 +895,15 @@ in
     "deploy-Daily" = mkTimer "Daily" "*-*-* 00:00";
     "deploy-Weekly" = mkTimer "Weekly" "Sat *-*-* 01:00";
     "deploy-Monthly" = mkTimer "Monthly" "Sat *-*-1..7 02:00";
+    "deploy-retry" = {
+      enable = true;
+      description = "Retry deferred Colmena deploys every 30 minutes";
+      wantedBy = [ "timers.target" ];
+      timerConfig = {
+        OnCalendar = "*-*-* *:0/30:00";
+        Persistent = true;
+        Unit = "deploy-retry.service";
+      };
+    };
   };
 }
