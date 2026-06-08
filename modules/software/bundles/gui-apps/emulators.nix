@@ -11,9 +11,7 @@
     environment.systemPackages = with pkgs; [
       retroarch
       dolphin-emu # GameCube / Wii
-      (rpcs3.overrideAttrs (prev: {
-        cmakeFlags = prev.cmakeFlags ++ [ (lib.cmakeBool "BUILD_SHARED_LIBS" false) ];
-      })) # PS3
+      rpcs3
       ps3-disc-dumper
       pcsx2 # PS2
       ryubing # Switch
