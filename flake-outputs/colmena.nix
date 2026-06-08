@@ -151,9 +151,7 @@ in
     "jellyseerr-nix" = mkHost "weekly" "jellyseerr-nix" "${self}/hosts/server-nix/LXCs/jellyseerr.nix";
     "jellyfin-nix" = mkHost "weekly" "jellyfin-nix" "${self}/hosts/server-nix/LXCs/jellyfin.nix";
     "gotify-nix" = mkHost "weekly" "gotify-nix" "${self}/hosts/server-nix/LXCs/gotify.nix";
-    "monitoring-nix" =
-      mkHost "weekly" "monitoring-nix"
-        "${self}/hosts/server-nix/LXCs/monitoring.nix";
+    "monitoring-nix" = mkHost "weekly" "monitoring-nix" "${self}/hosts/server-nix/LXCs/monitoring.nix";
     "llm-nix" = mkHost "weekly" "llm-nix" "${self}/hosts/server-nix/LXCs/llm.nix";
     "searx-nix" = mkHost "weekly" "searx-nix" "${self}/hosts/server-nix/LXCs/searx.nix";
     "arrs-nix" = mkHost "weekly" "arrs-nix" "${self}/hosts/server-nix/LXCs/arrs.nix";
@@ -179,7 +177,7 @@ in
         "${self}/hosts/taylor-desktop-nix";
     "taylor-laptop-nix" = mkUnstableHost "daily" "taylor-laptop-nix" "${self}/hosts/taylor-laptop-nix";
     # Steam Deck: frequently asleep/off-LAN, so manual-only (no schedule tag).
-    "taylor-deck-nix" = mkUnstableHost null "taylor-deck-nix" "${self}/hosts/taylor-deck-nix";
+    "taylor-deck-nix" = mkUnstableHost "daily" "taylor-deck-nix" "${self}/hosts/taylor-deck-nix";
     # --- main server ---
     "server-nix" = mkHost "weekly" "server-nix" "${self}/hosts/server-nix";
 
