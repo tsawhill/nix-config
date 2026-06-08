@@ -135,6 +135,41 @@ let
       printf '%s/%s/%s.env\n' "$RETRY_STATE_DIR" "$schedule_label" "$host_label"
     }
 
+    retry_gcroot_path() {
+      local schedule="$1"
+      local host="$2"
+      local schedule_label
+      local host_label
+      schedule_label=$(printf '%s' "$schedule" | sanitize_state_label)
+      host_label=$(printf '%s' "$host" | sanitize_state_label)
+      printf '/nix/var/nix/gcroots/colmena-retries/%s/%s\n' "$schedule_label" "$host_label"
+    }
+
+    pin_retry_system() {
+      local schedule="$1"
+      local host="$2"
+      local system_path="$3"
+      local root
+      local dir
+
+      [ -n "$system_path" ] || return 1
+      [ -e "$system_path" ] || return 1
+      root=$(retry_gcroot_path "$schedule" "$host")
+      dir=$(dirname "$root")
+      mkdir -p "$dir"
+      rm -f "$root"
+      ${pkgs.nix}/bin/nix-store --add-root "$root" --indirect --realise "$system_path" || return 1
+    }
+
+    delete_retry_gcroot() {
+      local schedule="$1"
+      local host="$2"
+      local root
+      root=$(retry_gcroot_path "$schedule" "$host")
+      rm -f "$root"
+      rmdir "$(dirname "$root")" 2>/dev/null || true
+    }
+
     write_retry_record() {
       local schedule="$1"
       local tag="$2"
@@ -151,6 +186,7 @@ let
       record=$(retry_record_path "$schedule" "$host")
       dir=$(dirname "$record")
       mkdir -p "$dir"
+      pin_retry_system "$schedule" "$host" "$system_path" || return 1
       tmp="$record.tmp.$$"
       {
         printf 'schedule=%q\n' "$schedule"
@@ -171,6 +207,7 @@ let
       local record
       record=$(retry_record_path "$schedule" "$host")
       rm -f "$record"
+      delete_retry_gcroot "$schedule" "$host"
     }
 
     clear_retry_schedule() {
@@ -183,6 +220,11 @@ let
         log_phase "Clearing queued retries for $schedule"
         find "$dir" -type f -name '*.env' -delete
       fi
+      dir="/nix/var/nix/gcroots/colmena-retries/$schedule_label"
+      if [ -d "$dir" ]; then
+        find "$dir" -maxdepth 1 -type l -delete
+        rmdir "$dir" 2>/dev/null || true
+      fi
     }
 
     clear_retry_host() {
@@ -194,6 +236,11 @@ let
         [ -e "$record" ] || continue
         log_phase "Clearing queued retry for $host"
         rm -f "$record"
+      done
+      for record in /nix/var/nix/gcroots/colmena-retries/*/"$host_label"; do
+        [ -e "$record" ] || [ -L "$record" ] || continue
+        rm -f "$record"
+        rmdir "$(dirname "$record")" 2>/dev/null || true
       done
     }
 
@@ -737,6 +784,9 @@ let
 
       if [ -z "$schedule" ] || [ -z "$host" ] || [ -z "$system_path" ]; then
         log_phase "Deploy retry: removing invalid retry record $record"
+        if [ -n "$schedule" ] && [ -n "$host" ]; then
+          delete_retry_gcroot "$schedule" "$host"
+        fi
         rm -f "$record"
         continue
       fi
@@ -745,7 +795,7 @@ let
         log_phase "Deploy retry: $host queued system path is missing: $system_path"
         notify_email "❌ Deploy retry $host stale" 10 \
           "Queued retry for $host cannot continue because the local system path no longer exists:\n$system_path"
-        rm -f "$record"
+        delete_retry_record "$schedule" "$host"
         continue
       fi
 
@@ -757,7 +807,7 @@ let
 
       if [ $retry_exit -eq 0 ]; then
         log_phase "Deploy retry: $host succeeded"
-        rm -f "$record"
+        delete_retry_record "$schedule" "$host"
         notify "✅ Deploy retry $host succeeded" 3 \
           "$host applied queued $schedule build $build_id.\nSystem: $system_path"
       elif is_retryable_deploy_failure "$LOG" "$retry_exit"; then
@@ -769,7 +819,7 @@ let
         notify_email "❌ Deploy retry $host FAILED" 10 \
           "Queued retry failed with a non-connection error and has been removed.\nLast 20 lines:\n$ERROR_SUMMARY" \
           "$EMAIL_BODY"
-        rm -f "$record"
+        delete_retry_record "$schedule" "$host"
       fi
 
       rm "$LOG"
