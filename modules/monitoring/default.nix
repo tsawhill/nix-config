@@ -5,6 +5,7 @@
   # notification module owns SMTP/Gotify settings, while the feature modules
   # below decide which services to enable.
   imports = [
+    ./metrics.nix
     ./notifications.nix
     ./smart-alerts.nix
     ./zfs-alerts.nix

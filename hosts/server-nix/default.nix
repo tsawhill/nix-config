@@ -103,6 +103,8 @@ in
       scrub.interval = "monthly";
       trim.interval = "monthly";
     };
+
+    metrics.exporters.enable = true;
   };
   my.users.taylor = {
     enable = true;

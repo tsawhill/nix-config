@@ -27,6 +27,7 @@ in
     "${self}/modules/nix/features.nix"
     "${self}/modules/nix/keep-outputs-derivations.nix"
     "${self}/modules/nix/garbage-collection.nix"
+    "${self}/modules/monitoring"
 
     # SSH Access
     "${self}/modules/ssh/openssh.nix"
@@ -52,6 +53,7 @@ in
     enable = true;
   };
   my.garbage.collection.generations = 2;
+  my.monitoring.metrics.exporters.enable = true;
   environment.sessionVariables = {
     EDITOR = "nvim";
   };

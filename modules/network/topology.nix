@@ -158,6 +158,13 @@ let
       };
       dns.enable = true;
     };
+    monitoring-nix = {
+      lan = {
+        ip = "10.73.73.28";
+        mac = "bc:24:11:4d:2c:9f";
+      };
+      dns.enable = true;
+    };
     authentik-nix = {
       lan = {
         ip = "10.73.73.29";

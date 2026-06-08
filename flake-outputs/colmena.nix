@@ -139,6 +139,9 @@ in
     "jellyseerr-nix" = mkHost "weekly" "jellyseerr-nix" "${self}/hosts/server-nix/LXCs/jellyseerr.nix";
     "jellyfin-nix" = mkHost "weekly" "jellyfin-nix" "${self}/hosts/server-nix/LXCs/jellyfin.nix";
     "gotify-nix" = mkHost "weekly" "gotify-nix" "${self}/hosts/server-nix/LXCs/gotify.nix";
+    "monitoring-nix" =
+      mkHost "weekly" "monitoring-nix"
+        "${self}/hosts/server-nix/LXCs/monitoring.nix";
     "llm-nix" = mkHost "weekly" "llm-nix" "${self}/hosts/server-nix/LXCs/llm.nix";
     "searx-nix" = mkHost "weekly" "searx-nix" "${self}/hosts/server-nix/LXCs/searx.nix";
     "arrs-nix" = mkHost "weekly" "arrs-nix" "${self}/hosts/server-nix/LXCs/arrs.nix";

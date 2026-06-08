@@ -3,7 +3,6 @@
   imports = [
     ./base
     "${self}/modules/software/services/rebuild-scripts.nix"
-    "${self}/modules/monitoring"
 
     # Secrets (SOPS)
     inputs.sops-nix-stable.nixosModules.sops
