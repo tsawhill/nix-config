@@ -17,6 +17,20 @@
       url = "github:nix-community/home-manager/release-26.05";
       inputs.nixpkgs.follows = "nixpkgs-stable";
     };
+
+    # TEMP: remove once nixos-raspberrypi tracks nixos-26.05.
+    # pi-backup-nix is built on nixos-raspberrypi's pinned nixos-25.11 nixpkgs,
+    # but the fleet-standard 26.05 inputs assume nixpkgs 26.05 APIs and so can't
+    # evaluate against the pi's 25.11 pkgs:
+    #   - home-manager 26.05's modular-services imports `${pkgs.path}/lib/services/lib.nix`
+    #   - nixvim 26.05 calls `pkgs.neovimUtils.makeVimPackageInfo`
+    # neither exists in nixpkgs 25.11. Pin matching 25.11 home-manager + nixvim
+    # for that one host as a bridge. When upstream nixos-raspberrypi moves to
+    # nixos-26.05, delete these two inputs and revert
+    # hosts/pi-backup-nix/home-manager.nix back to home-manager-stable / nixvim-stable.
+    home-manager-2511.url = "github:nix-community/home-manager/release-25.11";
+    nixvim-2511.url = "github:nix-community/nixvim/nixos-25.11";
+
     nixvim-stable = {
       url = "github:nix-community/nixvim/nixos-26.05";
       inputs.nixpkgs.follows = "nixpkgs-stable";
