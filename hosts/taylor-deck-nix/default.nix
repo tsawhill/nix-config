@@ -31,8 +31,9 @@ in
     ./home-manager.nix
 
     # Hardware / system
-    ./hardware-configuration.nix
+    ./system/hardware
     ./system/boot.nix
+    ./system/disks.nix
     ./system/networking.nix
     ./system/samba.nix
     ./system/syncthing.nix
