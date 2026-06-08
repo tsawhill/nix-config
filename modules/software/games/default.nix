@@ -66,18 +66,9 @@ let
       extraPackages = lib.optionals (runnerCfg.proton == "cachyos") [ protonCachyos ];
     };
 
-  # PS3 titles need rpcs3 built with static libs, matching the emulators bundle
-  # (modules/software/bundles/gui-apps/emulators.nix). Without this the entries
-  # rpcs3 runner would silently use the stock dynamic build.
-  rpcs3Static = pkgs.rpcs3.overrideAttrs (prev: {
-    cmakeFlags = prev.cmakeFlags ++ [ (lib.cmakeBool "BUILD_SHARED_LIBS" false) ];
-  });
-
   mkEmulatorRunner =
     runnerCfg:
-    pkgs.callPackage ../../../pkgs/games/runners/emulators/${runnerCfg.type}.nix (
-      lib.optionalAttrs (runnerCfg.type == "rpcs3") { rpcs3 = rpcs3Static; }
-    ) (
+    pkgs.callPackage ../../../pkgs/games/runners/emulators/${runnerCfg.type}.nix { } (
       {
         inherit (runnerCfg) gamePath args;
       }
