@@ -38,9 +38,21 @@ let
     imports = [ modulePath ];
   };
 
+  # TEMP: source rpcs3 from nixpkgs-stable. As of 2026-06-07, unstable's rpcs3 is
+  # built with BUILD_SHARED_LIBS=FALSE (NixOS/nixpkgs#518285) and fails to link on
+  # recent revs (undefined GLXEW symbols, e.g. __glewXSwapIntervalEXT). A failing
+  # build is never cached, so every personal machine rebuilds it locally and hits
+  # the same link error. Pull the known-good, cached stable build until unstable's
+  # rpcs3 builds again, then delete this stablePkgs binding and the rpcs3 overlay.
+  stablePkgs = import nixpkgs-stable {
+    localSystem = "x86_64-linux";
+    config.allowUnfree = true;
+  };
+
   unstablePkgs = import nixpkgs-unstable {
     localSystem = "x86_64-linux";
     config.allowUnfree = true;
+    overlays = [ (_final: _prev: { inherit (stablePkgs) rpcs3; }) ];
   };
   piPkgs = import inputs.nixos-raspberrypi.inputs.nixpkgs { localSystem = "aarch64-linux"; };
 
