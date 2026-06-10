@@ -23,6 +23,7 @@
           "download"
           "gameservers"
           "code"
+          "games"
         ];
       };
       # taylor-laptop-nix
@@ -34,6 +35,7 @@
           "download"
           "gameservers"
           "code"
+          "games"
         ];
       };
       # taylor-deck-nix
@@ -45,6 +47,7 @@
           "download"
           "gameservers"
           "code"
+          "games"
         ];
       };
     };
@@ -84,6 +87,11 @@
       enable = true;
       members = [ "root" ];
       gid = 1003;
+    };
+    games = {
+      enable = true;
+      members = [ "root" ];
+      gid = 1005;
     };
   };
 

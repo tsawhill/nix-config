@@ -74,8 +74,8 @@ in
       "read only" = if scfg.readOnly then "yes" else "no";
       "guest ok" = "no";
       "valid users" = lib.concatStringsSep " " (if scfg.users == null then cfg.defaultUsers else scfg.users);
-      "create mask" = "0644";
-      "directory mask" = "0755";
+      "create mask" = "0664";
+      "directory mask" = "0775";
     }) (lib.filterAttrs (n: v: v.enable) cfg.definitions);
 
     # Dynamically Generate Password Sync Services
