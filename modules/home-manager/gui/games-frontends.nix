@@ -208,10 +208,11 @@ in
 
     # Refresh art and Steam shortcuts after each home-manager activation (i.e.
     # every rebuild). Both skip work that's already done, so they're cheap no-ops
-    # when nothing changed. --no-block so activation never waits.
+    # when nothing changed. Run directly so deploy-time sync really happens before
+    # activation finishes; sync-steam-shortcuts skips safely if Steam is running.
     home.activation.gameFrontendsSync = lib.hm.dag.entryAfter [ "reloadSystemd" ] ''
-      run ${pkgs.systemd}/bin/systemctl --user start --no-block fetch-game-art.service || true
-      run ${pkgs.systemd}/bin/systemctl --user start --no-block sync-steam-shortcuts.service || true
+      run ${lib.getExe fetchGameArt} || true
+      run ${lib.getExe syncSteamShortcuts} || true
     '';
 
     xdg.dataFile = pegasusMetadataFiles // pegasusMarkerFiles;

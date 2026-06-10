@@ -37,9 +37,13 @@
       # On the Deck, Steam starts immediately in Game Mode. Steam owns
       # shortcuts.vdf while it is running, so sync the declarative shortcuts in
       # the same user-boot transaction before Jovian's gamescope session starts.
+      systemd.user.services.fetch-game-art = lib.mkIf (config.software.games.manifest != [ ]) {
+        Unit.Before = [ "gamescope-session.service" ];
+      };
       systemd.user.services.sync-steam-shortcuts = lib.mkIf (config.software.games.manifest != [ ]) {
         Unit = {
-          After = lib.mkForce [ ];
+          Wants = [ "fetch-game-art.service" ];
+          After = [ "fetch-game-art.service" ];
           Before = [ "gamescope-session.service" ];
         };
         Install.WantedBy = [ "default.target" ];
