@@ -38,7 +38,10 @@
       # shortcuts.vdf while it is running, so sync the declarative shortcuts in
       # the same user-boot transaction before Jovian's gamescope session starts.
       systemd.user.services.sync-steam-shortcuts = lib.mkIf (config.software.games.manifest != [ ]) {
-        Unit.Before = [ "gamescope-session.service" ];
+        Unit = {
+          After = lib.mkForce [ ];
+          Before = [ "gamescope-session.service" ];
+        };
         Install.WantedBy = [ "default.target" ];
       };
     };
