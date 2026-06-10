@@ -13,21 +13,6 @@
 let
   inherit (networkTopology.lib) fqdn;
 
-  # Wine-prefix system directories that regenerate on every run and cause
-  # endless sync conflicts. Excluding them keeps the actual game saves under
-  # drive_c/users in sync while dropping the noise.
-  wineSystemIgnores = [
-    "wine/*/drive_c/windows"
-    "wine/*/drive_c/Program Files"
-    # "wine/*/drive_c/Program Files (x86)"
-    "wine/*/drive_c/ProgramData"
-    "wine/*/drive_c/vrclient"
-    "wine/*/*.reg"
-    "wine/*/version"
-    "wine/*/config_info"
-    "wine/*/tracked_files"
-    "wine/*/.update-timestamp"
-  ];
 in
 {
   # Devices in the fleet. IDs are public (derived from the device's public
@@ -94,7 +79,7 @@ in
       # RetroArch keeps all config (incl. input binds) in one retroarch.cfg at
       # its dir root; saves/states live in subdirs. Excluding the cfg keeps
       # config per-host while still syncing the saves.
-      ignores = wineSystemIgnores ++ [
+      ignores = [
         # RuneLite regenerable caches — no point syncing.
         "runelite/cache"
         "runelite/jagexcache"
