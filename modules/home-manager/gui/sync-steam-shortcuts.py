@@ -10,7 +10,7 @@ For every Steam account this:
 The user's own shortcuts and collections are preserved; everything we manage
 carries a marker so removed games are cleaned up on the next run.
 
-argv: <games.json> <art_base_dir> <bin_dir>
+argv: <games.json> <art_base_dir> <bin_dir> [--stop-steam] [--restart-steam]
 games.json: [ { "id", "name", "command", "category" }, ... ]
 """
 
@@ -46,6 +46,43 @@ def slug(text: str) -> str:
 
 def steam_running() -> bool:
     return subprocess.run(["pgrep", "-x", "steam"], capture_output=True).returncode == 0
+
+
+def wait_for_steam_exit(timeout: int = 45) -> bool:
+    for _ in range(timeout):
+        if not steam_running():
+            return True
+        time.sleep(1)
+    return not steam_running()
+
+
+def systemctl_user(action: str, unit: str) -> None:
+    env = os.environ.copy()
+    env.setdefault("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
+    subprocess.run(["systemctl", "--user", action, unit], check=False, env=env)
+
+
+def stop_steam() -> bool:
+    if not steam_running():
+        return False
+
+    print("Stopping Steam before syncing shortcuts...")
+    systemctl_user("stop", "gamescope-session.service")
+    subprocess.run(["pkill", "-TERM", "-x", "steam"], check=False)
+    subprocess.run(["pkill", "-TERM", "-x", "steamwebhelper"], check=False)
+
+    if wait_for_steam_exit():
+        return True
+
+    print("Steam did not exit after SIGTERM; forcing it down.", file=sys.stderr)
+    subprocess.run(["pkill", "-KILL", "-x", "steam"], check=False)
+    subprocess.run(["pkill", "-KILL", "-x", "steamwebhelper"], check=False)
+    return wait_for_steam_exit(timeout=10)
+
+
+def restart_steam() -> None:
+    print("Starting Steam Game Mode session...")
+    systemctl_user("start", "gamescope-session.service")
 
 
 def find_accounts(home: str) -> list:
@@ -196,35 +233,56 @@ def update_collections(config_dir, by_category, now):
 
 
 def main() -> int:
+    flags = set(sys.argv[4:])
+    valid_flags = {"--stop-steam", "--restart-steam"}
+    if len(sys.argv) < 4 or flags - valid_flags:
+        print(
+            "usage: sync-steam-shortcuts.py <games.json> <art_base_dir> <bin_dir> "
+            "[--stop-steam] [--restart-steam]",
+            file=sys.stderr,
+        )
+        return 2
+
     games = json.load(open(sys.argv[1], encoding="utf-8"))
     art_base = sys.argv[2]
     bin_dir = sys.argv[3]
     home = os.path.expanduser("~")
     now = int(time.time())
+    stopped_steam = False
 
     if steam_running():
-        print(
-            "Steam is running; not touching shortcuts.vdf because Steam will "
-            "overwrite it on exit. Fully quit Steam, run `sync-steam-shortcuts`, "
-            "then reopen Steam.",
-            file=sys.stderr,
-        )
+        if "--stop-steam" not in flags:
+            print(
+                "Steam is running; not touching shortcuts.vdf because Steam will "
+                "overwrite it on exit. Fully quit Steam, run `sync-steam-shortcuts`, "
+                "then reopen Steam.",
+                file=sys.stderr,
+            )
+            return 0
+
+        stopped_steam = stop_steam()
+        if steam_running():
+            print("Steam is still running; cannot safely sync shortcuts.", file=sys.stderr)
+            return 1
+
+    try:
+        accounts = find_accounts(home)
+        if not accounts:
+            print("No Steam account found; open Steam and log in once first.", file=sys.stderr)
+            return 0
+
+        for account in accounts:
+            config = os.path.join(account, "config")
+            os.makedirs(config, exist_ok=True)
+            print(f"Account {os.path.basename(account)}:")
+            by_category = write_shortcuts(config, games, art_base, bin_dir)
+            if by_category is not None:
+                update_collections(config, by_category, now)
+
         return 0
-
-    accounts = find_accounts(home)
-    if not accounts:
-        print("No Steam account found; open Steam and log in once first.", file=sys.stderr)
-        return 0
-
-    for account in accounts:
-        config = os.path.join(account, "config")
-        os.makedirs(config, exist_ok=True)
-        print(f"Account {os.path.basename(account)}:")
-        by_category = write_shortcuts(config, games, art_base, bin_dir)
-        if by_category is not None:
-            update_collections(config, by_category, now)
-
-    return 0
+    finally:
+        if stopped_steam and "--restart-steam" in flags:
+            restart_steam()
 
 
 if __name__ == "__main__":

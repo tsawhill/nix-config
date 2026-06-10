@@ -203,6 +203,10 @@ in
 
   options.software.games.lsfgVk.enable = lib.mkEnableOption "lsfg-vk for game launchers";
 
+  options.software.games.steamSync.stopSteamDuringSync = lib.mkEnableOption ''
+    stopping Steam while syncing non-Steam shortcuts and collections
+  '';
+
   options.software.games.entries = lib.mkOption {
     type = lib.types.attrsOf (
       lib.types.submodule {

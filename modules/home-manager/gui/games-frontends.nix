@@ -14,6 +14,7 @@ let
   games = osConfig.software.games.manifest or [ ];
 
   home = config.home.homeDirectory;
+  stopSteamDuringSync = osConfig.software.games.steamSync.stopSteamDuringSync or false;
   # Per-game art lives here; shared by Pegasus (assets.*) and any manual fetch.
   artBase = "${home}/Games/art";
   # Launchers are installed system-wide, so each command resolves here.
@@ -172,9 +173,12 @@ let
     runtimeInputs = [
       (pkgs.python3.withPackages (p: [ p.vdf ]))
       pkgs.procps # pgrep, to warn when Steam is running
+      pkgs.systemd # systemctl, to stop/restart Deck Game Mode when requested
     ];
     text = ''
-      exec python3 ${./sync-steam-shortcuts.py} ${steamGamesJson} ${lib.escapeShellArg artBase} ${binDir}
+      exec python3 ${./sync-steam-shortcuts.py} ${steamGamesJson} ${lib.escapeShellArg artBase} ${binDir} ${
+        lib.optionalString stopSteamDuringSync "--stop-steam --restart-steam"
+      }
     '';
   };
 in
@@ -209,7 +213,7 @@ in
     # Refresh art and Steam shortcuts after each home-manager activation (i.e.
     # every rebuild). Both skip work that's already done, so they're cheap no-ops
     # when nothing changed. Run directly so deploy-time sync really happens before
-    # activation finishes; sync-steam-shortcuts skips safely if Steam is running.
+    # activation finishes. Hosts may opt into stopping Steam for this sync.
     home.activation.gameFrontendsSync = lib.hm.dag.entryAfter [ "reloadSystemd" ] ''
       run ${lib.getExe fetchGameArt} || true
       run ${lib.getExe syncSteamShortcuts} || true

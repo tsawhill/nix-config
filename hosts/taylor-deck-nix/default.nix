@@ -121,6 +121,7 @@ in
       height = 800;
     }
   ];
+  software.games.steamSync.stopSteamDuringSync = true;
 
   # Games kept on the deck's local disk launch from their localPath instead of
   # the Samba share (the deck isn't always on the LAN). Add entry ids here and
