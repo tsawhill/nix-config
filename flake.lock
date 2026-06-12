@@ -63,11 +63,11 @@
         "uv2nix": "uv2nix"
       },
       "locked": {
-        "lastModified": 1780582607,
-        "narHash": "sha256-zAJcOvOHBdaqnmGXxeXPwIgQ3p4VDMt8ecJ2sl4cdjQ=",
+        "lastModified": 1781273728,
+        "narHash": "sha256-s/Hhlh8Ec568pZPim1bCx+8Um+ae51DGuf/QECmIo6M=",
         "owner": "nix-community",
         "repo": "authentik-nix",
-        "rev": "7611d20f7a0db3e08bd94b3cb3948d8e38958776",
+        "rev": "c670bf44d94f23d6a1c97f20512f08d7afa97c94",
         "type": "github"
       },
       "original": {
@@ -79,16 +79,16 @@
     "authentik-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1779981174,
-        "narHash": "sha256-djsdph2E+JIIu9Sy5gJwBG378nunXXK2LPW5z/oneMs=",
+        "lastModified": 1781116246,
+        "narHash": "sha256-nmAX8nwZpdDcFAPvC9hAEp0x43RnFtGLUTAm7NcvNZo=",
         "owner": "goauthentik",
         "repo": "authentik",
-        "rev": "2d26ce9b538df68b9d78dccdd5ac5bfb4c1b2983",
+        "rev": "b94d1f11124cad80523c46936636124cdfa8907c",
         "type": "github"
       },
       "original": {
         "owner": "goauthentik",
-        "ref": "version/2026.5.2",
+        "ref": "version/2026.5.3",
         "repo": "authentik",
         "type": "github"
       }
@@ -454,11 +454,11 @@
         "xdph": "xdph"
       },
       "locked": {
-        "lastModified": 1781201646,
-        "narHash": "sha256-3Nt0j/Kb0Uyqk0AFzvRJYSW0veej1parJ+prbDr/4Jw=",
+        "lastModified": 1781275123,
+        "narHash": "sha256-5VCof5SdvG9v1nQa6B8DVUXCn6U7MnnTAszFD/l9iVA=",
         "owner": "hyprwm",
         "repo": "Hyprland",
-        "rev": "70fd412d95b082e3c9a2a2e2597a9e467947d320",
+        "rev": "d5b8d7288d1ad56da906714fe911f54dca4245c4",
         "type": "github"
       },
       "original": {
@@ -1106,11 +1106,11 @@
         "systems": "systems_6"
       },
       "locked": {
-        "lastModified": 1781038653,
-        "narHash": "sha256-MxUVyE7A5QMJXOEFQhOHsqs4UPhujeDgdFhguE7Wmic=",
+        "lastModified": 1781287895,
+        "narHash": "sha256-980eQ7c4HeblAy/gUxrYw9GmZHerC9qsjG/2NsbT0Xo=",
         "owner": "nix-community",
         "repo": "nixvim",
-        "rev": "e7ce6708cc5b6275406a8feee06ca50c5cafd6bf",
+        "rev": "d5a4ff853474e0459402ff307545c6df70b267e6",
         "type": "github"
       },
       "original": {
@@ -1129,11 +1129,11 @@
         "systems": "systems_7"
       },
       "locked": {
-        "lastModified": 1781034432,
-        "narHash": "sha256-+UuS36un3lXLtKsGCYQnOn51hDhB+dZ1SHoHXClnV/0=",
+        "lastModified": 1781287460,
+        "narHash": "sha256-9hXtN4my7eBqHRVQ/t6FQZ4YqZ1KG6SsKSG4Hdtr+i0=",
         "owner": "nix-community",
         "repo": "nixvim",
-        "rev": "e9fbbd56eab78751ba4c166c31a1667042528ced",
+        "rev": "f2029d9a26266eb67f46b0c79bd0a3713839a57a",
         "type": "github"
       },
       "original": {
