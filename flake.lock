@@ -758,7 +758,7 @@
         "narHash": "sha256-xTL4spG6POmfOuMgtSWKrsbQRrBRxiKvogAIP4fJCzk=",
         "owner": "temidaradev",
         "repo": "kopuz",
-        "rev": "63fd26a81e52fda662f0c2dc512e342ef2d4ce81",
+        "rev": "fbfd8e5681f9c77414706ef2234a791ea8b01b2a",
         "type": "github"
       },
       "original": {
@@ -1106,11 +1106,11 @@
         "systems": "systems_6"
       },
       "locked": {
-        "lastModified": 1781376614,
-        "narHash": "sha256-FZ7j8VM6R1UbhuzFsI6zC/J96lAy51KxqkUCJQh0to8=",
+        "lastModified": 1781388570,
+        "narHash": "sha256-prn8ws642FWX4pEU3Rl6m5QlrJl5MjEMHGfII9Ho9t0=",
         "owner": "nix-community",
         "repo": "nixvim",
-        "rev": "4b3862641699cb9bca888b90c7d66e35d53bf23e",
+        "rev": "0e73e3cb254a806d344bd70d996ab77896d3e3a8",
         "type": "github"
       },
       "original": {
@@ -1129,11 +1129,11 @@
         "systems": "systems_7"
       },
       "locked": {
-        "lastModified": 1781373146,
-        "narHash": "sha256-h8eBVfQ+UZRc52vqGHrtD0gT4cSw41G4PW+iK06Y3nc=",
+        "lastModified": 1781388258,
+        "narHash": "sha256-Kx1zxra9sZ215H3OiWUfkulu8N2v3iu19wqlzpD/Ac0=",
         "owner": "nix-community",
         "repo": "nixvim",
-        "rev": "19a4e5efa14d15aaeb947db6e700591e4acdb295",
+        "rev": "e3c908fdf6dff268b04ffb6758bcfc7c018489b9",
         "type": "github"
       },
       "original": {
