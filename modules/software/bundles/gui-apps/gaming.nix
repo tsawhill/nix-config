@@ -7,10 +7,19 @@
 let
   cfg = config.software.apps.gaming;
   protonDefault = pkgs.callPackage ../../../../pkgs/games/proton-default.nix { };
+  miniHostGhGuitarControllerMapping = "03000000091200008228000001010000,MiniHost GH Guitar,platform:Linux,a:b0,b:b1,x:b3,y:b4,leftshoulder:b6,back:b10,start:b11,dpup:h0.1,dpdown:h0.4,leftx:a0,righty:a2";
 in
 {
-  options.software.apps.gaming.enable = lib.mkEnableOption "gaming tools and launchers";
-  options.software.apps.gaming.lsfgVk.enable = lib.mkEnableOption "lsfg-vk frame generation layer";
+  options.software.apps.gaming = {
+    enable = lib.mkEnableOption "gaming tools and launchers";
+    lsfgVk.enable = lib.mkEnableOption "lsfg-vk frame generation layer";
+
+    sdlGameControllerMappings = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ miniHostGhGuitarControllerMapping ];
+      description = "SDL game controller mapping strings exported through SDL_GAMECONTROLLERCONFIG.";
+    };
+  };
 
   config = lib.mkIf cfg.enable {
     programs.steam = {
@@ -39,9 +48,10 @@ in
       # dormant unless MANGOHUD=1. systemPackages alone doesn't reach the
       # in-container loader. GHWTDE is 32-bit, so the i686 layer is required.
       extraPackages = [ pkgs.mangohud ] ++ lib.optionals cfg.lsfgVk.enable [ pkgs.lsfg-vk ];
-      extraPackages32 =
-        [ pkgs.pkgsi686Linux.mangohud ]
-        ++ lib.optionals cfg.lsfgVk.enable [ pkgs.pkgsi686Linux.lsfg-vk ];
+      extraPackages32 = [
+        pkgs.pkgsi686Linux.mangohud
+      ]
+      ++ lib.optionals cfg.lsfgVk.enable [ pkgs.pkgsi686Linux.lsfg-vk ];
     };
 
     services.udev = {
@@ -52,13 +62,13 @@ in
       '';
     };
 
-    environment.sessionVariables = {
-      # MiniHost GH Guitar controller mapping
-      SDL_GAMECONTROLLERCONFIG = "03000000091200008228000001010000,MiniHost GH Guitar,platform:Linux,a:b0,b:b1,x:b3,y:b4,leftshoulder:b6,back:b10,start:b11,dpup:h0.1,dpdown:h0.4,leftx:a0,righty:a2";
-    }
-    // lib.optionalAttrs cfg.lsfgVk.enable {
-      DISABLE_LSFG = "1";
-    };
+    environment.sessionVariables =
+      lib.optionalAttrs (cfg.sdlGameControllerMappings != [ ]) {
+        SDL_GAMECONTROLLERCONFIG = lib.concatStringsSep "\n" cfg.sdlGameControllerMappings;
+      }
+      // lib.optionalAttrs cfg.lsfgVk.enable {
+        DISABLE_LSFG = "1";
+      };
 
     environment.systemPackages =
       with pkgs;
