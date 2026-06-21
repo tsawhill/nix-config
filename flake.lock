@@ -454,11 +454,11 @@
         "xdph": "xdph"
       },
       "locked": {
-        "lastModified": 1781888691,
-        "narHash": "sha256-TmrOChAzMwvktV2xM9glJRSsZWyOqBFeCyfbEoZiwUc=",
+        "lastModified": 1782038310,
+        "narHash": "sha256-OFQS7iO89c0GcUnyXnF/95G8inj4PNfzzt1To9yFOzI=",
         "owner": "hyprwm",
         "repo": "Hyprland",
-        "rev": "d486a5fe69c9800e75aed76ae4beb3183ac8886d",
+        "rev": "735c0e02247344ed5b8e38a5c39ba8c8c8cb85dd",
         "type": "github"
       },
       "original": {
@@ -734,11 +734,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1781811300,
-        "narHash": "sha256-1cz2lhRJTeodLB3fycZmMl7x6X5hiyu2MV8CixGM2qc=",
+        "lastModified": 1782029918,
+        "narHash": "sha256-HFbkQDbk9gAOe9Gnmm3leVjvk+lY5dEWQ6fIHcikBLk=",
         "owner": "Jovian-Experiments",
         "repo": "Jovian-NixOS",
-        "rev": "ee34630ec857335f2fb6a832f10c09724db2c467",
+        "rev": "12a0c56d9f42d917814e9ccf66a330499c4f2753",
         "type": "github"
       },
       "original": {
@@ -754,11 +754,11 @@
         "rust-overlay": "rust-overlay"
       },
       "locked": {
-        "lastModified": 1782001096,
-        "narHash": "sha256-h1WCNppvF1SxoCae7u3RUQl+ihuMu8Apaq0Ig0ZM2Vc=",
+        "lastModified": 1782036027,
+        "narHash": "sha256-3DZN6Bi7KqQLLmhViWi5qsjopIvH1GsnxnBGF1Ufw3I=",
         "owner": "temidaradev",
         "repo": "kopuz",
-        "rev": "deb228ef24a6973a935be24dbb0679cf4caf631e",
+        "rev": "a538561e2551cdb2313c1ba38dc831537241fd63",
         "type": "github"
       },
       "original": {
