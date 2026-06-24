@@ -734,11 +734,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1782029918,
-        "narHash": "sha256-HFbkQDbk9gAOe9Gnmm3leVjvk+lY5dEWQ6fIHcikBLk=",
+        "lastModified": 1782305443,
+        "narHash": "sha256-7hPWX+sHobFXfdwsnW06TMS5+NFqaks0n4cRqPchhDg=",
         "owner": "Jovian-Experiments",
         "repo": "Jovian-NixOS",
-        "rev": "12a0c56d9f42d917814e9ccf66a330499c4f2753",
+        "rev": "7a80f1365521a24c733a8f786f1c53cdf51b2b29",
         "type": "github"
       },
       "original": {
@@ -754,11 +754,11 @@
         "rust-overlay": "rust-overlay"
       },
       "locked": {
-        "lastModified": 1782173045,
-        "narHash": "sha256-5lsezspnbfts6sxBAGmf5qUTheeiyWvjYz8HeC3ffPU=",
+        "lastModified": 1782300233,
+        "narHash": "sha256-bbhhheFjeAUHc7xfL9YjSVatbgtld5mGGqe6X2HgKTI=",
         "owner": "temidaradev",
         "repo": "kopuz",
-        "rev": "c6758b4d8dc426118637c1b9562252fdb62df1e8",
+        "rev": "b556563fa0038f39e7b0e6f9c0d30ccca811445a",
         "type": "github"
       },
       "original": {
