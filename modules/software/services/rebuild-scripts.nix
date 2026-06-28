@@ -916,7 +916,7 @@ in
       description = "Retry deferred Colmena deploys every 30 minutes";
       wantedBy = [ "timers.target" ];
       timerConfig = {
-        OnCalendar = "*-*-* *:0/30:00";
+        OnCalendar = "*-*-* *:05/30:00";
         Persistent = true;
         Unit = "deploy-retry.service";
       };
