@@ -25,6 +25,7 @@ in
     # Nix settings
     "${self}/modules/nix/nixpkgs.nix"
     "${self}/modules/nix/features.nix"
+    "${self}/modules/nix/cachix.nix"
     "${self}/modules/nix/keep-outputs-derivations.nix"
     "${self}/modules/nix/garbage-collection.nix"
     "${self}/modules/monitoring"

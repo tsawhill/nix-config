@@ -42,6 +42,7 @@ in
     # NixOS Settings
     "${self}/modules/nix/nixpkgs.nix"
     "${self}/modules/nix/features.nix"
+    "${self}/modules/nix/cachix.nix"
     "${self}/modules/nix/garbage-collection.nix"
 
     # Users
