@@ -453,11 +453,11 @@
         "xdph": "xdph"
       },
       "locked": {
-        "lastModified": 1782592679,
-        "narHash": "sha256-sP0xRyoV4NpY1DwK/eA3S+HTz9Lx/h9HraHacTsOjqk=",
+        "lastModified": 1782651607,
+        "narHash": "sha256-e258bpVXttdSg90jTXcd7vWfrGv3jCRNGTH9CCkKjrI=",
         "owner": "hyprwm",
         "repo": "Hyprland",
-        "rev": "ca877baddeabc16583ac57286683ad1347ff5f02",
+        "rev": "997780c86a8914706ac9ce9ec8283a248d828ce7",
         "type": "github"
       },
       "original": {
@@ -753,11 +753,11 @@
         "rust-overlay": "rust-overlay"
       },
       "locked": {
-        "lastModified": 1782583866,
-        "narHash": "sha256-mweoZR/b12UmKe4K5An/TOBBU+Z9KRmqHubdvTxa1Ms=",
+        "lastModified": 1782645343,
+        "narHash": "sha256-Jp3RgcC0j+vZCjprQPIkyCFNvWq+TIzvOcuRqwbAgwk=",
         "owner": "temidaradev",
         "repo": "kopuz",
-        "rev": "570ed67b9da6f074fac4a89618da51d9bd5bf26c",
+        "rev": "81652703954b75ab82d86900f624d524cbddfb63",
         "type": "github"
       },
       "original": {
