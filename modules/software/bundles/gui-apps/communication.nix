@@ -64,7 +64,6 @@ in
     environment.systemPackages = [
       vesktopPackage
       pkgs.thunderbird
-      pkgs.mailspring
     ];
   };
 }
