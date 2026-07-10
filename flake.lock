@@ -62,11 +62,11 @@
         "uv2nix": "uv2nix"
       },
       "locked": {
-        "lastModified": 1783353508,
-        "narHash": "sha256-JzU4Us0jo27PIG4B9Vzewejcxi6VAiLrcYuha/vE2VU=",
+        "lastModified": 1783699970,
+        "narHash": "sha256-LxMQ0d9OQDdYL7fIUZ87I/lj+Sp9FatrhSZ4cwn4I50=",
         "owner": "nix-community",
         "repo": "authentik-nix",
-        "rev": "d2f0782d5e43cc7e2d6f10a89faa6f25389816ce",
+        "rev": "dcde98df1f4b083559cad803615dd7ed43ea7d0d",
         "type": "github"
       },
       "original": {
@@ -78,16 +78,16 @@
     "authentik-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1781116246,
-        "narHash": "sha256-nmAX8nwZpdDcFAPvC9hAEp0x43RnFtGLUTAm7NcvNZo=",
+        "lastModified": 1783473460,
+        "narHash": "sha256-pGOd9+Una59JUgOcPC3PoqOqY08GkJtY+jgtk13rJ1Y=",
         "owner": "goauthentik",
         "repo": "authentik",
-        "rev": "b94d1f11124cad80523c46936636124cdfa8907c",
+        "rev": "c2942671a5b98dfa596de7bf247accb48a5c71ee",
         "type": "github"
       },
       "original": {
         "owner": "goauthentik",
-        "ref": "version/2026.5.3",
+        "ref": "version/2026.5.4",
         "repo": "authentik",
         "type": "github"
       }
@@ -340,11 +340,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1783618078,
-        "narHash": "sha256-F43DGcBoIO8xOZFAfodg3jy0VghB9NGdb6xbTYAIx1A=",
+        "lastModified": 1783689750,
+        "narHash": "sha256-iMO/Ypany7DPXD6D7sQgH7METtEUihnOvdb+A9ehn8k=",
         "owner": "nix-community",
         "repo": "home-manager",
-        "rev": "144f4e36d0186195037da9fce80a727108978070",
+        "rev": "79e6082586b3680ff32c8e75127545058f074fa4",
         "type": "github"
       },
       "original": {
@@ -431,11 +431,11 @@
         "xdph": "xdph"
       },
       "locked": {
-        "lastModified": 1783582777,
-        "narHash": "sha256-fsDLDZuvet2iZv6svhcMjcO5LjwHrY6VQnJAfND/N+U=",
+        "lastModified": 1783702177,
+        "narHash": "sha256-+7u5ZPLoWyrHOhpsJm7JQK/NbZ5BkFBhC7Ip5naptkk=",
         "owner": "hyprwm",
         "repo": "Hyprland",
-        "rev": "01f5c9aee4c31e5b782e99eb354ee7230b999821",
+        "rev": "781d6070bac87c477f43177489da10ddc93b3838",
         "type": "github"
       },
       "original": {
