@@ -14,9 +14,6 @@ in
   networking.hostName = "taylor-desktop-nix";
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
   system.stateVersion = "25.11";
-  nixpkgs.config.permittedInsecurePackages = [
-    "electron-39.8.10"
-  ];
 
   imports = [
     # Secrets (SOPS)
