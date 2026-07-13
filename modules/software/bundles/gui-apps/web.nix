@@ -13,7 +13,6 @@
     environment.systemPackages = with pkgs; [
       zen-input.packages.${pkgs.stdenv.hostPlatform.system}.default
       ungoogled-chromium
-      bitwarden-desktop
     ];
   };
 }
