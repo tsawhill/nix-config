@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   cfg = config.my.monitoring;
@@ -21,6 +26,7 @@ in
   config = lib.mkIf cfg.smartAlerts.enable {
     services.smartd = {
       enable = true;
+      defaults.monitored = "-a -W 0,0,45";
       notifications.mail = {
         enable = true;
         recipient = notifications.recipientEmail;
