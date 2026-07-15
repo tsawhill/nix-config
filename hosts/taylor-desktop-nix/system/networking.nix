@@ -33,7 +33,7 @@ in
       "SanJose-California"
       "Fremont-California"
     ];
-    autoconnect = "Bunda";
+    # autoconnect = "Bunda";
   };
 
   hardware.bluetooth = {
