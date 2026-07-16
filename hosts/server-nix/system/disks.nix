@@ -96,6 +96,7 @@
 
     "/mnt/gameSSD" = {
       device = "/dev/sdc1";
+      fsType = "ext4";
       options = [
         "nofail"
       ];
