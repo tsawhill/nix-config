@@ -27,6 +27,13 @@ let
   mkConnection =
     name: profile:
     let
+      effectiveMacAddress =
+        if profile.macAddress != null then profile.macAddress else cfg.defaultMacAddress;
+
+      macAddressSection = mkOptionalLine (
+        effectiveMacAddress != null
+      ) "cloned-mac-address=${effectiveMacAddress}";
+
       prioritySection = mkOptionalLine (
         profile.autoconnectPriority != null
       ) "autoconnect-priority=${toString profile.autoconnectPriority}";
@@ -54,6 +61,7 @@ let
         mode=infrastructure
         ssid=${config.sops.placeholder.${profile.ssidSecret}}
         hidden=${boolToString profile.hidden}
+        ${macAddressSection}
 
         [wifi-security]
         key-mgmt=wpa-psk
@@ -71,6 +79,12 @@ in
 {
   options.my.network.networkmanager.wifi = {
     enable = lib.mkEnableOption "known Wi-Fi NetworkManager profiles";
+
+    defaultMacAddress = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = "Default MAC address to use for Wi-Fi NetworkManager profiles.";
+    };
 
     networks = lib.mkOption {
       type = lib.types.attrsOf (
@@ -110,6 +124,12 @@ in
                 type = lib.types.bool;
                 default = false;
                 description = "Whether the SSID is hidden.";
+              };
+
+              macAddress = lib.mkOption {
+                type = lib.types.nullOr lib.types.str;
+                default = null;
+                description = "MAC address to use for this Wi-Fi profile. Overrides my.network.networkmanager.wifi.defaultMacAddress.";
               };
 
               ipv4 = {
@@ -162,6 +182,18 @@ in
           name: builtins.match "^[A-Za-z0-9._-]+$" name != null
         ) (builtins.attrNames cfg.networks);
         message = "my.network.networkmanager.wifi.networks keys must only contain letters, numbers, dot, underscore, or dash";
+      }
+      {
+        assertion =
+          let
+            isMac =
+              value:
+              value == null || builtins.match "^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$" value != null;
+          in
+          isMac cfg.defaultMacAddress && lib.all (profile: isMac profile.macAddress) (
+            builtins.attrValues cfg.networks
+          );
+        message = "Wi-Fi MAC addresses must use colon-separated hex format, like 00:11:22:33:44:55";
       }
     ];
 
