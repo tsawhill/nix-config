@@ -28,7 +28,7 @@
       mpv
       feishin
       delfin
-      self.packages.${pkgs.stdenv.hostPlatform.system}.kopuz
+      # self.packages.${pkgs.stdenv.hostPlatform.system}.kopuz
     ];
   };
 }
