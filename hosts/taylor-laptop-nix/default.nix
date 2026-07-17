@@ -13,6 +13,10 @@ in
 {
   networking.hostName = "taylor-laptop-nix";
   system.stateVersion = "25.11";
+  nixpkgs.config.permittedInsecurePackages = [
+    # Temporary Vesktop dependency; remove when Vesktop moves past Electron 40.
+    "electron-40.10.5"
+  ];
   imports = [
     # Secrets (SOPS)
     inputs.sops-nix-stable.nixosModules.sops

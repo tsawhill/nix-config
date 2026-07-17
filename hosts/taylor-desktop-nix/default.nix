@@ -14,6 +14,10 @@ in
   networking.hostName = "taylor-desktop-nix";
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
   system.stateVersion = "25.11";
+  nixpkgs.config.permittedInsecurePackages = [
+    # Temporary Vesktop dependency; remove when Vesktop moves past Electron 40.
+    "electron-40.10.5"
+  ];
 
   imports = [
     # Secrets (SOPS)
