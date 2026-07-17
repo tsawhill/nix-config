@@ -67,7 +67,7 @@
       fsType = "zfs";
       options = [
         "nofail"
-      ]; # Still boot if the zpool is not available.
+      ];
     };
 
     "/mnt/zpool" = {
@@ -75,7 +75,7 @@
       fsType = "zfs";
       options = [
         "nofail"
-      ]; # Still boot if the zpool is not available.
+      ];
     };
 
     "/mnt/downloadHDD" = {
@@ -83,7 +83,7 @@
       fsType = "zfs";
       options = [
         "nofail"
-      ]; # Still boot if the zpool is not available.
+      ];
     };
 
     "/mnt/downloadSSD" = {
@@ -91,12 +91,12 @@
       fsType = "zfs";
       options = [
         "nofail"
-      ]; # Still boot if the zpool is not available.
+      ];
     };
 
     "/mnt/gameSSD" = {
-      device = "/dev/sdc1";
-      fsType = "ext4";
+      device = "/dev/disk/by-uuid/c393d8b8-6567-400d-99f2-551f1d9b69a3";
+      fsType = "xfs";
       options = [
         "nofail"
       ];
