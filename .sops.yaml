@@ -115,6 +115,18 @@ creation_rules:
         - *taylor-deck-nix
   ##############################################################################
   #
+  #                             NetworkManager Wi-Fi
+  #
+  ##############################################################################
+  - path_regex: modules/secrets/networkmanager/wifi/known-networks\.yaml$
+    key_groups:
+      - age:
+        - *build-nix
+        - *taylor-desktop-nix
+        - *taylor-laptop-nix
+        - *taylor-deck-nix
+  ##############################################################################
+  #
   #                             Cloudflare DDNS tokens
   #
   ##############################################################################

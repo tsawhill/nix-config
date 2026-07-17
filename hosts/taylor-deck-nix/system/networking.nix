@@ -18,6 +18,8 @@ in
   # WireGuard tunnel back to the home network. allowedIPs cover the LAN and the
   # remote WG subnet so LAN services resolve when the deck is off-site.
   my.secrets.wireguard.pubkeys.enable = true;
+  my.network.networkmanager.wifi.enable = true;
+
   my.network.wg-remote = {
     enable = true;
     address = wgAddress "taylor-deck-nix";

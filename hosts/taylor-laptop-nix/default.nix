@@ -60,8 +60,9 @@ in
     # Desktop
     "${self}/modules/software/desktop"
 
-    # WireGuard
-    "${self}/modules/network/wireguard/wg-remote.nix"
+    # NetworkManager
+    "${self}/modules/network/networkmanager/wireguard/wg-remote.nix"
+    "${self}/modules/network/networkmanager/wifi/known-networks.nix"
 
     # Hardware
     "${self}/modules/software/services/openrgb.nix"
@@ -91,6 +92,7 @@ in
   software.apps.tools.enable = true;
 
   my.secrets.sshclientkey.taylor-laptop-nix-taylor.enable = true;
+  my.secrets.networkmanager.wifi.known-networks.enable = true;
   my.secrets.wireguard.taylor-laptop-nix.wg-remote.enable = true;
   my.secrets.steamgriddb_api_key.enable = true;
   my.users.taylor = {

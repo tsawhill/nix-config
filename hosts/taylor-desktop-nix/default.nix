@@ -59,9 +59,10 @@ in
     # Desktop
     "${self}/modules/software/desktop"
 
-    # WireGuard
-    "${self}/modules/network/wireguard/wg-remote.nix"
-    "${self}/modules/network/wireguard/airvpn.nix"
+    # NetworkManager
+    "${self}/modules/network/networkmanager/wireguard/wg-remote.nix"
+    "${self}/modules/network/networkmanager/wireguard/airvpn.nix"
+    "${self}/modules/network/networkmanager/wifi/known-networks.nix"
 
     # Hardware services
     # "${self}/modules/software/services/openrgb.nix"
@@ -136,6 +137,7 @@ in
   software.apps.tools.enable = true;
 
   my.secrets.sshclientkey.taylor-desktop-nix-taylor.enable = true;
+  my.secrets.networkmanager.wifi.known-networks.enable = true;
   my.secrets.wireguard.taylor-desktop-nix.wg-remote.enable = true;
   my.secrets.wireguard.taylor-desktop-nix.wg-airvpn.enable = true;
   my.secrets.steamgriddb_api_key.enable = true;

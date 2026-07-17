@@ -69,10 +69,11 @@ in
     "${self}/modules/software/desktop/kde.nix"
     "${self}/modules/software/desktop/pipewire/base.nix"
 
-    # WireGuard (remote tunnel home). AirVPN scaffolding is present but disabled —
+    # NetworkManager (remote tunnel home). AirVPN scaffolding is present but disabled —
     # see system/networking.nix to enable once you generate a deck AirVPN config.
-    "${self}/modules/network/wireguard/wg-remote.nix"
-    "${self}/modules/network/wireguard/airvpn.nix"
+    "${self}/modules/network/networkmanager/wireguard/wg-remote.nix"
+    "${self}/modules/network/networkmanager/wireguard/airvpn.nix"
+    "${self}/modules/network/networkmanager/wifi/known-networks.nix"
 
     # Hardware services
     "${self}/modules/hardware/udev"
@@ -143,6 +144,7 @@ in
   };
 
   my.secrets.sshclientkey.taylor-deck-nix-taylor.enable = true;
+  my.secrets.networkmanager.wifi.known-networks.enable = true;
   my.secrets.wireguard.pubkeys.enable = true;
   my.secrets.wireguard.taylor-deck-nix.wg-remote.enable = true;
   my.secrets.steamgriddb_api_key.enable = true;

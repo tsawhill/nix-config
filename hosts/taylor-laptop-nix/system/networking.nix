@@ -13,6 +13,8 @@ in
 
   my.secrets.wireguard.pubkeys.enable = true;
 
+  my.network.networkmanager.wifi.enable = true;
+
   my.network.wg-remote = {
     enable = true;
     address = wgAddress "taylor-laptop-nix";

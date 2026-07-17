@@ -26,7 +26,7 @@ in
     ./home-manager.nix
     ./system/disks.nix
     ./system/networking.nix
-    "${self}/modules/network/wireguard/wg-remote.nix"
+    "${self}/modules/network/networkmanager/wireguard/wg-remote.nix"
     ./system/cloudflare-ddns.nix
     ./system/zfs-backup-target.nix
     # Locale
