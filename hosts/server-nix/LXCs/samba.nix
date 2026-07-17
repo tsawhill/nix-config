@@ -7,11 +7,13 @@
   my.secrets.immobile0783-pass.enable = true;
   my.secrets.umbriel-pass.enable = true;
   my.secrets.pelican8334-pass.enable = true;
+  my.secrets.cube8801-pass.enable = true;
   my.shares = {
     defaultUsers = [
       "immobile0783"
       "umbriel"
       "pelican8334"
+      "cube8801"
     ];
     users = {
       # taylor-desktop-nix
@@ -42,6 +44,18 @@
       pelican8334 = {
         enable = true;
         passwordSecretPath = config.sops.secrets.pelican8334-pass.path;
+        extraGroups = [
+          "media"
+          "download"
+          "gameservers"
+          "code"
+          "games"
+        ];
+      };
+      # taylor-cube-nix
+      cube8801 = {
+        enable = true;
+        passwordSecretPath = config.sops.secrets.cube8801-pass.path;
         extraGroups = [
           "media"
           "download"

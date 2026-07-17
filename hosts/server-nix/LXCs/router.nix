@@ -116,6 +116,11 @@ in
             publicKeyFile = secrets.wg_pubkey_taylor_deck_nix.path;
             allowedIPs = [ "${wgIp "taylor-deck-nix"}/32" ];
           }
+          {
+            name = "taylor-cube-nix";
+            publicKeyFile = secrets.wg_pubkey_taylor_cube_nix.path;
+            allowedIPs = [ "${wgIp "taylor-cube-nix"}/32" ];
+          }
         ];
       };
 

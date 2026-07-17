@@ -122,6 +122,23 @@
             };
             modules = [ "${inputs.self}/hosts/taylor-deck-nix" ];
           };
+
+          # Steam Machine ("cube"). Same unstable inputs colmena uses; day-to-day
+          # updates go through colmena (`deploy taylor-cube-nix`).
+          taylor-cube-nix = inputs.nixpkgs-unstable.lib.nixosSystem {
+            system = "x86_64-linux";
+            specialArgs = {
+              inherit inputs;
+              inherit networkTopology;
+              self = inputs.self;
+              home-manager-input = inputs.home-manager-unstable;
+              nixvim-input = inputs.nixvim-unstable;
+              sops-input = inputs.sops-nix-unstable;
+              zen-input = inputs.zen-browser-unstable;
+              nix-vscode-extensions-input = inputs.nix-vscode-extensions-unstable;
+            };
+            modules = [ "${inputs.self}/hosts/taylor-cube-nix" ];
+          };
         };
 
       packages.x86_64-linux = {

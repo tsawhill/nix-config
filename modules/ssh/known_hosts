@@ -8,6 +8,7 @@ pi-backup-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILWyZ/i1VfPZmQphX5HtPsO4DE
 taylor-desktop-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPvrQEvPEa4QwUzi8u2BZRj/ZkeqbTPBoUuP4Ou8daNw
 taylor-laptop-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEx3Xl0lyXZOOVy/SP/YOSOGUlL4EdNqwHupjWp3Tlc8
 taylor-deck-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIL3T6a9V4uoAfchz+mpJvFBQ0u79VVWs5uVaLgw1ZMqS
+taylor-cube-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAID0yqB2pBIkxc4z65BN09EWFIGzLrpJlY27xxw77InhV
 
 # Daily services
 local-nginx-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGFonmIrhprZuHGhPrIh9UQmj8t4+6unrRQMW8X9G29B

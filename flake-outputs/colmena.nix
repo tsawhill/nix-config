@@ -108,11 +108,13 @@ in
         "taylor-desktop-nix" = unstablePkgs;
         "taylor-laptop-nix" = unstablePkgs;
         "taylor-deck-nix" = unstablePkgs;
+        "taylor-cube-nix" = unstablePkgs;
       };
       nodeSpecialArgs = {
         "taylor-desktop-nix" = unstableArgs;
         "taylor-laptop-nix" = unstableArgs;
         "taylor-deck-nix" = unstableArgs;
+        "taylor-cube-nix" = unstableArgs;
       };
     };
 
@@ -166,6 +168,9 @@ in
     "taylor-laptop-nix" = mkUnstableHost "daily" "taylor-laptop-nix" "${self}/hosts/taylor-laptop-nix";
     # Steam Deck: frequently asleep/off-LAN, so manual-only (no schedule tag).
     "taylor-deck-nix" = mkUnstableHost "daily" "taylor-deck-nix" "${self}/hosts/taylor-deck-nix";
+    # Steam Machine ("cube"). Manual-only until it's settled on its reserved IP
+    # (10.73.73.74) and reachable at taylor-cube-nix.lan; then switch null -> "daily".
+    "taylor-cube-nix" = mkUnstableHost null "taylor-cube-nix" "${self}/hosts/taylor-cube-nix";
     # --- main server ---
     "server-nix" = mkHost "weekly" "server-nix" "${self}/hosts/server-nix";
 

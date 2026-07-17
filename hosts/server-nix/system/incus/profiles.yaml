@@ -24,23 +24,6 @@ nixos-lxc:
       pool: "rpool"
       size: "4GiB"
 
-nixos-router-lxc:
-  description: "NixOS router LXC config without inherited LAN eth0"
-  config:
-    boot.autostart: "false"
-    limits.cpu: "2"
-    limits.memory: "2GiB"
-    security.idmap.base: "100000"
-    security.idmap.isolated: "true"
-    security.idmap.size: "65535"
-    security.nesting: "true"
-  devices:
-    root:
-      type: "disk"
-      path: "/"
-      pool: "rpool"
-      size: "4GiB"
-
 downloadHDD-mount:
   description: "Disk passthrough for downloadHDD directory"
   config: {}
@@ -61,6 +44,16 @@ downloadSSD-mount:
       source: "/mnt/downloadSSD"
       shift: "true"
 
+gameSSD-mount:
+  description: "Disk passthrough for gameSSD directory"
+  config: {}
+  devices:
+    gameSSD:
+      type: "disk"
+      path: "/mnt/gameSSD"
+      source: "/mnt/gameSSD"
+      shift: "true"
+
 gamesaves-mount:
   description: "Disk passthrough for gamesaves directory"
   config: {}
@@ -79,16 +72,6 @@ gameserver-mount:
       type: "disk"
       path: "/mnt/zpool/gameservers"
       source: "/mnt/zpool/gameservers"
-      shift: "true"
-
-gameSSD-mount:
-  description: "Disk passthrough for gameSSD directory"
-  config: {}
-  devices:
-    gameSSD:
-      type: "disk"
-      path: "/mnt/gameSSD"
-      source: "/mnt/gameSSD"
       shift: "true"
 
 immich-mount:
@@ -131,6 +114,23 @@ nix-config-mount:
       source: "/mnt/zpool/code/nix-config"
       shift: "true"
 
+nixos-router-lxc:
+  description: "NixOS router LXC config without inherited LAN eth0"
+  config:
+    boot.autostart: "false"
+    limits.cpu: "2"
+    limits.memory: "2GiB"
+    security.idmap.base: "100000"
+    security.idmap.isolated: "true"
+    security.idmap.size: "65535"
+    security.nesting: "true"
+  devices:
+    root:
+      type: "disk"
+      path: "/"
+      pool: "rpool"
+      size: "4GiB"
+
 roms-mount:
   description: "Disk passthrough for roms directory"
   config: {}
@@ -140,3 +140,4 @@ roms-mount:
       path: "/mnt/zpool/roms"
       source: "/mnt/zpool/roms"
       shift: "true"
+

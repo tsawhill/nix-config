@@ -35,6 +35,10 @@ in
       id = "5D7VEJQ-K26I3DA-IMVGXJM-JLNGOW3-5WF3OIF-2OEKC3D-OJBAEBM-MSSYUA5";
       addresses = [ "tcp://${fqdn "taylor-deck-nix"}:22000" ];
     };
+    cube = {
+      id = "4WLZTJW-OFH4YAC-663LY3B-WCJYXA4-HNCE2MH-CNNTI7P-3MFZYDB-R74OPAP";
+      addresses = [ "tcp://${fqdn "taylor-cube-nix"}:22000" ];
+    };
     server = {
       id = "DGGC7I2-VTFNYNL-QVTE4EQ-NXNJ4CH-HBI3XUR-4RE77KN-WLYCQ35-3R7UBAX";
       addresses = [ "tcp://${fqdn "syncthing-nix"}:22000" ];
@@ -74,6 +78,7 @@ in
         "laptop"
         "server"
         "deck"
+        "cube"
       ];
       overrides.server = "/mnt/zpool/gamesaves";
       # RetroArch keeps all config (incl. input binds) in one retroarch.cfg at
