@@ -137,6 +137,7 @@ creation_rules:
         - *taylor-desktop-nix
         - *taylor-laptop-nix
         - *taylor-deck-nix
+        - *taylor-cube-nix
   ##############################################################################
   #
   #                             Cloudflare DDNS tokens
