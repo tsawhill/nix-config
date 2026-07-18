@@ -44,7 +44,7 @@
         Wants = [ "xdg-desktop-portal-hyprland.service" ];
       };
       Service = {
-        ExecStart = "${pkgs.vesktop}/bin/vesktop";
+        ExecStart = "/run/current-system/sw/bin/vesktop";
         Environment = [ "NIXOS_OZONE_WL=1" ];
         Restart = "on-failure";
         RestartSec = "5s";

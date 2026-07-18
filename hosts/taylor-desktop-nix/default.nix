@@ -14,10 +14,6 @@ in
   networking.hostName = "taylor-desktop-nix";
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
   system.stateVersion = "25.11";
-  nixpkgs.config.permittedInsecurePackages = [
-    # Temporary Vesktop dependency; remove when Vesktop moves past Electron 40.
-    "electron-40.10.5"
-  ];
 
   imports = [
     # Secrets (SOPS)
@@ -94,18 +90,13 @@ in
   software.fonts.enable = true;
   software.apps.config.enable = true;
   software.apps.web.enable = true;
-  software.apps.communication = {
+  software.apps.communication.enable = true;
+  software.apps.vesktop = {
     enable = true;
-    vesktop = {
-      env = {
-        DRI_PRIME = "pci-0000_6f_00_0";
-        LIBVA_DRIVER_NAME = "radeonsi";
-        NIXOS_OZONE_WL = "1";
-      };
-      extraFlags = [
-        "--enable-features=VaapiVideoEncoder,WebRTCPipeWireCapturer"
-        "--ignore-gpu-blocklist"
-      ];
+    hardwareVideoEncode = {
+      enable = true;
+      driPrime = "pci-0000_6f_00_0";
+      vaDriver = "radeonsi";
     };
   };
   software.apps.media-playback.enable = true;
