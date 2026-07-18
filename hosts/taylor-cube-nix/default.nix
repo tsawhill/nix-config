@@ -73,6 +73,7 @@ in
     # see system/networking.nix to enable once you generate a cube AirVPN config.
     "${self}/modules/network/networkmanager/wireguard/wg-remote.nix"
     "${self}/modules/network/networkmanager/wireguard/airvpn.nix"
+    "${self}/modules/network/networkmanager/wifi/known-networks.nix"
 
     # Hardware services
     "${self}/modules/hardware/udev"
@@ -138,6 +139,7 @@ in
   };
 
   my.secrets.sshclientkey.taylor-cube-nix-taylor.enable = true;
+  my.secrets.networkmanager.wifi.known-networks.enable = true;
   my.secrets.wireguard.pubkeys.enable = true;
   my.secrets.wireguard.taylor-cube-nix.wg-remote.enable = true;
   my.secrets.steamgriddb_api_key.enable = true;
