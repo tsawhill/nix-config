@@ -28,7 +28,7 @@ downloadHDD-mount:
   description: "Disk passthrough for downloadHDD directory"
   config: {}
   devices:
-    downloadHDD:
+    mnt_downloadHDD:
       type: "disk"
       path: "/mnt/downloadHDD"
       source: "/mnt/downloadHDD"
@@ -38,7 +38,7 @@ downloadSSD-mount:
   description: "Disk passthrough for downloadSSD directory"
   config: {}
   devices:
-    downloadSSD:
+    mnt_downloadSSD:
       type: "disk"
       path: "/mnt/downloadSSD"
       source: "/mnt/downloadSSD"
@@ -48,7 +48,7 @@ gameSSD-mount:
   description: "Disk passthrough for gameSSD directory"
   config: {}
   devices:
-    gameSSD:
+    mnt_gameSSD:
       type: "disk"
       path: "/mnt/gameSSD"
       source: "/mnt/gameSSD"
@@ -58,7 +58,7 @@ gamesaves-mount:
   description: "Disk passthrough for gamesaves directory"
   config: {}
   devices:
-    gamesaves:
+    mnt_zpool_gamesaves:
       type: "disk"
       path: "/mnt/zpool/gamesaves"
       source: "/mnt/zpool/gamesaves"
@@ -68,7 +68,7 @@ gameserver-mount:
   description: "Disk passthrough for gameserver directory"
   config: {}
   devices:
-    /mnt/zpool/gameservers:
+    mnt_zpool_gameservers:
       type: "disk"
       path: "/mnt/zpool/gameservers"
       source: "/mnt/zpool/gameservers"
@@ -78,7 +78,7 @@ immich-mount:
   description: "Disk passthrough for immich directory"
   config: {}
   devices:
-    downloadHDD:
+    mnt_zpool_immich:
       type: "disk"
       path: "/mnt/zpool/immich"
       source: "/mnt/zpool/immich"
@@ -88,7 +88,7 @@ media-mount:
   description: "Disk passthrough for media directory"
   config: {}
   devices:
-    /mnt/zpool/media:
+    mnt_zpool_media:
       type: "disk"
       path: "/mnt/zpool/media"
       source: "/mnt/zpool/media"
@@ -98,7 +98,7 @@ nextcloud-mount:
   description: "Disk passthrough for nextcloud directory"
   config: {}
   devices:
-    /mnt/zpool/nextcloud:
+    mnt_zpool_nextcloud:
       type: "disk"
       path: "/mnt/zpool/nextcloud"
       source: "/mnt/zpool/nextcloud"
@@ -108,7 +108,7 @@ nix-config-mount:
   description: "Disk passthrough for nixos config directory"
   config: {}
   devices:
-    /mnt/zpool/code/nix-config:
+    mnt_zpool_code_nix-config:
       type: "disk"
       path: "/mnt/zpool/code/nix-config"
       source: "/mnt/zpool/code/nix-config"
@@ -135,7 +135,7 @@ roms-mount:
   description: "Disk passthrough for roms directory"
   config: {}
   devices:
-    /mnt/zpool/roms:
+    mnt_zpool_roms:
       type: "disk"
       path: "/mnt/zpool/roms"
       source: "/mnt/zpool/roms"

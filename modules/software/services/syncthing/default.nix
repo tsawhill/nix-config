@@ -161,6 +161,9 @@ in
         folders = lib.genAttrs myShareNames mkFolder;
       };
     };
+    networking.firewall.allowedTCPPorts = [
+      8384
+    ];
 
     # Write each share's ignore patterns into its folder's .stignore before
     # syncthing starts, so it never indexes/syncs the excluded directories.
