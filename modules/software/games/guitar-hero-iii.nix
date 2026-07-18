@@ -6,7 +6,7 @@
     env = [
       "WINEDLLOVERRIDES=xinput1_3=n,b"
       "vblank_mode=0"
-      "PULSE_LATENCY_MSEC=60"
+      "PULSE_LATENCY_MSEC=30"
     ];
     runner.umu = {
       exePath = "/mnt/gameSSD/Games/GH3/GH3.exe";

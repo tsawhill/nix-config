@@ -39,6 +39,6 @@ in
       let
         automount_opts = "x-systemd.automount,noauto,nofail,x-systemd.idle-timeout=60,x-systemd.device-timeout=5s,x-systemd.mount-timeout=5s,x-systemd.requires=network-online.target,x-systemd.after=network-online.target,_netdev";
       in
-      [ "${automount_opts},credentials=/run/secrets/smb-nix-config-credentials,uid=1000,gid=100,forceuid,forcegid,file_mode=0664,dir_mode=0775,noperm,mfsymlinks" ];
+      [ "${automount_opts},credentials=/run/secrets/smb-nix-config-credentials,uid=1000,mfsymlinks" ];
   };
 }
