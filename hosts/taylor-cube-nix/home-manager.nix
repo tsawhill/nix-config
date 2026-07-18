@@ -25,7 +25,7 @@
     users.taylor = {
       # No Hyprland here: import the shared CLI + GUI bundles only. bundles/gui.nix
       # brings games-frontends.nix (syncs the games library into Steam as
-      # non-Steam shortcuts + Pegasus) and emulator-saves.nix.
+      # non-Steam shortcuts + Pegasus) and game save links.
       imports = [
         "${self}/modules/home-manager/bundles/all.nix"
         "${self}/modules/home-manager/bundles/gui.nix"

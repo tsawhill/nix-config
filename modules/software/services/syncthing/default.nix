@@ -127,7 +127,7 @@ in
       internal = true;
       readOnly = true;
       default = lib.genAttrs myShareNames effPath;
-      description = "Resolved local path of each share this host participates in. Set by the module; read by consumers (e.g. emulator-saves) that need a share's on-disk location.";
+      description = "Resolved local path of each share this host participates in. Set by the module; read by consumers (e.g. game save links) that need a share's on-disk location.";
     };
   };
 
