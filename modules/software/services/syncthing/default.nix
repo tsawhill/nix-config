@@ -162,11 +162,6 @@ in
       };
     };
 
-    systemd.services.syncthing = {
-      after = [ "sops-nix.service" ];
-      requires = [ "sops-nix.service" ];
-    };
-
     # Write each share's ignore patterns into its folder's .stignore before
     # syncthing starts, so it never indexes/syncs the excluded directories.
     systemd.services.syncthing-stignore = lib.mkIf (ignoredShares != [ ]) {
