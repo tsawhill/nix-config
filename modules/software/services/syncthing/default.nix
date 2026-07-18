@@ -98,6 +98,12 @@ in
       description = "sops YAML file holding `syncthing_key` and `syncthing_cert` for this host.";
     };
 
+    guiAddress = lib.mkOption {
+      type = lib.types.str;
+      default = "127.0.0.1:8384";
+      description = "Syncthing GUI listen address.";
+    };
+
     sharePaths = lib.mkOption {
       type = lib.types.attrsOf lib.types.str;
       default = { };
@@ -152,6 +158,7 @@ in
       enable = true;
       openDefaultPorts = true;
       inherit (cfg) user group;
+      guiAddress = cfg.guiAddress;
       key = config.sops.secrets."syncthing_key".path;
       cert = config.sops.secrets."syncthing_cert".path;
       settings = {
@@ -161,7 +168,7 @@ in
         folders = lib.genAttrs myShareNames mkFolder;
       };
     };
-    networking.firewall.allowedTCPPorts = [
+    networking.firewall.allowedTCPPorts = lib.mkIf (cfg.guiAddress != "127.0.0.1:8384") [
       8384
     ];
 

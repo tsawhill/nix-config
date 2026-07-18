@@ -11,6 +11,7 @@
     device = "cube";
     user = "taylor";
     group = "users";
+    guiAddress = "0.0.0.0:8384";
     credentialsFile = "${self}/modules/secrets/syncthing/taylor-cube-nix.yaml";
   };
 }
