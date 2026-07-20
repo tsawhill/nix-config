@@ -2,7 +2,7 @@ let
   lanDomain = "lan";
 
   hosts = {
-    router-nix = {
+    opnsense = {
       lan = {
         ip = "10.73.73.1";
         dnsIp = "10.73.73.135";
@@ -299,7 +299,7 @@ in
   networks = {
     lan = {
       cidr = "10.73.73.0/24";
-      gateway = hosts.router-nix.lan.ip;
+      gateway = hosts.opnsense.lan.ip;
       dnsHost = "adguard-nix";
       dhcpPool = {
         start = "10.73.73.100";

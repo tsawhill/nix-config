@@ -148,8 +148,6 @@
         kopuz = inputs.kopuz.packages.x86_64-linux.default;
       };
 
-      nixosModules = {
-        router = import ./modules/router;
-      };
+      nixosModules = { };
     };
 }

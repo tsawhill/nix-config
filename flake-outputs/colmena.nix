@@ -120,7 +120,6 @@ in
 
     # --- local deploy (no SSH, uses apply-local) ---
     "build-nix" = mkHost "weekly" null "${self}/hosts/server-nix/LXCs/build.nix";
-    # "router-nix" = mkHost null "router-nix" "${self}/hosts/server-nix/LXCs/router.nix";
 
     # --- daily ---
     "local-nginx-nix" =
