@@ -239,7 +239,7 @@ let
     };
     taylor-cube-nix = {
       lan = {
-        ip = "10.73.73.74";
+        ip = "10.50.50.6";
         # Wi-Fi NIC (wlp6s0). Ethernet (enp5s0, 90:82:c3:6b:8e:69) is currently
         # unplugged; swap this MAC if the cube moves to a wired link.
         mac = "ec:b5:0a:e7:24:7c";
