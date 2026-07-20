@@ -211,7 +211,10 @@ let
         dhcpHostname = "laptop-nix";
       };
       wgRemote.ip = "10.50.50.3";
-      dns.enable = true;
+      dns = {
+        enable = true;
+        roaming = true;
+      };
     };
     taylor-desktop-nix = {
       lan = {
@@ -220,7 +223,10 @@ let
         dhcpHostname = "desktop-nix";
       };
       wgRemote.ip = "10.50.50.2";
-      dns.enable = true;
+      dns = {
+        enable = true;
+        roaming = true;
+      };
     };
     printer = {
       lan = {
@@ -235,17 +241,23 @@ let
         mac = "b4:8c:9d:7e:6d:73";
       };
       wgRemote.ip = "10.50.50.4";
-      dns.enable = true;
+      dns = {
+        enable = true;
+        roaming = true;
+      };
     };
     taylor-cube-nix = {
       lan = {
-        ip = "10.50.50.6";
+        ip = "10.73.73.74";
         # Wi-Fi NIC (wlp6s0). Ethernet (enp5s0, 90:82:c3:6b:8e:69) is currently
         # unplugged; swap this MAC if the cube moves to a wired link.
         mac = "ec:b5:0a:e7:24:7c";
       };
       wgRemote.ip = "10.50.50.6";
-      dns.enable = true;
+      dns = {
+        enable = true;
+        roaming = true;
+      };
     };
     sunshine-nix = {
       lan = {
@@ -273,7 +285,8 @@ let
     host:
     let
       entry = hosts.${host};
-      preferred = entry.dns.preferredAddress or "lan";
+      preferred =
+        entry.dns.preferredAddress or (if entry.dns.roaming or false then "wgRemote" else "lan");
     in
     if preferred == "wgRemote" then entry.wgRemote.ip else entry.lan.dnsIp or entry.lan.ip;
 in

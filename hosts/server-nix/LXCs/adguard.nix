@@ -3,6 +3,7 @@
   imports = [
     ./base
     "${self}/modules/software/services/adguard.nix"
+    "${self}/modules/software/services/adguard-lan-failover.nix"
   ];
   networking.hostName = "adguard-nix";
 
