@@ -3,10 +3,7 @@ let
 
   hosts = {
     opnsense = {
-      lan = {
-        ip = "10.73.73.1";
-        dnsIp = "10.73.73.135";
-      };
+      lan.ip = "10.73.73.1";
       dns.enable = true;
     };
     server-nix = {

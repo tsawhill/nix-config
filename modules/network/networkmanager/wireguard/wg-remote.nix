@@ -2,6 +2,8 @@
 
 let
   cfg = config.my.network.wg-remote;
+  address = lib.head (lib.splitString "/" cfg.address);
+  allowedIPs = lib.filter (ip: ip != "") (lib.splitString ";" cfg.peer.allowedIPs);
 
   dnsSection = lib.optionalString (cfg.dns != null) ''
     dns=${cfg.dns};
@@ -11,6 +13,18 @@ let
   metricSection = lib.optionalString (cfg.routeMetric != null) ''
     route-metric=${toString cfg.routeMetric}
   '';
+
+  sourceRouteSection = lib.optionalString cfg.sourceRouting.enable (
+    lib.concatStringsSep "\n" (
+      (lib.imap1 (i: ip: ''
+        route${toString i}=${ip}
+        route${toString i}_options=table=${toString cfg.sourceRouting.table},src=${address}
+      '') allowedIPs)
+      ++ [
+        "routing-rule1=priority ${toString cfg.sourceRouting.priority} from ${address}/32 table ${toString cfg.sourceRouting.table}"
+      ]
+    )
+  );
 in
 {
   options.my.network.wg-remote = {
@@ -62,6 +76,26 @@ in
       default = null;
       description = "Route metric. Higher = lower priority, so LAN routes win";
     };
+
+    sourceRouting = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Route traffic sourced from the wg-remote address back out the wg-remote interface.";
+      };
+
+      table = lib.mkOption {
+        type = lib.types.int;
+        default = 1050;
+        description = "Routing table used for wg-remote source-routed replies.";
+      };
+
+      priority = lib.mkOption {
+        type = lib.types.int;
+        default = 1050;
+        description = "Policy routing rule priority for wg-remote source-routed replies.";
+      };
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -89,6 +123,7 @@ in
         method=manual
         address1=${cfg.address}
         ${dnsSection}${metricSection}
+        ${sourceRouteSection}
         [ipv6]
         method=disabled
       '';
