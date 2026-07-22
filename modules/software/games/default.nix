@@ -7,13 +7,24 @@
 
 let
   cfg = config.software.games;
-  directoryContents = builtins.readDir ./.;
 
-  gameModules = lib.filterAttrs (
-    name: type: type == "regular" && lib.hasSuffix ".nix" name && name != "default.nix"
-  ) directoryContents;
+  # Auto-import every game entry file (recursively, so games can live in
+  # per-platform subdirs like proton/ and ps3/). default.nix itself is excluded.
+  collectNix =
+    dir:
+    lib.concatLists (
+      lib.mapAttrsToList (
+        name: type:
+        if type == "directory" then
+          collectNix (dir + "/${name}")
+        else if type == "regular" && lib.hasSuffix ".nix" name && name != "default.nix" then
+          [ (dir + "/${name}") ]
+        else
+          [ ]
+      ) (builtins.readDir dir)
+    );
 
-  importPaths = map (name: ./. + "/${name}") (builtins.attrNames gameModules);
+  importPaths = collectNix ./.;
 
   resolutionType = lib.types.submodule {
     options = {
@@ -38,84 +49,114 @@ let
   mkGameLauncher = pkgs.callPackage ../../../pkgs/games/mk-game-launcher.nix { };
 
   mkUmuRunner =
-    runnerCfg:
+    umuCfg: exePath:
     let
       protonCachyos = pkgs.callPackage ../../../pkgs/games/proton-cachyos.nix {
-        version = runnerCfg.protonVersion;
+        version = umuCfg.protonVersion;
       };
 
-      useGeProton = runnerCfg.proton == "ge-proton";
+      useGeProton = umuCfg.proton == "ge-proton";
 
       geProton = pkgs.callPackage ../../../pkgs/games/proton-ge.nix {
-        version = runnerCfg.protonVersion;
+        version = umuCfg.protonVersion;
       };
 
       protonPath =
         if useGeProton then
-          (if runnerCfg.protonVersion == "latest" then "GE-Proton" else "${geProton}")
+          (if umuCfg.protonVersion == "latest" then "GE-Proton" else "${geProton}")
         else
           "${protonCachyos}/share/steam/compatibilitytools.d/proton-cachyos";
 
       runner = pkgs.callPackage ../../../pkgs/games/runners/umu.nix { } {
-        inherit (runnerCfg) exePath prefixPath;
-        inherit protonPath;
+        inherit exePath protonPath;
+        inherit (umuCfg) prefixPath;
       };
     in
     runner
     // {
-      extraPackages = lib.optionals (runnerCfg.proton == "cachyos") [ protonCachyos ];
+      extraPackages = lib.optionals (umuCfg.proton == "cachyos") [ protonCachyos ];
     };
 
   mkEmulatorRunner =
-    runnerCfg:
-    pkgs.callPackage ../../../pkgs/games/runners/emulators/${runnerCfg.type}.nix { } (
+    emuCfg: gamePath:
+    pkgs.callPackage ../../../pkgs/games/runners/emulators/${emuCfg.type}.nix { } (
       {
-        inherit (runnerCfg) gamePath args;
+        inherit gamePath;
+        inherit (emuCfg) args;
       }
-      // lib.optionalAttrs (runnerCfg.type == "retroarch") {
-        inherit (runnerCfg) core;
+      // lib.optionalAttrs (emuCfg.type == "retroarch") {
+        inherit (emuCfg) core;
       }
     );
 
-  # When a host opts a game into local mode (software.games.localGames), the
-  # runner's game path is relocated under localPath, keeping the original
-  # filename. localPath is the *folder* holding the file, so the basename of the
-  # default (network-share) path is appended. Only umu and emulator runners
-  # reference on-disk game files; native commands are left untouched.
+  # CIFS mount of the full library, mounted at the server's own path on every
+  # gaming host so a game's basePath resolves identically everywhere.
+  cifsRoot = "/mnt/zpool/roms";
+
+  # A basePath under the roms root is relative; absolute paths (/, ~, $HOME) are
+  # one-off launchers that never sync and always launch from where they point.
+  isRelative = p: !(lib.hasPrefix "/" p || lib.hasPrefix "~" p || lib.hasPrefix "$HOME" p);
+
+  # Platform = first path segment of a relative basePath (pc, ps3, wii, …).
+  platformOf =
+    entryCfg:
+    if entryCfg.basePath != null && isRelative entryCfg.basePath then
+      lib.head (lib.splitString "/" entryCfg.basePath)
+    else
+      null;
+
+  syncAll = lib.elem "*" cfg.syncPlatforms;
+
+  # Whether this host keeps a local synced copy of the game.
+  isSelected =
+    id: entryCfg:
+    entryCfg.basePath != null
+    && isRelative entryCfg.basePath
+    && (
+      syncAll
+      || lib.elem id cfg.syncGames
+      || (platformOf entryCfg != null && lib.elem (platformOf entryCfg) cfg.syncPlatforms)
+    );
+
+  # Base the launcher reads the game from: the local synced copy when selected,
+  # otherwise the CIFS library mount; absolute basePaths are used as-is.
+  baseDir =
+    id: entryCfg:
+    let
+      bp = entryCfg.basePath;
+    in
+    if bp == null then
+      null
+    else if !(isRelative bp) then
+      bp
+    else if isSelected id entryCfg then
+      "${cfg.syncRoot}/${bp}"
+    else
+      "${cifsRoot}/${bp}";
+
   mkRunner =
-    useLocal: localPath: entryCfg:
+    id: entryCfg:
+    let
+      base = baseDir id entryCfg;
+    in
     if entryCfg.runner.umu != null then
-      mkUmuRunner (
-        entryCfg.runner.umu
-        // lib.optionalAttrs useLocal {
-          exePath = "${localPath}/${baseNameOf entryCfg.runner.umu.exePath}";
-        }
-      )
+      mkUmuRunner entryCfg.runner.umu "${base}/${entryCfg.runner.umu.exe}"
     else if entryCfg.runner.native != null then
       pkgs.callPackage ../../../pkgs/games/runners/native.nix { } entryCfg.runner.native
     else
-      mkEmulatorRunner (
-        entryCfg.runner.emulator
-        // lib.optionalAttrs useLocal {
-          gamePath = "${localPath}/${baseNameOf entryCfg.runner.emulator.gamePath}";
-        }
-      );
+      mkEmulatorRunner entryCfg.runner.emulator base;
 
   mkEntryPackage =
     id: entryCfg:
     let
-      useLocal = lib.elem id cfg.localGames && entryCfg.localPath != null;
-      runner = mkRunner useLocal entryCfg.localPath entryCfg;
+      runner = mkRunner id entryCfg;
       gamescopeResolutions =
         if entryCfg.gamescope.resolutions == null then
           cfg.gamescope.resolutions
         else
           entryCfg.gamescope.resolutions;
       lsfgVkEnable =
-        if entryCfg.lsfgVk.enable == null then
-          cfg.lsfgVk.enable
-        else
-          entryCfg.lsfgVk.enable;
+        if entryCfg.lsfgVk.enable == null then cfg.lsfgVk.enable else entryCfg.lsfgVk.enable;
     in
     {
       package = mkGameLauncher {
@@ -161,6 +202,59 @@ let
     command = entryCfg.command;
     category = entryCategory entryCfg;
   }) includedEntries;
+
+  # --- Selective sync (see ./default.nix header docs / the roms Syncthing share) ---
+
+  # Relative basePaths of the individually-selected syncable games on this host.
+  selectedGamePaths = lib.filter (p: p != null) (
+    map (
+      id:
+      let
+        e = cfg.entries.${id} or null;
+      in
+      if e != null && e.basePath != null && isRelative e.basePath then e.basePath else null
+    ) cfg.syncGames
+  );
+
+  # Whole platforms selected (excluding the "*" sync-all wildcard).
+  wholePlatforms = lib.filter (p: p != "*") cfg.syncPlatforms;
+
+  # Top-level roots this host manages under syncRoot (for the prune manifest).
+  managedPaths = lib.unique (wholePlatforms ++ selectedGamePaths);
+
+  # .stignore lines for the roms share: whitelist the selected platforms/games,
+  # exclude everything else. Empty (no restriction, full sync) when "*" is set.
+  romsIgnores =
+    if syncAll then
+      [ ]
+    else
+      let
+        coveredByPlatform = p: lib.elem (lib.head (lib.splitString "/" p)) wholePlatforms;
+        specific = lib.unique (lib.filter (p: !(coveredByPlatform p)) selectedGamePaths);
+        ancestorsOf =
+          p:
+          let
+            parts = lib.splitString "/" p;
+          in
+          map (k: lib.concatStringsSep "/" (lib.take k parts)) (lib.range 1 (lib.length parts - 1));
+        specificAncestors = lib.unique (lib.concatMap ancestorsOf specific);
+        # Dirs we descend into and must exclude the non-selected children of;
+        # a wholesale platform's whole subtree is kept, so it is not excluded.
+        excludeDirs = lib.filter (d: !(lib.elem d wholePlatforms)) specificAncestors;
+        depth = p: lib.length (lib.splitString "/" p);
+        byDepthDesc = lib.sort (a: b: depth a > depth b);
+        includes = lib.unique (wholePlatforms ++ specific ++ specificAncestors);
+      in
+      # Includes first (deepest-first) so they win over the excludes that follow.
+      (map (p: "!/" + p) (byDepthDesc includes))
+      ++ (map (d: "/" + d + "/*") (byDepthDesc excludeDirs))
+      ++ [ "*" ];
+
+  hasSelection = cfg.syncGames != [ ] || cfg.syncPlatforms != [ ];
+
+  # Manifest of currently-managed roots; the prune diffs the previous run against
+  # this to delete de-selected local copies.
+  managedFile = pkgs.writeText "game-local-managed" (lib.concatStringsSep "\n" managedPaths + "\n");
 in
 {
   imports = importPaths;
@@ -172,18 +266,37 @@ in
     description = "Game launcher module ids to exclude from the default game library.";
   };
 
-  options.software.games.localGames = lib.mkOption {
+  options.software.games.syncRoot = lib.mkOption {
+    type = lib.types.str;
+    default = "/home/taylor/Games/synced";
+    description = ''
+      Local directory the roms Syncthing folder syncs selected games into on this
+      host. May point at removable media (e.g. an SD card mount) — Syncthing's
+      folder marker keeps that safe when the card is absent. Selected games launch
+      from "<syncRoot>/<basePath>"; unselected ones launch from the CIFS library
+      mount at ${cifsRoot} instead.
+    '';
+  };
+
+  options.software.games.syncGames = lib.mkOption {
     type = lib.types.listOf lib.types.str;
     default = [ ];
-    example = [
-      "guitarHero3"
-      "ps3GuitarHero3"
-    ];
+    example = [ "guitarHero3" ];
     description = ''
-      Game entry ids to launch from their localPath instead of the default
-      (network share) path on this host. Each listed entry must define localPath
-      and use a umu or emulator runner. Useful for hosts (e.g. a Steam Deck) that
-      keep certain games on local disk and aren't always on the LAN.
+      Individual game entry ids to keep on this host's local disk (synced via the
+      roms Syncthing share). Each must have a relative basePath. De-selecting a game
+      and rebuilding deletes its local copy.
+    '';
+  };
+
+  options.software.games.syncPlatforms = lib.mkOption {
+    type = lib.types.listOf lib.types.str;
+    default = [ ];
+    example = [ "ps3" ];
+    description = ''
+      Whole platforms (first path segment of a basePath, e.g. "ps3", "pc") to keep
+      on this host's local disk, or [ "*" ] to sync the entire library. Combined
+      (union) with software.games.syncGames.
     '';
   };
 
@@ -232,6 +345,23 @@ in
             '';
           };
 
+          basePath = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            default = null;
+            example = "pc/GH3";
+            description = ''
+              The game's location under the roms library root, e.g. "pc/GH3" (a
+              directory holding the .exe for umu/Proton) or
+              "ps3/Some Game (USA).iso" (the ISO for an emulator). A relative
+              basePath is a library game: it launches from the CIFS mount
+              (${cifsRoot}/<basePath>) or, when this host selects it via
+              software.games.syncGames/syncPlatforms, from
+              <syncRoot>/<basePath>, and it is eligible for local sync. An absolute
+              path (/, ~, $HOME) marks a one-off launcher that never syncs.
+              Required for umu and emulator runners; unused for native runners.
+            '';
+          };
+
           env = lib.mkOption {
             type = lib.types.listOf lib.types.str;
             default = [ ];
@@ -250,21 +380,6 @@ in
             description = "Gamescope resolutions for this game. Null inherits the global default; an empty list disables gamescope.";
           };
 
-          localPath = lib.mkOption {
-            type = lib.types.nullOr lib.types.str;
-            default = null;
-            example = "/home/taylor/Games/local/GH3";
-            description = ''
-              Local directory holding this game's files: the folder containing the
-              ROM/ISO for emulator runners, or the folder containing the .exe for
-              umu/Proton runners. On hosts that list this entry id in
-              software.games.localGames, the launcher loads the game from
-              "<localPath>/<basename of the default path>" instead of the default
-              (network share) path. Use an absolute path (dolphin/pcsx2/retroarch
-              do not expand $HOME).
-            '';
-          };
-
           lsfgVk.enable = lib.mkOption {
             type = lib.types.nullOr lib.types.bool;
             default = null;
@@ -275,9 +390,10 @@ in
             type = lib.types.nullOr (
               lib.types.submodule {
                 options = {
-                  exePath = lib.mkOption {
+                  exe = lib.mkOption {
                     type = lib.types.str;
-                    description = "Path to the Windows executable.";
+                    example = "GH3.exe";
+                    description = "Path to the Windows executable, relative to the entry's basePath.";
                   };
 
                   prefixPath = lib.mkOption {
@@ -348,11 +464,6 @@ in
                     description = "Emulator backend to use.";
                   };
 
-                  gamePath = lib.mkOption {
-                    type = lib.types.str;
-                    description = "Path to the game, ROM, ISO, or emulator game directory.";
-                  };
-
                   core = lib.mkOption {
                     type = lib.types.nullOr lib.types.str;
                     default = null;
@@ -368,7 +479,7 @@ in
               }
             );
             default = null;
-            description = "Run this game through an emulator backend.";
+            description = "Run this game through an emulator backend. The game path comes from the entry's basePath.";
           };
         };
       }
@@ -377,52 +488,94 @@ in
     description = "Data-driven game launcher entries.";
   };
 
-  config = {
-    assertions = lib.flatten (
-      lib.mapAttrsToList (
-        entryName: entryCfg:
+  config = lib.mkMerge [
+    {
+      assertions = lib.flatten (
+        lib.mapAttrsToList (
+          entryName: entryCfg:
+          let
+            enabledRunners = lib.length (
+              lib.filter (runnerCfg: runnerCfg != null) [
+                entryCfg.runner.umu
+                entryCfg.runner.native
+                entryCfg.runner.emulator
+              ]
+            );
+          in
+          [
+            {
+              assertion = enabledRunners == 1;
+              message = "software.games.entries.${entryName} must configure exactly one runner.";
+            }
+            {
+              assertion =
+                entryCfg.runner.native != null || entryCfg.basePath != null;
+              message = "software.games.entries.${entryName} must define basePath (umu and emulator runners locate the game via it).";
+            }
+            {
+              assertion =
+                entryCfg.runner.emulator == null
+                || entryCfg.runner.emulator.type != "retroarch"
+                || entryCfg.runner.emulator.core != null;
+              message = "software.games.entries.${entryName}.runner.emulator.core is required for retroarch entries.";
+            }
+          ]
+        ) cfg.entries
+      )
+      ++ map (
+        id:
         let
-          enabledRunners = lib.length (
-            lib.filter (runnerCfg: runnerCfg != null) [
-              entryCfg.runner.umu
-              entryCfg.runner.native
-              entryCfg.runner.emulator
-            ]
-          );
+          entry = cfg.entries.${id} or null;
         in
-        [
-          {
-            assertion = enabledRunners == 1;
-            message = "software.games.entries.${entryName} must configure exactly one runner.";
-          }
-          {
-            assertion =
-              entryCfg.runner.emulator == null
-              || entryCfg.runner.emulator.type != "retroarch"
-              || entryCfg.runner.emulator.core != null;
-            message = "software.games.entries.${entryName}.runner.emulator.core is required for retroarch entries.";
-          }
-        ]
-      ) cfg.entries
-    )
-    ++ map (
-      id:
-      let
-        entry = cfg.entries.${id} or null;
-      in
-      {
-        assertion =
-          entry != null
-          && entry.localPath != null
-          && (entry.runner.umu != null || entry.runner.emulator != null);
-        message = "software.games.localGames entry \"${id}\" must exist in software.games.entries, define localPath, and use a umu or emulator runner.";
-      }
-    ) cfg.localGames;
+        {
+          assertion = entry != null && entry.basePath != null && isRelative entry.basePath;
+          message = "software.games.syncGames entry \"${id}\" must exist in software.games.entries and define a relative (library) basePath.";
+        }
+      ) cfg.syncGames;
 
-    software.games.manifest = gamesManifest;
+      software.games.manifest = gamesManifest;
 
-    environment.systemPackages =
-      (map (entryPackage: entryPackage.package) entryPackages)
-      ++ lib.flatten (map (entryPackage: entryPackage.extraPackages) entryPackages);
-  };
+      environment.systemPackages =
+        (map (entryPackage: entryPackage.package) entryPackages)
+        ++ lib.flatten (map (entryPackage: entryPackage.extraPackages) entryPackages);
+    }
+
+    # Only hosts that actually select games touch the Syncthing/prune machinery,
+    # so the games module never hard-depends on my.syncthing where it is unused.
+    (lib.mkIf hasSelection {
+      my.syncthing.sharePaths.roms = cfg.syncRoot;
+      my.syncthing.extraIgnores.roms = romsIgnores;
+
+      # Delete local copies of de-selected games. Safe: the roms folder is
+      # ignoreDelete, so this rm never propagates to the server, and the updated
+      # .stignore stops Syncthing re-fetching. Re-runs whenever the selection
+      # (managedFile) changes.
+      systemd.services.game-local-prune = {
+        description = "Prune de-selected local game copies under syncRoot";
+        wantedBy = [ "multi-user.target" ];
+        after = [ "syncthing.service" ];
+        restartTriggers = [ managedFile ];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+        };
+        script = ''
+          set -eu
+          state_dir=/var/lib/game-local-sync
+          mkdir -p "$state_dir"
+          state="$state_dir/manifest"
+          touch "$state"
+          sync_root=${lib.escapeShellArg cfg.syncRoot}
+          # Delete roots we synced last time that are no longer selected.
+          while IFS= read -r p; do
+            [ -n "$p" ] || continue
+            if ! ${pkgs.gnugrep}/bin/grep -qxF -- "$p" ${managedFile}; then
+              rm -rf -- "$sync_root/$p"
+            fi
+          done < "$state"
+          cp ${managedFile} "$state"
+        '';
+      };
+    })
+  ];
 }

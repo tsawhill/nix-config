@@ -32,8 +32,8 @@ in
       [ "${automount_opts},credentials=/run/secrets/smb-nix-config-credentials,uid=1000,mfsymlinks" ];
   };
 
-  fileSystems."/mnt/gameSSD" = {
-    device = "//${sambaHost}/gameSSD/";
+  fileSystems."/mnt/zpool/roms" = {
+    device = "//${sambaHost}/roms/";
     fsType = "cifs";
     options =
       let

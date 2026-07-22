@@ -51,16 +51,24 @@ let
     in
     { inherit (d) id; } // lib.optionalAttrs ((d.addresses or [ ]) != [ ]) { inherit (d) addresses; };
 
-  mkFolder = name: {
-    path = effPath name;
-    devices = folderPeers name; # self is implicit in syncthing
-    # Don't sync unix permission bits. The server's shares live on setgid,
-    # group-owned ZFS dirs (drwxrwsr-x, group `games`) whose setgid bit can't be
-    # cleared, so syncthing's attempt to chmod created dirs to the sender's mode
-    # fails (EPERM) and wedges the whole folder in a 60s retry loop. We don't
-    # care about perms travelling between hosts for game saves anyway.
-    ignorePerms = true;
-  };
+  mkFolder =
+    name:
+    {
+      path = effPath name;
+      devices = folderPeers name; # self is implicit in syncthing
+      # Don't sync unix permission bits. The server's shares live on setgid,
+      # group-owned ZFS dirs (drwxrwsr-x, group `games`) whose setgid bit can't be
+      # cleared, so syncthing's attempt to chmod created dirs to the sender's mode
+      # fails (EPERM) and wedges the whole folder in a 60s retry loop. We don't
+      # care about perms travelling between hosts for game saves anyway.
+      ignorePerms = true;
+    }
+    # Opt-in per share (fleet.nix): never propagate deletions. Used by `roms` so a
+    # host (or the games prune) deleting a local copy cannot delete the master, while
+    # additions/modifications still sync both ways.
+    // lib.optionalAttrs (fleet.shares.${name}.ignoreDelete or false) {
+      ignoreDelete = true;
+    };
 
   # Effective ignore patterns for a share on this host: the share's common
   # ignores from fleet.nix, plus any host-specific extras for that share.
@@ -192,11 +200,13 @@ in
           path = effPath name;
         in
         ''
-          if [ -d ${lib.escapeShellArg path} ]; then
-            install -m 0644 -o ${cfg.user} -g ${cfg.group} ${mkStignore name} ${
-              lib.escapeShellArg (path + "/.stignore")
-            }
-          fi
+          # Create the folder up front and write .stignore before syncthing/init
+          # run, so a folder with ignores (e.g. selective `roms`) never starts up
+          # ignore-less and full-syncs the whole share on a fresh host.
+          install -d -m 0755 -o ${cfg.user} -g ${cfg.group} ${lib.escapeShellArg path}
+          install -m 0644 -o ${cfg.user} -g ${cfg.group} ${mkStignore name} ${
+            lib.escapeShellArg (path + "/.stignore")
+          }
         ''
       ) ignoredShares;
     };

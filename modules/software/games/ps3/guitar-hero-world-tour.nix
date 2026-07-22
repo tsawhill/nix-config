@@ -9,9 +9,7 @@
         height = 1440;
       }
     ];
-    runner.emulator = {
-      type = "rpcs3";
-      gamePath = "Guitar Hero World Tour (USA) (En,Fr).iso";
-    };
+    basePath = "ps3/Guitar Hero World Tour (USA) (En,Fr).iso";
+    runner.emulator.type = "rpcs3";
   };
 }

@@ -8,8 +8,9 @@
       "vblank_mode=0"
       "PULSE_LATENCY_MSEC=30"
     ];
+    basePath = "pc/GH3";
     runner.umu = {
-      exePath = "/mnt/gameSSD/Games/GH3/GH3.exe";
+      exe = "GH3.exe";
       # GH3 is 32-bit: its GPU drivers and fonts only resolve inside umu's sniper
       # container, which proton-cachyos (host-native, missing libunwind in sniper)
       # can't run in. GE-Proton is built for sniper, so use it here, pinned.

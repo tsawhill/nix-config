@@ -9,9 +9,7 @@
         height = 1440;
       }
     ];
-    runner.emulator = {
-      type = "rpcs3";
-      gamePath = "Rock Band 2 (USA).iso";
-    };
+    basePath = "ps3/Rock Band 2 (USA).iso";
+    runner.emulator.type = "rpcs3";
   };
 }

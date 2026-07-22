@@ -9,9 +9,7 @@
         height = 1440;
       }
     ];
-    runner.emulator = {
-      type = "rpcs3";
-      gamePath = "Guitar Hero III - Legends of Rock (USA).iso";
-    };
+    basePath = "ps3/Guitar Hero III - Legends of Rock (USA).iso";
+    runner.emulator.type = "rpcs3";
   };
 }

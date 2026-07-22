@@ -11,8 +11,9 @@
         "vblank_mode=0"
         "PULSE_LATENCY_MSEC=60"
       ];
+      basePath = "pc/GHWTDE";
       runner.umu = {
-        exePath = "/mnt/gameSSD/Games/GHWTDE/GHWT_Definitive.exe";
+        exe = "GHWT_Definitive.exe";
         proton = "ge-proton";
         protonVersion = "9-25";
       };
@@ -27,8 +28,9 @@
         "vblank_mode=0"
         "PULSE_LATENCY_MSEC=60"
       ];
+      basePath = "pc/GHWTDE";
       runner.umu = {
-        exePath = "/mnt/gameSSD/Games/GHWTDE/Updater.exe";
+        exe = "Updater.exe";
         proton = "ge-proton";
         protonVersion = "9-25";
       };

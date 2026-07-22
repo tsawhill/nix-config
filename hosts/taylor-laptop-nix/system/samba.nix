@@ -37,8 +37,8 @@ in
     options = [ mountOptions ];
   };
 
-  fileSystems."/mnt/gameSSD" = {
-    device = "//${sambaHost}/gameSSD/";
+  fileSystems."/mnt/zpool/roms" = {
+    device = "//${sambaHost}/roms/";
     fsType = "cifs";
     options = [ mountOptions ];
   };

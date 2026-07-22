@@ -9,8 +9,9 @@ let
   credentialsPath = "/run/secrets/smb-deck-credentials";
   sambaHost = networkTopology.lib.fqdn "samba-nix";
   # Lazy automount: only mounts on first access and never blocks boot, so the
-  # deck still boots fine off-LAN. Games kept locally (software.games.localGames)
-  # launch without ever touching this share.
+  # deck still boots fine off-LAN. Games this host selects
+  # (software.games.syncGames) are on local disk and launch without touching this
+  # share; unselected games launch from here over the LAN.
   automountOptions = "x-systemd.automount,noauto,nofail,x-systemd.idle-timeout=60,x-systemd.device-timeout=5s,x-systemd.mount-timeout=5s,x-systemd.requires=network-online.target,x-systemd.after=network-online.target,_netdev";
   mountOptions = "${automountOptions},credentials=${credentialsPath},uid=1000,mfsymlinks";
 in
@@ -28,8 +29,8 @@ in
     mode = "0400";
   };
 
-  fileSystems."/mnt/gameSSD" = {
-    device = "//${sambaHost}/gameSSD/";
+  fileSystems."/mnt/zpool/roms" = {
+    device = "//${sambaHost}/roms/";
     fsType = "cifs";
     options = [ mountOptions ];
   };

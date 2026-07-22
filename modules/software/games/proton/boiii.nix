@@ -3,8 +3,9 @@
     boiii = {
       command = "boiii";
       desktopName = "BOIII";
+      basePath = "pc/Call of Duty/boiii";
       runner.umu = {
-        exePath = "/mnt/gameSSD/Games/Call of Duty/boiii/boiii.exe";
+        exe = "boiii.exe";
         proton = "ge-proton";
         protonVersion = "10-34";
       };
@@ -14,8 +15,9 @@
       command = "boiii-steam";
       desktopName = "BOIII Steam";
       gamescope.resolutions = [ ];
+      basePath = "$HOME/Games/saves/wine/default/drive_c/Program Files (x86)/Steam";
       runner.umu = {
-        exePath = "$HOME/Games/saves/wine/default/drive_c/Program Files (x86)/Steam/Steam.exe";
+        exe = "Steam.exe";
         proton = "ge-proton";
         protonVersion = "10-34";
       };

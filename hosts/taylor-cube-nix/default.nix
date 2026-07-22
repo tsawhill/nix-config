@@ -120,11 +120,12 @@ in
   # native (EDID) resolution.
   software.games.steamSync.stopSteamDuringSync = true;
 
-  # Games kept on the cube's local 512GB SSD launch from their localPath instead
-  # of the Samba share. Add entry ids here and set `localPath` on each game once
-  # its files are copied locally, e.g.:
-  #   software.games.localGames = [ "guitarHero3" "ps3GuitarHero3" ];
-  software.games.localGames = [ ];
+  # Games (or whole platforms) kept on the cube's local SSD: they sync there via
+  # the roms Syncthing share (into software.games.syncRoot, default
+  # ~/Games/synced) and launch locally; everything else launches from the full
+  # library over the /mnt/zpool/roms CIFS mount. De-selecting a game and
+  # rebuilding deletes its local copy.
+  software.games.syncGames = [ "guitarHero3" ];
 
   # ---------------------------------------------------------------------------
   # User + secrets

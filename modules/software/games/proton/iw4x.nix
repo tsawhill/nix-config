@@ -3,8 +3,9 @@
     iw4x = {
       command = "iw4x";
       desktopName = "IW4x";
+      basePath = "pc/Call of Duty/IW4X";
       runner.umu = {
-        exePath = "/mnt/gameSSD/Games/Call of Duty/IW4X/iw4x.exe";
+        exe = "iw4x.exe";
         proton = "ge-proton";
         protonVersion = "10-34";
       };
@@ -14,8 +15,9 @@
       command = "iw4x-launcher";
       desktopName = "IW4x Launcher";
       gamescope.resolutions = [ ];
+      basePath = "pc/Call of Duty/IW4X";
       runner.umu = {
-        exePath = "/mnt/gameSSD/Games/Call of Duty/IW4X/iw4x-launcher.exe";
+        exe = "iw4x-launcher.exe";
         proton = "ge-proton";
         protonVersion = "10-34";
       };

@@ -125,11 +125,13 @@ in
   ];
   software.games.steamSync.stopSteamDuringSync = true;
 
-  # Games kept on the deck's local disk launch from their localPath instead of
-  # the Samba share (the deck isn't always on the LAN). Add entry ids here and
-  # set `localPath` on each game once its files are copied to the deck, e.g.:
-  #   software.games.localGames = [ "guitarHero3" "ps3GuitarHero3" ];
-  software.games.localGames = [ ];
+  # To keep games on the deck's local disk (it isn't always on the LAN), add the
+  # deck to the `roms` Syncthing share members in
+  # modules/software/services/syncthing/fleet.nix, then select games/platforms:
+  #   software.games.syncGames = [ "guitarHero3" ];
+  #   software.games.syncPlatforms = [ "ps3" ];
+  # They sync into software.games.syncRoot and launch locally; everything else
+  # launches from the /mnt/zpool/roms CIFS mount.
 
   # ---------------------------------------------------------------------------
   # User + secrets

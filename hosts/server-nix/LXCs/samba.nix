@@ -79,6 +79,13 @@
         enable = true;
         path = "/mnt/gameSSD";
       };
+      # Full game library. Gaming hosts mount this at /mnt/zpool/roms (same path as
+      # here) to play any game on-LAN, and selectively pull local copies of some via
+      # the roms Syncthing share (see modules/software/games).
+      roms = {
+        enable = true;
+        path = "/mnt/zpool/roms";
+      };
     };
   };
   my.groups = {

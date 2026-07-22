@@ -62,14 +62,22 @@ in
   # are never synced by anyone. A host can add its own extra patterns on top via
   # `my.syncthing.extraIgnores.<share>`.
   shares = {
+    # Selective, per-host local game sync (see modules/software/games). The server
+    # is the canonical copy; opt-in hosts join to pull LOCAL copies of the games
+    # they select, each restricting what it fetches via a generated .stignore and
+    # syncing into its software.games.syncRoot (default /home/taylor/Games/synced).
+    # `ignoreDelete` protects the master: a client — or the games prune — deleting a
+    # local copy never removes it from the server, while adds/mods still sync both
+    # ways. Do NOT add a host here to full-sync the multi-TB library; hosts read the
+    # full library over the /mnt/zpool/roms CIFS share instead.
     roms = {
-      path = "/home/taylor/Games/roms";
+      path = "/home/taylor/Games/synced";
       members = [
-        "desktop"
-        "laptop"
         "server"
+        "cube"
       ];
       overrides.server = "/mnt/zpool/roms";
+      ignoreDelete = true;
     };
     gamesaves = {
       path = "/home/taylor/Games/saves";
