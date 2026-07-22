@@ -244,15 +244,17 @@ let
         depth = p: lib.length (lib.splitString "/" p);
         byDepthDesc = lib.sort (a: b: depth a > depth b);
         recursiveIncludes = wholePlatforms ++ specific;
-        includes = lib.unique (
-          (map (p: p + "/**") recursiveIncludes) ++ recursiveIncludes ++ specificAncestors
-        );
+        selectedIncludes = lib.unique ((map (p: p + "/**") recursiveIncludes) ++ recursiveIncludes);
+        ancestorRules = d: [
+          ("/" + d + "/*")
+          ("!/" + d)
+        ];
       in
-      # Includes first (deepest-first) so they win over the excludes that follow.
       # Selected game/platform directories need both the directory itself and its
-      # contents included; ancestor directories only need to be traversable.
-      (map (p: "!/" + p) (byDepthDesc includes))
-      ++ (map (d: "/" + d + "/*") (byDepthDesc excludeDirs))
+      # contents included. Ancestors must be included after their sibling excludes,
+      # because a directory include also matches its subtree in Syncthing.
+      (map (p: "!/" + p) (byDepthDesc selectedIncludes))
+      ++ lib.concatMap ancestorRules (byDepthDesc excludeDirs)
       ++ [ "*" ];
 
   hasSelection = cfg.syncGames != [ ] || cfg.syncPlatforms != [ ];
