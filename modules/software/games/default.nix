@@ -218,6 +218,37 @@ let
 
   # Whole platforms selected (excluding the "*" sync-all wildcard).
   wholePlatforms = lib.filter (p: p != "*") cfg.syncPlatforms;
+  coveredByPlatform = p: lib.elem (lib.head (lib.splitString "/" p)) wholePlatforms;
+  specificGamePaths = lib.unique (lib.filter (p: !(coveredByPlatform p)) selectedGamePaths);
+  ancestorsOf =
+    p:
+    let
+      parts = lib.splitString "/" p;
+    in
+    map (k: lib.concatStringsSep "/" (lib.take k parts)) (lib.range 1 (lib.length parts - 1));
+  specificAncestors = lib.unique (lib.concatMap ancestorsOf specificGamePaths);
+  # Dirs we descend into and must exclude the non-selected children of;
+  # a wholesale platform's whole subtree is kept, so it is not excluded.
+  excludeDirs = lib.filter (d: !(lib.elem d wholePlatforms)) specificAncestors;
+
+  pathDirectChildOf =
+    parent: path:
+    let
+      parentParts = lib.splitString "/" parent;
+      pathParts = lib.splitString "/" path;
+      parentDepth = lib.length parentParts;
+    in
+    if lib.take parentDepth pathParts == parentParts && lib.length pathParts > parentDepth then
+      lib.concatStringsSep "/" (lib.take (parentDepth + 1) pathParts)
+    else
+      null;
+  keepChildrenOf =
+    parent: lib.unique (lib.filter (p: p != null) (map (pathDirectChildOf parent) specificGamePaths));
+  pruneKeepFile =
+    parent:
+    pkgs.writeText "game-local-keep-${lib.replaceStrings [ "/" " " ] [ "-" "-" ] parent}" (
+      lib.concatStringsSep "\n" (keepChildrenOf parent) + "\n"
+    );
 
   # Top-level roots this host manages under syncRoot (for the prune manifest).
   managedPaths = lib.unique (wholePlatforms ++ selectedGamePaths);
@@ -229,21 +260,9 @@ let
       [ ]
     else
       let
-        coveredByPlatform = p: lib.elem (lib.head (lib.splitString "/" p)) wholePlatforms;
-        specific = lib.unique (lib.filter (p: !(coveredByPlatform p)) selectedGamePaths);
-        ancestorsOf =
-          p:
-          let
-            parts = lib.splitString "/" p;
-          in
-          map (k: lib.concatStringsSep "/" (lib.take k parts)) (lib.range 1 (lib.length parts - 1));
-        specificAncestors = lib.unique (lib.concatMap ancestorsOf specific);
-        # Dirs we descend into and must exclude the non-selected children of;
-        # a wholesale platform's whole subtree is kept, so it is not excluded.
-        excludeDirs = lib.filter (d: !(lib.elem d wholePlatforms)) specificAncestors;
         depth = p: lib.length (lib.splitString "/" p);
         byDepthDesc = lib.sort (a: b: depth a > depth b);
-        recursiveIncludes = wholePlatforms ++ specific;
+        recursiveIncludes = wholePlatforms ++ specificGamePaths;
         selectedIncludes = lib.unique ((map (p: p + "/**") recursiveIncludes) ++ recursiveIncludes);
         ancestorRules = d: [
           ("/" + d + "/*")
@@ -561,7 +580,7 @@ in
         description = "Prune de-selected local game copies under syncRoot";
         wantedBy = [ "multi-user.target" ];
         after = [ "syncthing.service" ];
-        restartTriggers = [ managedFile ];
+        restartTriggers = [ managedFile ] ++ map pruneKeepFile excludeDirs;
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
@@ -580,6 +599,28 @@ in
               rm -rf -- "$sync_root/$p"
             fi
           done < "$state"
+          # Also delete direct children that were fetched before the ignore rules
+          # narrowed. For example, with only pc/GH3 selected, remove pc/Call of
+          # Duty but keep pc/GH3.
+          ${lib.concatMapStringsSep "\n" (
+            d:
+            let
+              keepFile = pruneKeepFile d;
+            in
+            ''
+              dir="$sync_root/${d}"
+              if [ -d "$dir" ]; then
+                for child in "$dir"/* "$dir"/.[!.]* "$dir"/..?*; do
+                  [ -e "$child" ] || continue
+                  child_name="''${child##*/}"
+                  child_rel="${d}/$child_name"
+                  if ! ${pkgs.gnugrep}/bin/grep -qxF -- "$child_rel" ${keepFile}; then
+                    rm -rf -- "$child"
+                  fi
+                done
+              fi
+            ''
+          ) excludeDirs}
           cp ${managedFile} "$state"
         '';
       };
