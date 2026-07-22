@@ -243,9 +243,14 @@ let
         excludeDirs = lib.filter (d: !(lib.elem d wholePlatforms)) specificAncestors;
         depth = p: lib.length (lib.splitString "/" p);
         byDepthDesc = lib.sort (a: b: depth a > depth b);
-        includes = lib.unique (wholePlatforms ++ specific ++ specificAncestors);
+        recursiveIncludes = wholePlatforms ++ specific;
+        includes = lib.unique (
+          (map (p: p + "/**") recursiveIncludes) ++ recursiveIncludes ++ specificAncestors
+        );
       in
       # Includes first (deepest-first) so they win over the excludes that follow.
+      # Selected game/platform directories need both the directory itself and its
+      # contents included; ancestor directories only need to be traversable.
       (map (p: "!/" + p) (byDepthDesc includes))
       ++ (map (d: "/" + d + "/*") (byDepthDesc excludeDirs))
       ++ [ "*" ];
