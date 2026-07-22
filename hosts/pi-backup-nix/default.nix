@@ -53,6 +53,7 @@ in
 
     # Software
     # "${self}/modules/software/bundles/all.nix"
+    "${self}/modules/software/packages/ssh-copy.nix"
     "${self}/modules/software/packages/zsh.nix"
     # "${self}/modules/software/services/incus.nix"
 
@@ -65,6 +66,9 @@ in
     "${self}/modules/software/services/fail2ban"
 
   ];
+
+  software.ssh-copy.enable = true;
+
   # NixOS defaults include x86-only modules (e.g. i8042) that don't exist
   # in the Pi's ARM kernel, causing the initrd build to fail.
   boot.initrd.includeDefaultModules = false;

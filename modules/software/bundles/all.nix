@@ -8,6 +8,7 @@
 {
   imports = [
     "${self}/modules/software/packages/lan-launch.nix"
+    "${self}/modules/software/packages/ssh-copy.nix"
   ];
   options.software.all.enable = lib.mkOption {
     type = lib.types.bool;
@@ -17,6 +18,7 @@
 
   config = lib.mkIf config.software.all.enable {
     software.lan-launch.enable = true;
+    software.ssh-copy.enable = true;
     # AppImage support
     programs.appimage = {
       enable = true;
