@@ -21,7 +21,7 @@ let
     fi
     SECONDARY=$(echo "$REAL_MONITORS" | ${lib.getExe pkgs.jq} -r '[.[] | select(.name != "'"$PRIMARY"'")] | .[0].name')
 
-    RULES_FILE="$HOME/.config/hypr/workspace-rules.conf"
+    RULES_FILE="$HOME/.config/hypr/workspace-rules.lua"
     STATE_FILE="$HOME/.local/state/hypr-swap-state"
     PRIMARY_FILE="$HOME/.local/state/hypr-primary-monitor"
     mkdir -p "$(dirname "$STATE_FILE")"
@@ -52,16 +52,16 @@ let
     + ''
     # Update rules file so non-existent workspaces land on the right monitor after restart
     cat > "$RULES_FILE" << EOF
-workspace = 1, monitor:$A, default:true
-workspace = 2, monitor:$A
-workspace = 3, monitor:$A
-workspace = 4, monitor:$A
-workspace = 5, monitor:$A
-workspace = 6, monitor:$B, default:true
-workspace = 7, monitor:$B
-workspace = 8, monitor:$B
-workspace = 9, monitor:$B
-workspace = 10, monitor:$B
+hl.workspace_rule({ workspace = "1", monitor = "$A", default = true })
+hl.workspace_rule({ workspace = "2", monitor = "$A" })
+hl.workspace_rule({ workspace = "3", monitor = "$A" })
+hl.workspace_rule({ workspace = "4", monitor = "$A" })
+hl.workspace_rule({ workspace = "5", monitor = "$A" })
+hl.workspace_rule({ workspace = "6", monitor = "$B", default = true })
+hl.workspace_rule({ workspace = "7", monitor = "$B" })
+hl.workspace_rule({ workspace = "8", monitor = "$B" })
+hl.workspace_rule({ workspace = "9", monitor = "$B" })
+hl.workspace_rule({ workspace = "10", monitor = "$B" })
 EOF
 
     # Move existing workspaces immediately (non-existent ones are silently skipped)
@@ -81,7 +81,7 @@ in
 {
   home.packages = [ swapScript ];
 
-  wayland.windowManager.hyprland.settings.bind = [
-    "$mainMod, M, exec, hypr-swap-monitors"
-  ];
+  wayland.windowManager.hyprland.extraConfig = ''
+    hl.bind(mainMod .. " + M", hl.dsp.exec_cmd("hypr-swap-monitors"))
+  '';
 }

@@ -3,13 +3,16 @@
 # Add to config.my.hypr.taskbarPopups from any module/host — definitions are concatenated.
 let
   mkPopupRules = class: [
-    "float on, match:class ${class}"
-    "size 700 700, match:class ${class}"
-    "move (monitor_w-705) 60, match:class ${class}"
-    "rounding 16, match:class ${class}"             # Rounder than global default (5)
-    "opacity 0.88 0.88, match:class ${class}"       # Frosted glass — pairs with global blur
-    "border_color rgba(ffcce6ff) rgba(9778D0ff) 45deg, match:class ${class}" # Pink/purple gradient border
-    "animation slide right, match:class ${class}"  # Slide in from right using global overshoot bezier
+    {
+      match = { class = class; };
+      float = true;
+      size = "700 700";
+      move = "(monitor_w-705) 60";
+      rounding = 16; # Rounder than global default (5)
+      opacity = "0.88 0.88"; # Frosted glass — pairs with global blur
+      border_color = "rgba(ffcce6ff) rgba(9778D0ff) 45deg"; # Pink/purple gradient border
+      animation = "slide right"; # Slide in from right using global overshoot bezier
+    }
   ];
 in
 {
@@ -29,7 +32,7 @@ in
     ];
 
 
-    wayland.windowManager.hyprland.settings.windowrule =
+    wayland.windowManager.hyprland.settings.window_rule =
       lib.concatMap mkPopupRules config.my.hypr.taskbarPopups;
   };
 }

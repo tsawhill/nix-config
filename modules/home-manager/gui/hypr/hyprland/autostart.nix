@@ -1,14 +1,17 @@
 { lib, pkgs, ... }:
 {
-  wayland.windowManager.hyprland.settings.exec-once = [
-    # One-shot setup commands (not app launches)
-    "rfkill unblock 0; sleep 15; rfkill unblock 0"
+  # Startup execs: hl.on("hyprland.start", function() ... end)
+  wayland.windowManager.hyprland.extraConfig = ''
+    hl.on("hyprland.start", function()
+      -- One-shot setup commands (not app launches)
+      hl.exec_cmd("rfkill unblock 0; sleep 15; rfkill unblock 0")
 
-    # App launches (vesktop managed as systemd service below for portal ordering)
-    "steam"
-    "sleep 15; uwsm app -- heroic"
-    "sleep 15; uwsm app -- feishin"
-  ];
+      -- App launches (vesktop managed as systemd service below for portal ordering)
+      hl.exec_cmd("steam")
+      hl.exec_cmd("sleep 15; uwsm app -- heroic")
+      hl.exec_cmd("sleep 15; uwsm app -- feishin")
+    end)
+  '';
 
   # Persistent background processes managed as systemd user services
   systemd.user.services = {

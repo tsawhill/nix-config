@@ -50,7 +50,9 @@ let
 in
 lib.mkIf (cfg.monitors.secondary == null) {
   home.packages = [ daemonScript ];
-  wayland.windowManager.hyprland.settings.exec-once = [
-    (lib.getExe daemonScript)
-  ];
+  wayland.windowManager.hyprland.extraConfig = ''
+    hl.on("hyprland.start", function()
+      hl.exec_cmd("${lib.getExe daemonScript}")
+    end)
+  '';
 }

@@ -3,14 +3,19 @@
   options.my.hypr.windowRules.secondaryMonitor.enable = lib.mkEnableOption "secondary monitor window rules" // { default = true; };
 
   config = lib.mkIf config.my.hypr.windowRules.secondaryMonitor.enable {
-    wayland.windowManager.hyprland.settings.windowrule = [
+    wayland.windowManager.hyprland.settings.window_rule = [
       # vesktop — master window on workspace 6
-      "pseudo on, match:class vesktop"
-      "size 2123 1209, match:class vesktop"
-
+      {
+        match = { class = "vesktop"; };
+        pseudo = true;
+        size = "2123 1209";
+      }
       # feishin — slave window on workspace 6
-      "pseudo on, match:class feishin"
-      "size 907 921, match:class feishin"
+      {
+        match = { class = "feishin"; };
+        pseudo = true;
+        size = "907 921";
+      }
     ];
   };
 }

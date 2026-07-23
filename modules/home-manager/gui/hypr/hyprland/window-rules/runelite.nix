@@ -3,26 +3,46 @@
   options.my.hypr.windowRules.runelite.enable = lib.mkEnableOption "runelite window rules" // { default = true; };
 
   config = lib.mkIf config.my.hypr.windowRules.runelite.enable {
-    wayland.windowManager.hyprland.settings.windowrule = [
+    wayland.windowManager.hyprland.settings.window_rule = [
       # Bolt Launcher
-      "float on, match:class BoltLauncher"
-      "size 1115 894, match:class BoltLauncher"
+      {
+        match = { class = "BoltLauncher"; };
+        float = true;
+        size = "1115 894";
+      }
 
       # RuneLite Launcher (update/splash screen)
-      "float on, match:class net-runelite-launcher-Launcher"
-      "size 640 480, match:class net-runelite-launcher-Launcher"
+      {
+        match = { class = "net-runelite-launcher-Launcher"; };
+        float = true;
+        size = "640 480";
+      }
 
-      # RuneLite client (float all windows; size only the main client, not popups)
-      "float on, match:class net-runelite-client-RuneLite"
-      "pseudo on, match:class net-runelite-client-RuneLite"
-      "size 1078 777, match:class net-runelite-client-RuneLite, match:title ^RuneLite$"
-      # Suppress focus fighting on XWayland popups (titled win* by Java)
-      "suppress_event activatefocus, match:class net-runelite-client-RuneLite, match:title ^win"
-      "no_initial_focus on, match:class net-runelite-client-RuneLite, match:title ^win"
-      # Fix black popup rendering on XWayland
-      "immediate on, match:class net-runelite-client-RuneLite, match:title ^win"
-      "render_unfocused on, match:class net-runelite-client-RuneLite, match:title ^win"
-      "focus_on_activate off, match:class net-runelite-client-RuneLite, match:title ^win"
+      # RuneLite client — float all windows; size only the main client, not popups
+      {
+        match = { class = "net-runelite-client-RuneLite"; };
+        float = true;
+        pseudo = true;
+      }
+      {
+        match = {
+          class = "net-runelite-client-RuneLite";
+          title = "^RuneLite$";
+        };
+        size = "1078 777";
+      }
+      # XWayland popups (titled win* by Java): suppress focus fighting and fix black rendering
+      {
+        match = {
+          class = "net-runelite-client-RuneLite";
+          title = "^win";
+        };
+        suppress_event = "activatefocus";
+        no_initial_focus = true;
+        immediate = true;
+        render_unfocused = true;
+        focus_on_activate = false;
+      }
     ];
   };
 }

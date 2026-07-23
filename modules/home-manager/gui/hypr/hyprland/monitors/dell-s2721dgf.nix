@@ -5,14 +5,14 @@
   };
 
   config = lib.mkIf config.my.hypr.monitors.dellS2721dgf.enable {
-    wayland.windowManager.hyprland.extraConfig = ''
-      monitorv2 {
-        output=desc:Dell Inc. DELL S2721DGF 98T9623
-        mode=2560x1440@60.00Hz
-        position=auto-right
-        scale=1
-        vrr=1
+    wayland.windowManager.hyprland.settings.monitor = [
+      {
+        output = "desc:Dell Inc. DELL S2721DGF 98T9623";
+        mode = "2560x1440@60.00Hz";
+        position = "auto-right";
+        scale = 1;
+        vrr = 1;
       }
-    '';
+    ];
   };
 }

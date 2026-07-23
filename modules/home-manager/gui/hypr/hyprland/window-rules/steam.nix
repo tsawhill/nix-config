@@ -3,31 +3,58 @@
   options.my.hypr.windowRules.steam.enable = lib.mkEnableOption "steam window rules" // { default = true; };
 
   config = lib.mkIf config.my.hypr.windowRules.steam.enable {
-    wayland.windowManager.hyprland.settings.windowrule = [
+    wayland.windowManager.hyprland.settings.window_rule = [
       # Suppress steam from stealing focus
-      "suppress_event activatefocus, match:class steam"
-      "no_initial_focus on, match:class steam"
+      {
+        match = { class = "steam"; };
+        suppress_event = "activatefocus";
+        no_initial_focus = true;
+      }
 
       # Notification toasts — block idle inhibition and focus grabs
-      "idle_inhibit none, match:class steam, match:title ^notificationtoasts"
-      "suppress_event activatefocus, match:class steam, match:title ^notificationtoasts"
-      "no_initial_focus on, match:class steam, match:title ^notificationtoasts"
+      {
+        match = {
+          class = "steam";
+          title = "^notificationtoasts";
+        };
+        idle_inhibit = "none";
+        suppress_event = "activatefocus";
+        no_initial_focus = true;
+      }
 
-      # Fallback: any steam window except notification toasts — catches chat/DMs where title is dynamic
+      # Fallback: any steam window except notification toasts — catches chat/DMs where title is dynamic.
       # More specific rules below override position/size for library and friends list.
       # Percentages are relative to the window's current monitor so layout scales
       # correctly across monitors of different resolutions (e.g. ultrawide after swap).
-      "float on, match:class steam, match:title negative:^notificationtoasts"
-      "move 61% 5%, match:class steam, match:title negative:^notificationtoasts"
-      "size 38% 47%, match:class steam, match:title negative:^notificationtoasts"
+      {
+        match = {
+          class = "steam";
+          title = "negative:^notificationtoasts";
+        };
+        float = true;
+        move = "61% 5%";
+        size = "38% 47%";
+      }
 
       # Steam library (main window) — overrides fallback
-      "move 1% 6%, match:class steam, match:title ^Steam$"
-      "size 56% 88%, match:class steam, match:title ^Steam$"
+      {
+        match = {
+          class = "steam";
+          title = "^Steam$";
+        };
+        move = "1% 6%";
+        size = "56% 88%";
+      }
 
       # Steam friends list — overrides fallback
-      "move 66% 55%, match:class steam, match:title ^Friends List$"
-      "size 30% 43%, match:class steam, match:title ^Friends List$"
+      {
+        match = {
+          class = "steam";
+          title = "^Friends List$";
+        };
+        move = "66% 55%";
+        size = "30% 43%";
+      }
     ];
   };
 }

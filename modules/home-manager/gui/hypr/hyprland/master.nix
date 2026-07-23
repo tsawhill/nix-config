@@ -1,5 +1,5 @@
 {
-  wayland.windowManager.hyprland.settings.master = {
+  wayland.windowManager.hyprland.settings.config.master = {
     allow_small_split = true;
     mfact = 0.7;
     orientation = "center";

@@ -203,8 +203,8 @@ in
       monitor: monCfg: lib.nameValuePair "wallpaper-engine-${monitor}" (mkWallpaperService monitor monCfg)
     ) cfg.monitors;
 
-    # wayland.windowManager.hyprland.settings.layerrule = [
-    #   "idleinhibit never, linux-wallpaperengine"
+    # wayland.windowManager.hyprland.settings.layer_rule = [
+    #   { match = { namespace = "linux-wallpaperengine"; }; }
     # ];
   };
 }

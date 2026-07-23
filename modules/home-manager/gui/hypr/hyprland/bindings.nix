@@ -4,116 +4,77 @@
   #         Key bindings         #
   #                              #
   ################################
-  wayland.windowManager.hyprland.settings.bind = [
-    "$mainMod, B, exec, zen"
-    "$mainMod, Return, exec, foot"
-    "$mainMod SHIFT, Q, killactive, "
-    "$mainMod SHIFT, E, exit, "
-    "$mainMod, Next, exec, pkill -USR1 'gpu-screen-re*' && sleep 0.5 && notify-send -t 1500 -u low -- \"GPU Screen Recorder\" \"Replay saved\""
-    "$mainMod, Delete, exec, grimblast copysave area"
-    "$mainMod, Page_Up, exec, grimblast copysave active"
-    ", Print, exec, grimblast copysave output"
-    "$mainMod, F, fullscreen"
-    "$mainMod, E, exec, nemo"
-    "$mainMod, Space, togglefloating, "
-    "$mainMod, D, exec, walker"
-    "$mainMod, R, exec, walker -m runner"
-    "$mainMod, P, pseudo, "
-    "$mainMod, V, layoutmsg, togglesplit"
-    "$mainMod, W, layoutmsg, addmaster"
-    "$mainMod, S, layoutmsg, removemaster"
+  # Hand-written Lua: hl.bind(keys, dispatcher_closure, opts?). `mainMod` is the
+  # `local mainMod = "SUPER"` declared in default.nix (settings.mainMod._var).
+  # Dispatchers are hl.dsp.* closures — NOT strings.
+  wayland.windowManager.hyprland.extraConfig = ''
+    -- Apps / actions
+    hl.bind(mainMod .. " + B",      hl.dsp.exec_cmd("zen"))
+    hl.bind(mainMod .. " + Return", hl.dsp.exec_cmd("foot"))
+    hl.bind(mainMod .. " + Next",   hl.dsp.exec_cmd([[pkill -USR1 'gpu-screen-re*' && sleep 0.5 && notify-send -t 1500 -u low -- "GPU Screen Recorder" "Replay saved"]]))
+    hl.bind(mainMod .. " + Delete",  hl.dsp.exec_cmd("grimblast copysave area"))
+    hl.bind(mainMod .. " + Page_Up", hl.dsp.exec_cmd("grimblast copysave active"))
+    hl.bind("Print",                 hl.dsp.exec_cmd("grimblast copysave output"))
+    hl.bind(mainMod .. " + F",      hl.dsp.window.fullscreen({}))
+    hl.bind(mainMod .. " + E",      hl.dsp.exec_cmd("nemo"))
+    hl.bind(mainMod .. " + Space",  hl.dsp.window.float({ action = "toggle" }))
+    hl.bind(mainMod .. " + D",      hl.dsp.exec_cmd("walker"))
+    hl.bind(mainMod .. " + R",      hl.dsp.exec_cmd("walker -m runner"))
+    hl.bind(mainMod .. " + P",      hl.dsp.window.pseudo({}))
+    hl.bind(mainMod .. " + V",      hl.dsp.layout("togglesplit"))
+    hl.bind(mainMod .. " + W",      hl.dsp.layout("addmaster"))
+    hl.bind(mainMod .. " + S",      hl.dsp.layout("removemaster"))
 
-    # Cycle through windows
-    "$mainMod, Tab, cyclenext"
-    "$mainMod SHIFT, Tab, cyclenext, prev"
+    -- Cycle through windows
+    hl.bind(mainMod .. " + Tab",         hl.dsp.window.cycle_next({}))
+    hl.bind(mainMod .. " + SHIFT + Tab", hl.dsp.window.cycle_next({ next = false }))
 
-    # Switch workspaces with mainMod + [0-9]
-    "$mainMod, 1, workspace, 1"
-    "$mainMod, 2, workspace, 2"
-    "$mainMod, 3, workspace, 3"
-    "$mainMod, 4, workspace, 4"
-    "$mainMod, 5, workspace, 5"
-    "$mainMod, 6, workspace, 6"
-    "$mainMod, 7, workspace, 7"
-    "$mainMod, 8, workspace, 8"
-    "$mainMod, 9, workspace, 9"
-    "$mainMod, 0, workspace, 10"
+    -- Switch workspaces (mainMod + [0-9]) / move active window to workspace (mainMod + SHIFT + [0-9])
+    for i = 1, 10 do
+      local key = i % 10 -- 10 maps to key 0
+      hl.bind(mainMod .. " + " .. key,         hl.dsp.focus({ workspace = i }))
+      hl.bind(mainMod .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = i }))
+    end
 
-    # Move active window to a workspace with mainMod + SHIFT + [0-9]
-    "$mainMod SHIFT, 1, movetoworkspace, 1"
-    "$mainMod SHIFT, 2, movetoworkspace, 2"
-    "$mainMod SHIFT, 3, movetoworkspace, 3"
-    "$mainMod SHIFT, 4, movetoworkspace, 4"
-    "$mainMod SHIFT, 5, movetoworkspace, 5"
-    "$mainMod SHIFT, 6, movetoworkspace, 6"
-    "$mainMod SHIFT, 7, movetoworkspace, 7"
-    "$mainMod SHIFT, 8, movetoworkspace, 8"
-    "$mainMod SHIFT, 9, movetoworkspace, 9"
-    "$mainMod SHIFT, 0, movetoworkspace, 10"
+    -- Scroll through workspaces
+    hl.bind(mainMod .. " + mouse_down", hl.dsp.focus({ workspace = "e+1" }))
+    hl.bind(mainMod .. " + mouse_up",   hl.dsp.focus({ workspace = "e-1" }))
 
-    # Scroll through existing workspaces with mainMod + scroll
-    "$mainMod, mouse_down, workspace, e+1"
-    "$mainMod, mouse_up, workspace, e-1"
+    -- Move focus
+    hl.bind(mainMod .. " + left",  hl.dsp.focus({ direction = "left" }))
+    hl.bind(mainMod .. " + right", hl.dsp.focus({ direction = "right" }))
+    hl.bind(mainMod .. " + up",    hl.dsp.focus({ direction = "up" }))
+    hl.bind(mainMod .. " + down",  hl.dsp.focus({ direction = "down" }))
 
-    # Move focus with mainMod + arrow keys
-    "$mainMod, left, movefocus, l"
-    "$mainMod, right, movefocus, r"
-    "$mainMod, up, movefocus, u"
-    "$mainMod, down, movefocus, d"
+    -- Move window
+    hl.bind(mainMod .. " + CTRL + left",  hl.dsp.window.move({ direction = "left" }))
+    hl.bind(mainMod .. " + CTRL + right", hl.dsp.window.move({ direction = "right" }))
+    hl.bind(mainMod .. " + CTRL + up",    hl.dsp.window.move({ direction = "up" }))
+    hl.bind(mainMod .. " + CTRL + down",  hl.dsp.window.move({ direction = "down" }))
 
-    # Move window with mainMod + CTRL + arrow keys
-    "$mainMod CTRL, left, movewindow, l"
-    "$mainMod CTRL, right, movewindow, r"
-    "$mainMod CTRL, up, movewindow, u"
-    "$mainMod CTRL, down, movewindow, d"
+    -- Mic mute
+    hl.bind(mainMod .. " + CTRL + Z",      hl.dsp.exec_cmd("pactl set-source-mute @DEFAULT_SOURCE@ toggle"))
+    hl.bind(mainMod .. " + XF86AudioMute", hl.dsp.exec_cmd("pactl set-source-mute @DEFAULT_SOURCE@ toggle"))
 
-    # Mic mute
-    "$mainMod CTRL, Z, exec, pactl set-source-mute @DEFAULT_SOURCE@ toggle"
-    "$mainMod, xf86audiomute, exec, pactl set-source-mute @DEFAULT_SOURCE@ toggle"
+    -- Brightness
+    hl.bind("XF86MonBrightnessUp",   hl.dsp.exec_cmd("brightnessctl set +5%"))
+    hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("brightnessctl set 5%-"))
 
-    # Brightness
-    ", xf86monbrightnessup, exec, brightnessctl set +5%"
-    ", xf86monbrightnessdown, exec, brightnessctl set 5%-"
-  ];
+    -- Repeated resize (binde)
+    hl.bind(mainMod .. " + SHIFT + right", hl.dsp.window.resize({ x = 30,  y = 0 }),   { repeating = true })
+    hl.bind(mainMod .. " + SHIFT + left",  hl.dsp.window.resize({ x = -30, y = 0 }),   { repeating = true })
+    hl.bind(mainMod .. " + SHIFT + up",    hl.dsp.window.resize({ x = 0,   y = -30 }), { repeating = true })
+    hl.bind(mainMod .. " + SHIFT + down",  hl.dsp.window.resize({ x = 0,   y = 30 }),  { repeating = true })
 
-  ################################
-  #                              #
-  #    Repeated key bindings     #
-  #                              #
-  ################################
-  wayland.windowManager.hyprland.settings.binde = [
-    "$mainMod SHIFT, right, resizeactive, 30 0"
-    "$mainMod SHIFT, left, resizeactive, -30 0"
-    "$mainMod SHIFT, up, resizeactive, 0 -30"
-    "$mainMod SHIFT, down, resizeactive, 0 30"
-  ];
+    -- Locked binds (bindl): fire even when a game has grabbed the keyboard
+    hl.bind(mainMod .. " + SHIFT + Q", hl.dsp.window.close(), { locked = true })
+    hl.bind(mainMod .. " + SHIFT + E", hl.dsp.exit(),         { locked = true })
+    hl.bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("pactl set-sink-volume @DEFAULT_SINK@ +5%"),  { locked = true })
+    hl.bind("XF86AudioLowerVolume", hl.dsp.exec_cmd("pactl set-sink-volume @DEFAULT_SINK@ -5%"),  { locked = true })
+    hl.bind("XF86AudioMute",        hl.dsp.exec_cmd("pactl set-sink-mute @DEFAULT_SINK@ toggle"), { locked = true })
 
-  ################################
-  #                              #
-  #   Locked bindings (games)    #
-  #   Fire even when input is    #
-  #   grabbed by another app     #
-  #                              #
-  ################################
-  wayland.windowManager.hyprland.settings.bindl = [
-    # Allow killing/escaping even when a game has grabbed the keyboard
-    "$mainMod SHIFT, Q, killactive, "
-    "$mainMod SHIFT, E, exit, "
-
-    # Volume while in-game
-    ", xf86audioraisevolume, exec, pactl set-sink-volume @DEFAULT_SINK@ +5%"
-    ", xf86audiolowervolume, exec, pactl set-sink-volume @DEFAULT_SINK@ -5%"
-    ", xf86audiomute, exec, pactl set-sink-mute @DEFAULT_SINK@ toggle"
-  ];
-
-  ################################
-  #                              #
-  #        Mouse bindings        #
-  #                              #
-  ################################
-  wayland.windowManager.hyprland.settings.bindm = [
-    # Move/resize windows with mainMod + LMB/RMB and dragging
-    "$mainMod, mouse:272, movewindow"
-    "$mainMod, mouse:273, resizeactive"
-  ];
+    -- Mouse binds (bindm): move/resize with mainMod + LMB/RMB drag
+    hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(),   { mouse = true })
+    hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
+  '';
 }

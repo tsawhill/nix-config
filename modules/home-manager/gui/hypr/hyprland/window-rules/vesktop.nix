@@ -5,8 +5,11 @@
   };
 
   config = lib.mkIf config.my.hypr.windowRules.vesktop.enable {
-    wayland.windowManager.hyprland.settings.windowrule = [
-      "suppress_event fullscreen fullscreenoutput, match:class vesktop"
+    wayland.windowManager.hyprland.settings.window_rule = [
+      {
+        match = { class = "vesktop"; };
+        suppress_event = "fullscreen fullscreenoutput";
+      }
     ];
   };
 }

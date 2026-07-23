@@ -9,6 +9,19 @@ let
   hyprCfg = config.my.hypr;
   primaryMonitorFile = "${config.home.homeDirectory}/.local/state/hypr-primary-monitor";
 
+  # Translate a hyprlang bind prefix ("$mainMod SHIFT, Key") into a Lua key
+  # expression for hl.bind, referencing the `mainMod` local from default.nix.
+  keyExpr =
+    spec:
+    let
+      toks = lib.filter (t: t != "") (lib.splitString " " (lib.replaceStrings [ "," ] [ " " ] spec));
+      key = lib.last toks;
+      mods = lib.init toks;
+      otherMods = lib.filter (t: t != "$mainMod") mods;
+      suffix = lib.concatStringsSep " + " (otherMods ++ [ key ]);
+    in
+    if lib.elem "$mainMod" mods then ''mainMod .. " + ${suffix}"'' else ''"${suffix}"'';
+
   audioArgs = lib.concatMapStringsSep " " (d: "-a ${lib.escapeShellArg d}") (
     cfg.audio.output ++ cfg.audio.input
   );
@@ -280,8 +293,13 @@ in
       };
     };
 
-    wayland.windowManager.hyprland.settings.bindl =
-      [ "${cfg.recordingToggleKeybind}, exec, ${lib.getExe recordingToggle}" ]
-      ++ lib.optional (cfg.captureTarget == "portal") "${cfg.sourcePickerKeybind}, exec, ${lib.getExe sourcePicker}";
+    # Locked binds (hl.bind ... { locked = true }) so they fire in-game.
+    wayland.windowManager.hyprland.extraConfig =
+      ''
+        hl.bind(${keyExpr cfg.recordingToggleKeybind}, hl.dsp.exec_cmd("${lib.getExe recordingToggle}"), { locked = true })
+      ''
+      + lib.optionalString (cfg.captureTarget == "portal") ''
+        hl.bind(${keyExpr cfg.sourcePickerKeybind}, hl.dsp.exec_cmd("${lib.getExe sourcePicker}"), { locked = true })
+      '';
   };
 }

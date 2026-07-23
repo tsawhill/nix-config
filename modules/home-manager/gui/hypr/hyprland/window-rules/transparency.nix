@@ -3,6 +3,18 @@
 # Add classes to dimApps for 97% inactive opacity.
 # Add raw match strings to opaqueApps to exempt windows from dimming (full inactive opacity).
 # Both lists are additive — definitions across modules are concatenated.
+let
+  # Parse a raw "prop value" opaque-match string into a { prop = value; } table,
+  # e.g. "title .*YouTube" -> { title = ".*YouTube"; }.
+  mkMatch =
+    m:
+    let
+      parts = lib.splitString " " m;
+    in
+    {
+      ${lib.head parts} = lib.concatStringsSep " " (lib.tail parts);
+    };
+in
 {
   options.my.hypr.windowRules.transparency.enable = lib.mkEnableOption "transparency window rules" // { default = true; };
 
@@ -31,9 +43,20 @@
       ];
     };
 
-    wayland.windowManager.hyprland.settings.windowrule =
-      [ "opacity 1.0 override 0.99 override, match:class .+" ]
-      ++ map (c: "opacity 1.0 override 0.97 override, match:class ${c}") config.my.hypr.transparency.dimApps
-      ++ map (m: "opacity 1.0 override 1.0 override, match:${m}") config.my.hypr.transparency.opaqueApps;
+    wayland.windowManager.hyprland.settings.window_rule =
+      [
+        {
+          match = { class = ".+"; };
+          opacity = "1.0 override 0.99 override";
+        }
+      ]
+      ++ map (c: {
+        match = { class = c; };
+        opacity = "1.0 override 0.97 override";
+      }) config.my.hypr.transparency.dimApps
+      ++ map (m: {
+        match = mkMatch m;
+        opacity = "1.0 override 1.0 override";
+      }) config.my.hypr.transparency.opaqueApps;
   };
 }

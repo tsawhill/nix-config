@@ -3,6 +3,19 @@
 let
   cfg = config.my.hypr.crosshair;
   hyprCfg = config.my.hypr;
+
+  # Translate a hyprlang bind prefix ("$mainMod SHIFT, Key") into a Lua key
+  # expression for hl.bind, referencing the `mainMod` local from default.nix.
+  keyExpr =
+    spec:
+    let
+      toks = lib.filter (t: t != "") (lib.splitString " " (lib.replaceStrings [ "," ] [ " " ] spec));
+      key = lib.last toks;
+      mods = lib.init toks;
+      otherMods = lib.filter (t: t != "$mainMod") mods;
+      suffix = lib.concatStringsSep " + " (otherMods ++ [ key ]);
+    in
+    if lib.elem "$mainMod" mods then ''mainMod .. " + ${suffix}"'' else ''"${suffix}"'';
 in
 {
   options.my.hypr.crosshair = {
@@ -126,14 +139,14 @@ in
       };
     };
 
-    # Locked binds so they work in-game
-    wayland.windowManager.hyprland.settings.bindl =
-      lib.optionals (config.programs.hyprcrosshair.profiles.configs != [ ]) [
-        "${cfg.cycleKeybind}, exec, hyprcrosshair-cycle"
-      ]
-      ++ [
-        # Toggle: kill if running, start if not
-        "${cfg.toggleKeybind}, exec, pkill -x hyprcrosshair || hyprcrosshair"
-      ];
+    # Locked binds (hl.bind ... { locked = true }) so they work in-game
+    wayland.windowManager.hyprland.extraConfig =
+      lib.optionalString (config.programs.hyprcrosshair.profiles.configs != [ ]) ''
+        hl.bind(${keyExpr cfg.cycleKeybind}, hl.dsp.exec_cmd("hyprcrosshair-cycle"), { locked = true })
+      ''
+      # Toggle: kill if running, start if not
+      + ''
+        hl.bind(${keyExpr cfg.toggleKeybind}, hl.dsp.exec_cmd("pkill -x hyprcrosshair || hyprcrosshair"), { locked = true })
+      '';
   };
 }

@@ -67,35 +67,42 @@
     enable = true;
     package = null;
     portalPackage = null;
+    # Hyprland 0.55+ defaults to loading ~/.config/hypr/hyprland.lua and it takes
+    # precedence over hyprland.conf. Emit Lua so HM owns that file. `settings`
+    # attrs render to hl.<name>(...) calls; binds/autostart/animations that need
+    # dispatcher closures or functions are hand-written Lua in each module's
+    # extraConfig (appended verbatim to hyprland.lua).
+    configType = "lua";
     systemd.enable = false; # Using uwsm -- https://wiki.hyprland.org/Useful-Utilities/Systemd-start/
     settings = {
+      # `local mainMod = "SUPER"` at the top of hyprland.lua; referenced by the
+      # hand-written hl.bind(...) calls in bindings.nix / swap-monitors.nix.
+      mainMod = {
+        _var = "SUPER";
+      };
+
+      # hl.env("NAME", "value")
       env = [
-        "GDK_SCALE, 1"
-        "ELECTRON_OZONE_PLATFORM_HINT,wayland"
-        "EDITOR, nvim"
+        { _args = [ "GDK_SCALE" "1" ]; }
+        { _args = [ "ELECTRON_OZONE_PLATFORM_HINT" "wayland" ]; }
+        { _args = [ "EDITOR" "nvim" ]; }
       ];
 
-      misc = {
-        disable_hyprland_logo = true;
-        enable_swallow = false;
-        swallow_regex = "^(foot)$";
-        enable_anr_dialog = false;
+      # Config sections all live under a single hl.config({ ... }) call. Other
+      # modules (appearance/input/master/dwindle/monitors) merge more sections in.
+      config = {
+        misc = {
+          disable_hyprland_logo = true;
+          enable_swallow = false;
+          swallow_regex = "^(foot)$";
+          enable_anr_dialog = false;
+        };
+
+        general = {
+          layout = config.my.hypr.windowLayout;
+          allow_tearing = true;
+        };
       };
-
-      # debug = {
-      #   vfr = true;
-      # };
-
-      # render = {
-      #   keep_unmodified_copy = 1;
-      # };
-
-      general = {
-        layout = config.my.hypr.windowLayout;
-        allow_tearing = true;
-      };
-
-      "$mainMod" = "SUPER";
     };
   };
 }

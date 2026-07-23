@@ -4,32 +4,33 @@ let
   p = cfg.monitors.primary;
   s = cfg.monitors.secondary;
 
-  # Workspace 1-5 live on monitor A, 6-10 on monitor B.
+  # Workspace 1-5 live on monitor A, 6-10 on monitor B. Emitted as Lua
+  # (hl.workspace_rule) since it is dofile'd from the Lua config.
   mkRules = A: B: (
     ''
-      workspace = 1, monitor:${A}, default:true
-      workspace = 2, monitor:${A}
-      workspace = 3, monitor:${A}
-      workspace = 4, monitor:${A}
-      workspace = 5, monitor:${A}
+      hl.workspace_rule({ workspace = "1", monitor = "${A}", default = true })
+      hl.workspace_rule({ workspace = "2", monitor = "${A}" })
+      hl.workspace_rule({ workspace = "3", monitor = "${A}" })
+      hl.workspace_rule({ workspace = "4", monitor = "${A}" })
+      hl.workspace_rule({ workspace = "5", monitor = "${A}" })
     '' + lib.optionalString (B != null) ''
-      workspace = 6, monitor:${B}, default:true
-      workspace = 7, monitor:${B}
-      workspace = 8, monitor:${B}
-      workspace = 9, monitor:${B}
-      workspace = 10, monitor:${B}
+      hl.workspace_rule({ workspace = "6", monitor = "${B}", default = true })
+      hl.workspace_rule({ workspace = "7", monitor = "${B}" })
+      hl.workspace_rule({ workspace = "8", monitor = "${B}" })
+      hl.workspace_rule({ workspace = "9", monitor = "${B}" })
+      hl.workspace_rule({ workspace = "10", monitor = "${B}" })
     ''
   );
 
-  defaultRules = pkgs.writeText "hypr-workspace-rules-default.conf" (
+  defaultRules = pkgs.writeText "hypr-workspace-rules-default.lua" (
     lib.optionalString (p != "") (mkRules p s)
   );
 
-  swappedRules = pkgs.writeText "hypr-workspace-rules-swapped.conf" (
+  swappedRules = pkgs.writeText "hypr-workspace-rules-swapped.lua" (
     lib.optionalString (p != "" && s != null) (mkRules s p)
   );
 
-  rulesPath = "${config.home.homeDirectory}/.config/hypr/workspace-rules.conf";
+  rulesPath = "${config.home.homeDirectory}/.config/hypr/workspace-rules.lua";
   stateFile = "${config.home.homeDirectory}/.local/state/hypr-swap-state";
   primaryMonitorFile = "${config.home.homeDirectory}/.local/state/hypr-primary-monitor";
 
@@ -79,12 +80,20 @@ lib.mkIf (p != "") {
     '')
   );
 
-  wayland.windowManager.hyprland.settings.exec-once = [
-    "${initScript}"
-  ];
-
-  # Source the mutable rules file from the Hyprland config.
+  # Load the mutable workspace-rules Lua file (seeded on activation and at start
+  # by initScript), then run initScript which re-seeds per swap state + reloads.
   wayland.windowManager.hyprland.extraConfig = ''
-    source = ${rulesPath}
+    do
+      local wsRules = "${rulesPath}"
+      local f = io.open(wsRules, "r")
+      if f then
+        f:close()
+        dofile(wsRules)
+      end
+    end
+
+    hl.on("hyprland.start", function()
+      hl.exec_cmd("${initScript}")
+    end)
   '';
 }
