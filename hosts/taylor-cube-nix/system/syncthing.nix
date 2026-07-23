@@ -5,7 +5,8 @@
   # Joins the `gamesaves` share (see modules/.../syncthing/fleet.nix). That
   # membership auto-activates the game save links home-manager module, symlinking
   # RPCS3/RetroArch/PCSX2/Dolphin data dirs into the share so saves follow the
-  # cube. Deliberately does NOT join `roms` (too large for the local disk).
+  # cube. The games module also joins `roms` when software.games.syncGames or
+  # syncPlatforms selects local copies.
   my.syncthing = {
     enable = true;
     device = "cube";

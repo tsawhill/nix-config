@@ -123,9 +123,23 @@ in
   # Games (or whole platforms) kept on the cube's local SSD: they sync there via
   # the roms Syncthing share (into software.games.syncRoot, default
   # ~/Games/synced) and launch locally; everything else launches from the full
-  # library over the /mnt/zpool/roms CIFS mount. De-selecting a game and
-  # rebuilding deletes its local copy.
+  # library over the /mnt/zpool/roms CIFS mount. Keep pc selective so only GH3
+  # syncs from that platform.
   software.games.syncGames = [ "guitarHero3" ];
+  software.games.syncPlatforms = [
+    "3ds"
+    "arcade"
+    "n64"
+    "nds"
+    "nes"
+    "ngc"
+    "ps2"
+    "ps3"
+    "snes"
+    "switch"
+    "wii"
+    "wiiu"
+  ];
 
   # ---------------------------------------------------------------------------
   # User + secrets
