@@ -62,11 +62,11 @@
         "uv2nix": "uv2nix"
       },
       "locked": {
-        "lastModified": 1784896125,
-        "narHash": "sha256-ICjt4/9uBMaQI+kav6XA8Ml3SMZ55D41OrjmdI0T6MI=",
+        "lastModified": 1784899305,
+        "narHash": "sha256-JdDo5+hOPLpwxS3XRfpotjR99jsB02U3BK/XJTZOhFc=",
         "owner": "nix-community",
         "repo": "authentik-nix",
-        "rev": "6327a2c65d2b3930e601cc0a649eb5ee49745745",
+        "rev": "572314712559bca245437e70c733ff83fc6cb5db",
         "type": "github"
       },
       "original": {
@@ -340,11 +340,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1784877405,
-        "narHash": "sha256-W649GocILahx7Vb/JMx834217+OLKBrq014VmC/8+NM=",
+        "lastModified": 1784913159,
+        "narHash": "sha256-JWq0BfjO4ktpH5USfQNQzdvHpIDT8fSKD5K7LvdMRFs=",
         "owner": "nix-community",
         "repo": "home-manager",
-        "rev": "32de400b6ac9f43042bca706f4a64f6ad08117e8",
+        "rev": "079a3b5d1aa6a719920a51316253b7d6dd22738d",
         "type": "github"
       },
       "original": {
@@ -731,11 +731,11 @@
         "rust-overlay": "rust-overlay"
       },
       "locked": {
-        "lastModified": 1784839890,
-        "narHash": "sha256-/F/unI3Z1f6dFScYIxFhEec4pbviONMC0LJamHDSAsE=",
+        "lastModified": 1784917523,
+        "narHash": "sha256-+dAWnI2jmwKqpRlXE0SpNcS6S70kbxzLa5yOt6MyT7s=",
         "owner": "temidaradev",
         "repo": "kopuz",
-        "rev": "f41c03c14c6302362a40fa871cabd97a1cf3c9bc",
+        "rev": "e8e05705af68e8e74e2538e6252c49193a23cb5e",
         "type": "github"
       },
       "original": {
