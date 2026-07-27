@@ -36,7 +36,14 @@ in
   # This sets amdgpu.ppfeaturemask=0xfffd7fff as a kernel param.
   hardware.amdgpu.overdrive.enable = true;
 
-  services.lact.enable = true;
+  services.lact = {
+    enable = true;
+
+    # LACT 0.9.1's libdisplay-info-sys requires libdisplay-info < 0.4.0.
+    package = pkgs.lact.override {
+      libdisplay-info = pkgs.libdisplay-info_0_2;
+    };
+  };
 
   # Write the config declaratively. LACT hot-reloads on file changes,
   # but a full daemon restart on rebuild ensures settings are always applied.
