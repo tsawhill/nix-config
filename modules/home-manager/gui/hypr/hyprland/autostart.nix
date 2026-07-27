@@ -15,8 +15,8 @@
 
   # Persistent background processes managed as systemd user services
   systemd.user.services = {
-    # programs.hyprpanel generates this service — only override the session target
-    hyprpanel = {
+    # services.wayle generates this service — only override the session target
+    wayle = {
       Unit = {
         After = lib.mkForce [ "wayland-session@hyprland.desktop.target" ];
         PartOf = lib.mkForce [ "wayland-session@hyprland.desktop.target" ];
