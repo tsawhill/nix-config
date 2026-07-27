@@ -49,13 +49,16 @@ lib.mkIf (config.my.hypr.panel.theme == "pink") {
       shadow = "none";
       button-group-background = "transparent";
       button-group-border-color = faint;
+      scale = 0.9;
+      inset-ends = 0.5;
+      padding-ends = 1.0;
+      button-icon-size = 0.85;
     };
 
     modules = lib.genAttrs splitButtonModules (_: splitButtonTheme) // {
-      # Match the inverted microphone button from the old HyprPanel theme.
       microphone = splitButtonTheme // {
-        icon-color = bg;
-        icon-bg-color = primary;
+        icon-color = primary;
+        icon-bg-color = bg;
       };
 
       dashboard = {
@@ -72,9 +75,9 @@ lib.mkIf (config.my.hypr.panel.theme == "pink") {
       };
 
       hyprland-workspaces = {
-        container-bg-color = primary;
-        active-color = bg;
-        occupied-color = faint;
+        container-bg-color = bg;
+        active-color = primary;
+        occupied-color = primary;
         empty-color = faint;
         border-show = true;
         border-color = faint;
