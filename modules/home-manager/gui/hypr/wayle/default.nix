@@ -62,7 +62,7 @@ in
         ];
         location = "top";
         inset-edge = 0.6;
-        inset-ends = 0;
+        inset-ends = lib.mkDefault 0;
         background-opacity = 0;
         button-variant = "block-prefix";
         button-bg-opacity = 80;
