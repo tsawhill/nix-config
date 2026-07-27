@@ -10,12 +10,10 @@ let
 
   # Upstream builds the same vendorHash twice under different fixed-output
   # names: elephant-*-go-modules and elephant-providers-*-go-modules. Give the
-  # providers module output the daemon's name so Nix shares the already-fetched
+  # providers module output the daemon's pname so Nix shares the already-fetched
   # dependencies instead of downloading every Go module a second time.
   elephantProviders = elephantPackages.elephant-providers.overrideAttrs {
-    overrideModAttrs = _: _: {
-      name = "${elephantPackages.elephant.name}-go-modules";
-    };
+    pname = elephantPackages.elephant.pname;
   };
 
   elephantWithProviders = elephantPackages.elephant-with-providers.overrideAttrs {
