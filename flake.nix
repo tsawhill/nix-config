@@ -5,11 +5,6 @@
     authentik-nix.url = "github:nix-community/authentik-nix";
     nixos-raspberrypi.url = "github:nvmd/nixos-raspberrypi/main";
 
-    elephant.url = "github:abenz1267/elephant";
-    walker = {
-      url = "github:abenz1267/walker";
-      inputs.elephant.follows = "elephant";
-    };
     kopuz.url = "github:temidaradev/kopuz";
 
     nixpkgs-stable.url = "github:NixOS/nixpkgs/nixos-26.05";
