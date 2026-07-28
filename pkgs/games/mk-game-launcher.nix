@@ -3,6 +3,7 @@
   writeShellApplication,
   makeDesktopItem,
   symlinkJoin,
+  coreutils,
   gamescope,
 }:
 
@@ -24,7 +25,7 @@ let
   # The Vulkan loader disables an implicit layer whenever that variable is
   # *defined at all* — it never compares the value — so exporting DISABLE_LSFG=0
   # still disables it. The system-wide default defines DISABLE_LSFG to keep lsfg
-  # off everywhere; to actually enable it for this launcher we must unset it.
+  # off everywhere; to actually enable it for the game process we must unset it.
   #
   # Under Proton, lsfg-vk sees the wine/preloader process name rather than the
   # Windows exe, so a conf.toml `exe = "Game.exe"` entry never matches. Derive
@@ -32,11 +33,16 @@ let
   # applies automatically for every Proton/umu title. (exe_path is set by the
   # runner's setupScript; guarded so non-exe runners are unaffected.)
   lsfgSetup = lib.optionalString lsfgVkEnable ''
-    unset DISABLE_LSFG
+    export DISABLE_LSFG=1
     if [ -n "''${exe_path:-}" ]; then
       export LSFG_PROCESS="''${exe_path##*/}"
     fi
   '';
+
+  # Enable lsfg-vk only for the game runner. In particular, keep the implicit
+  # layer disabled while gamescope creates its own Vulkan instance and device.
+  gameCommand =
+    lib.optionalString lsfgVkEnable "${lib.getExe' coreutils "env"} -u DISABLE_LSFG " + runnerCommand;
 
   resolutionLabel = resolution: "${toString resolution.width}x${toString resolution.height}";
   resolutionArgs =
@@ -73,12 +79,12 @@ let
     entry:
     if entry.gamescopeArgs == null then
       ''
-        exec ${runnerCommand}
+        exec ${gameCommand}
       ''
     else
       ''
         exec ${lib.getExe gamescope} ${entry.gamescopeArgs} -- \
-          ${runnerCommand}
+          ${gameCommand}
       '';
 
   mkLauncher = entry: writeShellApplication {
