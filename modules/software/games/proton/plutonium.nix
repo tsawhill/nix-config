@@ -6,7 +6,6 @@
     runner.umu = {
       exe = "plutonium.exe";
       proton = "ge-proton";
-      protonVersion = "10-34";
     };
   };
 }

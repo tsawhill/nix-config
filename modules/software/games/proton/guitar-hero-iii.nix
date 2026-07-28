@@ -11,11 +11,10 @@
     basePath = "pc/GH3";
     runner.umu = {
       exe = "GH3.exe";
-      # GH3 is 32-bit: its GPU drivers and fonts only resolve inside umu's sniper
-      # container, which proton-cachyos (host-native, missing libunwind in sniper)
-      # can't run in. GE-Proton is built for sniper, so use it here, pinned.
+      # GH3 is 32-bit: its GPU drivers and fonts only resolve inside umu's Steam
+      # Runtime container, which proton-cachyos (host-native, missing libunwind
+      # in the container) can't run in. GE-Proton is built for it, so use it here.
       proton = "ge-proton";
-      protonVersion = "9-25";
     };
   };
 }

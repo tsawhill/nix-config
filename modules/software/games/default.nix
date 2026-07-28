@@ -51,15 +51,16 @@ let
   mkUmuRunner =
     umuCfg: exePath:
     let
-      protonCachyos = pkgs.callPackage ../../../pkgs/games/proton-cachyos.nix {
+      # "default" defers to each Proton package's own pinned default version.
+      versionArgs = lib.optionalAttrs (umuCfg.protonVersion != "default") {
         version = umuCfg.protonVersion;
       };
+
+      protonCachyos = pkgs.callPackage ../../../pkgs/games/proton-cachyos.nix versionArgs;
 
       useGeProton = umuCfg.proton == "ge-proton";
 
-      geProton = pkgs.callPackage ../../../pkgs/games/proton-ge.nix {
-        version = umuCfg.protonVersion;
-      };
+      geProton = pkgs.callPackage ../../../pkgs/games/proton-ge.nix versionArgs;
 
       protonPath =
         if useGeProton then
@@ -439,8 +440,12 @@ in
 
                   protonVersion = lib.mkOption {
                     type = lib.types.str;
-                    default = "latest";
-                    description = "Version of the selected Proton.";
+                    default = "default";
+                    description = ''
+                      Version of the selected Proton. "default" uses the version
+                      pinned by the Proton package itself; "latest" makes umu
+                      fetch the newest build at runtime instead of pinning.
+                    '';
                   };
                 };
               }

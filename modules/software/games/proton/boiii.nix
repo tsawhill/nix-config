@@ -7,7 +7,6 @@
       runner.umu = {
         exe = "boiii.exe";
         proton = "ge-proton";
-        protonVersion = "10-34";
       };
     };
 
@@ -19,7 +18,6 @@
       runner.umu = {
         exe = "Steam.exe";
         proton = "ge-proton";
-        protonVersion = "10-34";
       };
     };
   };

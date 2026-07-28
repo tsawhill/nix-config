@@ -7,7 +7,6 @@
       runner.umu = {
         exe = "iw4x.exe";
         proton = "ge-proton";
-        protonVersion = "10-34";
       };
     };
 
@@ -19,7 +18,6 @@
       runner.umu = {
         exe = "iw4x-launcher.exe";
         proton = "ge-proton";
-        protonVersion = "10-34";
       };
     };
   };

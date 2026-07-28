@@ -15,7 +15,6 @@
       runner.umu = {
         exe = "GHWT_Definitive.exe";
         proton = "ge-proton";
-        protonVersion = "9-25";
       };
     };
 
@@ -32,7 +31,6 @@
       runner.umu = {
         exe = "Updater.exe";
         proton = "ge-proton";
-        protonVersion = "9-25";
       };
     };
   };
