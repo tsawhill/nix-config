@@ -6,7 +6,6 @@
     env = [
       "WINEDLLOVERRIDES=xinput1_3=n,b"
       "vblank_mode=0"
-      "PULSE_LATENCY_MSEC=30"
     ];
     basePath = "pc/GH3";
     runner.umu = {
