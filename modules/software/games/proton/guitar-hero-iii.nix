@@ -11,9 +11,9 @@
     runner.umu = {
       exe = "GH3.exe";
       # GH3 is 32-bit: its GPU drivers and fonts only resolve inside umu's Steam
-      # Runtime container, which proton-cachyos (host-native, missing libunwind
-      # in the container) can't run in. GE-Proton is built for it, so use it here.
-      proton = "ge-proton";
+      # Runtime container. That used to rule out proton-cachyos, whose only build
+      # was host-native and missing libunwind in the container -- but upstream now
+      # ships a -slr build made for the runtime, so the default applies here.
     };
   };
 }
