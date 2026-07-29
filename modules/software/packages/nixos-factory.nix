@@ -1,4 +1,4 @@
-{ config, pkgs, ... }:
+{ pkgs, ... }:
 
 let
   pythonWithYaml = pkgs.python3.withPackages (ps: [ ps.pyyaml ]);
@@ -214,6 +214,100 @@ let
         raise SystemExit(f"unknown action: {action}")
   '';
 
+  topologyManager = pkgs.writeText "topology-manager.py" ''
+    import ipaddress
+    import re
+    import sys
+
+    def read_lines(path):
+        with open(path) as f:
+            return f.readlines()
+
+    def write_lines(path, lines):
+        with open(path, "w") as f:
+            f.writelines(lines)
+
+    def hosts_bounds(lines):
+        try:
+            start = lines.index("  hosts = {\n") + 1
+        except ValueError:
+            raise SystemExit("missing topology hosts section")
+
+        for end in range(start, len(lines)):
+            if lines[end] == "  };\n":
+                return start, end
+        raise SystemExit("unterminated topology hosts section")
+
+    def host_pattern(host):
+        return re.compile(rf"^    {re.escape(host)}(?:\.[^=\s]+)?\s*=")
+
+    def add(path, host, address, mac):
+        try:
+            ipaddress.IPv4Address(address)
+        except ipaddress.AddressValueError:
+            raise SystemExit(f"invalid IPv4 address: {address}")
+
+        if re.fullmatch(r"(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}", mac) is None:
+            raise SystemExit(f"invalid MAC address: {mac}")
+
+        lines = read_lines(path)
+        start, end = hosts_bounds(lines)
+        host_lines = lines[start:end]
+
+        if any(host_pattern(host).match(line) for line in host_lines):
+            raise SystemExit(f"topology host already exists: {host}")
+
+        ip_needle = re.compile(rf'\bip\s*=\s*"{re.escape(address)}";')
+        if any(ip_needle.search(line) for line in host_lines):
+            raise SystemExit(f"topology IP already exists: {address}")
+
+        mac_needle = re.compile(rf'\bmac\s*=\s*"{re.escape(mac)}";', re.IGNORECASE)
+        if any(mac_needle.search(line) for line in host_lines):
+            raise SystemExit(f"topology MAC already exists: {mac}")
+
+        block = [
+            f"    {host} = {{\n",
+            "      lan = {\n",
+            f'        ip = "{address}";\n',
+            f'        mac = "{mac.lower()}";\n',
+            "      };\n",
+            "      dns.enable = true;\n",
+            "    };\n",
+        ]
+        lines[end:end] = block
+        write_lines(path, lines)
+
+    def remove(path, host):
+        lines = read_lines(path)
+        start, end = hosts_bounds(lines)
+        entry_start = None
+        opening = f"    {host} = {{\n"
+
+        for idx in range(start, end):
+            if lines[idx] == opening:
+                entry_start = idx
+                break
+
+        if entry_start is None:
+            return
+
+        for entry_end in range(entry_start + 1, end):
+            if lines[entry_end] == "    };\n":
+                del lines[entry_start:entry_end + 1]
+                write_lines(path, lines)
+                return
+
+        raise SystemExit(f"unterminated topology entry: {host}")
+
+    action = sys.argv[1]
+    if action == "add":
+        add(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
+    elif action == "remove":
+        remove(sys.argv[2], sys.argv[3])
+    else:
+        raise SystemExit(f"unknown action: {action}")
+  '';
+
   # Helper: remove a top-level YAML block by key name from a file.
   # Operates on raw lines to preserve exact formatting.
   removeYamlBlock = pkgs.writeShellScript "remove-yaml-block" ''
@@ -257,10 +351,14 @@ with open(sys.argv[2], 'w') as f:
     # --- Tool paths (pinned to nix store) ---
     GUM="${pkgs.gum}/bin/gum"
     FIGLET="${pkgs.figlet}/bin/figlet"
-    PV="${pkgs.pv}/bin/pv"
     JQ="${pkgs.jq}/bin/jq"
+    SSH="${pkgs.openssh}/bin/ssh"
 
-    # --- Incus / ZFS defaults ---
+    # Incus and ZFS live on server-nix. The factory itself runs on build-nix,
+    # whose root SSH key is authorized on server-nix.
+    SERVER_HOST="root@server-nix.lan"
+
+    # --- Incus / ZFS defaults (on server-nix) ---
     IMAGE_ALIAS="nixos-base-image"       # local image alias for base NixOS LXC
     PROFILE="nixos-lxc"                  # default profile applied to new containers
     ROOT_POOLS=("rpool" "downloadHDD" "VMDisks")  # ZFS pools the user can pick from
@@ -281,16 +379,52 @@ with open(sys.argv[2], 'w') as f:
     # (security.idmap.base = 100000 in the nixos-lxc profile).
     UID_GID="100000:100000"
 
-    # --- Nix config repo paths (on server-nix) ---
+    # The repo is bind-mounted from server-nix into build-nix, so local edits
+    # here are immediately visible to both hosts.
     NIX_CONFIG="/mnt/zpool/code/nix-config"
     INSTANCES_YAML="$NIX_CONFIG/hosts/server-nix/system/incus/instances.yaml"
     COLMENA_NIX="$NIX_CONFIG/flake-outputs/colmena.nix"
+    TOPOLOGY_NIX="$NIX_CONFIG/modules/network/topology.nix"
     KNOWN_HOSTS_FILE="$NIX_CONFIG/modules/ssh/known_hosts"
     SOPS_YAML="$NIX_CONFIG/.sops.yaml"
+
+    server_cmd() {
+      "$SSH" \
+        -o BatchMode=yes \
+        -o ConnectTimeout=10 \
+        "$SERVER_HOST" \
+        "$@"
+    }
+
+    require_server() {
+      if ! server_cmd incus version >/dev/null 2>&1; then
+        $GUM style --foreground 196 --bold \
+          "Cannot run Incus over SSH on $SERVER_HOST"
+        $GUM style --foreground 214 \
+          "Check build-nix's root SSH key and the server-nix host key, then retry."
+        exit 1
+      fi
+    }
 
     validate_hostname() {
       if [[ ! "$1" =~ ^[A-Za-z0-9][A-Za-z0-9-]*$ ]]; then
         $GUM style --foreground 196 --bold "Invalid hostname: $1"
+        exit 1
+      fi
+    }
+
+    validate_ipv4() {
+      if ! ${pythonWithYaml}/bin/python3 -c \
+        'import ipaddress, sys; ipaddress.IPv4Address(sys.argv[1])' "$1"
+      then
+        $GUM style --foreground 196 --bold "Invalid IPv4 address: $1"
+        exit 1
+      fi
+    }
+
+    validate_mac() {
+      if [[ ! "$1" =~ ^([[:xdigit:]]{2}:){5}[[:xdigit:]]{2}$ ]]; then
+        $GUM style --foreground 196 --bold "Invalid MAC address: $1"
         exit 1
       fi
     }
@@ -303,12 +437,11 @@ with open(sys.argv[2], 'w') as f:
       host="$1"
       host_lan="$host.lan"
 
-      public_key=$(incus exec "$host" -- sh -c '
-        if [ ! -s /etc/ssh/ssh_host_ed25519_key.pub ]; then
-          ssh-keygen -A >/dev/null 2>&1 || true
-        fi
-        cat /etc/ssh/ssh_host_ed25519_key.pub 2>/dev/null || true
-      ' 2>/dev/null | grep -E "^ssh-ed25519[[:space:]]" | head -n1 || true)
+      server_cmd incus exec "$host" -- ssh-keygen -A >/dev/null 2>&1 || true
+      public_key=$(server_cmd incus exec "$host" -- \
+        cat /etc/ssh/ssh_host_ed25519_key.pub 2>/dev/null \
+        | grep -E "^ssh-ed25519[[:space:]]" \
+        | head -n1 || true)
 
       if [ -n "$public_key" ]; then
         printf '%s %s\n' "$host_lan" "$public_key"
@@ -380,12 +513,16 @@ with open(sys.argv[2], 'w') as f:
     }
 
     deploy_build_nix() {
-      incus exec build-nix -- deploy build-nix
+      deploy build-nix
     }
 
-    deploy_from_build_nix() {
+    deploy_host() {
       host="$1"
-      incus exec build-nix -- deploy "$host"
+      deploy "$host"
+    }
+
+    deploy_adguard() {
+      deploy adguard-nix
     }
 
     # ── Splash screen ─────────────────────────────────────────────
@@ -400,22 +537,28 @@ with open(sys.argv[2], 'w') as f:
     #  CREATE — provision a new NixOS container end-to-end
     #
     #  Flow:
-    #    1. Prompt for hostname
+    #    1. Prompt for hostname and optional topology/DNS management
     #    2. Verify a NixOS / colmena config already exists for it
-    #    3. Collect storage pool + MAC address
+    #    3. Collect IP, storage pool, and MAC address
     #    4. Show plan and confirm
-    #    5. Create Incus container from base image
-    #    6. Clone the template nix store via ZFS send/receive
-    #    7. Wire up devices (nix-store disk, eth0 NIC)
-    #    8. Append instance to instances.yaml (declarative config)
-    #    9. Start the container, wait for network
-    #   10. Trust the new host key, add its age recipient, and deploy build-nix
-    #   11. Exec into build-nix and deploy the NixOS config
+    #    5. Optionally add topology and deploy AdGuard
+    #    6. Create the container and nix store on server-nix over SSH
+    #    7. Append the instance to instances.yaml
+    #    8. Start the container and verify its expected DHCP address
+    #    9. Trust the new host key, add its age recipient, and deploy build-nix
+    #   10. Deploy the new host from build-nix
     # ══════════════════════════════════════════════════════════════
     do_create() {
+      require_server
+
       HOSTNAME=$($GUM input --placeholder "Enter the new container hostname")
       if [ -z "$HOSTNAME" ]; then exit 1; fi
       validate_hostname "$HOSTNAME"
+
+      MANAGE_TOPOLOGY=false
+      if $GUM confirm "Add $HOSTNAME to topology and deploy AdGuard DNS?"; then
+        MANAGE_TOPOLOGY=true
+      fi
 
       # --- Pre-flight checks ---
 
@@ -430,12 +573,19 @@ with open(sys.argv[2], 'w') as f:
       fi
 
       # Don't clobber an existing container
-      if incus info "$HOSTNAME" >/dev/null 2>&1; then
+      if server_cmd incus info "$HOSTNAME" >/dev/null 2>&1; then
         $GUM style --foreground 196 "Container $HOSTNAME already exists in Incus."
         exit 1
       fi
 
       # --- Collect parameters ---
+
+      IP_ADDRESS=""
+      if [ "$MANAGE_TOPOLOGY" = true ]; then
+        IP_ADDRESS=$($GUM input --placeholder "LAN IPv4 address (for example 10.73.73.31)")
+        if [ -z "$IP_ADDRESS" ]; then exit 1; fi
+        validate_ipv4 "$IP_ADDRESS"
+      fi
 
       $GUM style --foreground 212 "Select target root storage pool:"
       SELECTED_POOL=$($GUM choose "''${ROOT_POOLS[@]}")
@@ -447,6 +597,8 @@ with open(sys.argv[2], 'w') as f:
         MAC_ADDR=$(printf '02:%02X:%02X:%02X:%02X:%02X' $((RANDOM%256)) $((RANDOM%256)) $((RANDOM%256)) $((RANDOM%256)) $((RANDOM%256)))
         $GUM style --foreground 212 "Generated MAC: $MAC_ADDR"
       fi
+      validate_mac "$MAC_ADDR"
+      MAC_ADDR=$(printf '%s' "$MAC_ADDR" | tr '[:upper:]' '[:lower:]')
 
       # --- Show plan and confirm ---
       echo ""
@@ -456,7 +608,14 @@ with open(sys.argv[2], 'w') as f:
       echo "  MAC:       $MAC_ADDR"
       echo "  Store:     $NIX_HOST_MOUNT_BASE/$HOSTNAME"
       echo "  YAML:      $INSTANCES_YAML (will be updated)"
-      echo "  Deploy:    incus exec build-nix -- deploy $HOSTNAME"
+      if [ "$MANAGE_TOPOLOGY" = true ]; then
+        echo "  Topology:  $HOSTNAME.lan → $IP_ADDRESS"
+        echo "  DNS:       deploy adguard-nix"
+      else
+        echo "  Topology:  unchanged"
+      fi
+      echo "  Incus:     SSH to $SERVER_HOST"
+      echo "  Deploy:    deploy $HOSTNAME"
       echo ""
 
       if ! $GUM confirm "Create container?"; then
@@ -464,38 +623,125 @@ with open(sys.argv[2], 'w') as f:
         exit 0
       fi
 
-      # --- Step 1: Create the Incus container ---
+      TOPOLOGY_ADDED=false
+      ADGUARD_DEPLOY_ATTEMPTED=false
+      CONTAINER_CREATED=false
+      DATASET_CREATED=false
+      INSTANCE_ADDED=false
+      KNOWN_HOST_ADDED=false
+      SOPS_KEY_ADDED=false
+      TRUST_DEPLOY_ATTEMPTED=false
+
+      rollback_create() {
+        reason="$1"
+        trap - ERR
+        set +e
+
+        $GUM style --foreground 196 --bold "$reason — rolling back..."
+
+        if [ "$CONTAINER_CREATED" = true ] \
+          && server_cmd incus info "$HOSTNAME" >/dev/null 2>&1
+        then
+          echo "==> Stopping and deleting $HOSTNAME on server-nix..."
+          server_cmd incus stop "$HOSTNAME" --force >/dev/null 2>&1 || true
+          server_cmd incus delete "$HOSTNAME" >/dev/null 2>&1 || true
+        fi
+
+        if [ "$DATASET_CREATED" = true ] \
+          && server_cmd zfs list "$NIX_PARENT_DATASET/$HOSTNAME" >/dev/null 2>&1
+        then
+          echo "==> Destroying ZFS dataset $NIX_PARENT_DATASET/$HOSTNAME..."
+          server_cmd zfs destroy -r "$NIX_PARENT_DATASET/$HOSTNAME" || true
+        fi
+
+        if [ "$INSTANCE_ADDED" = true ]; then
+          echo "==> Removing $HOSTNAME from instances.yaml..."
+          ${removeYamlBlock} "$HOSTNAME" "$INSTANCES_YAML" || true
+        fi
+
+        if [ "$KNOWN_HOST_ADDED" = true ]; then
+          remove_known_host "$HOSTNAME" || true
+        fi
+        if [ "$SOPS_KEY_ADDED" = true ]; then
+          remove_sops_age_key "$HOSTNAME" || true
+        fi
+        if [ "$TRUST_DEPLOY_ATTEMPTED" = true ]; then
+          deploy_build_nix || true
+        fi
+
+        if [ "$TOPOLOGY_ADDED" = true ]; then
+          echo "==> Removing $HOSTNAME from topology.nix..."
+          ${pythonWithYaml}/bin/python3 ${topologyManager} \
+            remove "$TOPOLOGY_NIX" "$HOSTNAME" || true
+        fi
+        if [ "$ADGUARD_DEPLOY_ATTEMPTED" = true ]; then
+          echo "==> Restoring AdGuard DNS..."
+          deploy_adguard || true
+        fi
+
+        $GUM style --foreground 196 --border rounded --padding "1 2" \
+          "Create aborted. All factory changes were rolled back."
+        exit 1
+      }
+
+      trap 'rollback_create "Unexpected create failure"' ERR
+
+      # --- Step 1: Add topology and apply DNS ---
+      if [ "$MANAGE_TOPOLOGY" = true ]; then
+        echo "==> Adding $HOSTNAME to topology.nix..."
+        if ! ${pythonWithYaml}/bin/python3 ${topologyManager} \
+          add "$TOPOLOGY_NIX" "$HOSTNAME" "$IP_ADDRESS" "$MAC_ADDR"
+        then
+          rollback_create "Topology update failed"
+        fi
+        TOPOLOGY_ADDED=true
+
+        echo "==> Deploying AdGuard DNS..."
+        ADGUARD_DEPLOY_ATTEMPTED=true
+        if ! deploy_adguard; then
+          rollback_create "AdGuard deploy failed"
+        fi
+      fi
+
+      # --- Step 2: Create the Incus container on server-nix ---
       # Uses the base NixOS image and the nixos-lxc profile for defaults
       # (2 CPU, 2GiB RAM, nesting, idmap, bridged networking).
       echo "==> Initializing root FS on $SELECTED_POOL..."
-      incus init "$IMAGE_ALIAS" "$HOSTNAME" -p "$PROFILE" -s "$SELECTED_POOL"
+      if ! server_cmd incus init "$IMAGE_ALIAS" "$HOSTNAME" \
+        -p "$PROFILE" -s "$SELECTED_POOL"
+      then
+        rollback_create "Incus initialization failed"
+      fi
+      CONTAINER_CREATED=true
 
-      # --- Step 2: Clone the template nix store ---
+      # --- Step 3: Clone the template nix store ---
       # ZFS send/receive copies the pre-built /nix from the template snapshot
-      # into a new dataset for this container. pv shows a progress bar.
-      DATASET_NAME="''${NIX_TEMPLATE_SNAPSHOT%@*}"
-      SIZE=$(sudo zfs list -H -p -o referenced "$DATASET_NAME")
-
+      # into a new dataset for this container. Both ends stay on server-nix.
       echo "==> Replicating nix store to $NIX_PARENT_DATASET/$HOSTNAME..."
-      sudo zfs send "$NIX_TEMPLATE_SNAPSHOT" | $PV -p -s "$SIZE" | sudo zfs receive "$NIX_PARENT_DATASET/$HOSTNAME"
+      if ! server_cmd \
+        "zfs send $NIX_TEMPLATE_SNAPSHOT | zfs receive $NIX_PARENT_DATASET/$HOSTNAME"
+      then
+        rollback_create "Nix store replication failed"
+      fi
+      DATASET_CREATED=true
 
-      # --- Step 3: Wire up devices ---
+      # --- Step 4: Wire up devices ---
       # - chown the nix store to the container's mapped UID/GID
       # - Attach the host-side nix store as a disk device at /nix
       # - Set or create the eth0 NIC with the chosen MAC address
-      $GUM spin --spinner pulse --title "Configuring devices..." -- bash -c "
-        sudo chown -R $UID_GID $NIX_HOST_MOUNT_BASE/$HOSTNAME
+      echo "==> Configuring container devices on server-nix..."
+      server_cmd chown -R "$UID_GID" "$NIX_HOST_MOUNT_BASE/$HOSTNAME"
+      server_cmd incus config device add "$HOSTNAME" nix-store disk \
+        source="$NIX_HOST_MOUNT_BASE/$HOSTNAME" path=/nix
 
-        incus config device add $HOSTNAME nix-store disk source=$NIX_HOST_MOUNT_BASE/$HOSTNAME path=/nix
+      if server_cmd incus config device show "$HOSTNAME" | grep -q '^eth0:'; then
+        server_cmd incus config device set "$HOSTNAME" eth0 hwaddr="$MAC_ADDR"
+      else
+        server_cmd incus config device add "$HOSTNAME" eth0 nic \
+          nictype=bridged parent=br0 hwaddr="$MAC_ADDR"
+      fi
 
-        if incus config device show $HOSTNAME | grep -q '^eth0:'; then
-          incus config device set $HOSTNAME eth0 hwaddr=$MAC_ADDR
-        else
-          incus config device add $HOSTNAME eth0 nic nictype=bridged parent=br0 hwaddr=$MAC_ADDR
-        fi
-      "
-
-      # --- Step 4: Add to declarative config ---
+      # --- Step 5: Add to declarative config ---
       # Append this instance to instances.yaml so incus-declarative-apply
       # and incus-sync know about it without needing a manual pull.
       echo "==> Adding $HOSTNAME to instances.yaml..."
@@ -510,141 +756,74 @@ $HOSTNAME:
     nix-store: { type: "disk", path: "/nix", source: "$NIX_HOST_MOUNT_BASE/$HOSTNAME" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "$MAC_ADDR" }
 YAML
+      INSTANCE_ADDED=true
 
-      # --- Step 5: Start and wait for network ---
+      # --- Step 6: Start and wait for network ---
       # The container boots with the base NixOS image. We need it to get a
       # DHCP lease and be reachable before we can deploy the real config.
       echo "==> Starting $HOSTNAME..."
-      incus start "$HOSTNAME"
+      server_cmd incus start "$HOSTNAME"
 
       echo "==> Waiting for $HOSTNAME to get network..."
+      NETWORK_READY=false
       for i in $(seq 1 30); do
-        if incus exec "$HOSTNAME" -- ping -c1 -W1 build-nix.lan >/dev/null 2>&1; then
+        if server_cmd incus exec "$HOSTNAME" -- \
+          ping -c1 -W1 build-nix.lan >/dev/null 2>&1
+        then
+          NETWORK_READY=true
           break
         fi
         sleep 1
       done
 
-      # --- Step 6: Trust the new host from build-nix before deployment ---
+      if [ "$NETWORK_READY" = false ]; then
+        rollback_create "Container did not acquire working network"
+      fi
+
+      if [ "$MANAGE_TOPOLOGY" = true ]; then
+        if ! server_cmd incus query "/1.0/instances/$HOSTNAME/state" \
+          | "$JQ" -e --arg ip "$IP_ADDRESS" \
+            'any(.network.eth0.addresses[]?; .family == "inet" and .address == $ip)' \
+            >/dev/null
+        then
+          $GUM style --foreground 214 \
+            "Expected $IP_ADDRESS for MAC $MAC_ADDR. Check the OPNsense DHCP reservation."
+          rollback_create "Container received the wrong IPv4 address"
+        fi
+      fi
+
+      # --- Step 7: Trust the new host from build-nix before deployment ---
       # Colmena runs from build-nix. The new container's host key must be in
       # the repo-level known_hosts and applied to build-nix before build-nix
       # can SSH to the target non-interactively.
       echo "==> Adding $HOSTNAME.lan to known_hosts..."
       if ! add_known_host "$HOSTNAME"; then
-        $GUM style --foreground 196 --bold "Host key scan failed — rolling back..."
-
-        if incus info "$HOSTNAME" >/dev/null 2>&1; then
-          echo "==> Stopping $HOSTNAME..."
-          incus stop "$HOSTNAME" --force 2>/dev/null || true
-          echo "==> Deleting container $HOSTNAME..."
-          incus delete "$HOSTNAME" 2>/dev/null || true
-        fi
-
-        if zfs list "$NIX_PARENT_DATASET/$HOSTNAME" >/dev/null 2>&1; then
-          echo "==> Destroying ZFS dataset $NIX_PARENT_DATASET/$HOSTNAME..."
-          sudo zfs destroy -r "$NIX_PARENT_DATASET/$HOSTNAME"
-        fi
-
-        if grep -q "^$HOSTNAME:" "$INSTANCES_YAML" 2>/dev/null; then
-          echo "==> Removing $HOSTNAME from instances.yaml..."
-          ${removeYamlBlock} "$HOSTNAME" "$INSTANCES_YAML"
-        fi
-
-        exit 1
+        rollback_create "Host key scan failed"
       fi
+      KNOWN_HOST_ADDED=true
 
       echo "==> Adding $HOSTNAME age recipient to .sops.yaml..."
       if ! add_sops_age_key "$HOSTNAME"; then
-        $GUM style --foreground 196 --bold "SOPS age recipient setup failed — rolling back..."
-
-        remove_known_host "$HOSTNAME" || true
-
-        if incus info "$HOSTNAME" >/dev/null 2>&1; then
-          echo "==> Stopping $HOSTNAME..."
-          incus stop "$HOSTNAME" --force 2>/dev/null || true
-          echo "==> Deleting container $HOSTNAME..."
-          incus delete "$HOSTNAME" 2>/dev/null || true
-        fi
-
-        if zfs list "$NIX_PARENT_DATASET/$HOSTNAME" >/dev/null 2>&1; then
-          echo "==> Destroying ZFS dataset $NIX_PARENT_DATASET/$HOSTNAME..."
-          sudo zfs destroy -r "$NIX_PARENT_DATASET/$HOSTNAME"
-        fi
-
-        if grep -q "^$HOSTNAME:" "$INSTANCES_YAML" 2>/dev/null; then
-          echo "==> Removing $HOSTNAME from instances.yaml..."
-          ${removeYamlBlock} "$HOSTNAME" "$INSTANCES_YAML"
-        fi
-
-        exit 1
+        rollback_create "SOPS age recipient setup failed"
       fi
+      SOPS_KEY_ADDED=true
 
       echo "==> Deploying updated trust data to build-nix..."
+      TRUST_DEPLOY_ATTEMPTED=true
       if ! deploy_build_nix; then
-        $GUM style --foreground 196 --bold "build-nix deploy failed — rolling back..."
-
-        remove_known_host "$HOSTNAME" || true
-        remove_sops_age_key "$HOSTNAME" || true
-
-        if incus info "$HOSTNAME" >/dev/null 2>&1; then
-          echo "==> Stopping $HOSTNAME..."
-          incus stop "$HOSTNAME" --force 2>/dev/null || true
-          echo "==> Deleting container $HOSTNAME..."
-          incus delete "$HOSTNAME" 2>/dev/null || true
-        fi
-
-        if zfs list "$NIX_PARENT_DATASET/$HOSTNAME" >/dev/null 2>&1; then
-          echo "==> Destroying ZFS dataset $NIX_PARENT_DATASET/$HOSTNAME..."
-          sudo zfs destroy -r "$NIX_PARENT_DATASET/$HOSTNAME"
-        fi
-
-        if grep -q "^$HOSTNAME:" "$INSTANCES_YAML" 2>/dev/null; then
-          echo "==> Removing $HOSTNAME from instances.yaml..."
-          ${removeYamlBlock} "$HOSTNAME" "$INSTANCES_YAML"
-        fi
-
-        exit 1
+        rollback_create "build-nix deploy failed"
       fi
 
-      # --- Step 7: Deploy NixOS config ---
-      # Exec into build-nix (the colmena deployment host) and trigger a deploy.
-      # This builds the NixOS config and pushes it to the new container.
+      # --- Step 8: Deploy NixOS config ---
+      # Build the NixOS config locally and push it to the new container.
       # If the deploy fails, automatically roll back everything we just created
       # so the system is left in the same state as before the script ran.
-      echo "==> Deploying NixOS config via build-nix..."
-      if ! deploy_from_build_nix "$HOSTNAME"; then
-        $GUM style --foreground 196 --bold "Deploy failed — rolling back..."
-
-        remove_known_host "$HOSTNAME" || true
-        remove_sops_age_key "$HOSTNAME" || true
-
-        # Stop the container if it's running
-        if incus info "$HOSTNAME" >/dev/null 2>&1; then
-          echo "==> Stopping $HOSTNAME..."
-          incus stop "$HOSTNAME" --force 2>/dev/null || true
-          echo "==> Deleting container $HOSTNAME..."
-          incus delete "$HOSTNAME" 2>/dev/null || true
-        fi
-
-        # Destroy the ZFS nix store dataset we cloned
-        if zfs list "$NIX_PARENT_DATASET/$HOSTNAME" >/dev/null 2>&1; then
-          echo "==> Destroying ZFS dataset $NIX_PARENT_DATASET/$HOSTNAME..."
-          sudo zfs destroy -r "$NIX_PARENT_DATASET/$HOSTNAME"
-        fi
-
-        # Remove from instances.yaml
-        if grep -q "^$HOSTNAME:" "$INSTANCES_YAML" 2>/dev/null; then
-          echo "==> Removing $HOSTNAME from instances.yaml..."
-          ${removeYamlBlock} "$HOSTNAME" "$INSTANCES_YAML"
-        fi
-
-        deploy_build_nix || true
-
-        $GUM style --foreground 196 --border rounded --padding "1 2" \
-          "Create aborted. All changes rolled back."
-        exit 1
+      echo "==> Deploying NixOS config from build-nix..."
+      if ! deploy_host "$HOSTNAME"; then
+        rollback_create "Host deploy failed"
       fi
 
+      trap - ERR
       $GUM style --foreground 82 --border rounded --padding "1 2" \
         "Successfully created and deployed $HOSTNAME
     Pool:  $SELECTED_POOL
@@ -670,8 +849,10 @@ YAML
     #  configs manually.
     # ══════════════════════════════════════════════════════════════
     do_rename() {
+      require_server
+
       # Build list of all containers for the picker
-      mapfile -t CONTAINERS < <(incus list -c n --format csv)
+      mapfile -t CONTAINERS < <(server_cmd incus list -c n --format csv)
       if [ ''${#CONTAINERS[@]} -eq 0 ]; then
         $GUM style --foreground 196 "No containers found."
         exit 1
@@ -690,20 +871,21 @@ YAML
       fi
 
       # Don't clobber an existing container
-      if incus info "$NEW_NAME" >/dev/null 2>&1; then
+      if server_cmd incus info "$NEW_NAME" >/dev/null 2>&1; then
         $GUM style --foreground 196 "Container $NEW_NAME already exists."
         exit 1
       fi
 
       # Check current state so we can stop/restart as needed
-      STATE=$(incus query "/1.0/instances/$OLD_NAME" | $JQ -r '.status')
+      STATE=$(server_cmd incus query "/1.0/instances/$OLD_NAME" | $JQ -r '.status')
       WAS_RUNNING=false
       if [ "$STATE" = "Running" ]; then
         WAS_RUNNING=true
       fi
 
       # Check if this container has a nix-store device (most do, VMs might not)
-      OLD_NIX_SOURCE=$(incus config device get "$OLD_NAME" nix-store source 2>/dev/null || true)
+      OLD_NIX_SOURCE=$(server_cmd incus config device get \
+        "$OLD_NAME" nix-store source 2>/dev/null || true)
       HAS_NIX_STORE=false
       if [ -n "$OLD_NIX_SOURCE" ]; then
         HAS_NIX_STORE=true
@@ -733,26 +915,28 @@ YAML
 
       if [ "$WAS_RUNNING" = true ]; then
         echo "==> Stopping $OLD_NAME..."
-        incus stop "$OLD_NAME"
+        server_cmd incus stop "$OLD_NAME"
       fi
 
       # Rename the Incus container itself
       echo "==> Renaming container $OLD_NAME → $NEW_NAME..."
-      incus rename "$OLD_NAME" "$NEW_NAME"
+      server_cmd incus rename "$OLD_NAME" "$NEW_NAME"
 
       # Rename the ZFS dataset backing the nix store and update the
       # device source path so the container mounts the right location.
       if [ "$HAS_NIX_STORE" = true ]; then
         echo "==> Renaming ZFS dataset..."
-        sudo zfs rename "$NIX_PARENT_DATASET/$OLD_NAME" "$NIX_PARENT_DATASET/$NEW_NAME"
+        server_cmd zfs rename \
+          "$NIX_PARENT_DATASET/$OLD_NAME" "$NIX_PARENT_DATASET/$NEW_NAME"
 
         echo "==> Updating nix-store device source..."
-        incus config device set "$NEW_NAME" nix-store source="$NIX_HOST_MOUNT_BASE/$NEW_NAME"
+        server_cmd incus config device set \
+          "$NEW_NAME" nix-store source="$NIX_HOST_MOUNT_BASE/$NEW_NAME"
       fi
 
       if [ "$WAS_RUNNING" = true ]; then
         echo "==> Starting $NEW_NAME..."
-        incus start "$NEW_NAME"
+        server_cmd incus start "$NEW_NAME"
       fi
 
       $GUM style --foreground 82 --border rounded --padding "1 2" \
@@ -774,8 +958,10 @@ YAML
     #
     # ══════════════════════════════════════════════════════════════
     do_delete() {
+      require_server
+
       # Build list of all containers for the picker
-      mapfile -t CONTAINERS < <(incus list -c n --format csv)
+      mapfile -t CONTAINERS < <(server_cmd incus list -c n --format csv)
       if [ ''${#CONTAINERS[@]} -eq 0 ]; then
         $GUM style --foreground 196 "No containers found."
         exit 1
@@ -785,9 +971,10 @@ YAML
       TARGET=$($GUM choose "''${CONTAINERS[@]}")
 
       # Gather info for the plan display
-      STATE=$(incus query "/1.0/instances/$TARGET" | $JQ -r '.status')
+      STATE=$(server_cmd incus query "/1.0/instances/$TARGET" | $JQ -r '.status')
 
-      NIX_SOURCE=$(incus config device get "$TARGET" nix-store source 2>/dev/null || true)
+      NIX_SOURCE=$(server_cmd incus config device get \
+        "$TARGET" nix-store source 2>/dev/null || true)
       HAS_NIX_STORE=false
       NIX_DATASET=""
       if [ -n "$NIX_SOURCE" ]; then
@@ -826,16 +1013,16 @@ YAML
 
       if [ "$STATE" = "Running" ]; then
         echo "==> Stopping $TARGET..."
-        incus stop "$TARGET"
+        server_cmd incus stop "$TARGET"
       fi
 
       echo "==> Deleting container $TARGET..."
-      incus delete "$TARGET"
+      server_cmd incus delete "$TARGET"
 
       # Recursively destroy the ZFS dataset (includes any snapshots)
       if [ "$DESTROY_STORE" = true ]; then
         echo "==> Destroying ZFS dataset $NIX_DATASET..."
-        sudo zfs destroy -r "$NIX_DATASET"
+        server_cmd zfs destroy -r "$NIX_DATASET"
       fi
 
       # Remove from instances.yaml so declarative config stays in sync
@@ -868,7 +1055,6 @@ in
 {
   environment.systemPackages = [
     pkgs.gum
-    pkgs.pv
     pkgs.figlet
     pkgs.jq
     nixosFactoryScript

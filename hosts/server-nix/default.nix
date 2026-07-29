@@ -63,7 +63,6 @@ in
     "${self}/modules/software/bundles"
     "${self}/modules/software/services/incus.nix"
     "${self}/modules/software/services/incus-declarative.nix"
-    "${self}/modules/software/packages/nixos-factory.nix"
     "${self}/modules/software/packages/incus-sync.nix"
 
   ];

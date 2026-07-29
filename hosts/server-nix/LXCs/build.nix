@@ -1,8 +1,14 @@
-{ self, config, inputs, ... }:
+{
+  self,
+  config,
+  inputs,
+  ...
+}:
 {
   imports = [
     ./base
     "${self}/modules/software/services/rebuild-scripts.nix"
+    "${self}/modules/software/packages/nixos-factory.nix"
 
     # Secrets (SOPS)
     inputs.sops-nix-stable.nixosModules.sops
