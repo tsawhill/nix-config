@@ -29,11 +29,11 @@
         "uv2nix": "uv2nix"
       },
       "locked": {
-        "lastModified": 1785159467,
-        "narHash": "sha256-1LwjkVJK5pst6Atm3uOiZW3eBMY3gs0ICO14eFGlpGw=",
+        "lastModified": 1785317240,
+        "narHash": "sha256-KEF/HXXmmP8e/AxFbw8Ptlhb+FVEPoASNcew2xk3TQ0=",
         "owner": "nix-community",
         "repo": "authentik-nix",
-        "rev": "a492deb563cf54cb8fe134e94a7ba3b01820ca5e",
+        "rev": "28f0b3bc96b8e0f664aabb540a2ed61a352e8fc7",
         "type": "github"
       },
       "original": {
@@ -342,11 +342,11 @@
         "rust-overlay": "rust-overlay"
       },
       "locked": {
-        "lastModified": 1785234708,
-        "narHash": "sha256-q8770ay1+z2twTOKZtcMD2AmQSHsfm6wrvb8wzq6z+4=",
+        "lastModified": 1785320500,
+        "narHash": "sha256-/q07aa/MXTVCtdIDTUDmheHGItuW817ZvXrdW8KnojE=",
         "owner": "temidaradev",
         "repo": "kopuz",
-        "rev": "edcac040f91eb601616337ab0a168725e682c81f",
+        "rev": "38e093a626cb88e8ca89bf31fba5bc6e1cbc3a19",
         "type": "github"
       },
       "original": {
@@ -711,11 +711,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1782093830,
-        "narHash": "sha256-6gmEVe69+KlRkZD4PEEV5xAlB9CB0Y9TiuEgQjDrKTQ=",
+        "lastModified": 1785115949,
+        "narHash": "sha256-8AM37BfyGaL2v/SZyg4PupRxJ01Y4htvM+WrTjWrPpo=",
         "owner": "pyproject-nix",
         "repo": "build-system-pkgs",
-        "rev": "430680a19bc85a3bda55f12e4cc1a1aadcf2e478",
+        "rev": "62c0d86027edb1c4f39a5facc09876348144f7c9",
         "type": "github"
       },
       "original": {
