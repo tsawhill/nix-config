@@ -42,7 +42,7 @@ let
       mkdir -p "$(dirname ${rulesPath})" "$(dirname ${primaryMonitorFile})"
       cp ${defaultRules} "${rulesPath}"
       printf '%s\n' "${p}" > "${primaryMonitorFile}"
-      hyprctl reload config-only
+      hyprctl reload
       ${lib.getExe pkgs.xrandr} --output "${p}" --primary 2>/dev/null || true
     '' else ''
       mkdir -p "$(dirname ${stateFile})" "$(dirname ${rulesPath})" "$(dirname ${primaryMonitorFile})"
@@ -54,27 +54,27 @@ let
         XRANDR_PRIMARY="${p}"
       fi
       printf '%s\n' "$XRANDR_PRIMARY" > "${primaryMonitorFile}"
-      hyprctl reload config-only
+      hyprctl reload
       ${lib.getExe pkgs.xrandr} --output "$XRANDR_PRIMARY" --primary 2>/dev/null || true
     ''
   );
 in
 lib.mkIf (p != "") {
-  # Seed rules file on home-manager activation so Hyprland's `source` directive
-  # has something to read at session start. Respects persisted swap state.
+  # Seed the mutable rules file on home-manager activation so dofile() has
+  # something to read at session start. Respects persisted swap state.
   home.activation.initHyprWorkspaceRules = lib.hm.dag.entryAfter [ "writeBoundary" ] (
     ''
       mkdir -p "$HOME/.config/hypr"
       mkdir -p "$HOME/.local/state"
     '' + (if s == null then ''
-      cp ${defaultRules} "$HOME/.config/hypr/workspace-rules.conf"
+      cp ${defaultRules} "$HOME/.config/hypr/workspace-rules.lua"
       printf '%s\n' "${p}" > "$HOME/.local/state/hypr-primary-monitor"
     '' else ''
       if [ -f "$HOME/.local/state/hypr-swap-state" ]; then
-        cp ${swappedRules} "$HOME/.config/hypr/workspace-rules.conf"
+        cp ${swappedRules} "$HOME/.config/hypr/workspace-rules.lua"
         printf '%s\n' "${s}" > "$HOME/.local/state/hypr-primary-monitor"
       else
-        cp ${defaultRules} "$HOME/.config/hypr/workspace-rules.conf"
+        cp ${defaultRules} "$HOME/.config/hypr/workspace-rules.lua"
         printf '%s\n' "${p}" > "$HOME/.local/state/hypr-primary-monitor"
       fi
     '')

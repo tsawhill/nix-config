@@ -64,13 +64,20 @@ hl.workspace_rule({ workspace = "9", monitor = "$B" })
 hl.workspace_rule({ workspace = "10", monitor = "$B" })
 EOF
 
-    # Move existing workspaces immediately (non-existent ones are silently skipped)
-    for i in 1 2 3 4 5;  do hyprctl dispatch moveworkspacetomonitor "$i $A" 2>/dev/null; done
-    for i in 6 7 8 9 10; do hyprctl dispatch moveworkspacetomonitor "$i $B" 2>/dev/null; done
+    # Move existing workspaces immediately (non-existent ones are silently skipped).
+    # Hyprland 0.55+ expects Lua dispatcher expressions from hyprctl.
+    for i in 1 2 3 4 5; do
+      hyprctl dispatch "hl.dsp.workspace.move({ workspace = \"$i\", monitor = \"$A\" })" >/dev/null 2>&1
+    done
+    for i in 6 7 8 9 10; do
+      hyprctl dispatch "hl.dsp.workspace.move({ workspace = \"$i\", monitor = \"$B\" })" >/dev/null 2>&1
+    done
 
     # Restore each monitor to the workspace it was showing before the swap
-    hyprctl dispatch focusmonitor "$SECONDARY" && hyprctl dispatch workspace "$WS_ON_PRIMARY"
-    hyprctl dispatch focusmonitor "$PRIMARY"   && hyprctl dispatch workspace "$WS_ON_SECONDARY"
+    hyprctl dispatch "hl.dsp.focus({ monitor = \"$SECONDARY\" })" \
+      && hyprctl dispatch "hl.dsp.focus({ workspace = \"$WS_ON_PRIMARY\" })"
+    hyprctl dispatch "hl.dsp.focus({ monitor = \"$PRIMARY\" })" \
+      && hyprctl dispatch "hl.dsp.focus({ workspace = \"$WS_ON_SECONDARY\" })"
 
     # Update X primary output so XWayland apps (Steam toasts) place popups on the correct monitor
     ${lib.getExe pkgs.xrandr} --output "$A" --primary 2>/dev/null || true
