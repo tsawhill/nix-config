@@ -2,6 +2,7 @@
 let
   cfg = config.my.hypr.idle;
   lockCommand = "hyprlock --grace 5";
+  dpmsCommand = action: ''hyprctl dispatch 'hl.dsp.dpms({ action = "${action}" })' '';
   enabled = t: t > 0;
   toSec = m: m * 60;
 in
@@ -30,13 +31,13 @@ in
       settings = {
         general = {
           lock_cmd = lockCommand;
-          after_sleep_cmd = "hyprctl dispatch dpms on";
+          after_sleep_cmd = dpmsCommand "enable";
         };
         listener = lib.filter (x: x != null) [
           (if enabled cfg.screenOff.time then {
             timeout = toSec cfg.screenOff.time;
-            on-timeout = "hyprctl dispatch dpms off";
-            on-resume = "hyprctl dispatch dpms on";
+            on-timeout = dpmsCommand "disable";
+            on-resume = dpmsCommand "enable";
           } else null)
           (if enabled cfg.lock.time then {
             timeout = toSec cfg.lock.time;

@@ -73,7 +73,7 @@ in
 
     -- Locked binds (bindl): fire even when a game has grabbed the keyboard
     hl.bind(mainMod .. " + SHIFT + Q", hl.dsp.window.close(), { locked = true })
-    hl.bind(mainMod .. " + SHIFT + E", hl.dsp.exit(),         { locked = true })
+    hl.bind(mainMod .. " + SHIFT + E", hl.dsp.exec_cmd("uwsm stop"), { locked = true })
     hl.bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("pactl set-sink-volume @DEFAULT_SINK@ +5%"),  { locked = true })
     hl.bind("XF86AudioLowerVolume", hl.dsp.exec_cmd("pactl set-sink-volume @DEFAULT_SINK@ -5%"),  { locked = true })
     hl.bind("XF86AudioMute",        hl.dsp.exec_cmd("pactl set-sink-mute @DEFAULT_SINK@ toggle"), { locked = true })

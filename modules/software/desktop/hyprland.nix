@@ -40,6 +40,8 @@
     # GTK portal needed alongside hyprland's own portal for file pickers etc.
     xdg.portal.extraPortals = [ pkgs.xdg-desktop-portal-gtk ];
 
+    security.pam.services.hyprlock = { };
+
     environment.systemPackages = with pkgs; [
       grimblast
       libnotify
