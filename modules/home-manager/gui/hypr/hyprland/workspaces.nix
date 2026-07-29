@@ -40,17 +40,17 @@ let
   initScript = pkgs.writeShellScript "hypr-init-workspace-rules" (
     if s == null then ''
       mkdir -p "$(dirname ${rulesPath})" "$(dirname ${primaryMonitorFile})"
-      cp ${defaultRules} "${rulesPath}"
+      ${pkgs.coreutils}/bin/install -m 0644 ${defaultRules} "${rulesPath}"
       printf '%s\n' "${p}" > "${primaryMonitorFile}"
       hyprctl reload
       ${lib.getExe pkgs.xrandr} --output "${p}" --primary 2>/dev/null || true
     '' else ''
       mkdir -p "$(dirname ${stateFile})" "$(dirname ${rulesPath})" "$(dirname ${primaryMonitorFile})"
       if [ -f "${stateFile}" ]; then
-        cp ${swappedRules} "${rulesPath}"
+        ${pkgs.coreutils}/bin/install -m 0644 ${swappedRules} "${rulesPath}"
         XRANDR_PRIMARY="${s}"
       else
-        cp ${defaultRules} "${rulesPath}"
+        ${pkgs.coreutils}/bin/install -m 0644 ${defaultRules} "${rulesPath}"
         XRANDR_PRIMARY="${p}"
       fi
       printf '%s\n' "$XRANDR_PRIMARY" > "${primaryMonitorFile}"
@@ -67,14 +67,14 @@ lib.mkIf (p != "") {
       mkdir -p "$HOME/.config/hypr"
       mkdir -p "$HOME/.local/state"
     '' + (if s == null then ''
-      cp ${defaultRules} "$HOME/.config/hypr/workspace-rules.lua"
+      ${pkgs.coreutils}/bin/install -m 0644 ${defaultRules} "$HOME/.config/hypr/workspace-rules.lua"
       printf '%s\n' "${p}" > "$HOME/.local/state/hypr-primary-monitor"
     '' else ''
       if [ -f "$HOME/.local/state/hypr-swap-state" ]; then
-        cp ${swappedRules} "$HOME/.config/hypr/workspace-rules.lua"
+        ${pkgs.coreutils}/bin/install -m 0644 ${swappedRules} "$HOME/.config/hypr/workspace-rules.lua"
         printf '%s\n' "${s}" > "$HOME/.local/state/hypr-primary-monitor"
       else
-        cp ${defaultRules} "$HOME/.config/hypr/workspace-rules.lua"
+        ${pkgs.coreutils}/bin/install -m 0644 ${defaultRules} "$HOME/.config/hypr/workspace-rules.lua"
         printf '%s\n' "${p}" > "$HOME/.local/state/hypr-primary-monitor"
       fi
     '')
