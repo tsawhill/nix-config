@@ -342,11 +342,11 @@
         "rust-overlay": "rust-overlay"
       },
       "locked": {
-        "lastModified": 1785320500,
-        "narHash": "sha256-/q07aa/MXTVCtdIDTUDmheHGItuW817ZvXrdW8KnojE=",
+        "lastModified": 1785330959,
+        "narHash": "sha256-qXPzoA8qlfesdRu8Izju75zYroxtihDS5h1odFYPXBM=",
         "owner": "temidaradev",
         "repo": "kopuz",
-        "rev": "38e093a626cb88e8ca89bf31fba5bc6e1cbc3a19",
+        "rev": "5d4f90ebe267729f70f0a10384f645a8b22df6db",
         "type": "github"
       },
       "original": {
