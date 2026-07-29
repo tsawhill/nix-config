@@ -1,3 +1,8 @@
+{ config, ... }:
+let
+  splitLayoutMessage =
+    if config.my.hypr.windowLayout == "master" then "orientationnext" else "togglesplit";
+in
 {
   ################################
   #                              #
@@ -21,7 +26,7 @@
     hl.bind(mainMod .. " + D",      hl.dsp.exec_cmd("walker"))
     hl.bind(mainMod .. " + R",      hl.dsp.exec_cmd("walker -m runner"))
     hl.bind(mainMod .. " + P",      hl.dsp.window.pseudo({}))
-    hl.bind(mainMod .. " + V",      hl.dsp.layout("togglesplit"))
+    hl.bind(mainMod .. " + V",      hl.dsp.layout("${splitLayoutMessage}"))
     hl.bind(mainMod .. " + W",      hl.dsp.layout("addmaster"))
     hl.bind(mainMod .. " + S",      hl.dsp.layout("removemaster"))
 
