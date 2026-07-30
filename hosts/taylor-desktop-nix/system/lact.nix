@@ -38,11 +38,6 @@ in
 
   services.lact = {
     enable = true;
-
-    # LACT 0.9.1's libdisplay-info-sys requires libdisplay-info < 0.4.0.
-    package = pkgs.lact.override {
-      libdisplay-info = pkgs.libdisplay-info_0_2;
-    };
   };
 
   # Write the config declaratively. LACT hot-reloads on file changes,
