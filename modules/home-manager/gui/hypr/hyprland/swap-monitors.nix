@@ -50,7 +50,8 @@ let
 
     ''
     + ''
-    # Update rules file so non-existent workspaces land on the right monitor after restart
+    # Update and reload the rules so workspaces that do not currently exist
+    # are also assigned to the swapped monitor when they are next opened.
     cat > "$RULES_FILE" << EOF
 hl.workspace_rule({ workspace = "1", monitor = "$A", default = true })
 hl.workspace_rule({ workspace = "2", monitor = "$A" })
@@ -63,6 +64,8 @@ hl.workspace_rule({ workspace = "8", monitor = "$B" })
 hl.workspace_rule({ workspace = "9", monitor = "$B" })
 hl.workspace_rule({ workspace = "10", monitor = "$B" })
 EOF
+
+    hyprctl reload
 
     # Move existing workspaces immediately (non-existent ones are silently skipped).
     # Hyprland 0.55+ expects Lua dispatcher expressions from hyprctl.
