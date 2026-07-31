@@ -19,6 +19,7 @@
     "authentik-nix": {
       "inputs": {
         "authentik-src": "authentik-src",
+        "client-ts-generator-src": "client-ts-generator-src",
         "flake-compat": "flake-compat",
         "flake-parts": "flake-parts",
         "flake-utils": "flake-utils",
@@ -29,11 +30,11 @@
         "uv2nix": "uv2nix"
       },
       "locked": {
-        "lastModified": 1785488913,
-        "narHash": "sha256-5kEMR7Pbaldsz5PBYJ6z5o1AxxdnWbGoDkFngl4SXFI=",
+        "lastModified": 1785518110,
+        "narHash": "sha256-xjYVeyu38koV1OwCYK/RY56EGprNcHAHBLh6/DDNtj0=",
         "owner": "nix-community",
         "repo": "authentik-nix",
-        "rev": "d9a66712def0b044b86dc13f7a319641bbd2a34b",
+        "rev": "65952f8360754a8aa5507f8c345ed3d256212ccb",
         "type": "github"
       },
       "original": {
@@ -56,6 +57,22 @@
         "owner": "goauthentik",
         "ref": "version/2026.5.6",
         "repo": "authentik",
+        "type": "github"
+      }
+    },
+    "client-ts-generator-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1784638510,
+        "narHash": "sha256-NfwEWQ/SRjgeUz+F/7uoWAMwk7OqdF2+686krhvJn2M=",
+        "owner": "goauthentik",
+        "repo": "client-ts",
+        "rev": "5850af5867bef6fd4291731797d21b704c7f189d",
+        "type": "github"
+      },
+      "original": {
+        "owner": "goauthentik",
+        "repo": "client-ts",
         "type": "github"
       }
     },
@@ -342,11 +359,11 @@
         "rust-overlay": "rust-overlay"
       },
       "locked": {
-        "lastModified": 1785416418,
-        "narHash": "sha256-4OzwDyYBktyi4wammsFd92nQf/rW1R0pW7cr/vokwAs=",
+        "lastModified": 1785520294,
+        "narHash": "sha256-1bLVv2mZt/z4IEIgfnljZFIL/NZeeQJwxsazzvc88PI=",
         "owner": "temidaradev",
         "repo": "kopuz",
-        "rev": "1d1eb8f837514bc3472498ec6259786ef4b01c16",
+        "rev": "4bd6f86e6383e6934e8935730493b4b79147891a",
         "type": "github"
       },
       "original": {
