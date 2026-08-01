@@ -32,6 +32,7 @@
         "${self}/modules/home-manager/bundles/gui.nix"
         "${self}/modules/home-manager/git.nix"
         "${self}/modules/home-manager/gui/hypr"
+        "${self}/modules/home-manager/gui/mangohud.nix"
         "${self}/modules/home-manager/gui/vesktop.nix"
         (import "${self}/pkgs/hyprcrosshair/hm-module.nix" self)
       ];
