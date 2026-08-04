@@ -1,4 +1,12 @@
-{ lib, pkgs, ... }:
+{
+  inputs,
+  pkgs,
+  ...
+}:
+
+let
+  unstablePkgs = inputs.nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system};
+in
 {
   services.pufferpanel = {
     enable = true;
@@ -10,16 +18,7 @@
       gzip
       javaPackages.compiler.openjdk21
     ];
-    package = pkgs.buildFHSEnv {
-      name = "pufferpanel-fhs";
-      runScript = lib.getExe pkgs.pufferpanel;
-      targetPkgs =
-        pkgs': with pkgs'; [
-          icu
-          openssl
-          zlib
-        ];
-    };
+    package = unstablePkgs.pufferpanel;
   };
   networking.firewall.allowedTCPPorts = [ 8080 ];
 }
