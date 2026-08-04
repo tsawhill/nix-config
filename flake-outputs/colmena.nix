@@ -132,7 +132,7 @@ in
     "local-nginx-nix" =
       mkHost "daily" "local-nginx-nix"
         "${self}/hosts/server-nix/LXCs/local-nginx.nix";
-    # "remote-nginx-nix" = mkHost "daily" "remote-nginx-nix" "${self}/hosts/remote-nginx-nix";
+    "remote-nginx-nix" = mkHost "daily" "remote-nginx-nix" "${self}/hosts/remote-nginx-nix";
 
     # OCI aarch64 proxy. targetHost resolves to its wg-remote address
     # (10.50.50.17) via the AdGuard rewrite generated from topology.nix, so the
