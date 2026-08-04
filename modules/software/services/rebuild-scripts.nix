@@ -279,7 +279,10 @@ let
           done
         fi
       done
-      printf '%s\n' "$expanded" | tr ' ' '\n' | sort -u | grep -v '^$' | tr '\n' ' ' | xargs
+      # sed, not `grep -v`: grep exits 1 when nothing matches, and under
+      # `set -euo pipefail` that kills the caller at the assignment before it
+      # can report an unmatched selector.
+      printf '%s\n' "$expanded" | tr ' ' '\n' | sort -u | sed '/^$/d' | tr '\n' ' ' | xargs
     }
 
     local_build_system_path() {
@@ -631,6 +634,7 @@ let
     SELECTED_HOSTS=$(expand_colmena_selector "$TARGET")
     if [ -z "$SELECTED_HOSTS" ]; then
       echo "No hosts matched selector '$TARGET'"
+      echo "Known colmena hosts: $(list_colmena_hosts)"
       exit 1
     fi
     log_phase "Manual deploy $TARGET: hosts to deploy: $SELECTED_HOSTS"
