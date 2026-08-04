@@ -168,6 +168,7 @@ in
     "pufferpanel-nix" =
       mkHost "monthly" "pufferpanel-nix"
         "${self}/hosts/server-nix/LXCs/pufferpanel.nix";
+    "palworld-nix" = mkHost "monthly" "palworld-nix" "${self}/hosts/server-nix/LXCs/palworld.nix";
     "deluge-nix" = mkHost "monthly" "deluge-nix" "${self}/hosts/server-nix/LXCs/deluge.nix";
     "authentik-nix" = mkHost "monthly" "authentik-nix" "${self}/hosts/server-nix/LXCs/authentik.nix";
     "romm-nix" = mkHost "monthly" "romm-nix" "${self}/hosts/server-nix/LXCs/romm.nix";
