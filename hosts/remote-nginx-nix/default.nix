@@ -53,8 +53,7 @@ in
 
     # Nginx
     "${self}/modules/software/services/nginx/nginx.nix"
-    "${self}/modules/software/services/nginx/proxies"
-    "${self}/modules/software/services/nginx/streams/minecraft.nix"
+    "${self}/modules/software/services/nginx/streams/palworld.nix"
 
     # fail2ban
     "${self}/modules/software/services/fail2ban"
@@ -65,72 +64,5 @@ in
   users.users.nginx = {
     # This tells NixOS not to use the 'nologin' shell
     shell = pkgs.zsh;
-  };
-
-  proxy.authentik = {
-    enable = true;
-    domain = "auth.tsawhill.org";
-  };
-
-  proxy.vaultwarden = {
-    enable = true;
-    domain = "vault.tsawhill.org";
-  };
-  proxy.immich = {
-    enable = true;
-    domain = "immich.tsawhill.org";
-  };
-  proxy.jellyfin = {
-    enable = true;
-    domain = "jelly.tsawhill.org";
-  };
-  proxy.nextcloud = {
-    enable = true;
-    domain = "nc.tsawhill.org";
-  };
-  proxy.open-webui = {
-    enable = true;
-    domain = "llm.tsawhill.org";
-    mTLSCert = "mTLS-CA";
-  };
-  proxy.gotify = {
-    enable = true;
-    domain = "gotify.tsawhill.org";
-    mTLSCert = "mTLS-CA";
-  };
-  proxy.radarr = {
-    enable = true;
-    domain = "rad.tsawhill.org";
-    mTLSCert = "mTLS-CA";
-  };
-  proxy.sonarr = {
-    enable = true;
-    domain = "son.tsawhill.org";
-    # mTLSCert = "mTLS-CA";
-    enableAuthentik = true;
-  };
-  proxy.lidarr = {
-    enable = true;
-    domain = "lid.tsawhill.org";
-    mTLSCert = "mTLS-CA";
-  };
-  proxy.prowlarr = {
-    enable = true;
-    domain = "pro.tsawhill.org";
-    mTLSCert = "mTLS-CA";
-  };
-  proxy.seerr = {
-    enable = true;
-    domain = "request.tsawhill.org";
-  };
-  proxy.unifi = {
-    enable = true;
-    domain = "unifi.tsawhill.org";
-    mTLSCert = "mTLS-CA";
-  };
-  proxy.searx = {
-    enable = true;
-    domain = "searx.tsawhill.org";
-    mTLSCert = "mTLS-CA";
   };
 }
