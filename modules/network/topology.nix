@@ -271,6 +271,17 @@ let
         preferredAddress = "wgRemote";
       };
     };
+    # NixOS replacement for oracle-rocky-proxy on an OCI A1.Flex (aarch64).
+    # Deliberately given its own tunnel address rather than reusing .16 so the
+    # two can run side by side during cutover. Once traffic is moved, drop
+    # oracle-rocky-proxy and move the tsawhill.org aliases here.
+    oracle-1-nix = {
+      wgRemote.ip = "10.50.50.17";
+      dns = {
+        enable = true;
+        preferredAddress = "wgRemote";
+      };
+    };
     pixel7pro.wgRemote.ip = "10.50.50.11";
     fwlaptop.wgRemote.ip = "10.50.50.15";
   };

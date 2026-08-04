@@ -7,6 +7,13 @@
 
     kopuz.url = "github:temidaradev/kopuz";
 
+    # Declarative partitioning, used by oracle-1-nix so nixos-anywhere can
+    # lay out the OCI boot volume from scratch.
+    disko = {
+      url = "github:nix-community/disko";
+      inputs.nixpkgs.follows = "nixpkgs-stable";
+    };
+
     nixpkgs-stable.url = "github:NixOS/nixpkgs/nixos-26.05";
     home-manager-stable = {
       url = "github:nix-community/home-manager/release-26.05";

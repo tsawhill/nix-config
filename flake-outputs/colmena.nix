@@ -44,6 +44,12 @@ let
   };
   piPkgs = import inputs.nixos-raspberrypi.inputs.nixpkgs { localSystem = "aarch64-linux"; };
 
+  # oracle-1-nix is an aarch64 OCI instance. build-nix builds it under binfmt
+  # emulation (boot.binfmt.emulatedSystems), but almost the whole closure comes
+  # prebuilt from cache.nixos.org since aarch64-linux is a first-class cached
+  # platform, so emulation only bites on genuinely local derivations.
+  arm64Pkgs = import nixpkgs-stable { localSystem = "aarch64-linux"; };
+
   unstableArgs = sharedArgs // {
     home-manager-input = inputs.home-manager-unstable;
     nixvim-input = inputs.nixvim-unstable;
@@ -105,6 +111,7 @@ in
       specialArgs = sharedArgs;
       nodeNixpkgs = {
         "pi-backup-nix" = piPkgs;
+        "oracle-1-nix" = arm64Pkgs;
         "taylor-desktop-nix" = unstablePkgs;
         "taylor-laptop-nix" = unstablePkgs;
         "taylor-deck-nix" = unstablePkgs;
@@ -126,6 +133,12 @@ in
       mkHost "daily" "local-nginx-nix"
         "${self}/hosts/server-nix/LXCs/local-nginx.nix";
     # "remote-nginx-nix" = mkHost "daily" "remote-nginx-nix" "${self}/hosts/remote-nginx-nix";
+
+    # OCI aarch64 proxy. targetHost resolves to its wg-remote address
+    # (10.50.50.17) via the AdGuard rewrite generated from topology.nix, so the
+    # tunnel must be up before this node is reachable. Platform comes from
+    # meta.nodeNixpkgs."oracle-1-nix" above.
+    "oracle-1-nix" = mkHost "daily" "oracle-1-nix" "${self}/hosts/oracle-1-nix";
 
     # --- weekly ---
     "immich-nix" = mkHost "weekly" "immich-nix" "${self}/hosts/server-nix/LXCs/immich.nix";
