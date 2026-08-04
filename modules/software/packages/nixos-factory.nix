@@ -522,7 +522,9 @@ with open(sys.argv[2], 'w') as f:
     }
 
     deploy_adguard() {
-      deploy adguard-nix
+      deploy adguard-nix || return
+      echo "==> Waiting 30 seconds for AdGuard DNS to restart..."
+      sleep 30
     }
 
     # ── Splash screen ─────────────────────────────────────────────
