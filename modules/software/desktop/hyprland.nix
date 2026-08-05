@@ -29,6 +29,24 @@
       ];
     };
 
+    # nixpkgs ships glaze 8.0.0, but hyprland does find_package(glaze 7...<8),
+    # so it falls back to a FetchContent git clone that fails in the sandbox.
+    nixpkgs.overlays = [
+      (final: prev: {
+        hyprland = prev.hyprland.override {
+          glaze = prev.glaze.overrideAttrs (_: rec {
+            version = "7.2.0";
+            src = prev.fetchFromGitHub {
+              owner = "stephenberry";
+              repo = "glaze";
+              tag = "v${version}";
+              hash = "sha256-f3NVRi3SXKo42hn0WCw7JsOK3EkdOVJIcuzhPorKjFY=";
+            };
+          });
+        };
+      })
+    ];
+
     programs.hyprland = {
       enable = true;
       package = pkgs.hyprland;
