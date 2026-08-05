@@ -27,7 +27,6 @@ let
     "llm-nix"
     "nextcloud-nix"
     "pufferpanel-nix"
-    "romm-nix"
     "samba-nix"
     "searx-nix"
     "socks5-vpn-eu-nix"

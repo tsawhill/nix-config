@@ -136,17 +136,11 @@ pufferpanel-nix:
   type: "container"
   profiles: ["nixos-lxc"]
   config:
+    boot.autostart: "false"
     limits.memory: "8GiB"
   devices:
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/pufferpanel-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:9d:2b:70" }
-
-romm-nix:
-  type: "container"
-  profiles: ["nixos-lxc", "roms-mount"]
-  config: {}
-  devices:
-    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/romm-nix" }
 
 samba-nix:
   type: "container"

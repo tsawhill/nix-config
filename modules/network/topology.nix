@@ -121,13 +121,6 @@ let
       };
       dns.enable = true;
     };
-    romm-nix = {
-      lan = {
-        ip = "10.73.73.19";
-        mac = "10:66:6a:5a:5b:80";
-      };
-      dns.enable = true;
-    };
     deluge-nix = {
       lan = {
         ip = "10.73.73.20";
