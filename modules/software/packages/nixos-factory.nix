@@ -361,7 +361,6 @@ with open(sys.argv[2], 'w') as f:
     # --- Incus / ZFS defaults (on server-nix) ---
     IMAGE_ALIAS="nixos-base-image"       # local image alias for base NixOS LXC
     PROFILE="nixos-lxc"                  # default profile applied to new containers
-    ROOT_POOLS=("rpool" "downloadHDD" "VMDisks")  # ZFS pools the user can pick from
 
     # Template nix store snapshot — cloned into each new container so it has a
     # working /nix from the start (avoids a full download on first deploy).
@@ -390,6 +389,7 @@ with open(sys.argv[2], 'w') as f:
 
     server_cmd() {
       "$SSH" \
+        -n \
         -o BatchMode=yes \
         -o ConnectTimeout=10 \
         "$SERVER_HOST" \
@@ -552,6 +552,23 @@ with open(sys.argv[2], 'w') as f:
     # ══════════════════════════════════════════════════════════════
     do_create() {
       require_server
+
+      if ! ROOT_POOLS_OUTPUT=$(server_cmd incus storage list --columns n --format csv); then
+        $GUM style --foreground 196 --bold "Could not list Incus storage pools."
+        exit 1
+      fi
+
+      ROOT_POOLS=()
+      while IFS= read -r pool; do
+        if [ -n "$pool" ]; then
+          ROOT_POOLS+=("$pool")
+        fi
+      done <<< "$ROOT_POOLS_OUTPUT"
+
+      if [ "''${#ROOT_POOLS[@]}" -eq 0 ]; then
+        $GUM style --foreground 196 --bold "Incus did not report any storage pools."
+        exit 1
+      fi
 
       HOSTNAME=$($GUM input --placeholder "Enter the new container hostname")
       if [ -z "$HOSTNAME" ]; then exit 1; fi
