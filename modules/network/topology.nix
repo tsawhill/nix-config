@@ -263,18 +263,17 @@ let
       };
       dns.enable = true;
     };
-    oracle-rocky-proxy = {
+    remote-nginx-nix = {
       wgRemote.ip = "10.50.50.16";
       dns = {
-        enable = false;
-        aliases = [ "remote-nginx-nix.lan" ];
+        enable = true;
         preferredAddress = "wgRemote";
       };
     };
-    # NixOS replacement for oracle-rocky-proxy on an OCI A1.Flex (aarch64).
+    # NixOS replacement for remote-nginx-nix on an OCI A1.Flex (aarch64).
     # Deliberately given its own tunnel address rather than reusing .16 so the
-    # two can run side by side during cutover. Once traffic is moved, drop
-    # oracle-rocky-proxy and move the tsawhill.org aliases here.
+    # two can run side by side during cutover. Once traffic is moved, drop the
+    # remote-nginx-nix entry above.
     oracle-1-nix = {
       wgRemote.ip = "10.50.50.17";
       dns = {

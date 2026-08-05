@@ -7,8 +7,8 @@
 
 /*
   oracle-1-nix — public reverse proxy on an OCI VM.Standard.A1.Flex
-  (aarch64, 1 OCPU / 6 GB). Replaces remote-nginx-nix and the hand-built
-  oracle-rocky-proxy.
+  (aarch64, 1 OCPU / 6 GB). Replaces remote-nginx-nix, the x86 OCI instance
+  currently serving this role.
 
   First install goes through ./bootstrap.nix, not this file.
 */
