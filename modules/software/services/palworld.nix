@@ -342,7 +342,6 @@ in
 
     systemd.tmpfiles.rules = [
       "d ${cfg.dataDir} 0750 ${cfg.user} ${cfg.group} -"
-      "d ${settingsDirectory} 0750 ${cfg.user} ${cfg.group} -"
     ];
 
     environment.systemPackages = [

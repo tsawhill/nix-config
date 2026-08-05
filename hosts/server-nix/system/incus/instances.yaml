@@ -121,6 +121,17 @@ nextcloud-nix:
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/nextcloud-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:60:3d:cc" }
 
+palworld-nix:
+  type: "container"
+  profiles: ["nixos-lxc"]
+  config:
+    limits.cpu: "4"
+    limits.memory: "16GiB"
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "50GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/palworld-nix" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "02:36:bc:73:0d:3b" }
+
 pufferpanel-nix:
   type: "container"
   profiles: ["nixos-lxc"]
@@ -185,13 +196,3 @@ vaultwarden-nix:
   devices:
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/vaultwarden-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:f5:ac:e2" }
-
-
-palworld-nix:
-  type: "container"
-  profiles: ["nixos-lxc"]
-  config: {}
-  devices:
-    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
-    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/palworld-nix" }
-    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "02:36:bc:73:0d:3b" }

@@ -7,10 +7,7 @@
 
   services.palworld = {
     enable = true;
-
-    # nixos-factory initially provisions a 2 GiB RAM / 4 GiB disk LXC.
-    # Keep the server stopped until the generated Incus entry is resized.
-    autoStart = false;
+    autoStart = true;
 
     serverName = "Taylor's Palworld Server";
     serverDescription = "Palworld dedicated server";
