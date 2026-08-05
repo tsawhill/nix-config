@@ -45,14 +45,16 @@
                   plugin = "lsp-plugins-ladspa";
                   label = "http://lsp-plug.in/plugins/ladspa/gate_mono";
                   control = {
-                    "Curve threshold (G)" = 0.15;
+                    "Curve threshold (G)" = 0.20;
                     "Attack (ms)" = 5.0;
-                    "Release (ms)" = 100.0;
-                    "Reduction (G)" = 0.01;
+                    "Release (ms)" = 120.0;
+                    # -60 dB when closed — effectively silent between phrases.
+                    "Reduction (G)" = 0.001;
                     "Hysteresis" = 1.0;
-                    "Hysteresis threshold (G)" = 0.02;
+                    "Hysteresis threshold (G)" = 0.05;
                     "High-pass filter mode" = 1.0;
-                    "High-pass filter frequency (Hz)" = 300.0;
+                    # Sidechain deaf below 400 Hz so fan/rumble can't hold the gate open.
+                    "High-pass filter frequency (Hz)" = 400.0;
                     "Sidechain mode" = 1.0;
                     "Sidechain preamp (G)" = 2.0;
                   };
@@ -62,7 +64,7 @@
                   name = "hpf";
                   label = "bq_highpass";
                   control = {
-                    "Freq" = 80.0;
+                    "Freq" = 100.0;
                     "Q" = 0.707;
                   };
                 }
@@ -72,9 +74,10 @@
                   plugin = "librnnoise_ladspa";
                   label = "noise_suppressor_mono";
                   control = {
-                    "VAD Threshold (%)" = 80.0;
-                    "VAD Grace Period (ms)" = 200.0;
-                    "Retroactive VAD Grace (ms)" = 20.0;
+                    "VAD Threshold (%)" = 95.0;
+                    "VAD Grace Period (ms)" = 100.0;
+                    # Bumped to protect word onsets from the more aggressive VAD.
+                    "Retroactive VAD Grace (ms)" = 30.0;
                   };
                 }
                 {
