@@ -173,6 +173,34 @@ let
       systemctl start palworld.service
     '';
   };
+
+  rconCommand = pkgs.writeShellApplication {
+    name = "palworld-rcon";
+    runtimeInputs = [ pkgs.mcrcon ];
+    text = ''
+      if [ "$#" -eq 0 ]; then
+        echo "usage: palworld-rcon <command>" >&2
+        exit 2
+      fi
+
+      set -a
+      # shellcheck disable=SC1091
+      . ${lib.escapeShellArg cfg.environmentFile}
+      set +a
+
+      if [ -z "''${PALWORLD_ADMIN_PASSWORD:-}" ]; then
+        echo "PALWORLD_ADMIN_PASSWORD is missing from the Palworld environment file" >&2
+        exit 1
+      fi
+
+      rcon_command="$*"
+      exec mcrcon \
+        -H 127.0.0.1 \
+        -P ${toString cfg.rcon.port} \
+        -p "$PALWORLD_ADMIN_PASSWORD" \
+        "$rcon_command"
+    '';
+  };
 in
 {
   options.services.palworld = {
@@ -348,7 +376,8 @@ in
       pkgs.steamcmd
       pkgs.steam-run
       updateCommand
-    ];
+    ]
+    ++ lib.optionals cfg.rcon.enable [ rconCommand ];
 
     systemd.services.palworld-install = {
       description = "Install or update the Palworld dedicated server";
