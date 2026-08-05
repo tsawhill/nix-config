@@ -1,4 +1,9 @@
-{ config, lib, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   cfg = config.my.monitoring;
@@ -135,7 +140,7 @@ in
         tls_starttls = smtp.tlsStarttls;
         user = smtp.user;
         from = smtp.from;
-        passwordeval = "cat ${smtp.passwordFile}";
+        passwordeval = "${pkgs.coreutils}/bin/cat ${smtp.passwordFile}";
       };
     };
   };
