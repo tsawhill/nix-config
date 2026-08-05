@@ -378,7 +378,7 @@ in
         "palworld-install.service"
       ];
       wants = [ "network-online.target" ];
-      preStart = renderSettingsScript;
+      preStart = "${renderSettingsScript}";
       environment = {
         HOME = cfg.dataDir;
         SteamAppId = "2394010";
