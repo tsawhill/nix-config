@@ -835,11 +835,24 @@ YAML
 
       # --- Step 8: Deploy NixOS config ---
       # Build the NixOS config locally and push it to the new container.
-      # If the deploy fails, automatically roll back everything we just created
-      # so the system is left in the same state as before the script ran.
+      # A nonzero deploy can still mean the configuration activated but a
+      # service failed during switch. Let the operator keep the provisioned
+      # container in that case instead of unconditionally rolling it back.
       echo "==> Deploying NixOS config from build-nix..."
       if ! deploy_host "$HOSTNAME"; then
-        rollback_create "Host deploy failed"
+        $GUM style --foreground 214 --bold \
+          "Host deploy returned a failure. The configuration may still have activated."
+
+        if $GUM confirm \
+          --affirmative "Keep container" \
+          --negative "Roll back" \
+          "Keep $HOSTNAME and the generated configuration?"
+        then
+          $GUM style --foreground 214 \
+            "Keeping $HOSTNAME. Inspect the failed service and redeploy when ready."
+        else
+          rollback_create "Host deploy failed"
+        fi
       fi
 
       trap - ERR
