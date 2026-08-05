@@ -27,7 +27,8 @@
     environment.systemPackages = with pkgs; [
       mpv
       feishin
-      delfin
+      jellyfin-mpv-shim
+      jellyfin-desktop
       # self.packages.${pkgs.stdenv.hostPlatform.system}.kopuz
     ];
   };
