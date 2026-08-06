@@ -53,7 +53,10 @@
                     #
                     # -38 dBFS: 8 dB above the fan's peak, below conversational speech.
                     "Curve threshold (G)" = 0.0126;
-                    "Attack (ms)" = 5.0;
+                    # Slow enough that a desk tap is over before the gate finishes
+                    # opening. Speech is sustained and still opens it cleanly;
+                    # a few-ms transient only ever gets it partway.
+                    "Attack (ms)" = 15.0;
                     "Release (ms)" = 120.0;
                     # -60 dB when closed — effectively silent between phrases.
                     "Reduction (G)" = 0.001;
@@ -64,9 +67,10 @@
                     # open/close points plus the release time avoid that entirely.
                     "Hysteresis" = 0.0;
                     "High-pass filter mode" = 1.0;
-                    # Sidechain deaf below 400 Hz so fan/rumble can't hold the gate
-                    # open. This buys real extra margin — fan energy is mostly low.
-                    "High-pass filter frequency (Hz)" = 400.0;
+                    # Sidechain deaf below 700 Hz so fan/rumble can't hold the gate
+                    # open and desk thumps can't trigger it — both are dominated by
+                    # low frequencies, while speech keeps plenty of energy above.
+                    "High-pass filter frequency (Hz)" = 700.0;
                     "Sidechain mode" = 1.0;
                     # Unity, so the threshold above reads directly as dBFS.
                     "Sidechain preamp (G)" = 1.0;
