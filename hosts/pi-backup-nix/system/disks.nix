@@ -28,6 +28,8 @@ in
   boot.supportedFilesystems = [ "zfs" ];
   boot.zfs.extraPools = [ "backup" ];
   boot.zfs.devNodes = "/dev/disk/by-id";
+  # Becomes the default at stateVersion 26.11; drop this then.
+  boot.zfs.forceImportRoot = false;
 
   networking.hostId = "8425e349";
 

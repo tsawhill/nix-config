@@ -14,7 +14,7 @@ in
 {
   networking.hostName = "taylor-cube-nix";
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
-  system.stateVersion = "25.11";
+  system.stateVersion = "26.05";
   nixpkgs.config.permittedInsecurePackages = [
     "pnpm-9.15.9"
   ];

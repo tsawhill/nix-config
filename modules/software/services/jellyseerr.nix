@@ -1,6 +1,6 @@
 {
   networking.firewall.allowedTCPPorts = [ 5055 ];
-  services.jellyseerr = {
+  services.seerr = {
     enable = true;
   };
 }

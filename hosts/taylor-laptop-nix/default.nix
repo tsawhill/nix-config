@@ -12,7 +12,7 @@ let
 in
 {
   networking.hostName = "taylor-laptop-nix";
-  system.stateVersion = "25.11";
+  system.stateVersion = "26.05";
   imports = [
     # Secrets (SOPS)
     inputs.sops-nix-stable.nixosModules.sops

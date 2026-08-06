@@ -2,6 +2,8 @@
 {
   boot.supportedFilesystems = [ "zfs" "ntfs" ];
   networking.hostId = "34801239";
+  # Becomes the default at stateVersion 26.11; drop this then.
+  boot.zfs.forceImportRoot = false;
 
   fileSystems."/" = {
     device = "zpool/root";

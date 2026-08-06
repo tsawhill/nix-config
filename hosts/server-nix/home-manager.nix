@@ -22,13 +22,13 @@
 
     users.root = {
       imports = [ "${self}/modules/home-manager/bundles/all.nix" ];
-      home.stateVersion = "25.11";
+      home.stateVersion = "26.05";
       my.nixvim.full = true;
     };
 
     users.taylor = {
       imports = [ "${self}/modules/home-manager/bundles/all.nix" ];
-      home.stateVersion = "25.11";
+      home.stateVersion = "26.05";
       my.nixvim.full = true;
     };
 

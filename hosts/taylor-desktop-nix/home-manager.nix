@@ -31,7 +31,7 @@
         "${self}/modules/home-manager/gui/vesktop.nix"
         (import "${self}/pkgs/hyprcrosshair/hm-module.nix" self)
       ];
-      home.stateVersion = "25.11";
+      home.stateVersion = "26.05";
       my.nixvim.full = true;
       my.shell.starshipTheme = "personal";
       my.yarg.enable = true;

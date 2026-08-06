@@ -30,7 +30,7 @@
         "${self}/modules/home-manager/bundles/all.nix"
         "${self}/modules/home-manager/bundles/gui.nix"
       ];
-      home.stateVersion = "25.11";
+      home.stateVersion = "26.05";
       my.nixvim.full = true;
       my.shell.starshipTheme = "personal";
 
