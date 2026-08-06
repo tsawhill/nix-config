@@ -45,18 +45,31 @@
                   plugin = "lsp-plugins-ladspa";
                   label = "http://lsp-plug.in/plugins/ladspa/gate_mono";
                   control = {
-                    "Curve threshold (G)" = 0.20;
+                    # Thresholds below are absolute dBFS and were measured at the
+                    # M2's current hardware gain (fan floor peaks -46 dB, speech
+                    # peaks -16 dB). MOVING THE GAIN KNOB INVALIDATES THEM — remeasure
+                    # with: ffmpeg -f pulse -i <m2 source> -t 5 \
+                    #   -af "pan=mono|c0=c0,volumedetect" -f null -
+                    #
+                    # -38 dBFS: 8 dB above the fan's peak, below conversational speech.
+                    "Curve threshold (G)" = 0.0126;
                     "Attack (ms)" = 5.0;
                     "Release (ms)" = 120.0;
                     # -60 dB when closed — effectively silent between phrases.
                     "Reduction (G)" = 0.001;
-                    "Hysteresis" = 1.0;
-                    "Hysteresis threshold (G)" = 0.05;
+                    # Hysteresis OFF deliberately. It latches: the gate opens on
+                    # speech and won't close until the signal drops below the
+                    # separate (lower) hysteresis threshold, which the fan now sits
+                    # above — so airflow held the gate open indefinitely. Equal
+                    # open/close points plus the release time avoid that entirely.
+                    "Hysteresis" = 0.0;
                     "High-pass filter mode" = 1.0;
-                    # Sidechain deaf below 400 Hz so fan/rumble can't hold the gate open.
+                    # Sidechain deaf below 400 Hz so fan/rumble can't hold the gate
+                    # open. This buys real extra margin — fan energy is mostly low.
                     "High-pass filter frequency (Hz)" = 400.0;
                     "Sidechain mode" = 1.0;
-                    "Sidechain preamp (G)" = 2.0;
+                    # Unity, so the threshold above reads directly as dBFS.
+                    "Sidechain preamp (G)" = 1.0;
                   };
                 }
                 {
