@@ -111,7 +111,7 @@ in
           {
             name = "Chevron";
             settings = {
-              outputName = "DP-4";
+              outputName = cfg.monitor;
               shape = "chevron";
               dot.size = 2.0;
               color = {

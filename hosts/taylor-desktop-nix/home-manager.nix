@@ -39,6 +39,7 @@
       my.hypr = {
         monitors.primary = "DP-1";
         monitors.secondary = "DP-2";
+        crosshair.monitor = "DP-2";
         gpuRecorder = {
           enable = true;
           captureTarget = "primary";
