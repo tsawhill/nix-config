@@ -1,8 +1,94 @@
-{ lib, config, ... }:
+{ lib, config, pkgs, ... }:
 
 let
   cfg = config.my.hypr.crosshair;
   hyprCfg = config.my.hypr;
+
+  # Written by hypr-swap-monitors and workspaces.nix; holds whichever monitor is
+  # currently acting as primary. Same state file gpu-recorder resolves against.
+  primaryMonitorFile = "${config.home.homeDirectory}/.local/state/hypr-primary-monitor";
+
+  # Build-time value baked into profiles.ini. Only used when runtime resolution
+  # fails (no state file yet, crosshair started outside a Hyprland session).
+  fallbackMonitor = if cfg.monitor == "primary" then hyprCfg.monitors.primary else cfg.monitor;
+
+  # Prints the monitor the crosshair belongs on, resolved at call time.
+  monitorResolver = pkgs.writeShellApplication {
+    name = "hypr-crosshair-monitor";
+    runtimeInputs = [ pkgs.coreutils ];
+    text = ''
+      configured_monitor=${lib.escapeShellArg cfg.monitor}
+      state_file=${lib.escapeShellArg primaryMonitorFile}
+      fallback_primary=${lib.escapeShellArg hyprCfg.monitors.primary}
+
+      if [[ "$configured_monitor" != "primary" ]]; then
+        printf '%s\n' "$configured_monitor"
+        exit 0
+      fi
+
+      if [[ -s "$state_file" ]]; then
+        IFS= read -r primary_monitor < "$state_file" || true
+        if [[ -n "$primary_monitor" ]]; then
+          printf '%s\n' "$primary_monitor"
+          exit 0
+        fi
+      fi
+
+      printf '%s\n' "$fallback_primary"
+    '';
+  };
+
+  # Rewrites output_name in the mutable config.ini. hyprcrosshair only reads its
+  # config at startup, so --restart is how a change actually takes effect.
+  monitorApplier = pkgs.writeShellApplication {
+    name = "hyprcrosshair-apply-monitor";
+    runtimeInputs = [
+      pkgs.coreutils
+      pkgs.gnugrep
+      pkgs.gnused
+      pkgs.procps
+      monitorResolver
+      config.programs.hyprcrosshair.package
+    ];
+    text = ''
+      config_file="''${XDG_CONFIG_HOME:-$HOME/.config}/hyprcrosshair/config.ini"
+      [[ -f "$config_file" ]] || exit 0
+
+      monitor=$(hypr-crosshair-monitor)
+      [[ -n "$monitor" ]] || exit 0
+
+      if grep -q '^output_name=' "$config_file"; then
+        sed -i "s|^output_name=.*|output_name=$monitor|" "$config_file"
+      else
+        printf 'output_name=%s\n' "$monitor" >> "$config_file"
+      fi
+
+      if [[ "''${1:-}" == "--restart" ]] && pgrep -x hyprcrosshair >/dev/null 2>&1; then
+        pkill -x hyprcrosshair || true
+        hyprcrosshair &
+      fi
+    '';
+  };
+
+  # Toggle resolves the monitor before launching so a start after a swap lands
+  # on the right screen without waiting for the next swap.
+  toggleScript = pkgs.writeShellApplication {
+    name = "hyprcrosshair-toggle";
+    runtimeInputs = [
+      pkgs.procps
+      monitorApplier
+      config.programs.hyprcrosshair.package
+    ];
+    text = ''
+      if pgrep -x hyprcrosshair >/dev/null 2>&1; then
+        pkill -x hyprcrosshair || true
+        exit 0
+      fi
+
+      hyprcrosshair-apply-monitor
+      hyprcrosshair &
+    '';
+  };
 
   # Translate a hyprlang bind prefix ("$mainMod SHIFT, Key") into a Lua key
   # expression for hl.bind, referencing the `mainMod` local from default.nix.
@@ -27,8 +113,13 @@ in
 
     monitor = lib.mkOption {
       type = lib.types.str;
-      default = hyprCfg.monitors.primary or "";
-      description = "Monitor name for crosshair (defaults to primary monitor).";
+      default = "primary";
+      example = "DP-2";
+      description = ''
+        Monitor the crosshair renders on. A literal name (e.g. "DP-2") pins it to
+        that output. The sentinel "primary" tracks whichever monitor is currently
+        primary, so the crosshair follows hypr-swap-monitors.
+      '';
     };
 
     cycleKeybind = lib.mkOption {
@@ -46,8 +137,17 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    home.packages = [
+      monitorResolver
+      monitorApplier
+      toggleScript
+    ];
+
     programs.hyprcrosshair = {
       enable = true;
+      # Re-resolve on every profile cycle so cycling never reverts the monitor
+      # to the value baked into profiles.ini.
+      outputNameCommand = lib.getExe monitorResolver;
       profiles = {
         active = 0;
         configs = [
@@ -73,7 +173,7 @@ in
           {
             name = "Yellow Dot";
             settings = {
-              outputName = cfg.monitor;
+              outputName = fallbackMonitor;
               shape = "dot";
               color = {
                 red = 1.0;
@@ -91,7 +191,7 @@ in
           {
             name = "Yellow Cross";
             settings = {
-              outputName = cfg.monitor;
+              outputName = fallbackMonitor;
               shape = "cross";
               color = {
                 red = 1.0;
@@ -111,7 +211,7 @@ in
           {
             name = "Chevron";
             settings = {
-              outputName = cfg.monitor;
+              outputName = fallbackMonitor;
               shape = "chevron";
               dot.size = 2.0;
               color = {
@@ -144,9 +244,9 @@ in
       lib.optionalString (config.programs.hyprcrosshair.profiles.configs != [ ]) ''
         hl.bind(${keyExpr cfg.cycleKeybind}, hl.dsp.exec_cmd("hyprcrosshair-cycle"), { locked = true })
       ''
-      # Toggle: kill if running, start if not
+      # Toggle: kill if running, else resolve the monitor and start
       + ''
-        hl.bind(${keyExpr cfg.toggleKeybind}, hl.dsp.exec_cmd("pkill -x hyprcrosshair || hyprcrosshair"), { locked = true })
+        hl.bind(${keyExpr cfg.toggleKeybind}, hl.dsp.exec_cmd("hyprcrosshair-toggle"), { locked = true })
       '';
   };
 }

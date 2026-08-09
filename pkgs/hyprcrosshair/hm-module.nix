@@ -248,6 +248,14 @@ let
       in_profile && found && /=/ { print }
     ' "$PROFILES" > "$CONFIG"
 
+    ${lib.optionalString (cfg.outputNameCommand != null) ''
+      # Resolve the target monitor at runtime instead of using the baked-in name
+      RESOLVED_OUTPUT=$(${cfg.outputNameCommand} 2>/dev/null || true)
+      if [ -n "$RESOLVED_OUTPUT" ]; then
+        ${pkgs.gnused}/bin/sed -i "s|^output_name=.*|output_name=$RESOLVED_OUTPUT|" "$CONFIG"
+      fi
+    ''}
+
     # Save state
     echo "$NEXT" > "$STATE"
 
@@ -281,6 +289,16 @@ in
       type = crosshairSettingsType;
       default = { };
       description = "Main crosshair config written to ~/.config/hyprcrosshair/config.ini.";
+    };
+
+    outputNameCommand = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        Command whose stdout overrides `output_name` in config.ini whenever the
+        config is rewritten. Lets the monitor be resolved at runtime rather than
+        baked in at build time. Empty output leaves the configured value alone.
+      '';
     };
 
     profiles = {

@@ -49,6 +49,12 @@ let
     fi
 
     ''
+    + lib.optionalString (cfg.crosshair.enable && cfg.crosshair.monitor == "primary") ''
+    # The crosshair reads its output at startup, so move it onto the new primary.
+    # No-ops when hyprcrosshair is not running.
+    hyprcrosshair-apply-monitor --restart || true
+
+    ''
     + ''
     # Update and reload the rules so workspaces that do not currently exist
     # are also assigned to the swapped monitor when they are next opened.
