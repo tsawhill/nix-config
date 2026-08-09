@@ -19,11 +19,8 @@
       sddm = {
         enable = true;
         wayland.enable = true;
-        # Use the specific package for the Qt6 version of SDDM.
-        # mkDefault so hosts that also enable Plasma 6 (taylor-cube-nix) don't
-        # collide — plasma6.nix sets this same kdePackages.sddm unconditionally,
-        # so it wins there and the result is identical either way.
-        package = lib.mkDefault pkgs.kdePackages.sddm;
+        # Use the specific package for the Qt6 version of SDDM
+        package = pkgs.kdePackages.sddm;
 
         # The theme name to use
         theme = "${pkgs.sddm-astronaut}/share/sddm/themes/sddm-astronaut-theme";

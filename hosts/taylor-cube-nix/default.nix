@@ -63,17 +63,11 @@ in
     "${self}/modules/software/bundles"
     "${self}/modules/software/games"
 
-    # Desktop: the whole desktop/ dir — KDE Plasma, Hyprland, SDDM, and the full
-    # PipeWire stack (virtual sinks + mic chain). GNOME is in there too but stays
-    # gated behind desktop.gnome.enable.
-    #
-    # TEMPORARY (2026-07-31): the cube is standing in as the primary workstation
-    # while taylor-desktop-nix is torn down. That requires a display manager, so
-    # jovian.steam.autoStart is off below — Jovian's autoStart and a DM cannot
-    # both own the session. To revert to a console-only box: restore the
-    # KDE-only imports (kde.nix + pipewire/base.nix), drop desktop.hyprland,
-    # and set jovian.steam.autoStart back to true.
-    "${self}/modules/software/desktop"
+    # Desktop: KDE Plasma only (the desktop/ dir auto-imports SDDM + Hyprland,
+    # which we do not want — Jovian's autoStart is incompatible with a display
+    # manager).
+    "${self}/modules/software/desktop/kde.nix"
+    "${self}/modules/software/desktop/pipewire/base.nix"
 
     # WireGuard (remote tunnel home). AirVPN scaffolding is present but disabled —
     # see system/networking.nix to enable once you generate a cube AirVPN config.
@@ -97,13 +91,9 @@ in
   jovian = {
     steam = {
       enable = true;
-      # TEMPORARY: off while the cube is the primary workstation, so SDDM can
-      # autologin straight into Hyprland. Big Picture is still available as an
-      # SDDM session and from the Steam client. Set back to true to boot into
-      # Game Mode again.
-      autoStart = false;
+      autoStart = true; # boot straight into the Steam Big Picture UI
       user = "taylor";
-      desktopSession = "hyprland-uwsm"; # "Switch to Desktop" lands in Hyprland
+      desktopSession = "plasma"; # "Switch to Desktop" lands in KDE Plasma
     };
     decky-loader.enable = true; # plugin loader
     # Not a Steam Deck, so no jovian.devices.steamdeck (Deck APU/controls/fan/
@@ -113,7 +103,6 @@ in
     steamos.useSteamOSConfig = false;
   };
   desktop.kde.enable = true;
-  desktop.hyprland.enable = true;
 
   # ---------------------------------------------------------------------------
   # Software set (follows the deck, minus Deck-specific bits)
@@ -126,18 +115,6 @@ in
   software.apps.gaming.enable = true;
   software.apps.emulators.enable = true;
   software.apps.tools.enable = true;
-  # TEMPORARY (primary-workstation stint): dev tooling, previously desktop-only.
-  software.dev.enable = true;
-
-  # Audio: same layout as taylor-desktop-nix — game/discord/desktop virtual
-  # sinks plus a mic_input source. The motuMic filter chain's capture node
-  # autoconnects to the default source, so it works whether or not the M2 is
-  # physically attached.
-  my.desktop.audio.motuMic.enable = true;
-  my.desktop.audio.lowLatency = {
-    enable = true;
-    quantum = 128;
-  };
 
   # No forced gamescope launcher resolutions — the session renders at the TV's
   # native (EDID) resolution.
