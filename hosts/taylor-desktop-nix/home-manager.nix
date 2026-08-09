@@ -47,6 +47,11 @@
           # quality = "ultra";
           extraArgs = [ "-tune quality" ];
           fps = 120;
+          activation.processPatterns = [
+            "gamescope"
+            "net[.]runelite[.]client[.]RuneLite"
+            "(^|/)cs2([[:space:]]|$)"
+          ];
           audio.output = [
             "discord_audio.monitor"
             "game_audio.monitor"

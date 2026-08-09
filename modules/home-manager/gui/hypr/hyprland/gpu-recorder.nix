@@ -8,6 +8,18 @@ let
   cfg = config.my.hypr.gpuRecorder;
   hyprCfg = config.my.hypr;
   primaryMonitorFile = "${config.home.homeDirectory}/.local/state/hypr-primary-monitor";
+  activationEnabled = cfg.activation.processPatterns != [ ];
+
+  activationCheck =
+    if activationEnabled then
+      lib.concatStringsSep " || " (
+        map (
+          pattern:
+          "${pkgs.procps}/bin/pgrep --ignore-case --full -- ${lib.escapeShellArg pattern} > /dev/null 2>&1"
+        ) cfg.activation.processPatterns
+      )
+    else
+      "false";
 
   # Translate a hyprlang bind prefix ("$mainMod SHIFT, Key") into a Lua key
   # expression for hl.bind, referencing the `mainMod` local from default.nix.
@@ -183,6 +195,52 @@ let
     '';
   };
 
+  replayActivationWatcher = pkgs.writeShellApplication {
+    name = "gpu-recorder-activation-watcher";
+    runtimeInputs = [
+      pkgs.coreutils
+      pkgs.procps
+      pkgs.systemd
+    ];
+    text = ''
+      replay_service="gpu-recorder.service"
+      recording_service="gpu-recorder-recording.service"
+      stop_delay=${toString cfg.activation.stopDelaySeconds}
+      poll_interval=${toString cfg.activation.pollIntervalSeconds}
+      stop_deadline=0
+
+      cleanup() {
+        systemctl --user stop "$replay_service" >/dev/null 2>&1 || true
+      }
+      trap cleanup EXIT
+
+      while true; do
+        if ${activationCheck}; then
+          stop_deadline=0
+          if ! systemctl --user --quiet is-active "$replay_service" \
+            && ! systemctl --user --quiet is-active "$recording_service"; then
+            systemctl --user start "$replay_service"
+          fi
+        elif systemctl --user --quiet is-active "$recording_service"; then
+          # Never interrupt a recording started manually.
+          stop_deadline=0
+        elif systemctl --user --quiet is-active "$replay_service"; then
+          now=$(date +%s)
+          if (( stop_deadline == 0 )); then
+            stop_deadline=$((now + stop_delay))
+          elif (( now >= stop_deadline )); then
+            systemctl --user stop "$replay_service"
+            stop_deadline=0
+          fi
+        else
+          stop_deadline=0
+        fi
+
+        sleep "$poll_interval"
+      done
+    '';
+  };
+
 in
 {
   options.my.hypr.gpuRecorder = {
@@ -226,6 +284,30 @@ in
       type = lib.types.int;
       default = 120;
       description = "Replay buffer duration in seconds.";
+    };
+
+    activation = {
+      processPatterns = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [ ];
+        example = [
+          "gamescope"
+          "runelite"
+        ];
+        description = "Case-insensitive patterns matched against full process command lines. An empty list starts the replay buffer with the session.";
+      };
+
+      stopDelaySeconds = lib.mkOption {
+        type = lib.types.ints.unsigned;
+        default = 60;
+        description = "Seconds to keep the replay buffer running after the last matching process exits.";
+      };
+
+      pollIntervalSeconds = lib.mkOption {
+        type = lib.types.ints.positive;
+        default = 2;
+        description = "Seconds between activation process checks.";
+      };
     };
 
     recordingToggleKeybind = lib.mkOption {
@@ -272,6 +354,23 @@ in
         Type = "simple";
         ExecStartPre = "${pkgs.coreutils}/bin/mkdir -p ${cfg.outputDir}";
         ExecStart = "${lib.getExe recordingRunner} --replay";
+        Restart = "on-failure";
+        RestartSec = "3s";
+        KillSignal = "SIGINT";
+        TimeoutStopSec = "30s";
+      };
+      Install.WantedBy = lib.optionals (!activationEnabled) [ "wayland-session@hyprland.desktop.target" ];
+    };
+
+    systemd.user.services.gpu-recorder-activation = lib.mkIf activationEnabled {
+      Unit = {
+        Description = "GPU Screen Recorder process activation watcher";
+        After = [ "wayland-session@hyprland.desktop.target" ];
+        PartOf = [ "wayland-session@hyprland.desktop.target" ];
+      };
+      Service = {
+        Type = "simple";
+        ExecStart = lib.getExe replayActivationWatcher;
         Restart = "on-failure";
         RestartSec = "3s";
       };

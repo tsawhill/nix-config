@@ -68,6 +68,7 @@ in
     # manager).
     "${self}/modules/software/desktop/kde.nix"
     "${self}/modules/software/desktop/pipewire/base.nix"
+    "${self}/modules/software/desktop/pipewire/low-latency.nix"
 
     # NetworkManager (remote tunnel home). AirVPN scaffolding is present but disabled —
     # see system/networking.nix to enable once you generate a deck AirVPN config.

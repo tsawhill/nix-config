@@ -68,6 +68,7 @@ in
     # manager).
     "${self}/modules/software/desktop/kde.nix"
     "${self}/modules/software/desktop/pipewire/base.nix"
+    "${self}/modules/software/desktop/pipewire/low-latency.nix"
 
     # WireGuard (remote tunnel home). AirVPN scaffolding is present but disabled —
     # see system/networking.nix to enable once you generate a cube AirVPN config.

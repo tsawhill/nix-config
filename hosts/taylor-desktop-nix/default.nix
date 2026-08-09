@@ -79,6 +79,12 @@ in
   my.desktop.audio.lowLatency = {
     enable = true;
     quantum = 128;
+    # Test whether the desktop's ALSA devices are stable without PipeWire's
+    # additional safety buffer.
+    alsaHeadroom = 0;
+    # Recording is not latency-sensitive; batch its PulseAudio capture in
+    # 10.7 ms chunks while interactive streams keep the 128-sample quantum.
+    pulseCaptureQuantumByProcess.gpu-screen-recorder = 512;
   };
 
   software.lan-launch = {

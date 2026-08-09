@@ -7,8 +7,8 @@
 #
 # Native PipeWire processing chain for the MOTU M2 microphone.
 #
-# All plugins use LADSPA with absolute nix store paths — no LV2_PATH
-# discovery needed, works correctly in socket-activated pipewire.service.
+# Plugins are exposed through PipeWire's store-backed LADSPA search path, so
+# this works correctly in the socket-activated pipewire.service.
 #
 # When my.desktop.audio.mics.virtual is also enabled, the loopback is skipped —
 # the filter chain output IS mic_input. Apps connect to it via the pipewire-pulse
@@ -24,6 +24,10 @@
   config = lib.mkIf config.my.desktop.audio.motuMic.enable {
 
     services.pipewire = {
+      extraLadspaPackages = with pkgs; [
+        lsp-plugins
+        rnnoise-plugin
+      ];
 
       ##############################################################
       # Filter chain: MOTU M2 mic → DSP → virtual source
