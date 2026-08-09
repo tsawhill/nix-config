@@ -1,4 +1,4 @@
-{ config, ... }:
+{ config, pkgs, ... }:
 let
   splitLayoutMessage =
     if config.my.hypr.windowLayout == "master" then "orientationnext" else "togglesplit";
@@ -16,7 +16,12 @@ in
     -- Apps / actions
     hl.bind(mainMod .. " + B",      hl.dsp.exec_cmd("zen"))
     hl.bind(mainMod .. " + Return", hl.dsp.exec_cmd("foot"))
-    hl.bind(mainMod .. " + Next",   hl.dsp.exec_cmd([[pkill -USR1 'gpu-screen-re*' && sleep 0.5 && notify-send -t 1500 -u low -- "GPU Screen Recorder" "Replay saved"]]))
+    hl.bind(mainMod .. " + Next",   hl.dsp.exec_cmd([[
+      ${pkgs.systemd}/bin/systemctl --user --quiet is-active gpu-recorder.service \
+        && ${pkgs.systemd}/bin/systemctl --user kill --signal=SIGUSR1 gpu-recorder.service \
+        && sleep 0.5 \
+        && notify-send -t 1500 -u low -- "GPU Screen Recorder" "Replay saved"
+    ]]))
     hl.bind(mainMod .. " + Delete",  hl.dsp.exec_cmd("grimblast copysave area"))
     hl.bind(mainMod .. " + Page_Up", hl.dsp.exec_cmd("grimblast copysave active"))
     hl.bind("Print",                 hl.dsp.exec_cmd("grimblast copysave output"))
