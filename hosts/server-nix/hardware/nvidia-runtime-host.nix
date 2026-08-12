@@ -1,11 +1,34 @@
-{ config, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   driver = config.hardware.nvidia.package;
+  graphicsPackages =
+    [ config.hardware.graphics.package ]
+    ++ config.hardware.graphics.extraPackages
+    ++ (with pkgs; [
+      libdrm
+      libffi
+      libgbm
+      stdenv.cc.cc.lib
+      wayland
+    ]);
+  graphicsRuntime = pkgs.buildEnv {
+    name = "nvidia-lxc-graphics-runtime-${driver.version}";
+    paths = map lib.getLib graphicsPackages;
+    ignoreCollisions = true;
+  };
 
   # Incus cannot use the Nix store references embedded in the host driver from
-  # a container with its own store. Copy the runtime payload behind the normal
-  # NixOS driver path and rewrite its ELF lookup paths to that stable location.
+  # a container with its own store. Copy the complete host graphics environment
+  # behind the normal NixOS driver path and rewrite its lookup paths to that
+  # stable location. The external EGL platform libraries are required by
+  # graphical consumers such as KWin even though CUDA-only consumers do not use
+  # them.
   nvidiaRuntime =
     pkgs.runCommand "nvidia-lxc-runtime-${driver.version}"
       {
@@ -14,7 +37,7 @@ let
       ''
         mkdir -p "$out/bin" "$out/lib"
 
-        cp -a ${driver}/lib/. "$out/lib/"
+        cp -aL ${graphicsRuntime}/. "$out/"
         cp -a ${driver}/etc "$out/"
         cp -a ${driver}/share "$out/"
         cp -a ${driver.bin}/bin/nvidia-smi "$out/bin/"
@@ -35,10 +58,14 @@ let
         # keeps the runtime independent of both the guest's glibc and Nix store.
         cp -a ${pkgs.glibc}/lib/. "$out/lib/"
 
+        # GLVND, EGL, and Vulkan manifests use absolute package paths. All
+        # libraries have been flattened above, so point those manifests at the
+        # stable guest path as well.
         while IFS= read -r metadata; do
-          substituteInPlace "$metadata" \
-            --replace-fail ${driver} /run/opengl-driver
-        done < <(grep -rl ${driver} "$out/etc" "$out/share")
+          sed -Ei \
+            's#/nix/store/[a-z0-9]{32}-[^" ]+/lib/#/run/opengl-driver/lib/#g' \
+            "$metadata"
+        done < <(grep -rl /nix/store "$out/etc" "$out/share")
 
         echo ${driver.version} > "$out/driver-version"
       '';

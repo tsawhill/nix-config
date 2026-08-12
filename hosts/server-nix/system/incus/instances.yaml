@@ -163,6 +163,17 @@ socks5-vpn-eu-nix:
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/socks5-vpn-eu-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:51:dd:4e" }
 
+sunshine-nix:
+  type: "container"
+  profiles: ["nixos-lxc", "nvidia-gpu", "gameSSD-mount"]
+  config:
+    limits.cpu: "4"
+    limits.memory: "8GiB"
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "8GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/sunshine-nix" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "02:7d:da:73:cc:0d" }
+
 syncthing-nix:
   type: "container"
   profiles: ["nixos-lxc", "gamesaves-mount", "roms-mount", "nix-config-mount", "gameSSD-mount"]
