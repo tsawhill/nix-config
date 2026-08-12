@@ -38,10 +38,11 @@ let
         mkdir -p "$out/bin" "$out/lib"
 
         cp -aL ${graphicsRuntime}/. "$out/"
-        cp -a ${driver}/etc "$out/"
-        cp -a ${driver}/share "$out/"
-        cp -a ${driver.bin}/bin/nvidia-smi "$out/bin/"
+        # Nix store files are read-only, but the copied ELF and metadata need
+        # to be patched below. The merged graphics environment already includes
+        # the NVIDIA etc/share payload, so do not copy it over itself again.
         chmod -R u+w "$out"
+        cp -a ${driver.bin}/bin/nvidia-smi "$out/bin/"
 
         while IFS= read -r elf; do
           if patchelf --print-rpath "$elf" >/dev/null 2>&1; then
