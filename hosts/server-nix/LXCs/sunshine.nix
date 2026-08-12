@@ -16,8 +16,6 @@ let
     DBUS_SESSION_BUS_ADDRESS = "unix:path=%t/bus";
     KDE_FULL_SESSION = "true";
     KDE_SESSION_VERSION = "6";
-    KWIN_WAYLAND_VIRTUAL_SCREENS = "1";
-    KWIN_WAYLAND_VIRTUAL_SCREEN_GEOMETRIES = defaultResolution;
     QT_QPA_PLATFORM = "wayland";
     WAYLAND_DISPLAY = waylandDisplay;
     XDG_CURRENT_DESKTOP = "KDE";
@@ -118,7 +116,8 @@ in
     settings = {
       sunshine_name = "sunshine-nix";
       capture = "kwin";
-      output_name = "0";
+      output_name = "Virtual-sunshine";
+      csrf_allowed_origins = "https://sunshine-nix.lan:47990,https://10.73.73.140:47990";
     };
 
     applications.apps = [
@@ -182,6 +181,15 @@ in
       RestartSec = "5";
     };
   };
+
+  # The stock Plasma unit starts KWin's DRM backend. This LXC has no physical
+  # display attached, so use KWin's supported virtual framebuffer backend and
+  # give the session the stable socket name consumed by Sunshine and krfb.
+  systemd.user.services.plasma-kwin_wayland.serviceConfig.ExecStart = lib.mkForce (
+    "${lib.getExe' pkgs.kdePackages.kwin "kwin_wayland_wrapper"} "
+    + "--xwayland --virtual --width 1920 --height 1080 --scale 1 "
+    + "--socket ${waylandDisplay} --no-lockscreen"
+  );
 
   systemd.user.services.sunshine-virtual-monitor = {
     description = "Sunshine KDE virtual monitor";

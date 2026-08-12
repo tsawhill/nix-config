@@ -173,6 +173,7 @@ sunshine-nix:
     root: { type: "disk", path: "/", pool: "rpool", size: "8GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/sunshine-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "02:7d:da:73:cc:0d" }
+    uinput: { type: "unix-char", source: "/dev/uinput", path: "/dev/uinput", mode: "0660", gid: "174" }
 
 syncthing-nix:
   type: "container"
