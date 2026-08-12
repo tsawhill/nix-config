@@ -2,7 +2,7 @@
 {
   imports = [
     ./base
-    ../hardware/nvidia.nix # Import NVIDIA driver configuration for transcoding support
+    ./nvidia-runtime.nix
     "${self}/modules/software/services/jellyfin.nix"
   ];
   my.groups = {

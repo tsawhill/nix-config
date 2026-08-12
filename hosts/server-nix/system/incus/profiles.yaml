@@ -152,13 +152,20 @@ nixos-router-lxc:
       size: "4GiB"
 
 nvidia-gpu:
-  description: "Physical NVIDIA GPU passthrough"
-  config: {}
+  description: "Physical NVIDIA GPU and host userspace runtime passthrough"
+  config:
+    # Explicitly override any stale live setting from the nvidia.runtime pilot.
+    nvidia.runtime: "false"
   devices:
     gpu-1:
       type: "gpu"
       gputype: "physical"
       pci: "0000:0b:00.0"
+    nvidia-runtime:
+      type: "disk"
+      source: "/run/host-nvidia-runtime"
+      path: "/opt/host-nvidia-runtime"
+      readonly: "true"
 
 roms-mount:
   description: "Disk passthrough for roms directory"

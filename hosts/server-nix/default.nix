@@ -26,6 +26,7 @@ in
     ./system/boot.nix
     # NVIDIA gpu
     ./hardware/nvidia.nix
+    ./hardware/nvidia-runtime-host.nix
     # Disks and alerts
     ./system/disks.nix
     ./system/zfs-backups.nix
