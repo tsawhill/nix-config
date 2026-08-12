@@ -29,6 +29,22 @@ let
     set -eu
 
     resolution=''${SUNSHINE_VIRTUAL_MONITOR_RESOLUTION:-${defaultResolution}}
+
+    # Ordering after plasma-headless.service only guarantees that its process
+    # has started; KWin may still be creating the Wayland socket. Avoid a Qt
+    # abort/restart loop while the compositor finishes initializing.
+    for _ in $(seq 1 300); do
+      if [ -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]; then
+        break
+      fi
+      sleep 0.1
+    done
+
+    if [ ! -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]; then
+      echo "Wayland socket did not appear: $XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" >&2
+      exit 1
+    fi
+
     exec ${lib.getExe' pkgs.kdePackages.krfb "krfb-virtualmonitor"} \
       --name sunshine \
       --resolution "$resolution" \
@@ -162,8 +178,6 @@ in
     serviceConfig = {
       Type = "simple";
       ExecStart = "${pkgs.kdePackages.plasma-workspace}/bin/startplasma-wayland";
-      ExecStartPost = "${pkgs.systemd}/bin/systemctl --user start graphical-session.target";
-      ExecStopPost = "${pkgs.systemd}/bin/systemctl --user stop graphical-session.target";
       Restart = "on-failure";
       RestartSec = "5";
     };
