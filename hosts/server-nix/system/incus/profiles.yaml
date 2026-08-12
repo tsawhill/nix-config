@@ -104,6 +104,26 @@ nextcloud-mount:
       source: "/mnt/zpool/nextcloud"
       shift: "true"
 
+taylor-mount:
+  description: "Disk passthrough for Taylor's datasets"
+  config: {}
+  devices:
+    mnt_zpool_taylor_clips:
+      type: "disk"
+      path: "/mnt/zpool/taylor/clips"
+      source: "/mnt/zpool/taylor/clips"
+      shift: "true"
+    mnt_zpool_taylor_documents:
+      type: "disk"
+      path: "/mnt/zpool/taylor/documents"
+      source: "/mnt/zpool/taylor/documents"
+      shift: "true"
+    mnt_zpool_taylor_work:
+      type: "disk"
+      path: "/mnt/zpool/taylor/work"
+      source: "/mnt/zpool/taylor/work"
+      shift: "true"
+
 nix-config-mount:
   description: "Disk passthrough for nixos config directory"
   config: {}
@@ -131,6 +151,15 @@ nixos-router-lxc:
       pool: "rpool"
       size: "4GiB"
 
+nvidia-gpu:
+  description: "Physical NVIDIA GPU passthrough"
+  config: {}
+  devices:
+    gpu-1:
+      type: "gpu"
+      gputype: "physical"
+      pci: "0000:0b:00.0"
+
 roms-mount:
   description: "Disk passthrough for roms directory"
   config: {}
@@ -140,4 +169,3 @@ roms-mount:
       path: "/mnt/zpool/roms"
       source: "/mnt/zpool/roms"
       shift: "true"
-

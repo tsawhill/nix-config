@@ -75,9 +75,31 @@
         path = "/mnt/zpool/media";
         readOnly = true;
       };
+      downloadHDD = {
+        enable = true;
+        path = "/mnt/downloadHDD";
+        readOnly = true;
+      };
+      downloadSSD = {
+        enable = true;
+        path = "/mnt/downloadSSD";
+        readOnly = true;
+      };
       gameSSD = {
         enable = true;
         path = "/mnt/gameSSD";
+      };
+      clips = {
+        enable = true;
+        path = "/mnt/zpool/taylor/clips";
+      };
+      documents = {
+        enable = true;
+        path = "/mnt/zpool/taylor/documents";
+      };
+      work = {
+        enable = true;
+        path = "/mnt/zpool/taylor/work";
       };
       # Full game library. Gaming hosts mount this at /mnt/zpool/roms (same path as
       # here) to play any game on-LAN, and selectively pull local copies of some via

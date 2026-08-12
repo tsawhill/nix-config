@@ -78,14 +78,13 @@ immich-nix:
 
 jellyfin-nix:
   type: "container"
-  profiles: ["nixos-lxc", "media-mount"]
+  profiles: ["nixos-lxc", "media-mount", "nvidia-gpu"]
   config:
     limits.memory: "16GiB"
   devices:
     root: { type: "disk", path: "/", pool: "rpool", size: "32GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/jellyfin-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:92:d7:50" }
-    gpu-1: { type: "gpu", gputype: "physical", pci: "0000:0b:00.0" }
 
 jellyseerr-nix:
   type: "container"
@@ -144,7 +143,7 @@ pufferpanel-nix:
 
 samba-nix:
   type: "container"
-  profiles: ["nixos-lxc", "nix-config-mount", "media-mount", "gameSSD-mount", "roms-mount"]
+  profiles: ["nixos-lxc", "nix-config-mount", "media-mount", "downloadHDD-mount", "downloadSSD-mount", "gameSSD-mount", "roms-mount", "taylor-mount"]
   config: {}
   devices:
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/samba-nix" }
