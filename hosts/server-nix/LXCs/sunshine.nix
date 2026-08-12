@@ -8,7 +8,7 @@
 
 let
   user = "taylor";
-  waylandDisplay = "wayland-1";
+  waylandDisplay = "wayland-0";
   defaultResolution = "1920x1080";
   defaultFps = "60";
 
@@ -118,6 +118,7 @@ in
       capture = "kwin";
       output_name = "Virtual-sunshine";
       csrf_allowed_origins = "https://sunshine-nix.lan:47990,https://10.73.73.140:47990";
+      system_tray = "disabled";
     };
 
     applications.apps = [
@@ -165,6 +166,7 @@ in
     description = "Headless KDE Plasma Wayland Session";
     wantedBy = [ "default.target" ];
     after = [ "dbus.socket" ];
+    unitConfig.ConditionUser = user;
 
     path = with pkgs; [
       kdePackages.kwin
@@ -188,12 +190,13 @@ in
   systemd.user.services.plasma-kwin_wayland.serviceConfig.ExecStart = lib.mkForce (
     "${lib.getExe' pkgs.kdePackages.kwin "kwin_wayland_wrapper"} "
     + "--xwayland --virtual --width 1920 --height 1080 --scale 1 "
-    + "--socket ${waylandDisplay} --no-lockscreen"
+    + "--no-lockscreen"
   );
 
   systemd.user.services.sunshine-virtual-monitor = {
     description = "Sunshine KDE virtual monitor";
     wantedBy = [ "default.target" ];
+    unitConfig.ConditionUser = user;
     after = [
       "plasma-headless.service"
       "graphical-session.target"
@@ -215,16 +218,21 @@ in
   # Sunshine connects to the plasma Wayland session
   systemd.user.services.sunshine = {
     wantedBy = lib.mkForce [ "default.target" ];
-    after = [
+    unitConfig.ConditionUser = user;
+    partOf = lib.mkForce [ ];
+    wants = lib.mkForce [
       "plasma-headless.service"
       "sunshine-virtual-monitor.service"
     ];
-    wants = [
+    after = lib.mkForce [
       "plasma-headless.service"
       "sunshine-virtual-monitor.service"
     ];
     environment = sessionEnvironment // {
       DISPLAY = ":0";
+    };
+    serviceConfig = {
+      Restart = lib.mkForce "always";
     };
   };
 
