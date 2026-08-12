@@ -69,12 +69,11 @@ gotify-nix:
 
 immich-nix:
   type: "container"
-  profiles: ["nixos-lxc", "immich-mount"]
+  profiles: ["nixos-lxc", "immich-mount", "nvidia-gpu"]
   config: {}
   devices:
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/immich-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:de:09:b6" }
-    gpu-1: { type: "gpu", gputype: "physical", pci: "0000:0b:00.0" }
 
 jellyfin-nix:
   type: "container"
@@ -96,13 +95,12 @@ jellyseerr-nix:
 
 llm-nix:
   type: "container"
-  profiles: ["nixos-lxc"]
+  profiles: ["nixos-lxc", "nvidia-gpu"]
   config: {}
   devices:
     root: { type: "disk", path: "/", pool: "rpool", size: "32GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/llm-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:40:c1:43" }
-    gpu-1: { type: "gpu", gputype: "physical", pci: "0000:0b:00.0" }
 
 local-nginx-nix:
   type: "container"

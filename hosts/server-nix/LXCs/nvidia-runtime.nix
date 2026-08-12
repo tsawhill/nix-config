@@ -12,7 +12,6 @@
     {
       description = "Host NVIDIA userspace runtime";
       wantedBy = [ "local-fs.target" ];
-      before = [ "jellyfin.service" ];
       what = "/opt/host-nvidia-runtime";
       where = "/run/opengl-driver";
       type = "none";

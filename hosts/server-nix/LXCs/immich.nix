@@ -2,7 +2,7 @@
 {
   imports = [
     ./base
-    ../hardware/nvidia.nix # Import NVIDIA driver configuration for video playback and analyzing
+    ./nvidia-runtime.nix
     "${self}/modules/software/services/immich.nix"
   ];
   users.users.immich.extraGroups = [
