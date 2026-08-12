@@ -23,31 +23,54 @@ let
     XDG_SESSION_TYPE = "wayland";
   };
 
-  startVirtualMonitor = pkgs.writeShellScript "sunshine-start-virtual-monitor" ''
+  waitForKWin = pkgs.writeShellScript "sunshine-wait-for-kwin" ''
     set -eu
 
-    resolution=''${SUNSHINE_VIRTUAL_MONITOR_RESOLUTION:-${defaultResolution}}
-
-    # Ordering after plasma-headless.service only guarantees that its process
-    # has started; KWin may still be creating the Wayland socket. Avoid a Qt
-    # abort/restart loop while the compositor finishes initializing.
+    # kwin_wayland_wrapper creates the socket before the compositor is ready.
+    # Wait for the compositor's D-Bus name so clients do not connect to a
+    # socket that no process is servicing yet.
     for _ in $(seq 1 300); do
-      if [ -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]; then
+      if ${pkgs.systemd}/bin/busctl --user --no-pager list 2>/dev/null \
+        | ${pkgs.gnugrep}/bin/grep -q '^org\.kde\.KWin '; then
         break
       fi
       sleep 0.1
     done
 
-    if [ ! -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]; then
-      echo "Wayland socket did not appear: $XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" >&2
+    if ! ${pkgs.systemd}/bin/busctl --user --no-pager list 2>/dev/null \
+      | ${pkgs.gnugrep}/bin/grep -q '^org\.kde\.KWin '; then
+      echo "KWin did not become ready" >&2
       exit 1
     fi
+  '';
+
+  startVirtualMonitor = pkgs.writeShellScript "sunshine-start-virtual-monitor" ''
+    set -eu
+
+    resolution=''${SUNSHINE_VIRTUAL_MONITOR_RESOLUTION:-${defaultResolution}}
 
     exec ${lib.getExe' pkgs.kdePackages.krfb "krfb-virtualmonitor"} \
       --name sunshine \
       --resolution "$resolution" \
       --port 5905 \
       --password sunshine
+  '';
+
+  waitForVirtualMonitor = pkgs.writeShellScript "sunshine-wait-for-virtual-monitor" ''
+    set -eu
+
+    for _ in $(seq 1 60); do
+      outputs="$(${pkgs.coreutils}/bin/timeout --kill-after=0.2s 0.5s \
+        ${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} -o 2>/dev/null || true)"
+      if printf '%s\n' "$outputs" \
+        | ${pkgs.gnugrep}/bin/grep -q 'Virtual-sunshine'; then
+        exit 0
+      fi
+      sleep 0.1
+    done
+
+    echo "Virtual-sunshine did not become ready" >&2
+    exit 1
   '';
 
   setClientResolution = pkgs.writeShellScript "sunshine-set-client-resolution" ''
@@ -187,11 +210,22 @@ in
   # The stock Plasma unit starts KWin's DRM backend. This LXC has no physical
   # display attached, so use KWin's supported virtual framebuffer backend and
   # give the session the stable socket name consumed by Sunshine and krfb.
-  systemd.user.services.plasma-kwin_wayland.serviceConfig.ExecStart = lib.mkForce (
-    "${lib.getExe' pkgs.kdePackages.kwin "kwin_wayland_wrapper"} "
-    + "--xwayland --virtual --width 1920 --height 1080 --scale 1 "
-    + "--no-lockscreen"
-  );
+  systemd.user.services.plasma-kwin_wayland = {
+    # The wrapper starts kwin_wayland and Xwayland by name. This unit otherwise
+    # receives only systemd's basic PATH and silently remains as a socket-owning
+    # wrapper with no compositor behind it.
+    path = [
+      pkgs.kdePackages.kwin
+      pkgs.xwayland
+    ];
+    environment = sessionEnvironment;
+
+    serviceConfig.ExecStart = lib.mkForce (
+      "${lib.getExe' pkgs.kdePackages.kwin "kwin_wayland_wrapper"} "
+      + "--xwayland --virtual --width 1920 --height 1080 --scale 1 "
+      + "--no-lockscreen"
+    );
+  };
 
   systemd.user.services.sunshine-virtual-monitor = {
     description = "Sunshine KDE virtual monitor";
@@ -209,9 +243,11 @@ in
     serviceConfig = {
       Type = "simple";
       EnvironmentFile = "-%h/.config/sunshine/virtual-monitor.env";
+      ExecStartPre = "${waitForKWin}";
       ExecStart = "${startVirtualMonitor}";
       Restart = "on-failure";
       RestartSec = "5";
+      TimeoutStopSec = "5s";
     };
   };
 
@@ -232,6 +268,7 @@ in
       DISPLAY = ":0";
     };
     serviceConfig = {
+      ExecStartPre = [ "${waitForVirtualMonitor}" ];
       Restart = lib.mkForce "always";
     };
   };
