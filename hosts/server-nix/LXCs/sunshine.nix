@@ -89,7 +89,7 @@ in
 {
   imports = [
     ./base
-    ../hardware/nvidia.nix
+    ./nvidia-runtime.nix
     "${self}/modules/software/services/sunshine.nix"
   ];
 
@@ -118,11 +118,6 @@ in
         auto-detach = "true";
       }
     ];
-  };
-
-  hardware.graphics = {
-    enable = true;
-    enable32Bit = true;
   };
 
   environment.systemPackages = with pkgs; [
