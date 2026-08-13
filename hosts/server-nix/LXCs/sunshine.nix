@@ -9,8 +9,6 @@
 let
   user = "taylor";
   waylandDisplay = "wayland-0";
-  defaultResolution = "1920x1080";
-  defaultFps = "60";
 
   sessionEnvironment = {
     DBUS_SESSION_BUS_ADDRESS = "unix:path=%t/bus";
@@ -21,6 +19,16 @@ let
     XDG_CURRENT_DESKTOP = "KDE";
     XDG_SESSION_DESKTOP = "KDE";
     XDG_SESSION_TYPE = "wayland";
+  };
+
+  # Keep the version-independent GLVND dispatcher in the guest while loading
+  # the driver-version-specific NVIDIA EGL implementation from server-nix.
+  nvidiaGraphicsEnvironment = {
+    GBM_BACKEND = "nvidia-drm";
+    LD_PRELOAD = "${pkgs.libglvnd}/lib/libEGL.so.1";
+    __EGL_EXTERNAL_PLATFORM_CONFIG_DIRS = "/run/opengl-driver/share/egl/egl_external_platform.d";
+    __EGL_VENDOR_LIBRARY_FILENAMES = "/run/opengl-driver/share/glvnd/egl_vendor.d/10_nvidia.json";
+    __GLX_VENDOR_LIBRARY_NAME = "nvidia";
   };
 
   waitForKWin = pkgs.writeShellScript "sunshine-wait-for-kwin" ''
@@ -44,83 +52,21 @@ let
     fi
   '';
 
-  startVirtualMonitor = pkgs.writeShellScript "sunshine-start-virtual-monitor" ''
-    set -eu
-
-    resolution=''${SUNSHINE_VIRTUAL_MONITOR_RESOLUTION:-${defaultResolution}}
-
-    exec ${lib.getExe' pkgs.kdePackages.krfb "krfb-virtualmonitor"} \
-      --name sunshine \
-      --resolution "$resolution" \
-      --port 5905 \
-      --password sunshine
-  '';
-
-  waitForVirtualMonitor = pkgs.writeShellScript "sunshine-wait-for-virtual-monitor" ''
+  waitForVirtualOutput = pkgs.writeShellScript "sunshine-wait-for-virtual-output" ''
     set -eu
 
     for _ in $(seq 1 60); do
       outputs="$(${pkgs.coreutils}/bin/timeout --kill-after=0.2s 0.5s \
         ${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} -o 2>/dev/null || true)"
       if printf '%s\n' "$outputs" \
-        | ${pkgs.gnugrep}/bin/grep -q 'Virtual-sunshine'; then
+        | ${pkgs.gnugrep}/bin/grep -q 'Virtual-0'; then
         exit 0
       fi
       sleep 0.1
     done
 
-    echo "Virtual-sunshine did not become ready" >&2
+    echo "Virtual-0 did not become ready" >&2
     exit 1
-  '';
-
-  setClientResolution = pkgs.writeShellScript "sunshine-set-client-resolution" ''
-    set -eu
-
-    width=''${SUNSHINE_CLIENT_WIDTH:-1920}
-    height=''${SUNSHINE_CLIENT_HEIGHT:-1080}
-    fps=''${SUNSHINE_CLIENT_FPS:-${defaultFps}}
-
-    case "$width:$height:$fps" in
-      (*[!0-9:]* | "" | *::*)
-        echo "invalid Sunshine client geometry: $width x $height @ $fps" >&2
-        exit 1
-        ;;
-    esac
-
-    env_dir="$HOME/.config/sunshine"
-    env_file="$env_dir/virtual-monitor.env"
-    mkdir -p "$env_dir"
-    printf 'SUNSHINE_VIRTUAL_MONITOR_RESOLUTION=%sx%s\n' "$width" "$height" > "$env_file.tmp"
-    mv "$env_file.tmp" "$env_file"
-
-    ${pkgs.systemd}/bin/systemctl --user restart sunshine-virtual-monitor.service
-
-    # Give KWin/KScreen a moment to publish the recreated output before
-    # Sunshine starts capturing it.
-    for _ in $(seq 1 50); do
-      if ${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} -o 2>/dev/null | grep -q 'Virtual-sunshine'; then
-        break
-      fi
-      sleep 0.1
-    done
-
-    ${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} \
-      output.Virtual-sunshine.enable \
-      output.Virtual-sunshine.primary \
-      output.Virtual-sunshine.position.0,0 \
-      output.Virtual-sunshine.scale.1 || true
-  '';
-
-  resetClientResolution = pkgs.writeShellScript "sunshine-reset-client-resolution" ''
-    set -eu
-
-    env_dir="$HOME/.config/sunshine"
-    env_file="$env_dir/virtual-monitor.env"
-    mkdir -p "$env_dir"
-    printf 'SUNSHINE_VIRTUAL_MONITOR_RESOLUTION=${defaultResolution}\n' > "$env_file.tmp"
-    mv "$env_file.tmp" "$env_file"
-
-    ${pkgs.systemd}/bin/systemctl --user restart sunshine-virtual-monitor.service
   '';
 in
 {
@@ -136,10 +82,14 @@ in
   services.displayManager.sddm.enable = false;
 
   services.sunshine = {
+    # KWin capture does not need CAP_SYS_ADMIN. Avoiding the capability wrapper
+    # also preserves the EGL loader environment for Sunshine.
+    capSysAdmin = lib.mkForce false;
+
     settings = {
       sunshine_name = "sunshine-nix";
       capture = "kwin";
-      output_name = "Virtual-sunshine";
+      output_name = "Virtual-0";
       csrf_allowed_origins = "https://sunshine-nix.lan:47990,https://10.73.73.140:47990";
       system_tray = "disabled";
     };
@@ -147,22 +97,13 @@ in
     applications.apps = [
       {
         name = "Desktop";
-        prep-cmd = [
-          {
-            do = "${setClientResolution}";
-            undo = "${resetClientResolution}";
-          }
-        ];
-        exclude-global-prep-cmd = "false";
         auto-detach = "true";
       }
     ];
   };
 
   environment.systemPackages = with pkgs; [
-    kdePackages.krfb
     kdePackages.libkscreen
-    kdePackages.kscreen
     kdePackages.qtwayland
     xorg.xcbutilcursor
   ];
@@ -208,8 +149,7 @@ in
   };
 
   # The stock Plasma unit starts KWin's DRM backend. This LXC has no physical
-  # display attached, so use KWin's supported virtual framebuffer backend and
-  # give the session the stable socket name consumed by Sunshine and krfb.
+  # display attached, so use KWin's supported virtual framebuffer backend.
   systemd.user.services.plasma-kwin_wayland = {
     # The wrapper starts kwin_wayland and Xwayland by name. This unit otherwise
     # receives only systemd's basic PATH and silently remains as a socket-owning
@@ -218,7 +158,7 @@ in
       pkgs.kdePackages.kwin
       pkgs.xwayland
     ];
-    environment = sessionEnvironment;
+    environment = sessionEnvironment // nvidiaGraphicsEnvironment;
 
     serviceConfig.ExecStart = lib.mkForce (
       "${lib.getExe' pkgs.kdePackages.kwin "kwin_wayland_wrapper"} "
@@ -227,48 +167,19 @@ in
     );
   };
 
-  systemd.user.services.sunshine-virtual-monitor = {
-    description = "Sunshine KDE virtual monitor";
-    wantedBy = [ "default.target" ];
-    unitConfig.ConditionUser = user;
-    after = [
-      "plasma-headless.service"
-      "graphical-session.target"
-    ];
-    wants = [ "plasma-headless.service" ];
-    partOf = [ "plasma-headless.service" ];
-
-    environment = sessionEnvironment;
-
-    serviceConfig = {
-      Type = "simple";
-      EnvironmentFile = "-%h/.config/sunshine/virtual-monitor.env";
-      ExecStartPre = "${waitForKWin}";
-      ExecStart = "${startVirtualMonitor}";
-      Restart = "on-failure";
-      RestartSec = "5";
-      TimeoutStopSec = "5s";
-    };
-  };
-
   # Sunshine connects to the plasma Wayland session
   systemd.user.services.sunshine = {
     wantedBy = lib.mkForce [ "default.target" ];
     unitConfig.ConditionUser = user;
     partOf = lib.mkForce [ ];
-    wants = lib.mkForce [
-      "plasma-headless.service"
-      "sunshine-virtual-monitor.service"
-    ];
-    after = lib.mkForce [
-      "plasma-headless.service"
-      "sunshine-virtual-monitor.service"
-    ];
-    environment = sessionEnvironment // {
-      DISPLAY = ":0";
-    };
+    wants = lib.mkForce [ "plasma-headless.service" ];
+    after = lib.mkForce [ "plasma-headless.service" ];
+    environment = sessionEnvironment // nvidiaGraphicsEnvironment // { DISPLAY = ":0"; };
     serviceConfig = {
-      ExecStartPre = [ "${waitForVirtualMonitor}" ];
+      ExecStartPre = [
+        "${waitForKWin}"
+        "${waitForVirtualOutput}"
+      ];
       Restart = lib.mkForce "always";
     };
   };
