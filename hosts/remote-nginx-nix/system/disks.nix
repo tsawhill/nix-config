@@ -3,7 +3,9 @@
   boot.tmp.cleanOnBoot = true;
   zramSwap.enable = true;
   imports = [ (modulesPath + "/profiles/qemu-guest.nix") ];
-  fileSystems."/boot" = {
+  # Keep the small OCI EFI System Partition separate from /boot so GRUB can
+  # load kernels and initrds directly from the root filesystem's Nix store.
+  fileSystems."/boot/efi" = {
     device = "/dev/disk/by-uuid/C701-80FD";
     fsType = "vfat";
   };
