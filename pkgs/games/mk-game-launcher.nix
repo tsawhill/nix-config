@@ -5,6 +5,7 @@
   symlinkJoin,
   coreutils,
   gamescope,
+  util-linux,
 }:
 
 {
@@ -16,6 +17,7 @@
   gamescopeResolutions ? [ ],
   env ? [ ],
   lsfgVkEnable ? false,
+  networkEnable ? false,
 }:
 let
   envExports = lib.concatStringsSep "\n" (
@@ -43,6 +45,15 @@ let
   # layer disabled while gamescope creates its own Vulkan instance and device.
   gameCommand =
     lib.optionalString lsfgVkEnable "${lib.getExe' coreutils "env"} -u DISABLE_LSFG " + runnerCommand;
+
+  # Games are offline by default. A user namespace lets an unprivileged caller
+  # create the network namespace, while mapping the caller to the same UID/GID
+  # avoids making Wine/Proton believe it is running as root.
+  isolatedGameCommand =
+    if networkEnable then
+      gameCommand
+    else
+      "${lib.getExe' util-linux "unshare"} --map-current-user --net -- ${gameCommand}";
 
   resolutionLabel = resolution: "${toString resolution.width}x${toString resolution.height}";
   resolutionArgs =
@@ -79,12 +90,12 @@ let
     entry:
     if entry.gamescopeArgs == null then
       ''
-        exec ${gameCommand}
+        exec ${isolatedGameCommand}
       ''
     else
       ''
         exec ${lib.getExe gamescope} ${entry.gamescopeArgs} -- \
-          ${gameCommand}
+          ${isolatedGameCommand}
       '';
 
   mkLauncher = entry: writeShellApplication {

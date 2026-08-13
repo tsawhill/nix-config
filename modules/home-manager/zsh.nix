@@ -30,6 +30,9 @@ in
       shellAliases = {
         vim = "nvim";
         g = "git";
+      }
+      // lib.optionalAttrs (config.my.shell.starshipTheme == "personal") {
+        deploy = "ssh build-nix.lan deploy";
       };
 
       initContent = ''

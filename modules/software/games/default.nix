@@ -169,6 +169,7 @@ let
         inherit (runner) runnerCommand;
         setupScript = runner.setupScript or "";
         name = entryCfg.command;
+        networkEnable = entryCfg.network.enable;
         inherit gamescopeResolutions lsfgVkEnable;
       };
       extraPackages = runner.extraPackages or [ ];
@@ -412,6 +413,8 @@ in
             default = null;
             description = "Whether to enable lsfg-vk for this game. Null inherits the global default.";
           };
+
+          network.enable = lib.mkEnableOption "network access for this game";
 
           runner.umu = lib.mkOption {
             type = lib.types.nullOr (
