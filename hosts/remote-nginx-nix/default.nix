@@ -55,8 +55,6 @@ in
     "${self}/modules/software/services/nginx/nginx.nix"
     "${self}/modules/software/services/nginx/streams/palworld.nix"
 
-    # fail2ban
-    "${self}/modules/software/services/fail2ban"
   ];
   my.users.root = {
     enable = true;
