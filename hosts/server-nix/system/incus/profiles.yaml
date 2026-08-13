@@ -161,6 +161,8 @@ nvidia-gpu:
       type: "gpu"
       gputype: "physical"
       pci: "0000:0b:00.0"
+      gid: "26"
+      mode: "0660"
     nvidia-runtime:
       type: "disk"
       source: "/run/host-nvidia-runtime"

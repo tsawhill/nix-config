@@ -25,6 +25,7 @@ let
   # the driver-version-specific NVIDIA EGL implementation from server-nix.
   nvidiaGraphicsEnvironment = {
     GBM_BACKEND = "nvidia-drm";
+    KWIN_DRM_DEVICES = "/dev/dri/card1";
     LD_PRELOAD = "${pkgs.libglvnd}/lib/libEGL.so.1";
     __EGL_EXTERNAL_PLATFORM_CONFIG_DIRS = "/run/opengl-driver/share/egl/egl_external_platform.d";
     __EGL_VENDOR_LIBRARY_FILENAMES = "/run/opengl-driver/share/glvnd/egl_vendor.d/10_nvidia.json";
@@ -52,21 +53,61 @@ let
     fi
   '';
 
-  waitForVirtualOutput = pkgs.writeShellScript "sunshine-wait-for-virtual-output" ''
+  waitForOutput = pkgs.writeShellScript "sunshine-wait-for-output" ''
     set -eu
 
     for _ in $(seq 1 60); do
       outputs="$(${pkgs.coreutils}/bin/timeout --kill-after=0.2s 0.5s \
         ${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} -o 2>/dev/null || true)"
       if printf '%s\n' "$outputs" \
-        | ${pkgs.gnugrep}/bin/grep -q 'Virtual-0'; then
+        | ${pkgs.gnugrep}/bin/grep -q 'HDMI-A-1'; then
         exit 0
       fi
       sleep 0.1
     done
 
-    echo "Virtual-0 did not become ready" >&2
+    echo "HDMI-A-1 did not become ready" >&2
     exit 1
+  '';
+
+  # Incus hotplugs Sunshine's uinput event nodes, but an unprivileged LXC
+  # cannot synthesize the corresponding udev events. Mirror the host's udev
+  # records so libinput can classify the passed keyboard and mouse.
+  syncInputMetadata = pkgs.writeShellScript "sunshine-sync-input-metadata" ''
+    set -eu
+    shopt -s nullglob
+
+    ${pkgs.coreutils}/bin/install -d -m 0755 /run/udev/data
+    changed=0
+
+    for device in /dev/input/event*; do
+      event="''${device##*/}"
+      id_path="/sys/class/input/$event/device/id"
+      [ -r "$id_path/vendor" ] || continue
+      [ -r "$id_path/product" ] || continue
+      [ "$(<"$id_path/vendor")" = beef ] || continue
+      [ "$(<"$id_path/product")" = dead ] || continue
+
+      device_number="$(${pkgs.coreutils}/bin/stat -c '%t:%T' "$device")"
+      major_hex="''${device_number%%:*}"
+      minor_hex="''${device_number##*:}"
+      record="c$((16#$major_hex)):$((16#$minor_hex))"
+      source="/opt/host-udev-data/$record"
+      target="/run/udev/data/$record"
+
+      [ -r "$source" ] || continue
+      if [ "$(${pkgs.coreutils}/bin/readlink "$target" 2>/dev/null || true)" != "$source" ]; then
+        ${pkgs.coreutils}/bin/ln -sfnT "$source" "$target"
+        changed=1
+      fi
+    done
+
+    if [ "$changed" -eq 1 ]; then
+      # KWin's DRM backend discovers input through libinput at startup. The
+      # restart occurs only when a new udev record is linked.
+      ${pkgs.systemd}/bin/systemctl --user --machine=${user}@ \
+        try-restart plasma-kwin_wayland.service
+    fi
   '';
 in
 {
@@ -89,7 +130,7 @@ in
     settings = {
       sunshine_name = "sunshine-nix";
       capture = "kwin";
-      output_name = "Virtual-0";
+      output_name = "HDMI-A-1";
       csrf_allowed_origins = "https://sunshine-nix.lan:47990,https://10.73.73.140:47990";
       system_tray = "disabled";
     };
@@ -126,6 +167,26 @@ in
     "z /dev/uinput 0660 root input -"
   ];
 
+  systemd.paths.sunshine-input-metadata = {
+    description = "Watch for Sunshine input devices";
+    wantedBy = [ "multi-user.target" ];
+    pathConfig = {
+      PathChanged = "/dev/input";
+      Unit = "sunshine-input-metadata.service";
+    };
+  };
+
+  systemd.services.sunshine-input-metadata = {
+    description = "Expose Sunshine input udev metadata to libinput";
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig.Type = "oneshot";
+    script = ''
+      # Coalesce the keyboard and both mouse hotplug events.
+      ${pkgs.coreutils}/bin/sleep 1
+      ${syncInputMetadata}
+    '';
+  };
+
   systemd.user.services.plasma-headless = {
     description = "Headless KDE Plasma Wayland Session";
     wantedBy = [ "default.target" ];
@@ -148,8 +209,9 @@ in
     };
   };
 
-  # The stock Plasma unit starts KWin's DRM backend. This LXC has no physical
-  # display attached, so use KWin's supported virtual framebuffer backend.
+  # The virtual backend does not initialize libinput, so Sunshine's synthetic
+  # keyboard and mouse are invisible to Plasma. Use the passed NVIDIA DRM
+  # device and its connected HDMI output instead.
   systemd.user.services.plasma-kwin_wayland = {
     # The wrapper starts kwin_wayland and Xwayland by name. This unit otherwise
     # receives only systemd's basic PATH and silently remains as a socket-owning
@@ -161,9 +223,7 @@ in
     environment = sessionEnvironment // nvidiaGraphicsEnvironment;
 
     serviceConfig.ExecStart = lib.mkForce (
-      "${lib.getExe' pkgs.kdePackages.kwin "kwin_wayland_wrapper"} "
-      + "--xwayland --virtual --width 1920 --height 1080 --scale 1 "
-      + "--no-lockscreen"
+      "${lib.getExe' pkgs.kdePackages.kwin "kwin_wayland_wrapper"} " + "--xwayland --drm --no-lockscreen"
     );
   };
 
@@ -178,7 +238,7 @@ in
     serviceConfig = {
       ExecStartPre = [
         "${waitForKWin}"
-        "${waitForVirtualOutput}"
+        "${waitForOutput}"
       ];
       Restart = lib.mkForce "always";
     };

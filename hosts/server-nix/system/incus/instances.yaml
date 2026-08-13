@@ -175,6 +175,7 @@ sunshine-nix:
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "02:7d:da:73:cc:0d" }
     uinput: { type: "unix-char", source: "/dev/uinput", path: "/dev/uinput", mode: "0660", gid: "174" }
     sunshine-input: { type: "unix-hotplug", vendorid: "beef", productid: "dead", required: "false", mode: "0660", gid: "174" }
+    host-udev-data: { type: "disk", source: "/run/udev/data", path: "/opt/host-udev-data", readonly: "true" }
 
 syncthing-nix:
   type: "container"
