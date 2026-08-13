@@ -104,12 +104,10 @@ let
 
     if [ "$changed" -eq 1 ]; then
       # KWin's DRM backend discovers input through libinput at startup. The
-      # restart occurs only when a new udev record is linked. Sunshine must
-      # reconnect afterward because the old Wayland socket is gone.
+      # restart occurs only when a new udev record is linked. Sunshine's
+      # PartOf relationship propagates the compositor restart to Sunshine.
       ${pkgs.systemd}/bin/systemctl --user --machine=${user}@ \
         try-restart plasma-kwin_wayland.service
-      ${pkgs.systemd}/bin/systemctl --user --machine=${user}@ \
-        try-restart sunshine.service
     fi
   '';
 in
@@ -242,9 +240,15 @@ in
   systemd.user.services.sunshine = {
     wantedBy = lib.mkForce [ "default.target" ];
     unitConfig.ConditionUser = user;
-    partOf = lib.mkForce [ ];
+    # A restarted compositor invalidates Sunshine's Wayland connection. Carry
+    # every KWin restart (including NixOS activation) through to Sunshine.
+    partOf = lib.mkForce [ "plasma-kwin_wayland.service" ];
+    requires = lib.mkForce [ "plasma-kwin_wayland.service" ];
     wants = lib.mkForce [ "plasma-headless.service" ];
-    after = lib.mkForce [ "plasma-headless.service" ];
+    after = lib.mkForce [
+      "plasma-headless.service"
+      "plasma-kwin_wayland.service"
+    ];
     environment = sessionEnvironment // nvidiaGraphicsEnvironment // { DISPLAY = ":0"; };
     serviceConfig = {
       ExecStartPre = [
