@@ -11,6 +11,11 @@ let
   waylandDisplay = "wayland-0";
   boltLauncher = pkgs.bolt-launcher.override { jdk17 = pkgs.openjdk; };
 
+  nvidiaClientEnvironment = {
+    __EGL_EXTERNAL_PLATFORM_CONFIG_DIRS = "/run/opengl-driver/share/egl/egl_external_platform.d";
+    __EGL_VENDOR_LIBRARY_FILENAMES = "/run/opengl-driver/share/glvnd/egl_vendor.d/10_nvidia.json";
+  };
+
   sessionEnvironment = {
     DBUS_SESSION_BUS_ADDRESS = "unix:path=%t/bus";
     KDE_FULL_SESSION = "true";
@@ -24,14 +29,19 @@ let
 
   # Keep the version-independent GLVND dispatcher in the guest while loading
   # the driver-version-specific NVIDIA EGL implementation from server-nix.
-  nvidiaGraphicsEnvironment = {
+  nvidiaGraphicsEnvironment = nvidiaClientEnvironment // {
     GBM_BACKEND = "nvidia-drm";
     KWIN_DRM_DEVICES = "/dev/dri/card1";
     LD_PRELOAD = "${pkgs.libglvnd}/lib/libEGL.so.1";
-    __EGL_EXTERNAL_PLATFORM_CONFIG_DIRS = "/run/opengl-driver/share/egl/egl_external_platform.d";
-    __EGL_VENDOR_LIBRARY_FILENAMES = "/run/opengl-driver/share/glvnd/egl_vendor.d/10_nvidia.json";
     __GLX_VENDOR_LIBRARY_NAME = "nvidia";
   };
+
+  runRuneLite = pkgs.writeShellScript "sunshine-run-runelite" ''
+    # Sunshine needs this preload for capture and encoding, but passing it to
+    # Qt/Java clients prevents them from selecting the mounted NVIDIA driver.
+    unset LD_PRELOAD GBM_BACKEND KWIN_DRM_DEVICES
+    exec ${boltLauncher}/bin/bolt-launcher "$@"
+  '';
 
   waitForKWin = pkgs.writeShellScript "sunshine-wait-for-kwin" ''
     set -eu
@@ -144,7 +154,7 @@ in
       }
       {
         name = "RuneLite";
-        cmd = "${boltLauncher}/bin/bolt-launcher";
+        cmd = "${runRuneLite}";
         auto-detach = "true";
       }
     ];
@@ -271,6 +281,16 @@ in
     serviceConfig.ExecStart = lib.mkForce (
       "${lib.getExe' pkgs.kdePackages.kwin "kwin_wayland_wrapper"} " + "--xwayland --drm --no-lockscreen"
     );
+  };
+
+  # Extend Plasma's packaged service instead of replacing it. It must survive
+  # the intentional KWin restart used to discover Sunshine's virtual input.
+  systemd.user.services.plasma-plasmashell = {
+    overrideStrategy = "asDropin";
+    after = [ "plasma-kwin_wayland.service" ];
+    environment = nvidiaClientEnvironment;
+    unitConfig.StartLimitIntervalSec = 0;
+    serviceConfig.RestartSec = "2s";
   };
 
   # Sunshine connects to the plasma Wayland session
