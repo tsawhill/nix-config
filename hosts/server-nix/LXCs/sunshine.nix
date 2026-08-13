@@ -9,6 +9,7 @@
 let
   user = "taylor";
   waylandDisplay = "wayland-0";
+  boltLauncher = pkgs.bolt-launcher.override { jdk17 = pkgs.openjdk; };
 
   sessionEnvironment = {
     DBUS_SESSION_BUS_ADDRESS = "unix:path=%t/bus";
@@ -141,10 +142,16 @@ in
         name = "Desktop";
         auto-detach = "true";
       }
+      {
+        name = "RuneLite";
+        cmd = "${boltLauncher}/bin/bolt-launcher";
+        auto-detach = "true";
+      }
     ];
   };
 
   environment.systemPackages = with pkgs; [
+    boltLauncher
     kdePackages.libkscreen
     kdePackages.qtwayland
     xorg.xcbutilcursor
@@ -185,6 +192,36 @@ in
       # Coalesce the keyboard and both mouse hotplug events.
       ${pkgs.coreutils}/bin/sleep 1
       ${syncInputMetadata}
+    '';
+  };
+
+  # Keep the mutable RuneLite profile on the shared gamesaves dataset. Never
+  # replace a real directory: that could hide data created before this mount
+  # and link were configured.
+  systemd.services.sunshine-runelite-data = {
+    description = "Link RuneLite data to the gamesaves dataset";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "local-fs.target" ];
+    unitConfig.ConditionPathIsMountPoint = "/mnt/gamesaves";
+    serviceConfig = {
+      Type = "oneshot";
+      User = user;
+      Group = "users";
+    };
+    script = ''
+      target=/mnt/gamesaves/runelite
+      parent=/home/${user}/.local/share/bolt-launcher
+      link=$parent/.runelite
+
+      ${pkgs.coreutils}/bin/install -d -m 0755 "$target" "$parent"
+
+      if [ -L "$link" ]; then
+        ${pkgs.coreutils}/bin/ln -sfnT "$target" "$link"
+      elif [ ! -e "$link" ]; then
+        ${pkgs.coreutils}/bin/ln -s "$target" "$link"
+      else
+        echo "Not replacing existing non-symlink RuneLite data at $link" >&2
+      fi
     '';
   };
 
