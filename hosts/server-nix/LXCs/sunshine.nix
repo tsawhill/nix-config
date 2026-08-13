@@ -172,12 +172,14 @@ in
   users.users.taylor = {
     isNormalUser = true;
     extraGroups = [
+      "games"
       "wheel"
       "video"
       "input"
       "render"
     ];
   };
+  users.groups.games.gid = 1005;
 
   # Without linger, user services never start on this headless container.
   systemd.tmpfiles.rules = [
@@ -213,22 +215,30 @@ in
     wantedBy = [ "multi-user.target" ];
     after = [ "local-fs.target" ];
     unitConfig.ConditionPathIsMountPoint = "/mnt/gamesaves";
-    serviceConfig = {
-      Type = "oneshot";
-      User = user;
-      Group = "users";
-    };
+    serviceConfig.Type = "oneshot";
     script = ''
       target=/mnt/gamesaves/runelite
       parent=/home/${user}/.local/share/bolt-launcher
       link=$parent/.runelite
 
-      ${pkgs.coreutils}/bin/install -d -m 0755 "$target" "$parent"
+      ${pkgs.coreutils}/bin/install -d -m 0755 -o ${user} -g users "$parent"
+      if [ ! -d "$target" ]; then
+        ${pkgs.coreutils}/bin/install -d -m 2775 -o ${user} -g games "$target"
+      fi
+
+      # Syncthing owns this tree and keeps its files at 0644/0755. Preserve
+      # that ownership while granting the shared games group access. Default
+      # ACLs make the rule carry forward to newly synced files and folders.
+      ${pkgs.acl}/bin/setfacl -R -m g:games:rwX "$target"
+      ${pkgs.findutils}/bin/find "$target" -type d \
+        -exec ${pkgs.acl}/bin/setfacl -m d:g:games:rwx {} +
 
       if [ -L "$link" ]; then
         ${pkgs.coreutils}/bin/ln -sfnT "$target" "$link"
+        ${pkgs.coreutils}/bin/chown -h ${user}:users "$link"
       elif [ ! -e "$link" ]; then
         ${pkgs.coreutils}/bin/ln -s "$target" "$link"
+        ${pkgs.coreutils}/bin/chown -h ${user}:users "$link"
       else
         echo "Not replacing existing non-symlink RuneLite data at $link" >&2
       fi
