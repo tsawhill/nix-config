@@ -100,8 +100,6 @@ in
         mangohud
         vulkan-headers
 
-        # Streaming
-        moonlight-qt
       ]
       ++ lib.optionals cfg.lsfgVk.enable [
         lsfg-vk
