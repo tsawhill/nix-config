@@ -104,9 +104,12 @@ let
 
     if [ "$changed" -eq 1 ]; then
       # KWin's DRM backend discovers input through libinput at startup. The
-      # restart occurs only when a new udev record is linked.
+      # restart occurs only when a new udev record is linked. Sunshine must
+      # reconnect afterward because the old Wayland socket is gone.
       ${pkgs.systemd}/bin/systemctl --user --machine=${user}@ \
         try-restart plasma-kwin_wayland.service
+      ${pkgs.systemd}/bin/systemctl --user --machine=${user}@ \
+        try-restart sunshine.service
     fi
   '';
 in
@@ -220,7 +223,15 @@ in
       pkgs.kdePackages.kwin
       pkgs.xwayland
     ];
-    environment = sessionEnvironment // nvidiaGraphicsEnvironment;
+    environment =
+      sessionEnvironment
+      // nvidiaGraphicsEnvironment
+      // {
+        # This is a dedicated, single-user streaming LXC. Without the override,
+        # a cold KWin start hides its screencast protocol from systemd-launched
+        # Sunshine because there is no desktop-file security context.
+        KWIN_WAYLAND_NO_PERMISSION_CHECKS = "1";
+      };
 
     serviceConfig.ExecStart = lib.mkForce (
       "${lib.getExe' pkgs.kdePackages.kwin "kwin_wayland_wrapper"} " + "--xwayland --drm --no-lockscreen"
