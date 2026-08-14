@@ -38,6 +38,13 @@ let
         description = "Gamescope output and game height.";
       };
 
+      refresh = lib.mkOption {
+        type = lib.types.nullOr lib.types.int;
+        default = null;
+        example = 165;
+        description = "Gamescope nested refresh rate in frames per second. Null uses Gamescope's default.";
+      };
+
       scale = lib.mkOption {
         type = lib.types.number;
         default = 1.0;

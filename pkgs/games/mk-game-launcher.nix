@@ -63,7 +63,8 @@ let
       gameWidth = builtins.floor (resolution.width * scale);
       gameHeight = builtins.floor (resolution.height * scale);
     in
-    "-W ${toString resolution.width} -H ${toString resolution.height} -w ${toString gameWidth} -h ${toString gameHeight}";
+    "-W ${toString resolution.width} -H ${toString resolution.height} -w ${toString gameWidth} -h ${toString gameHeight}"
+    + lib.optionalString (resolution.refresh != null) " -r ${toString resolution.refresh}";
 
   entries =
     [

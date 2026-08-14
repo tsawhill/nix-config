@@ -116,10 +116,12 @@ in
     {
       width = 2560;
       height = 1440;
+      refresh = 360;
     }
     {
       width = 3440;
       height = 1440;
+      refresh = 165;
     }
   ];
   # GH3 stays on its prior resolutions rather than following the global default.
@@ -127,10 +129,12 @@ in
     {
       width = 1920;
       height = 1440;
+      refresh = 360;
     }
     {
       width = 2560;
       height = 1440;
+      refresh = 360;
     }
   ];
   software.apps.emulators.enable = true;
