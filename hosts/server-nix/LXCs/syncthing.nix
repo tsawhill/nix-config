@@ -15,6 +15,11 @@
     # sharePaths.roms = "/mnt/zpool/roms";
   };
 
+  # Synced files land in setgid, group-owned shares that Samba also serves.
+  # Keep group write permission when Syncthing creates or atomically replaces a
+  # file so Samba clients do not lose write access after another host syncs it.
+  systemd.services.syncthing.serviceConfig.UMask = "0002";
+
   my.groups = {
     media = {
       enable = true;
