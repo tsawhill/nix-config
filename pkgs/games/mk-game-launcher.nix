@@ -16,6 +16,7 @@
   gamescopeArgs ? null,
   gamescopeResolutions ? [ ],
   env ? [ ],
+  lsfgVkConfig ? null,
   lsfgVkEnable ? false,
   lsfgVkProcess ? name,
   networkEnable ? false,
@@ -33,8 +34,11 @@ let
   # Use an explicit profile identity instead of relying on the Vulkan process
   # name. This works for Proton launchers and also lets individual emulated games
   # have distinct LSFG profiles even though they share an emulator executable.
+  # LSFG_CONFIG selects the immutable Nix-generated profile set without taking
+  # ownership of the user's normal, manually editable config file.
   lsfgSetup = lib.optionalString lsfgVkEnable ''
     export DISABLE_LSFG=1
+    export LSFG_CONFIG=${lib.escapeShellArg lsfgVkConfig}
     export LSFG_PROCESS=${lib.escapeShellArg lsfgVkProcess}
   '';
 

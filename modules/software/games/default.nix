@@ -91,20 +91,8 @@ let
     };
   };
 
-  lsfgExternalProfileType = lib.types.submodule {
-    options = {
-      enable = lib.mkEnableOption "this external LSFG profile";
-
-      exe = lib.mkOption {
-        type = lib.types.str;
-        example = "Palworld.exe";
-        description = "Process name matched by lsfg-vk.";
-      };
-    }
-    // lsfgSettingsOptions;
-  };
-
   mkGameLauncher = pkgs.callPackage ../../../pkgs/games/mk-game-launcher.nix { };
+  lsfgToml = pkgs.formats.toml { };
 
   mkUmuRunner =
     umuCfg: exePath:
@@ -222,6 +210,7 @@ let
           builtins.baseNameOf entryCfg.runner.umu.exe
         else
           entryCfg.command;
+      lsfgVkConfig = lsfgConfig;
     in
     {
       package = mkGameLauncher {
@@ -234,7 +223,12 @@ let
         setupScript = runner.setupScript or "";
         name = entryCfg.command;
         networkEnable = entryCfg.network.enable;
-        inherit gamescopeResolutions lsfgVkEnable lsfgVkProcess;
+        inherit
+          gamescopeResolutions
+          lsfgVkConfig
+          lsfgVkEnable
+          lsfgVkProcess
+          ;
       };
       extraPackages = runner.extraPackages or [ ];
     };
@@ -294,11 +288,14 @@ let
     ) entryCfg.lsfgVk
   ) (lib.filterAttrs (_: entryCfg: cfg.lsfgVk.enable && entryCfg.lsfgVk.enable) includedEntries);
 
-  lsfgExternalProfiles = lib.mapAttrsToList (_: profileCfg: mkLsfgProfile profileCfg.exe profileCfg) (
-    lib.filterAttrs (_: profileCfg: cfg.lsfgVk.enable && profileCfg.enable) cfg.lsfgVk.externalProfiles
-  );
-
-  lsfgProfiles = lsfgEntryProfiles ++ lsfgExternalProfiles;
+  # Wrapped games use this immutable config through LSFG_CONFIG. The normal
+  # ~/.config/lsfg-vk/conf.toml remains mutable for Steam and other games that
+  # are launched outside software.games.
+  lsfgConfig = lsfgToml.generate "lsfg-vk-games.toml" {
+    version = 1;
+    global.dll = cfg.lsfgVk.dllPath;
+    game = lsfgEntryProfiles;
+  };
 
   # --- Selective sync (see ./default.nix header docs / the roms Syncthing share) ---
 
@@ -441,26 +438,10 @@ in
     enable = lib.mkEnableOption "lsfg-vk for selected game launchers on this host";
 
     dllPath = lib.mkOption {
-      type = lib.types.nullOr lib.types.str;
-      default = null;
+      type = lib.types.str;
+      default = "/home/taylor/.local/share/Steam/steamapps/common/Lossless Scaling/Lossless.dll";
       example = "/home/taylor/.local/share/Steam/steamapps/common/Lossless Scaling/Lossless.dll";
-      description = ''
-        Path to Lossless.dll. Null uses the current Home Manager user's standard
-        Steam library path.
-      '';
-    };
-
-    externalProfiles = lib.mkOption {
-      type = lib.types.attrsOf lsfgExternalProfileType;
-      default = { };
-      description = "LSFG profiles for games launched outside software.games, such as Steam games.";
-    };
-
-    generatedProfiles = lib.mkOption {
-      type = lib.types.listOf (lib.types.attrsOf lib.types.anything);
-      internal = true;
-      default = [ ];
-      description = "Rendered lsfg-vk game profiles consumed by Home Manager.";
+      description = "Path to the Lossless Scaling DLL used by Nix-managed game launchers.";
     };
   };
 
@@ -698,7 +679,6 @@ in
         ) cfg.syncGames;
 
       software.games.manifest = gamesManifest;
-      software.games.lsfgVk.generatedProfiles = lsfgProfiles;
 
       environment.systemPackages =
         (map (entryPackage: entryPackage.package) entryPackages)
