@@ -359,7 +359,7 @@ with open(sys.argv[2], 'w') as f:
     SERVER_HOST="root@server-nix.lan"
 
     # --- Incus / ZFS defaults (on server-nix) ---
-    IMAGE_ALIAS="nixos-base-image"       # local image alias for base NixOS LXC
+    IMAGE_ALIAS="barebones-nixos-allow-keys" # local image alias for base NixOS LXC
     PROFILE="nixos-lxc"                  # default profile applied to new containers
 
     # Template nix store snapshot — cloned into each new container so it has a

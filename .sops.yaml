@@ -21,6 +21,7 @@ keys:
   - &jellyfin-nix age1ttr947d3e630m9y9hvnpyxxs54rjytnfz52m45j8gvh3nmjnkq0qp6mskn
   - &jellyseerr-nix age1z49zdj5uxmyhg6vtp77rz0u4kpat3zuvs8e2mergvje4caqxg32sfdtj3e
   - &llm-nix age1vntw8mh9ncahfksquz4ws0ukucdq3qndftwur7e2z98kfffa2gdqstdkad
+  - &monitoring-nix age1yx2fwu2qyap82xkea4nhjmqaq28g0xe2v3tw0kjrn3gt94fh6gusu0danc
   - &nextcloud-nix age10gc54yhyn8slfrt9t3hzvz2ufmwf2cglftzn5cced0jmzmtpguaqey0amv
   - &searx-nix age1cn9q9fez96w3em99m4m3xw4yr4yysy2tfx0ajsyf5tc03s99jetspxr38l
   - &socks5-vpn-eu-nix age10cx3x3mre7vmt6heg7ht4nzfgc5z3dtewzak8l0ejptkzguu8geq2pmndq
@@ -328,6 +329,16 @@ creation_rules:
       - age:
         - *build-nix
         - *searx-nix
+  ##############################################################################
+  #
+  #                             Grafana secret key
+  #
+  ##############################################################################
+  - path_regex: modules/secrets/server/LXCs/grafana_secret_key\.yaml$
+    key_groups:
+      - age:
+        - *build-nix
+        - *monitoring-nix
   ##############################################################################
   #
   #                             Nextcloud admin pass
