@@ -10,16 +10,12 @@
   services.palworld = {
     enable = true;
     autoStart = true;
+    autoUpdate.enable = true;
     environmentFile = config.sops.secrets.palworld_env.path;
 
     serverName = "THE DOJO";
     serverDescription = "hehehe fnuny pokemon :)";
     maxPlayers = 16;
-
-    rcon = {
-      enable = true;
-      openFirewall = false;
-    };
   };
 
   networking.hostName = "palworld-nix";

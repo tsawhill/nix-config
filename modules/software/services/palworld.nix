@@ -159,20 +159,97 @@ let
     exec ${pkgs.steam-run}/bin/steam-run ./PalServer.sh ${lib.escapeShellArgs launchArguments}
   '';
 
+  performUpdateScript = pkgs.writeShellScript "palworld-perform-update" ''
+    set -euo pipefail
+
+    if [ "$EUID" -ne 0 ]; then
+      echo "Palworld updates must be run as root" >&2
+      exit 1
+    fi
+
+    ${pkgs.systemd}/bin/systemctl stop palworld.service
+    trap '${pkgs.systemd}/bin/systemctl start palworld.service' EXIT
+    ${pkgs.systemd}/bin/systemctl restart palworld-install.service
+    ${pkgs.systemd}/bin/systemctl start palworld.service
+    trap - EXIT
+  '';
+
   updateCommand = pkgs.writeShellApplication {
     name = "palworld-update-server";
-    runtimeInputs = [ pkgs.systemd ];
     text = ''
       if [ "$EUID" -ne 0 ]; then
         echo "palworld-update-server must be run as root" >&2
         exit 1
       fi
 
-      systemctl stop palworld.service
-      systemctl restart palworld-install.service
-      systemctl start palworld.service
+      exec ${pkgs.util-linux}/bin/flock \
+        /run/lock/palworld-update.lock \
+        ${performUpdateScript}
     '';
   };
+
+  updateCheckScript = pkgs.writeShellScript "palworld-update-check" ''
+    set -euo pipefail
+
+    manifest=${lib.escapeShellArg "${cfg.dataDir}/steamapps/appmanifest_2394010.acf"}
+    installed_build_id="$(${pkgs.gawk}/bin/awk -F '"' '$2 == "buildid" { print $4; exit }' "$manifest")"
+
+    steam_output="$(
+      ${pkgs.util-linux}/bin/runuser -u ${lib.escapeShellArg cfg.user} -- \
+        ${pkgs.coreutils}/bin/env HOME=${lib.escapeShellArg cfg.dataDir} \
+        ${pkgs.steamcmd}/bin/steamcmd \
+          +login anonymous \
+          +app_info_update 1 \
+          +app_info_print 2394010 \
+          +quit
+    )"
+
+    remote_build_id="$(
+      printf '%s\n' "$steam_output" | ${pkgs.gawk}/bin/awk -F '"' '
+        $2 == "branches" { in_branches = 1; next }
+        in_branches && $2 == "public" { in_public = 1; next }
+        in_public && $2 == "buildid" { print $4; exit }
+      '
+    )"
+
+    case "$installed_build_id" in
+      ""|*[!0-9]*)
+        echo "Could not determine the installed Palworld BuildID" >&2
+        exit 1
+        ;;
+    esac
+
+    case "$remote_build_id" in
+      ""|*[!0-9]*)
+        echo "Could not determine the current Palworld public BuildID" >&2
+        exit 1
+        ;;
+    esac
+
+    if [ "$installed_build_id" = "$remote_build_id" ]; then
+      echo "Palworld is current at BuildID $installed_build_id"
+      exit 0
+    fi
+
+    echo "Palworld update detected: $installed_build_id -> $remote_build_id"
+    set +e
+    ${pkgs.util-linux}/bin/flock -n -E 75 \
+      /run/lock/palworld-update.lock \
+      ${performUpdateScript}
+    update_result=$?
+    set -e
+
+    case "$update_result" in
+      0)
+        ;;
+      75)
+        echo "Another Palworld update is already running; deferring to the next check"
+        ;;
+      *)
+        exit "$update_result"
+        ;;
+    esac
+  '';
 
   rconCommand = pkgs.writeShellApplication {
     name = "palworld-rcon";
@@ -210,6 +287,22 @@ in
       type = lib.types.bool;
       default = true;
       description = "Start the Palworld server automatically at boot.";
+    };
+
+    autoUpdate = {
+      enable = lib.mkEnableOption "automatic Palworld server updates";
+
+      interval = lib.mkOption {
+        type = lib.types.str;
+        default = "15m";
+        description = "How often to check Steam for a newer public Palworld build.";
+      };
+
+      randomizedDelay = lib.mkOption {
+        type = lib.types.str;
+        default = "2m";
+        description = "Maximum randomized delay applied to update checks.";
+      };
     };
 
     dataDir = lib.mkOption {
@@ -423,6 +516,33 @@ in
         TimeoutStopSec = "120s";
         LimitNOFILE = 100000;
         UMask = "0027";
+      };
+    };
+
+    systemd.services.palworld-update-check = lib.mkIf cfg.autoUpdate.enable {
+      description = "Check Steam for Palworld dedicated server updates";
+      after = [
+        "network-online.target"
+        "palworld-install.service"
+      ];
+      wants = [ "network-online.target" ];
+      unitConfig.ConditionPathExists = "${cfg.dataDir}/steamapps/appmanifest_2394010.acf";
+      serviceConfig = {
+        Type = "oneshot";
+        WorkingDirectory = cfg.dataDir;
+        ExecStart = updateCheckScript;
+        TimeoutStartSec = "10m";
+      };
+    };
+
+    systemd.timers.palworld-update-check = lib.mkIf cfg.autoUpdate.enable {
+      description = "Periodically check Steam for Palworld dedicated server updates";
+      wantedBy = [ "timers.target" ];
+      timerConfig = {
+        OnBootSec = "10m";
+        OnUnitActiveSec = cfg.autoUpdate.interval;
+        RandomizedDelaySec = cfg.autoUpdate.randomizedDelay;
+        Persistent = true;
       };
     };
 
