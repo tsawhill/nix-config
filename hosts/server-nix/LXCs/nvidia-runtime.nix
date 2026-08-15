@@ -35,6 +35,7 @@
       where = "/run/opengl-driver";
       type = "none";
       options = "bind,ro";
+      mountConfig.LazyUnmount = true;
     }
   ];
 
