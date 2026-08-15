@@ -12,6 +12,7 @@
   # symlink behind; systemd refuses to use a symlink as a mount point.
   systemd.services.prepare-host-nvidia-runtime = {
     description = "Prepare the host NVIDIA runtime mount point";
+    unitConfig.DefaultDependencies = false;
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
