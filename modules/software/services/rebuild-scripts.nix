@@ -48,11 +48,21 @@ let
 
     acquire_deploy_lock() {
       local owner="$1"
+      local mode="''${2:-skip}"
       exec 9>"$DEPLOY_LOCK_PATH"
-      if ! ${pkgs.util-linux}/bin/flock -n 9; then
-        log_phase "Another deploy is already running; skipping $owner"
-        return 1
+      if ${pkgs.util-linux}/bin/flock -n 9; then
+        return 0
       fi
+
+      if [ "$mode" = "wait" ]; then
+        log_phase "Another deploy is already running; waiting to start $owner"
+        ${pkgs.util-linux}/bin/flock 9
+        log_phase "Deploy lock acquired for $owner"
+        return 0
+      fi
+
+      log_phase "Another deploy is already running; skipping $owner"
+      return 1
     }
 
     GOTIFY_KEY=""
@@ -285,6 +295,29 @@ let
       printf '%s\n' "$expanded" | tr ' ' '\n' | sort -u | sed '/^$/d' | tr '\n' ' ' | xargs
     }
 
+    order_deploy_hosts() {
+      local hosts="$1"
+      local host
+      local ordered=""
+      local include_build=false
+      local include_server=false
+
+      for host in $hosts; do
+        case "$host" in
+          build-nix) include_build=true ;;
+          server-nix) include_server=true ;;
+          *) ordered="$ordered $host" ;;
+        esac
+      done
+
+      # The controller updates itself only after all ordinary targets. The
+      # Incus host is absolute last so a delayed Incus restart cannot interrupt
+      # deployments to guests or build-nix.
+      [ "$include_build" = false ] || ordered="$ordered build-nix"
+      [ "$include_server" = false ] || ordered="$ordered server-nix"
+      printf '%s\n' "$ordered" | xargs
+    }
+
     local_build_system_path() {
       local host="$1"
       local log="$2"
@@ -449,7 +482,7 @@ let
     pkgs.util-linux
   ];
 
-  mkDeployService = name: tags: {
+  mkDeployService = name: selector: {
     description = "${name} Colmena Deploy";
     restartIfChanged = false;
     stopIfChanged = false;
@@ -457,6 +490,7 @@ let
     after = [
       "network-online.target"
       "sops-nix.service"
+      "flake-update.service"
     ];
     path = servicePath;
     serviceConfig = {
@@ -467,25 +501,27 @@ let
       set -euo pipefail
       ${sharedFns}
 
-      if ! acquire_deploy_lock "${name} deploy"; then
+      if ! acquire_deploy_lock "${name} deploy" wait; then
         exit 0
       fi
+
+      SELECTOR="${selector}"
 
       log_phase "${name}: committing pre-deploy state"
       ${pkgs.git}/bin/git -C "${repoPath}" add -A
       ${pkgs.git}/bin/git -C "${repoPath}" commit -m "auto: ${name} pre-deploy $(date '+%Y-%m-%d %H:%M')" || true
 
-      log_phase "Deploying ${name} (${tags})"
+      log_phase "Deploying ${name} ($SELECTOR)"
       cd "${repoPath}"
       BUILD_ID=$(date -u +%Y%m%d%H%M%S)
 
-      # Enumerate all hosts for this tag
-      log_phase "${name}: resolving hosts for ${tags}"
-      TAG_NAME="${lib.removePrefix "@" tags}"
-      ALL_HOSTS=$(list_colmena_hosts_for_tag "$TAG_NAME")
+      # Build one unique cumulative fleet for the selected cadence. Controller
+      # hosts are then moved to the safe tail of the deployment order.
+      log_phase "${name}: resolving hosts for $SELECTOR"
+      ALL_HOSTS=$(order_deploy_hosts "$(expand_colmena_selector "$SELECTOR")")
 
       if [ -z "$ALL_HOSTS" ]; then
-        log_phase "No hosts found for tag '${tags}'"
+        log_phase "No hosts found for selector '$SELECTOR'"
         exit 0
       fi
       log_phase "${name}: hosts to deploy: $ALL_HOSTS"
@@ -518,7 +554,7 @@ let
         fi
 
         log_phase "$host: queueing retry record for $system_path"
-        write_retry_record "${name}" '${tags}' "$host" "$system_path" "switch" "$BUILD_ID"
+        write_retry_record "${name}" "$SELECTOR" "$host" "$system_path" "switch" "$BUILD_ID"
 
         log_phase "$host: first exact-path apply started (timeout $APPLY_TIMEOUT)"
         apply_system_path "$host" "$system_path" "switch" "$LOG" || apply_exit=$?
@@ -860,17 +896,17 @@ in
       stopIfChanged = false;
       wants = [ "network-online.target" ];
       after = [ "network-online.target" ];
-      path = [
-        pkgs.git
-        pkgs.nix
-      ];
+      path = servicePath;
       serviceConfig = {
         Type = "oneshot";
         User = "root";
       };
       script = ''
         set -euo pipefail
-        echo "--- Updating flake ---"
+        ${sharedFns}
+
+        acquire_deploy_lock "flake update" wait
+        log_phase "Updating flake inputs"
         cd "${repoPath}"
         ${pkgs.nix}/bin/nix flake update --flake "${flakePath}"
         ${pkgs.git}/bin/git add flake.lock
@@ -878,8 +914,8 @@ in
       '';
     };
     "deploy-Daily" = mkDeployService "Daily" "@daily";
-    "deploy-Weekly" = mkDeployService "Weekly" "@weekly";
-    "deploy-Monthly" = mkDeployService "Monthly" "@monthly";
+    "deploy-Weekly" = mkDeployService "Weekly" "@daily,@weekly";
+    "deploy-Monthly" = mkDeployService "Monthly" "@daily,@weekly,@monthly";
     "deploy-retry" = {
       description = "Retry deferred Colmena deploys";
       restartIfChanged = false;
@@ -904,17 +940,22 @@ in
   systemd.timers = {
     "flake-update" = {
       enable = true;
-      description = "Update nix flake inputs every 6 hours";
+      description = "Update nix flake inputs daily before the fleet deploy";
       wantedBy = [ "timers.target" ];
       timerConfig = {
-        OnCalendar = "*-*-* 00/6:00:00";
+        OnCalendar = "*-*-* 23:00:00";
         Persistent = true;
         Unit = "flake-update.service";
       };
     };
-    "deploy-Daily" = mkTimer "Daily" "*-*-* 00:00";
-    "deploy-Weekly" = mkTimer "Weekly" "Sat *-*-* 01:00";
-    "deploy-Monthly" = mkTimer "Monthly" "Sat *-*-1..7 02:00";
+    # The calendars are mutually exclusive. Saturday jobs include the shorter
+    # cadences, so every host is deployed once without overlapping services.
+    "deploy-Daily" = mkTimer "Daily" [
+      "Sun *-*-* 00:00"
+      "Mon..Fri *-*-* 00:00"
+    ];
+    "deploy-Weekly" = mkTimer "Weekly" "Sat *-*-8..31 00:00";
+    "deploy-Monthly" = mkTimer "Monthly" "Sat *-*-1..7 00:00";
     "deploy-retry" = {
       enable = true;
       description = "Retry deferred Colmena deploys every 30 minutes";

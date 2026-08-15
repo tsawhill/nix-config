@@ -28,7 +28,7 @@
           if ! ${pkgs.systemd}/bin/systemd-run \
             --unit=incus-restart-after-activation \
             --description="Restart Incus after NixOS activation" \
-            --on-active=5min \
+            --on-active=15min \
             --property=Type=oneshot \
             --collect \
             ${pkgs.systemd}/bin/systemctl try-restart incus.service; then
