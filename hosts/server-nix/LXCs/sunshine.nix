@@ -226,12 +226,13 @@ in
         ${pkgs.coreutils}/bin/install -d -m 2775 -o ${user} -g games "$target"
       fi
 
-      # Syncthing owns this tree and keeps its files at 0644/0755. Preserve
-      # that ownership while granting the shared games group access. Default
-      # ACLs make the rule carry forward to newly synced files and folders.
-      ${pkgs.acl}/bin/setfacl -R -m g:games:rwX "$target"
+      # The Incus idmapped gamesaves mount does not support POSIX ACLs. Keep
+      # file ownership intact while making the shared games group writable;
+      # setgid directories carry that group into newly created entries.
+      ${pkgs.coreutils}/bin/chgrp -R games "$target"
+      ${pkgs.coreutils}/bin/chmod -R g+rwX "$target"
       ${pkgs.findutils}/bin/find "$target" -type d \
-        -exec ${pkgs.acl}/bin/setfacl -m d:g:games:rwx {} +
+        -exec ${pkgs.coreutils}/bin/chmod g+s {} +
 
       if [ -L "$link" ]; then
         ${pkgs.coreutils}/bin/ln -sfnT "$target" "$link"
