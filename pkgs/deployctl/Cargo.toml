@@ -1,0 +1,18 @@
+[package]
+name = "deployctl"
+version = "0.1.0"
+edition = "2021"
+description = "Typed deployment controller for the nix-config Colmena fleet"
+license = "MIT"
+
+[dependencies]
+anyhow = "1.0"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+clap = { version = "4.5", features = ["derive", "env"] }
+fs2 = "0.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[profile.release]
+lto = "thin"
+strip = true
