@@ -138,7 +138,7 @@ in
     # (10.50.50.17) via the AdGuard rewrite generated from topology.nix, so the
     # tunnel must be up before this node is reachable. Platform comes from
     # meta.nodeNixpkgs."oracle-1-nix" above.
-    "oracle-1-nix" = mkHost "daily" "oracle-1-nix" "${self}/hosts/oracle-1-nix";
+    # "oracle-1-nix" = mkHost "daily" "oracle-1-nix" "${self}/hosts/oracle-1-nix";
 
     # --- weekly ---
     "immich-nix" = mkHost "weekly" "immich-nix" "${self}/hosts/server-nix/LXCs/immich.nix";
