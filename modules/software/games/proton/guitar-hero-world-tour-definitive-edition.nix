@@ -28,6 +28,7 @@
         "PULSE_LATENCY_MSEC=60"
       ];
       basePath = "pc/GHWTDE";
+      network.enable = true;
       runner.umu = {
         exe = "Updater.exe";
         proton = "ge-proton";
