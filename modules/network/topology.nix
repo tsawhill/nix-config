@@ -275,7 +275,6 @@ let
       };
     };
     pixel7pro.wgRemote.ip = "10.50.50.11";
-    fwlaptop.wgRemote.ip = "10.50.50.15";
     palworld-nix = {
       lan = {
         ip = "10.73.73.31";

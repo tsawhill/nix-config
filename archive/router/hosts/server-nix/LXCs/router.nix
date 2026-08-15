@@ -16,7 +16,6 @@ let
     (wgIp "taylor-laptop-nix")
     (wgIp "taylor-deck-nix")
     (wgIp "pixel7pro")
-    (wgIp "fwlaptop")
   ];
 
   reservationHosts = lib.filterAttrs (
@@ -90,11 +89,6 @@ in
             name = "Pixel7Pro";
             publicKeyFile = secrets.wg_pubkey_pixel7pro.path;
             allowedIPs = [ "${wgIp "pixel7pro"}/32" ];
-          }
-          {
-            name = "FWLaptop";
-            publicKeyFile = secrets.wg_pubkey_fwlaptop.path;
-            allowedIPs = [ "${wgIp "fwlaptop"}/32" ];
           }
           {
             name = "pi-backup-nix";

@@ -9,7 +9,6 @@ let
     wg_pubkey_router_wg_remote = "router_wg_remote";
     wg_pubkey_oracle_rocky_proxy = "oracle_rocky_proxy";
     wg_pubkey_pixel7pro = "pixel7pro";
-    wg_pubkey_fwlaptop = "fwlaptop";
     wg_pubkey_pi_backup_nix = "pi_backup_nix";
     wg_pubkey_taylor_desktop_nix = "taylor_desktop_nix";
     wg_pubkey_taylor_laptop_nix = "taylor_laptop_nix";
