@@ -10,6 +10,7 @@ let
   cfg = config.my.monitoring.metrics;
   stack = cfg.stack;
   lanDomain = networkTopology.domains.lan;
+  grafanaSecretKeyFile = "${config.services.grafana.dataDir}/secret-key";
 
   defaultHosts = [
     "server-nix"
@@ -257,10 +258,13 @@ in
       services.grafana = {
         enable = true;
         openFirewall = true;
-        settings.server = {
-          http_addr = "0.0.0.0";
-          http_port = 3000;
-          domain = "monitoring-nix.${lanDomain}";
+        settings = {
+          security.secret_key = "$__file{${grafanaSecretKeyFile}}";
+          server = {
+            http_addr = "0.0.0.0";
+            http_port = 3000;
+            domain = "monitoring-nix.${lanDomain}";
+          };
         };
         provision = {
           enable = true;
@@ -289,6 +293,15 @@ in
           };
         };
       };
+
+      systemd.services.grafana.preStart = lib.mkAfter ''
+        secret_key_file=${lib.escapeShellArg grafanaSecretKeyFile}
+        if [ ! -s "$secret_key_file" ]; then
+          umask 0077
+          ${pkgs.coreutils}/bin/head -c 48 /dev/urandom \
+            | ${pkgs.coreutils}/bin/base64 > "$secret_key_file"
+        fi
+      '';
 
       services.gatus = {
         enable = true;

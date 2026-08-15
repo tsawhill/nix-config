@@ -47,11 +47,6 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    # Generation pruning is the retention boundary. Keep the bootloader from
-    # hiding additional same-day manual deployments before the daily prune.
-    boot.loader.systemd-boot.configurationLimit = lib.mkDefault null;
-    boot.loader.grub.configurationLimit = lib.mkDefault null;
-
     nix.gc = {
       automatic = true;
       dates = cfg.gcFrequency;

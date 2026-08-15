@@ -17,6 +17,17 @@ in
 {
   networking.hostName = "pi-backup-nix";
   system.stateVersion = "25.11";
+
+  # Starship 1.25.1's test suite disagrees with Git 2.54's status output.
+  # Keep the Pi-specific package usable until nixos-raspberrypi updates it.
+  nixpkgs.overlays = [
+    (_final: prev: {
+      starship = prev.starship.overrideAttrs (_old: {
+        doCheck = false;
+      });
+    })
+  ];
+
   imports = [
     # Secrets (SOPS)
     inputs.sops-nix-stable.nixosModules.sops
