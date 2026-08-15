@@ -4,7 +4,6 @@
   # firmware, kernel modules, controls, fan and backlight.
   boot.loader.systemd-boot = {
     enable = true;
-    configurationLimit = 10;
   };
   boot.loader.efi.canTouchEfiVariables = true;
 

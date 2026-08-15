@@ -23,7 +23,7 @@ in
 
     generations = lib.mkOption {
       type = lib.types.int;
-      default = 5;
+      default = 3;
       description = "The number of recent system generations to preserve.";
     };
 
@@ -47,6 +47,11 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    # Generation pruning is the retention boundary. Keep the bootloader from
+    # hiding additional same-day manual deployments before the daily prune.
+    boot.loader.systemd-boot.configurationLimit = lib.mkDefault null;
+    boot.loader.grub.configurationLimit = lib.mkDefault null;
+
     nix.gc = {
       automatic = true;
       dates = cfg.gcFrequency;
@@ -61,20 +66,23 @@ in
       serviceConfig = {
         Type = "oneshot";
       };
-      script = let
-        nix-env = "${pkgs.nix}/bin/nix-env";
-        keep = "+${toString cfg.generations}";
-      in ''
-        # Prune local system profile
-        ${nix-env} -p /nix/var/nix/profiles/system --delete-generations ${keep}
-      '' + lib.optionalString cfg.prunePerHostProfiles ''
-        # Prune Colmena per-host profiles (builder machine)
-        for prof in /nix/var/nix/profiles/per-host/*/system; do
-          [ -e "$prof" ] || continue
-          echo "Pruning $prof"
-          ${nix-env} -p "$prof" --delete-generations ${keep} || true
-        done
-      '';
+      script =
+        let
+          nix-env = "${pkgs.nix}/bin/nix-env";
+          keep = "+${toString cfg.generations}";
+        in
+        ''
+          # Prune local system profile
+          ${nix-env} -p /nix/var/nix/profiles/system --delete-generations ${keep}
+        ''
+        + lib.optionalString cfg.prunePerHostProfiles ''
+          # Prune Colmena per-host profiles (builder machine)
+          for prof in /nix/var/nix/profiles/per-host/*/system; do
+            [ -e "$prof" ] || continue
+            echo "Pruning $prof"
+            ${nix-env} -p "$prof" --delete-generations ${keep} || true
+          done
+        '';
       wantedBy = [ "multi-user.target" ];
     };
   };

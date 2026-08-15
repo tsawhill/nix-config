@@ -53,7 +53,7 @@ in
   my.users.root = {
     enable = true;
   };
-  my.garbage.collection.generations = 2;
+  my.garbage.collection.generations = 1;
   my.monitoring.metrics.exporters.enable = true;
   environment.sessionVariables = {
     EDITOR = "nvim";
