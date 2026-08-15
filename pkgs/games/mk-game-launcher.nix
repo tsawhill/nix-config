@@ -17,6 +17,7 @@
   gamescopeResolutions ? [ ],
   env ? [ ],
   lsfgVkEnable ? false,
+  lsfgVkProcess ? name,
   networkEnable ? false,
 }:
 let
@@ -29,16 +30,12 @@ let
   # still disables it. The system-wide default defines DISABLE_LSFG to keep lsfg
   # off everywhere; to actually enable it for the game process we must unset it.
   #
-  # Under Proton, lsfg-vk sees the wine/preloader process name rather than the
-  # Windows exe, so a conf.toml `exe = "Game.exe"` entry never matches. Derive
-  # LSFG_PROCESS from the launched exe's basename so the matching [[game]] block
-  # applies automatically for every Proton/umu title. (exe_path is set by the
-  # runner's setupScript; guarded so non-exe runners are unaffected.)
+  # Use an explicit profile identity instead of relying on the Vulkan process
+  # name. This works for Proton launchers and also lets individual emulated games
+  # have distinct LSFG profiles even though they share an emulator executable.
   lsfgSetup = lib.optionalString lsfgVkEnable ''
     export DISABLE_LSFG=1
-    if [ -n "''${exe_path:-}" ]; then
-      export LSFG_PROCESS="''${exe_path##*/}"
-    fi
+    export LSFG_PROCESS=${lib.escapeShellArg lsfgVkProcess}
   '';
 
   # Enable lsfg-vk only for the game runner. In particular, keep the implicit
@@ -66,26 +63,24 @@ let
     "-W ${toString resolution.width} -H ${toString resolution.height} -w ${toString gameWidth} -h ${toString gameHeight}"
     + lib.optionalString (resolution.refresh != null) " -r ${toString resolution.refresh}";
 
-  entries =
-    [
-      {
-        inherit name desktopName;
-        gamescopeArgs = null;
-      }
-    ]
-    ++ map (
-        resolution:
-        let
-          label = resolutionLabel resolution;
-        in
-        {
-          name = "${name}-${label}";
-          desktopName = "${desktopName} (${label})";
-          gamescopeArgs =
-            resolutionArgs resolution
-            + lib.optionalString (gamescopeArgs != null) " ${gamescopeArgs}";
-        }
-    ) gamescopeResolutions;
+  entries = [
+    {
+      inherit name desktopName;
+      gamescopeArgs = null;
+    }
+  ]
+  ++ map (
+    resolution:
+    let
+      label = resolutionLabel resolution;
+    in
+    {
+      name = "${name}-${label}";
+      desktopName = "${desktopName} (${label})";
+      gamescopeArgs =
+        resolutionArgs resolution + lib.optionalString (gamescopeArgs != null) " ${gamescopeArgs}";
+    }
+  ) gamescopeResolutions;
 
   runCommand =
     entry:
@@ -99,25 +94,29 @@ let
           ${isolatedGameCommand}
       '';
 
-  mkLauncher = entry: writeShellApplication {
-    inherit (entry) name;
-    text = ''
-      set -euo pipefail
+  mkLauncher =
+    entry:
+    writeShellApplication {
+      inherit (entry) name;
+      text = ''
+        set -euo pipefail
 
-      ${setupScript}
-      ${envExports}
-      ${lsfgSetup}
+        ${setupScript}
+        ${envExports}
+        ${lsfgSetup}
 
-      ${runCommand entry}
-    '';
-  };
+        ${runCommand entry}
+      '';
+    };
 
-  mkDesktopItem = entry: launcher: makeDesktopItem {
-    inherit (entry) name desktopName;
-    exec = lib.getExe launcher;
-    terminal = false;
-    categories = [ "Game" ];
-  };
+  mkDesktopItem =
+    entry: launcher:
+    makeDesktopItem {
+      inherit (entry) name desktopName;
+      exec = lib.getExe launcher;
+      terminal = false;
+      categories = [ "Game" ];
+    };
 
   packages = lib.flatten (
     map (

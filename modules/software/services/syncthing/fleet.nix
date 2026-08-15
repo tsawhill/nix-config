@@ -96,6 +96,10 @@ in
         # RuneLite regenerable caches — no point syncing.
         "runelite/cache"
         "runelite/jagexcache"
+        # Skyrim's launcher rewrites resolution and graphics settings for the
+        # current display. Keep those machine-local while syncing saves and the
+        # rest of the shared Proton prefix.
+        "wine/default/drive_c/users/steamuser/Documents/My Games/Skyrim Special Edition GOG/SkyrimPrefs.ini"
         # RetroArch: sync only saves/states/config. Everything else is
         # regenerable, downloadable, platform-specific (cores!), or path-bound
         # (playlists). First match wins and `*` doesn't cross `/`, so these

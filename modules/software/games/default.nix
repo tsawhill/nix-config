@@ -53,6 +53,57 @@ let
     };
   };
 
+  lsfgSettingsOptions = {
+    multiplier = lib.mkOption {
+      type = lib.types.int;
+      default = 2;
+      description = "LSFG frame generation multiplier.";
+    };
+
+    performanceMode = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Whether to use LSFG performance mode.";
+    };
+
+    flowScale = lib.mkOption {
+      type = lib.types.number;
+      default = 1.0;
+      description = "LSFG optical-flow resolution scale.";
+    };
+
+    hdrMode = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Whether to enable LSFG HDR mode.";
+    };
+
+    experimentalPresentMode = lib.mkOption {
+      type = lib.types.nullOr (
+        lib.types.enum [
+          "fifo"
+          "mailbox"
+          "immediate"
+        ]
+      );
+      default = null;
+      description = "Optional experimental Vulkan present mode.";
+    };
+  };
+
+  lsfgExternalProfileType = lib.types.submodule {
+    options = {
+      enable = lib.mkEnableOption "this external LSFG profile";
+
+      exe = lib.mkOption {
+        type = lib.types.str;
+        example = "Palworld.exe";
+        description = "Process name matched by lsfg-vk.";
+      };
+    }
+    // lsfgSettingsOptions;
+  };
+
   mkGameLauncher = pkgs.callPackage ../../../pkgs/games/mk-game-launcher.nix { };
 
   mkUmuRunner =
@@ -163,8 +214,14 @@ let
           cfg.gamescope.resolutions
         else
           entryCfg.gamescope.resolutions;
-      lsfgVkEnable =
-        if entryCfg.lsfgVk.enable == null then cfg.lsfgVk.enable else entryCfg.lsfgVk.enable;
+      lsfgVkEnable = cfg.lsfgVk.enable && entryCfg.lsfgVk.enable;
+      lsfgVkProcess =
+        if entryCfg.lsfgVk.exe != null then
+          entryCfg.lsfgVk.exe
+        else if entryCfg.runner.umu != null then
+          builtins.baseNameOf entryCfg.runner.umu.exe
+        else
+          entryCfg.command;
     in
     {
       package = mkGameLauncher {
@@ -177,7 +234,7 @@ let
         setupScript = runner.setupScript or "";
         name = entryCfg.command;
         networkEnable = entryCfg.network.enable;
-        inherit gamescopeResolutions lsfgVkEnable;
+        inherit gamescopeResolutions lsfgVkEnable lsfgVkProcess;
       };
       extraPackages = runner.extraPackages or [ ];
     };
@@ -211,6 +268,37 @@ let
     command = entryCfg.command;
     category = entryCategory entryCfg;
   }) includedEntries;
+
+  mkLsfgProfile =
+    exe: profileCfg:
+    {
+      inherit exe;
+      inherit (profileCfg) multiplier;
+      performance_mode = profileCfg.performanceMode;
+      flow_scale = profileCfg.flowScale;
+      hdr_mode = profileCfg.hdrMode;
+    }
+    // lib.optionalAttrs (profileCfg.experimentalPresentMode != null) {
+      experimental_present_mode = profileCfg.experimentalPresentMode;
+    };
+
+  lsfgEntryProfiles = lib.mapAttrsToList (
+    id: entryCfg:
+    mkLsfgProfile (
+      if entryCfg.lsfgVk.exe != null then
+        entryCfg.lsfgVk.exe
+      else if entryCfg.runner.umu != null then
+        builtins.baseNameOf entryCfg.runner.umu.exe
+      else
+        entryCfg.command
+    ) entryCfg.lsfgVk
+  ) (lib.filterAttrs (_: entryCfg: cfg.lsfgVk.enable && entryCfg.lsfgVk.enable) includedEntries);
+
+  lsfgExternalProfiles = lib.mapAttrsToList (_: profileCfg: mkLsfgProfile profileCfg.exe profileCfg) (
+    lib.filterAttrs (_: profileCfg: cfg.lsfgVk.enable && profileCfg.enable) cfg.lsfgVk.externalProfiles
+  );
+
+  lsfgProfiles = lsfgEntryProfiles ++ lsfgExternalProfiles;
 
   # --- Selective sync (see ./default.nix header docs / the roms Syncthing share) ---
 
@@ -349,7 +437,32 @@ in
     description = "Default gamescope resolutions to generate launchers for.";
   };
 
-  options.software.games.lsfgVk.enable = lib.mkEnableOption "lsfg-vk for game launchers";
+  options.software.games.lsfgVk = {
+    enable = lib.mkEnableOption "lsfg-vk for selected game launchers on this host";
+
+    dllPath = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      example = "/home/taylor/.local/share/Steam/steamapps/common/Lossless Scaling/Lossless.dll";
+      description = ''
+        Path to Lossless.dll. Null uses the current Home Manager user's standard
+        Steam library path.
+      '';
+    };
+
+    externalProfiles = lib.mkOption {
+      type = lib.types.attrsOf lsfgExternalProfileType;
+      default = { };
+      description = "LSFG profiles for games launched outside software.games, such as Steam games.";
+    };
+
+    generatedProfiles = lib.mkOption {
+      type = lib.types.listOf (lib.types.attrsOf lib.types.anything);
+      internal = true;
+      default = [ ];
+      description = "Rendered lsfg-vk game profiles consumed by Home Manager.";
+    };
+  };
 
   options.software.games.steamSync.stopSteamDuringSync = lib.mkEnableOption ''
     stopping Steam while syncing non-Steam shortcuts and collections
@@ -415,11 +528,21 @@ in
             description = "Gamescope resolutions for this game. Null inherits the global default; an empty list disables gamescope.";
           };
 
-          lsfgVk.enable = lib.mkOption {
-            type = lib.types.nullOr lib.types.bool;
-            default = null;
-            description = "Whether to enable lsfg-vk for this game. Null inherits the global default.";
-          };
+          lsfgVk = {
+            enable = lib.mkEnableOption "lsfg-vk for this game";
+
+            exe = lib.mkOption {
+              type = lib.types.nullOr lib.types.str;
+              default = null;
+              example = "SkyrimSE.exe";
+              description = ''
+                LSFG profile identity exported through LSFG_PROCESS. Null uses
+                the Windows executable basename for Proton games and the unique
+                launcher command for native or emulated games.
+              '';
+            };
+          }
+          // lsfgSettingsOptions;
 
           network.enable = lib.mkEnableOption "network access for this game";
 
@@ -531,55 +654,63 @@ in
 
   config = lib.mkMerge [
     {
-      assertions = lib.flatten (
-        lib.mapAttrsToList (
-          entryName: entryCfg:
+      assertions =
+        lib.flatten (
+          lib.mapAttrsToList (
+            entryName: entryCfg:
+            let
+              enabledRunners = lib.length (
+                lib.filter (runnerCfg: runnerCfg != null) [
+                  entryCfg.runner.umu
+                  entryCfg.runner.native
+                  entryCfg.runner.emulator
+                ]
+              );
+            in
+            [
+              {
+                assertion = enabledRunners == 1;
+                message = "software.games.entries.${entryName} must configure exactly one runner.";
+              }
+              {
+                assertion = entryCfg.runner.native != null || entryCfg.basePath != null;
+                message = "software.games.entries.${entryName} must define basePath (umu and emulator runners locate the game via it).";
+              }
+              {
+                assertion =
+                  entryCfg.runner.emulator == null
+                  || entryCfg.runner.emulator.type != "retroarch"
+                  || entryCfg.runner.emulator.core != null;
+                message = "software.games.entries.${entryName}.runner.emulator.core is required for retroarch entries.";
+              }
+            ]
+          ) cfg.entries
+        )
+        ++ map (
+          id:
           let
-            enabledRunners = lib.length (
-              lib.filter (runnerCfg: runnerCfg != null) [
-                entryCfg.runner.umu
-                entryCfg.runner.native
-                entryCfg.runner.emulator
-              ]
-            );
+            entry = cfg.entries.${id} or null;
           in
-          [
-            {
-              assertion = enabledRunners == 1;
-              message = "software.games.entries.${entryName} must configure exactly one runner.";
-            }
-            {
-              assertion =
-                entryCfg.runner.native != null || entryCfg.basePath != null;
-              message = "software.games.entries.${entryName} must define basePath (umu and emulator runners locate the game via it).";
-            }
-            {
-              assertion =
-                entryCfg.runner.emulator == null
-                || entryCfg.runner.emulator.type != "retroarch"
-                || entryCfg.runner.emulator.core != null;
-              message = "software.games.entries.${entryName}.runner.emulator.core is required for retroarch entries.";
-            }
-          ]
-        ) cfg.entries
-      )
-      ++ map (
-        id:
-        let
-          entry = cfg.entries.${id} or null;
-        in
-        {
-          assertion = entry != null && entry.basePath != null && isRelative entry.basePath;
-          message = "software.games.syncGames entry \"${id}\" must exist in software.games.entries and define a relative (library) basePath.";
-        }
-      ) cfg.syncGames;
+          {
+            assertion = entry != null && entry.basePath != null && isRelative entry.basePath;
+            message = "software.games.syncGames entry \"${id}\" must exist in software.games.entries and define a relative (library) basePath.";
+          }
+        ) cfg.syncGames;
 
       software.games.manifest = gamesManifest;
+      software.games.lsfgVk.generatedProfiles = lsfgProfiles;
 
       environment.systemPackages =
         (map (entryPackage: entryPackage.package) entryPackages)
         ++ lib.flatten (map (entryPackage: entryPackage.extraPackages) entryPackages);
     }
+
+    # The game-level master switch also installs the layer and establishes the
+    # disabled-by-default session environment. Individual launchers selectively
+    # unset that environment variable when their own profile is enabled.
+    (lib.mkIf cfg.lsfgVk.enable {
+      software.apps.gaming.lsfgVk.enable = lib.mkDefault true;
+    })
 
     # Only hosts that actually select games touch the Syncthing/prune machinery,
     # so the games module never hard-depends on my.syncthing where it is unused.
