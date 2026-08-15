@@ -553,6 +553,10 @@ let
           continue
         fi
 
+        # A cumulative Weekly or Monthly run can supersede retry state created
+        # by a shorter cadence. Once a replacement system has built, discard
+        # every older queued closure for this host before recording the new one.
+        clear_retry_host "$host"
         log_phase "$host: queueing retry record for $system_path"
         write_retry_record "${name}" "$SELECTOR" "$host" "$system_path" "switch" "$BUILD_ID"
 
