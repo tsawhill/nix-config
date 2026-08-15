@@ -1,9 +1,15 @@
-{ config, lib, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   cfg = config.my.network.wg-remote;
   address = lib.head (lib.splitString "/" cfg.address);
   allowedIPs = lib.filter (ip: ip != "") (lib.splitString ";" cfg.peer.allowedIPs);
+  allowedIPCount = lib.length allowedIPs;
 
   dnsSection = lib.optionalString (cfg.dns != null) ''
     dns=${cfg.dns};
@@ -14,12 +20,29 @@ let
     route-metric=${toString cfg.routeMetric}
   '';
 
+  # Keep the peer routes explicit instead of relying on NetworkManager's
+  # wireguard.peer-routes default.  In particular, set the preferred source so
+  # traffic to another WireGuard peer cannot inherit an address from another
+  # active connection.
+  peerRouteSection = lib.concatStringsSep "\n" (
+    lib.imap1 (i: ip: ''
+      route${toString i}=${ip}
+      route${toString i}_options=table=254,src=${address}
+    '') allowedIPs
+  );
+
   sourceRouteSection = lib.optionalString cfg.sourceRouting.enable (
     lib.concatStringsSep "\n" (
-      (lib.imap1 (i: ip: ''
-        route${toString i}=${ip}
-        route${toString i}_options=table=${toString cfg.sourceRouting.table},src=${address}
-      '') allowedIPs)
+      (lib.imap1 (
+        i: ip:
+        let
+          routeIndex = allowedIPCount + i;
+        in
+        ''
+          route${toString routeIndex}=${ip}
+          route${toString routeIndex}_options=table=${toString cfg.sourceRouting.table},src=${address}
+        ''
+      ) allowedIPs)
       ++ [
         "routing-rule1=priority ${toString cfg.sourceRouting.priority} from ${address}/32 table ${toString cfg.sourceRouting.table}"
       ]
@@ -96,41 +119,88 @@ in
         description = "Policy routing rule priority for wg-remote source-routed replies.";
       };
     };
-  };
 
-  config = lib.mkIf cfg.enable {
-    sops.templates."nm-wg-remote" = {
-      path = "/etc/NetworkManager/system-connections/wg-remote.nmconnection";
-      owner = "root";
-      group = "root";
-      mode = "0600";
-      content = ''
-        [connection]
-        id=wg-remote
-        type=wireguard
-        interface-name=wg-remote
-        autoconnect=${cfg.autoconnect}
-
-        [wireguard]
-        private-key=${config.sops.placeholder.wg_remote_private_key}
-
-        [wireguard-peer.${config.sops.placeholder.wg_pubkey_router_wg_remote}]
-        endpoint=${cfg.peer.endpoint}
-        allowed-ips=${cfg.peer.allowedIPs}
-        persistent-keepalive=${cfg.peer.persistentKeepalive}
-
-        [ipv4]
-        method=manual
-        address1=${cfg.address}
-        ${dnsSection}${metricSection}
-        ${sourceRouteSection}
-        [ipv6]
-        method=disabled
+    reconnectOnLinkChange = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = ''
+        Reconnect an autoconnected tunnel after resume or after an underlying
+        network link comes up. This refreshes the endpoint route and handshake.
       '';
     };
-
-    systemd.services.NetworkManager.restartTriggers = [
-      config.sops.templates."nm-wg-remote".content
-    ];
   };
+
+  config = lib.mkIf cfg.enable (
+    lib.mkMerge [
+      {
+        sops.templates."nm-wg-remote" = {
+          path = "/etc/NetworkManager/system-connections/wg-remote.nmconnection";
+          owner = "root";
+          group = "root";
+          mode = "0600";
+          content = ''
+            [connection]
+            id=wg-remote
+            type=wireguard
+            interface-name=wg-remote
+            autoconnect=${cfg.autoconnect}
+
+            [wireguard]
+            private-key=${config.sops.placeholder.wg_remote_private_key}
+            peer-routes=false
+
+            [wireguard-peer.${config.sops.placeholder.wg_pubkey_router_wg_remote}]
+            endpoint=${cfg.peer.endpoint}
+            allowed-ips=${cfg.peer.allowedIPs}
+            persistent-keepalive=${cfg.peer.persistentKeepalive}
+
+            [ipv4]
+            method=manual
+            address1=${cfg.address}
+            ${dnsSection}${metricSection}
+            ${peerRouteSection}
+            ${sourceRouteSection}
+            [ipv6]
+            method=disabled
+          '';
+        };
+
+        systemd.services.NetworkManager.restartTriggers = [
+          config.sops.templates."nm-wg-remote".content
+        ];
+      }
+
+      (lib.mkIf (cfg.reconnectOnLinkChange && cfg.autoconnect == "true") {
+        networking.networkmanager.dispatcherScripts = [
+          {
+            source = pkgs.writeShellScript "wg-remote-link-change" ''
+              if [ "$1" != "wg-remote" ] && [ "$2" = "up" ]; then
+                ${pkgs.systemd}/bin/systemctl --no-block restart wg-remote-reconnect.service
+              fi
+            '';
+            type = "basic";
+          }
+        ];
+
+        powerManagement.resumeCommands = ''
+          ${pkgs.systemd}/bin/systemctl --no-block restart wg-remote-reconnect.service
+        '';
+
+        systemd.services.wg-remote-reconnect = {
+          description = "Reconnect wg-remote after an underlying network change";
+          after = [ "NetworkManager.service" ];
+          requires = [ "NetworkManager.service" ];
+          path = [ pkgs.networkmanager ];
+          serviceConfig.Type = "oneshot";
+          script = ''
+            nmcli connection down id wg-remote >/dev/null 2>&1 || true
+
+            if nm-online --quiet --timeout=30; then
+              nmcli connection up id wg-remote
+            fi
+          '';
+        };
+      })
+    ]
+  );
 }
