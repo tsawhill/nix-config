@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ lib, pkgs, ... }:
 {
   boot.loader.systemd-boot = {
     enable = true;
@@ -17,6 +17,21 @@
   boot.kernelModules = [
     "hid_nintendo"
     "hid_playstation"
+  ];
+
+  # CEC hangs off the ChromeOS-style EC: cros-ec-cec.2.auto enumerates but binds
+  # nothing, since drivers/media/cec/platform/* is gated behind MEDIA_CEC_SUPPORT,
+  # which no stock kernel config sets. kernelPatches merges into the kernel's own
+  # structuredExtraConfig; .override would clobber linux-jovian's.
+  boot.kernelPatches = [
+    {
+      name = "cec-cros-ec";
+      patch = null;
+      extraStructuredConfig = with lib.kernel; {
+        MEDIA_CEC_SUPPORT = yes;
+        CEC_CROS_EC = module;
+      };
+    }
   ];
 
   # RetroCultMods "MiniHost" GH Guitar adapter (VID:PID 1209:2882) intermittently
