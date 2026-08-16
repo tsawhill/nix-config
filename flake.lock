@@ -292,15 +292,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1786610333,
-        "narHash": "sha256-p/mv2uKwbvIk7PqHP4ZNk2CSJ34uPwM4sOR65jQt4TM=",
-        "owner": "Jovian-Experiments",
+        "lastModified": 1786913189,
+        "narHash": "sha256-XJ2K1oCLZ6JbUugbZMJwEqAIPC4E82CTNTVk7uXBK6Y=",
+        "owner": "tsawhill",
         "repo": "Jovian-NixOS",
-        "rev": "a6043f17992543f9157c594129272e7621c45ea5",
+        "rev": "032b77ddf3f2d56dee8598383dac05e612b2e922",
         "type": "github"
       },
       "original": {
-        "owner": "Jovian-Experiments",
+        "owner": "tsawhill",
+        "ref": "steammachine-support",
         "repo": "Jovian-NixOS",
         "type": "github"
       }

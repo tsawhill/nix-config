@@ -100,12 +100,13 @@ in
       desktopSession = "plasma"; # "Switch to Desktop" lands in KDE Plasma
     };
     decky-loader.enable = true; # plugin loader
-    hardware.has.amd.gpu = true;
-    # SteamOS does not load amdgpu early (its mkinitcpio HOOKS have no kms hook
-    # and no MODULES=(amdgpu)), which is why it never hits the CEC notifier
-    # race. Match it: with amdgpu loaded from udev instead, cros_ec_cec
-    # registers "Port C" first and amdgpu's unnamed lookup matches it.
-    hardware.amd.gpu.enableEarlyModesetting = false;
+
+    # Steam Machine (Fremont) profile: the jovian kernel, HID preloads, initrd
+    # storage modules, valve-leds permissions and brightness slider, and — the
+    # point of the exercise — early modesetting defaulted off so cros_ec_cec
+    # registers its named "Port C" notifier before amdgpu registers an unnamed
+    # one and strands the CEC adapter at f.f.f.f. Also sets has.amd.gpu.
+    devices.steammachine.enable = true;
 
     # Deck hardware (neptune kernel, firmware, controller, fan, gyro) is gated by
     # jovian.devices.steamdeck, left off. useSteamOSConfig only bundles opinionated
