@@ -14,9 +14,12 @@ let
   # `rpool` is intentionally split into children. The bare `backup/rpool`
   # dataset is just a container on the target, and trying to replicate the empty
   # parent caused Syncoid to refuse the sync once children already existed.
+  # Nix stores are deliberately absent: they are reproducible from this flake,
+  # while the container state that is not lives in rpool/VMDisks. Snapshotting
+  # them cost ~865G (build-nix alone held 621G of churn) to protect nothing a
+  # `deploy` cannot rebuild.
   backupDatasets = [
     "VM-Disks"
-    "downloadHDD/nix-stores"
     "downloadSSD"
     "rpool/VMDisks"
     "rpool/home"
