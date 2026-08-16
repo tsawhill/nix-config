@@ -156,6 +156,30 @@ after:  cec_phys_addr = 0 12288 ; card 0, connector 121 ; 3.0.0.0 ; LA mask 0x00
 CEC then works end to end in Game Mode: TV control, remote passthrough, and
 wake/suspend of the TV.
 
+### Why SteamOS does not hit this
+
+SteamOS does not do early modesetting. `steamos-customizations-jupiter`
+(20260721.1-2) ships exactly one mkinitcpio fragment:
+
+```
+# /etc/mkinitcpio.conf.d/20-steamdeck.conf
+HOOKS=(base udev plymouth holo steam-deck modconf keyboard block filesystems resume)
+```
+
+No `kms` hook, no `MODULES=(amdgpu)`, and no `amdgpu` anywhere in the package's
+initcpio install hooks. amdgpu is therefore loaded from udev on the real root,
+after `cros_ec_cec` has registered `"Port C"`, so amdgpu's unnamed lookup adopts
+the existing notifier and the address flows.
+
+Jovian diverges by way of `jovian.hardware.amd.gpu.enableEarlyModesetting`
+(defaulting to `jovian.hardware.has.amd.gpu`), which puts amdgpu in the initrd
+and hands it the race.
+
+Incidentally, the same package's `usr/lib/modules-load.d/hid-preload.conf`
+carries the comment *"Preload some hid drivers so they have first claim. This
+prevents a race..."*, so Valve is deliberate about probe ordering generally —
+they simply never needed to solve it for CEC.
+
 ### Proposed fix
 
 The debugfs toggle is a workaround, not a fix. Better candidates, in order of
@@ -173,17 +197,61 @@ preference:
    the initrd ahead of amdgpu. Untested, and awkward: the probe cannot run until
    the EC MFD has created `cros-ec-cec.2.auto`, so being loaded first may still
    not mean registering first.
-3. Upstream: make the notifier lookup order-independent, or have `cros-ec-cec`
-   fall back to an unnamed lookup when the named one finds nothing. This is the
-   real bug and affects any system pairing early-KMS amdgpu with a cros-ec CEC
-   adapter.
+3. **Preferred: do not load amdgpu early**, matching SteamOS —
+   `jovian.hardware.amd.gpu.enableEarlyModesetting = false`. This keeps
+   `has.amd.gpu` (and so backlight control) while dropping only the initrd
+   loading, and needs no workaround at all.
+4. Upstream: make the notifier lookup order-independent, or have `cros-ec-cec`
+   fall back to an unnamed lookup when the named one finds nothing. Still a real
+   fragility — a named lookup can never adopt an unnamed notifier, so any
+   early-DRM / late-CEC pairing loses — but it is not what makes Jovian differ
+   from SteamOS, so it is a lower-priority upstream report rather than the fix.
+
+### What Jovian should do
+
+The two options are silently incompatible on hardware whose CEC adapter sits
+behind the EC, and nothing surfaces that to the user: `cecd` runs, Steam draws a
+full CEC menu, and every control in it is inert.
+
+An `assertions` entry is **not** appropriate. On a Steam Deck,
+`jovian.devices.steamdeck.enable` sets `has.amd.gpu = true` (so early
+modesetting is on) and `useSteamOSConfig` defaults `enableHdmiCecIntegration` to
+true, so both flags are on by default there — yet a Deck has no cros-ec CEC
+adapter and no conflict. A hard assertion would fail evaluation for every Deck
+user over a problem they do not have, and the module cannot detect the affected
+hardware at evaluation time because DMI is not available then.
+
+A `warnings` entry is the landable change:
+
+```nix
+warnings = lib.optional
+  (cfg.enableHdmiCecIntegration
+   && config.jovian.hardware.amd.gpu.enableEarlyModesetting)
+  ''
+    jovian.steamos.enableHdmiCecIntegration is enabled together with
+    jovian.hardware.amd.gpu.enableEarlyModesetting. On hardware whose CEC
+    adapter is driven by the EC (cros-ec-cec, e.g. the Steam Machine), loading
+    amdgpu from the initrd makes it register an unnamed CEC notifier before
+    cros-ec-cec can register its named one. cec_notifier_get_conn() cannot match
+    a named lookup against an unnamed notifier, so the adapter ends up on an
+    orphan and stays at physical address f.f.f.f. SteamOS does not enable early
+    modesetting, which is why it is unaffected.
+  '';
+```
+
+Wording could also point at the option description instead, if the maintainers
+prefer to keep warnings terse.
 
 A local stopgap using the debugfs toggle lives in
-`hosts/taylor-cube-nix/system/hardware/cec.nix`. Note it must wait on
-`/dev/cec0`, not on `cec_phys_addr`: the EC retains that value across a warm
-reboot, so it reads stale-valid and skips the work. `cros_ec_cec_init_port()`
-registers the notifier before `cec_register_adapter()`, so the node's existence
-is the correct signal.
+`hosts/taylor-cube-nix/system/hardware/cec.nix`, verified repairing a cold boot
+unattended (`f.f.f.f` -> `3.0.0.0`). Note it must wait on `/dev/cec0`, not on
+`cec_phys_addr`: the EC retains that value across a warm reboot, so it reads
+stale-valid and skips the work. `cros_ec_cec_init_port()` registers the notifier
+before `cec_register_adapter()`, so the node's existence is the correct signal.
+
+Status: `enableEarlyModesetting = false` is committed but **not yet verified by
+a reboot**. If the service log then reports a valid address before
+re-registering, the stopgap and the softdep can both be deleted.
 
 ## Unrelated: LED brightness
 
