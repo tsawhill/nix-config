@@ -11,32 +11,28 @@ let
   # CEC_CROS_EC is a module loaded from udev, while early modesetting puts
   # amdgpu in the initrd, so amdgpu wins and the adapter sits at f.f.f.f.
   # Re-registering amdgpu's notifier once cros_ec_cec is up lands it on the
-  # right one. Idempotent: only acts when the address is still invalid.
+  # right one.
+  #
+  # Wait on /dev/cec0 rather than the EC's cec_phys_addr: the EC keeps that
+  # value across a warm reboot, so it goes stale-valid and is no signal that the
+  # link is right. cros_ec_cec_init_port() registers the notifier before
+  # cec_register_adapter(), so the node existing means "Port C" is there to
+  # match. Then re-register unconditionally; it is cheap and safe to repeat.
   cecFixup = pkgs.writeShellScript "cec-notifier-fixup" ''
     set -u
     modprobe cros_ec_cec 2>/dev/null || true
 
-    addr=""
+    node=""
     for _ in $(seq 1 30); do
-      addr=$(cat /sys/class/chromeos/cros_ec/cec_phys_addr 2>/dev/null || true)
-      [ -n "$addr" ] && break
+      if [ -e /dev/cec0 ]; then
+        node=$(find /sys/kernel/debug/dri -name hdmi_cec_state 2>/dev/null | head -1)
+        [ -n "$node" ] && break
+      fi
       sleep 1
     done
 
-    if [ -z "$addr" ]; then
-      echo "no cros_ec cec_phys_addr; nothing to do"
-      exit 0
-    fi
-
-    # "<port> <addr>", 65535 (0xffff) meaning unset.
-    case "$addr" in
-      *" 65535") ;;
-      *) echo "physical address already set ($addr)"; exit 0 ;;
-    esac
-
-    node=$(find /sys/kernel/debug/dri -name hdmi_cec_state 2>/dev/null | head -1)
     if [ -z "$node" ]; then
-      echo "no hdmi_cec_state node; is the HDMI connector present?"
+      echo "no cec adapter or hdmi_cec_state node; nothing to do"
       exit 0
     fi
 
