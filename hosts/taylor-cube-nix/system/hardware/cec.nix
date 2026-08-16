@@ -72,12 +72,11 @@ in
   # The notifier link is lost if the connector is re-probed across a sleep.
   powerManagement.resumeCommands = "${cecFixup}";
 
-  # Try to win the race properly rather than repairing it after the fact: load
-  # cros_ec_cec before amdgpu so it registers "Port C" first. Unproven, because
-  # load order is not probe order -- cros_ec_cec cannot register its notifier
-  # until the EC's MFD has created cros-ec-cec.2.auto -- and early KMS loads
-  # amdgpu from the initrd, where this config may not apply. If the service log
-  # shows a valid address before re-registering, this worked and the service can
-  # go.
+  # Tested and NOT sufficient on its own: modprobe -c shows this is live, but
+  # early modesetting loads amdgpu from the initrd where /etc/modprobe.d does
+  # not apply, so amdgpu still registers first (boot log: amdgpu at 12:49:37,
+  # adapter still f.f.f.f when the service ran at 12:49:42). Kept because it
+  # would win the race if early KMS were ever turned off; the service above is
+  # what actually repairs it.
   boot.extraModprobeConfig = "softdep amdgpu pre: cros_ec_cec";
 }

@@ -161,11 +161,18 @@ wake/suspend of the TV.
 The debugfs toggle is a workaround, not a fix. Better candidates, in order of
 preference:
 
-1. Force the order with a modprobe softdep, e.g.
-   `softdep amdgpu pre: cros_ec_cec` — **untested**, and needs checking that
-   initrd modprobe honours it when amdgpu is loaded for early KMS.
+1. ~~Force the order with a modprobe softdep~~ — **tested, insufficient.**
+   `boot.extraModprobeConfig = "softdep amdgpu pre: cros_ec_cec"` is live
+   (`modprobe -c` confirms it), but `jovian.hardware.has.amd.gpu` enables early
+   modesetting, which loads amdgpu from the initrd where `/etc/modprobe.d` does
+   not apply. amdgpu still registered first (kernel log 12:49:37) and the
+   adapter was still `f.f.f.f` when the repair service ran at 12:49:42. It would
+   presumably work with early KMS disabled, i.e. the two features are mutually
+   exclusive as things stand.
 2. Load `cros_ec_cec` (with its `cros_ec_lpcs` / `cros_ec_dev` dependencies) from
-   the initrd ahead of amdgpu.
+   the initrd ahead of amdgpu. Untested, and awkward: the probe cannot run until
+   the EC MFD has created `cros-ec-cec.2.auto`, so being loaded first may still
+   not mean registering first.
 3. Upstream: make the notifier lookup order-independent, or have `cros-ec-cec`
    fall back to an unnamed lookup when the named one finds nothing. This is the
    real bug and affects any system pairing early-KMS amdgpu with a cros-ec CEC
