@@ -188,10 +188,11 @@ in
     "deploy-Monthly" = mkTimer "Monthly" "Sat *-*-1..7 00:00";
     deploy-retry = {
       enable = true;
-      description = "Retry deferred Colmena deploys every 30 minutes";
+      description = "Retry deferred Colmena deploys every 5 minutes";
       wantedBy = [ "timers.target" ];
       timerConfig = {
-        OnCalendar = "*-*-* *:05/30:00";
+        # Offset off the hour so scheduled deploys take the lock first.
+        OnCalendar = "*-*-* *:02/5:00";
         Persistent = true;
         Unit = "deploy-retry.service";
       };
