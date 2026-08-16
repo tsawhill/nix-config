@@ -32,6 +32,12 @@
         CEC_CROS_EC = module;
       };
     }
+    # Fremont's DMI entry asks for connector "Port C", but amdgpu registers its
+    # notifier unnamed, so the adapter gets an orphan and stays at f.f.f.f.
+    {
+      name = "cros-ec-cec-fremont-connector";
+      patch = ./patches/cros-ec-cec-fremont-connector.patch;
+    }
   ];
 
   # RetroCultMods "MiniHost" GH Guitar adapter (VID:PID 1209:2882) intermittently

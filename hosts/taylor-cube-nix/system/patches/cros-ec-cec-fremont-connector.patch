@@ -1,0 +1,47 @@
+Fix HDMI-CEC on the Valve Steam Machine (Fremont).
+
+cros-ec-cec looks up its CEC notifier by (hdmi_dev, port_name) using the
+connector name from its DMI table, and Fremont's entry asks for "Port C".
+amdgpu never names its connectors: amdgpu_dm_initialize_hdmi_connector()
+calls cec_notifier_conn_register(hdmi_dev, NULL, &conn_info).
+
+Since cec_notifier_conn_register() allocates a fresh notifier when the tuple
+does not already exist, the named lookup creates a second, orphaned notifier.
+amdgpu then publishes EDID and physical address changes to its own unnamed
+notifier, which the adapter is not attached to, so the CEC adapter comes up
+stuck at physical address f.f.f.f and can never claim a logical address:
+
+    Connector Info   : None
+    Physical Address : f.f.f.f
+    Logical Address Mask : 0x0000
+
+Port names are an i915/Chromebook convention. NULL is documented as correct
+when the HDMI device has a single HDMI connector, which Fremont does.
+
+The AMD Lilac and OEM F7F entries point at the same PCI device and likely
+need the same treatment, but are left alone here as they are untested.
+
+--- a/drivers/media/cec/platform/cros-ec/cros-ec-cec.c
++++ b/drivers/media/cec/platform/cros-ec/cros-ec-cec.c
+@@ -306,6 +306,12 @@
+ 	const char *const *conns;
+ };
+
++/*
++ * amdgpu registers its CEC notifier with no port name (see
++ * amdgpu_dm_initialize_hdmi_connector), so a named lookup allocates a second,
++ * orphaned notifier and the adapter never receives a physical address.
++ */
++static const char *const port_unnamed_conns[] = { NULL };
+ static const char *const port_b_conns[] = { "Port B", NULL };
+ static const char *const port_c_conns[] = { "Port C", NULL };
+ static const char *const port_db_conns[] = { "Port D", "Port B", NULL };
+@@ -318,7 +324,7 @@
+ 	{ "AMD", "Lilac", "0000:03:00.0", port_c_conns },
+ 	/* Valve Fremont */
+ 	{ "OEM", "F7F", "0000:03:00.0", port_c_conns },
+-	{ "Valve", "Fremont", "0000:03:00.0", port_c_conns },
++	{ "Valve", "Fremont", "0000:03:00.0", port_unnamed_conns },
+ 	/* Google Fizz */
+ 	{ "Google", "Fizz", "0000:00:02.0", port_b_conns },
+ 	/* Google Brask */
