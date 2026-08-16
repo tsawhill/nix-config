@@ -10,17 +10,25 @@
   ];
 
   home-manager = {
-    extraSpecialArgs = {
-      inherit inputs self;
-      # TEMP: 25.11 nixvim for the same reason as home-manager-2511 above —
-      # nixvim-stable (26.05) calls pkgs.neovimUtils.makeVimPackageInfo, absent
-      # in this host's 25.11 pkgs. Revert to inputs.nixvim-stable when
-      # nixos-raspberrypi moves to 26.05.
-      nixvim-input = inputs.nixvim-2511;
-    };
-
     users.root = {
-      imports = [ "${self}/modules/home-manager/bundles/all.nix" ];
+      # This host is an appliance, not an editing environment. Keep its SSH
+      # shell small instead of pulling in Nixvim/Neovim, tree-sitter, Starship,
+      # and their Rust-heavy ARM build closures.
+      imports = [ "${self}/modules/home-manager/xdg.nix" ];
+
+      programs.zsh = {
+        enable = true;
+        history = {
+          size = 50000;
+          save = 50000;
+          share = true;
+          ignoreDups = true;
+          expireDuplicatesFirst = true;
+          ignoreSpace = true;
+        };
+        shellAliases.g = "git";
+      };
+
       home.stateVersion = "25.11";
     };
 
