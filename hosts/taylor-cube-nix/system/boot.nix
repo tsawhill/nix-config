@@ -27,7 +27,7 @@
     {
       name = "cec-cros-ec";
       patch = null;
-      extraStructuredConfig = with lib.kernel; {
+      structuredExtraConfig = with lib.kernel; {
         MEDIA_CEC_SUPPORT = yes;
         CEC_CROS_EC = module;
       };
