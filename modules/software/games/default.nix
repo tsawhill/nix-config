@@ -243,6 +243,7 @@ let
     dolphin = "GameCube/Wii";
     pcsx2 = "PS2";
     retroarch = "RetroArch";
+    ryujinx = "Switch";
   };
   entryCategory =
     entryCfg:
@@ -605,6 +606,7 @@ in
                       "pcsx2"
                       "rpcs3"
                       "retroarch"
+                      "ryujinx"
                     ];
                     description = "Emulator backend to use.";
                   };
