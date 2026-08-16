@@ -36,10 +36,18 @@ let
       exit 0
     fi
 
+    # Logged so the journal shows whether the softdep below already won the race
+    # on its own, in which case this service is redundant.
+    before=$(cec-ctl -d /dev/cec0 2>/dev/null | sed -n 's/.*Physical Address *: *//p' | head -1)
+    echo "adapter physical address before re-register: ''${before:-unknown}"
+
     echo "re-registering amdgpu CEC notifier via $node"
     echo 0 > "$node"; sleep 1
     echo 1 > "$node"; sleep 1
-    echo "physical address now: $(cat /sys/class/chromeos/cros_ec/cec_phys_addr)"
+
+    after=$(cec-ctl -d /dev/cec0 2>/dev/null | sed -n 's/.*Physical Address *: *//p' | head -1)
+    echo "adapter physical address after re-register: ''${after:-unknown}"
+    echo "EC reports: $(cat /sys/class/chromeos/cros_ec/cec_phys_addr)"
   '';
 in
 {
@@ -52,6 +60,7 @@ in
       pkgs.kmod
       pkgs.coreutils
       pkgs.findutils
+      pkgs.v4l-utils
     ];
     serviceConfig = {
       Type = "oneshot";
@@ -62,4 +71,13 @@ in
 
   # The notifier link is lost if the connector is re-probed across a sleep.
   powerManagement.resumeCommands = "${cecFixup}";
+
+  # Try to win the race properly rather than repairing it after the fact: load
+  # cros_ec_cec before amdgpu so it registers "Port C" first. Unproven, because
+  # load order is not probe order -- cros_ec_cec cannot register its notifier
+  # until the EC's MFD has created cros-ec-cec.2.auto -- and early KMS loads
+  # amdgpu from the initrd, where this config may not apply. If the service log
+  # shows a valid address before re-registering, this worked and the service can
+  # go.
+  boot.extraModprobeConfig = "softdep amdgpu pre: cros_ec_cec";
 }
