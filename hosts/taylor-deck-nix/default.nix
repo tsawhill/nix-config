@@ -78,7 +78,10 @@ in
 
     # Hardware services
     "${self}/modules/hardware/udev"
+    "${self}/modules/hardware/lexar-sd.nix"
   ];
+
+  my.lexarSD.enable = true;
 
   # Required when using home-manager as a NixOS module with useUserPackages = true
   environment.pathsToLink = [

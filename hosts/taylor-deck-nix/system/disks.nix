@@ -14,17 +14,8 @@
     ];
   };
 
-  # 1TB SD card. fsType is "auto" (kernel detects the on-disk Linux fs at mount);
-  # pin it with `lsblk -f /dev/mmcblk0p1` if you want it explicit. nofail keeps
-  # the deck booting when the card is removed.
-  fileSystems."/mnt/SDcard" = {
-    device = "/dev/disk/by-id/mmc-LX1TB_0x378801e2-part1";
-    fsType = "auto";
-    options = [
-      "nofail"
-      "x-systemd.device-timeout=5s"
-    ];
-  };
+  # The 1TB Lexar SD card is mounted at /mnt/lexarSD by modules/hardware/lexar-sd.nix,
+  # keyed on filesystem UUID so it resolves in this slot and in the cube's USB reader.
 
   swapDevices = [ ];
 }
