@@ -5,12 +5,7 @@
       command = "skyrim";
       desktopName = "The Elder Scrolls V: Skyrim Special Edition";
       basePath = "pc/TES - Skyrim - Anniversary Edition";
-      lsfgVk = {
-        enable = lib.mkDefault true;
-        exe = lib.mkDefault "SkyrimSE.exe";
-        multiplier = lib.mkDefault 2;
-        flowScale = lib.mkDefault 0.25;
-      };
+      lsfgVk.enable = false;
       runner.umu.exe = "skse64_loader.exe";
     };
 
