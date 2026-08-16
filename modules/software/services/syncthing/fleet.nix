@@ -96,6 +96,10 @@ in
         "wine/default/drive_c/users/steamuser/Documents/My Games/Skyrim Special Edition GOG/SkyrimPrefs.ini"
         # RetroArch whitelist: first match wins and `*` doesn't cross `/`, so
         # these `!` includes survive the trailing glob that drops the rest.
+        # This exclude must precede the saves include to beat it: the dolphin-emu
+        # core keeps 12M of GPU-bound shader cache under its own User dir, which
+        # would otherwise ride along inside the whitelisted saves tree.
+        "Emulators/RetroArch/saves/dolphin-emu/User/Cache" # shader/uid caches, regenerable
         "!Emulators/RetroArch/saves" # in-game saves (SRAM) - keep
         "!Emulators/RetroArch/states" # save states - keep
         "!Emulators/RetroArch/config" # per-core config overrides - keep
