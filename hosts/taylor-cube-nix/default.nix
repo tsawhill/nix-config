@@ -100,14 +100,23 @@ in
       desktopSession = "plasma"; # "Switch to Desktop" lands in KDE Plasma
     };
     decky-loader.enable = true; # plugin loader
-    # Not a Steam Deck, so no jovian.devices.steamdeck (Deck APU/controls/fan/
-    # backlight). Use the mainline/stock NixOS kernel instead of the SteamOS
-    # (neptune) kernel — that kernel is really meant for Deck hardware. Game Mode
-    # / Big Picture still comes from jovian.steam above; it doesn't need it.
-    steamos.useSteamOSConfig = false;
-    # Defaults to useSteamOSConfig (false above), so opt in explicitly: cecd +
-    # HDMI-CEC settings in Game Mode.
-    steamos.enableHdmiCecIntegration = true;
+    hardware.has.amd.gpu = true; # early amdgpu KMS in initrd
+
+    # Deck hardware (neptune kernel, firmware, controller, fan, gyro) is gated by
+    # jovian.devices.steamdeck, left off. useSteamOSConfig only bundles opinionated
+    # SteamOS tweaks, so opt in per-option and skip the Deck-only ones.
+    steamos = {
+      useSteamOSConfig = false;
+      enableDefaultCmdlineConfig = true;
+      enableSysctlConfig = true;
+      enableEarlyOOM = true;
+      enableBluetoothConfig = true;
+      enableProductSerialAccess = true;
+      enableZram = true;
+      enableHdmiCecIntegration = true;
+      # enableAutoMountUdevRules: jupiter-hw-support, Deck SD slot only — removable
+      # media gets explicit mounts instead (see modules/hardware/lexar-sd.nix).
+    };
   };
   desktop.kde.enable = true;
 
