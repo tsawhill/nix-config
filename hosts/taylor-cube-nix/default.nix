@@ -105,6 +105,9 @@ in
     # (neptune) kernel — that kernel is really meant for Deck hardware. Game Mode
     # / Big Picture still comes from jovian.steam above; it doesn't need it.
     steamos.useSteamOSConfig = false;
+    # Defaults to useSteamOSConfig (false above), so opt in explicitly: cecd +
+    # HDMI-CEC settings in Game Mode.
+    steamos.enableHdmiCecIntegration = true;
   };
   desktop.kde.enable = true;
 
