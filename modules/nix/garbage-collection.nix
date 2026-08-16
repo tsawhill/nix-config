@@ -71,14 +71,22 @@ in
           ${nix-env} -p /nix/var/nix/profiles/system --delete-generations ${keep}
         ''
         + lib.optionalString cfg.prunePerHostProfiles ''
-          # Prune Colmena per-host profiles (builder machine). Colmena lays these
-          # out flat as <host>-<N>-link, so derive each distinct profile base;
-          # globbing <host>/system instead resolves into the closure and errors.
+          # Prune Colmena per-host profiles (builder machine). These are laid out
+          # flat as <host>-<N>-link with no base symlink, so nix-env cannot resolve
+          # a current generation: `--delete-generations +N` silently no-ops and
+          # `old` deletes every generation including the newest. Enumerate and
+          # delete by explicit number instead.
           for prof in $(${pkgs.findutils}/bin/find /nix/var/nix/profiles/per-host \
             -maxdepth 1 -name '*-[0-9]*-link' -printf '%f\n' 2>/dev/null \
             | ${pkgs.gnused}/bin/sed 's/-[0-9]\+-link$//' | ${pkgs.coreutils}/bin/sort -u); do
-            echo "Pruning per-host profile $prof"
-            ${nix-env} -p /nix/var/nix/profiles/per-host/"$prof" --delete-generations ${keep} || true
+            p=/nix/var/nix/profiles/per-host/"$prof"
+            stale=$(${nix-env} -p "$p" --list-generations 2>/dev/null \
+              | ${pkgs.gawk}/bin/awk '{print $1}' \
+              | ${pkgs.coreutils}/bin/head -n -${toString cfg.generations})
+            if [ -n "$stale" ]; then
+              echo "Pruning $prof: dropping generations $(echo $stale)"
+              ${nix-env} -p "$p" --delete-generations $stale
+            fi
           done
         '';
       wantedBy = [ "multi-user.target" ];
