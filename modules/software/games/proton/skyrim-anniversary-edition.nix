@@ -4,7 +4,6 @@
     skyrimAnniversaryEdition = {
       command = "skyrim";
       desktopName = "The Elder Scrolls V: Skyrim Special Edition";
-      category = "The Elder Scrolls";
       basePath = "pc/TES - Skyrim - Anniversary Edition";
       lsfgVk = {
         enable = lib.mkDefault true;
@@ -18,7 +17,6 @@
     skyrimAnniversaryEditionLauncher = {
       command = "skyrim-launcher";
       desktopName = "Skyrim Special Edition Launcher";
-      category = "The Elder Scrolls";
       gamescope.resolutions = [ ];
       lsfgVk.enable = false;
       basePath = "pc/TES - Skyrim - Anniversary Edition";
