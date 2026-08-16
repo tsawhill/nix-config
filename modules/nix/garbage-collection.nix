@@ -71,11 +71,14 @@ in
           ${nix-env} -p /nix/var/nix/profiles/system --delete-generations ${keep}
         ''
         + lib.optionalString cfg.prunePerHostProfiles ''
-          # Prune Colmena per-host profiles (builder machine)
-          for prof in /nix/var/nix/profiles/per-host/*/system; do
-            [ -e "$prof" ] || continue
-            echo "Pruning $prof"
-            ${nix-env} -p "$prof" --delete-generations ${keep} || true
+          # Prune Colmena per-host profiles (builder machine). Colmena lays these
+          # out flat as <host>-<N>-link, so derive each distinct profile base;
+          # globbing <host>/system instead resolves into the closure and errors.
+          for prof in $(${pkgs.findutils}/bin/find /nix/var/nix/profiles/per-host \
+            -maxdepth 1 -name '*-[0-9]*-link' -printf '%f\n' 2>/dev/null \
+            | ${pkgs.gnused}/bin/sed 's/-[0-9]\+-link$//' | ${pkgs.coreutils}/bin/sort -u); do
+            echo "Pruning per-host profile $prof"
+            ${nix-env} -p /nix/var/nix/profiles/per-host/"$prof" --delete-generations ${keep} || true
           done
         '';
       wantedBy = [ "multi-user.target" ];
