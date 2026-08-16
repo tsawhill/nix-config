@@ -89,26 +89,42 @@ in
         "cube"
       ];
       overrides.server = "/mnt/zpool/gamesaves";
-      # RetroArch keeps all config (incl. input binds) in one retroarch.cfg at
-      # its dir root; saves/states live in subdirs. Excluding the cfg keeps
-      # config per-host while still syncing the saves.
       ignores = [
-        # RuneLite regenerable caches — no point syncing.
-        "runelite/cache"
-        "runelite/jagexcache"
-        # Skyrim's launcher rewrites resolution and graphics settings for the
-        # current display. Keep those machine-local while syncing saves and the
-        # rest of the shared Proton prefix.
+        "runelite/cache" # regenerable client cache
+        "runelite/jagexcache" # regenerable asset cache
+        # Skyrim's launcher rewrites this for whatever display it starts on.
         "wine/default/drive_c/users/steamuser/Documents/My Games/Skyrim Special Edition GOG/SkyrimPrefs.ini"
-        # RetroArch: sync only saves/states/config. Everything else is
-        # regenerable, downloadable, platform-specific (cores!), or path-bound
-        # (playlists). First match wins and `*` doesn't cross `/`, so these
-        # `!` includes keep those dirs (and their contents) while the trailing
-        # glob drops every other top-level RetroArch entry, incl. retroarch.cfg.
-        "!Emulators/RetroArch/saves"
-        "!Emulators/RetroArch/states"
-        "!Emulators/RetroArch/config"
-        "Emulators/RetroArch/*"
+        # RetroArch whitelist: first match wins and `*` doesn't cross `/`, so
+        # these `!` includes survive the trailing glob that drops the rest.
+        "!Emulators/RetroArch/saves" # in-game saves (SRAM) - keep
+        "!Emulators/RetroArch/states" # save states - keep
+        "!Emulators/RetroArch/config" # per-core config overrides - keep
+        "!Emulators/RetroArch/system" # core BIOS/firmware - keep
+        "Emulators/RetroArch/*" # cores, playlists, thumbs, retroarch.cfg: host-bound or regenerable
+        # Dolphin data dir (~/.local/share/dolphin-emu); saves and mods stay.
+        "Emulators/Dolphin/Dump" # texture/frame dumps, debug only
+        "Emulators/Dolphin/Logs" # logs
+        "Emulators/Dolphin/ScreenShots" # screenshots
+        # Dolphin config dir (~/.config/dolphin-emu). Alone among these, Dolphin
+        # splits graphics into its own GFX.ini, so video can stay per-host while
+        # the controller binds in GCPadNew.ini/WiimoteNew.ini still sync.
+        "Emulators/DolphinConfig/GFX.ini" # per-host GPU/resolution settings
+        "Emulators/DolphinConfig/Logs" # logs
+        # PCSX2: inis/PCSX2.ini mixes graphics with pad binds, so settings stay.
+        "Emulators/PCSX2/cache" # game-list cache, rebuilt on scan
+        "Emulators/PCSX2/logs" # logs
+        "Emulators/PCSX2/snaps" # screenshots
+        "Emulators/PCSX2/covers" # downloadable cover art
+        "Emulators/PCSX2/videos" # capture output
+        # RPCS3 blacklist: video settings share config.yml with core/audio/input,
+        # so settings can't be split out - only dead weight is dropped here.
+        "Emulators/RPCS3/captures" # RSX frame captures, debug only
+        "Emulators/RPCS3/recordings" # gameplay capture output
+        "Emulators/RPCS3/GuiConfigs" # window geometry and GUI state
+        # Ryujinx: Config.json mixes graphics with input, same as RPCS3.
+        "Emulators/Ryujinx/games" # per-title PPTC + shader caches, GPU-bound
+        "Emulators/Ryujinx/Logs" # logs
+        "Emulators/Ryujinx/screenshots" # screenshots
       ];
     };
   };
