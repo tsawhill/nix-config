@@ -96,6 +96,12 @@ in
         path = lib.mkDefault "${config.home.homeDirectory}/.local/share/dolphin-emu";
         sharePath = lib.mkDefault "Emulators/Dolphin";
       };
+      # Dolphin splits its data dir (above) from its config dir; the inis with
+      # the controller binds live here, so it needs its own link.
+      DolphinConfig = {
+        path = lib.mkDefault "${config.xdg.configHome}/dolphin-emu";
+        sharePath = lib.mkDefault "Emulators/DolphinConfig";
+      };
       PCSX2 = {
         path = lib.mkDefault "${config.xdg.configHome}/PCSX2";
         sharePath = lib.mkDefault "Emulators/PCSX2";
@@ -103,6 +109,10 @@ in
       RPCS3 = {
         path = lib.mkDefault "${config.xdg.configHome}/rpcs3";
         sharePath = lib.mkDefault "Emulators/RPCS3";
+      };
+      Ryujinx = {
+        path = lib.mkDefault "${config.xdg.configHome}/Ryujinx";
+        sharePath = lib.mkDefault "Emulators/Ryujinx";
       };
       runelite = {
         path = lib.mkDefault "${config.xdg.dataHome}/bolt-launcher/.runelite";
