@@ -122,7 +122,7 @@ in
 
   my.desktop.audio.lowLatency = {
     enable = true;
-    quantum = 64;
+    quantum = 128;
   };
 
   # ---------------------------------------------------------------------------
