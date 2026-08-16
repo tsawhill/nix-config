@@ -1,3 +1,4 @@
+{ lib, ... }:
 {
   software.games.entries.ps3GuitarHeroMetallica = {
     command = "gh-metallica-ps3";
@@ -9,6 +10,10 @@
         height = 1440;
       }
     ];
+    lsfgVk = {
+      enable = lib.mkDefault true;
+      multiplier = lib.mkDefault 2;
+    };
     basePath = "ps3/Guitar Hero - Metallica (USA) (En,Fr).iso";
     runner.emulator.type = "rpcs3";
   };

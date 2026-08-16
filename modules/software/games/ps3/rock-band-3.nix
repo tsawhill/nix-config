@@ -1,3 +1,4 @@
+{ lib, ... }:
 {
   software.games.entries.ps3RockBand3 = {
     command = "rock-band-3-ps3";
@@ -9,6 +10,10 @@
         height = 1440;
       }
     ];
+    lsfgVk = {
+      enable = lib.mkDefault true;
+      multiplier = lib.mkDefault 2;
+    };
     basePath = "ps3/Rock Band 3 (USA).iso";
     runner.emulator.type = "rpcs3";
   };
