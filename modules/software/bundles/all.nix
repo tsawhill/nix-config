@@ -30,7 +30,6 @@
 
     environment.systemPackages = with pkgs; [
       # System
-      linux-firmware
       wireguard-tools
 
       # File tools
@@ -71,6 +70,9 @@
       colmena
       git
       gotify-cli
-    ];
+    ]
+    # Containers share the host kernel and can never load firmware, and each one
+    # has its own nix store dataset - so this was ~1.7G duplicated per LXC.
+    ++ lib.optionals (!config.boot.isContainer) [ pkgs.linux-firmware ];
   };
 }
