@@ -55,9 +55,9 @@ impl Controller {
         let Some(_lock) = DeployLock::acquire(
             &self.config.deploy_lock_path,
             "manual deploy",
-            LockMode::Skip,
+            LockMode::Prompt,
         )? else {
-            bail!("manual deploy skipped because another deploy owns the lock");
+            bail!("manual deploy did not wait for the deploy lock");
         };
 
         self.pre_deploy_commit(&format!("manual deploy {selector}"))?;
