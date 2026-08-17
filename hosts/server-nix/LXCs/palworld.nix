@@ -16,6 +16,11 @@
     serverName = "THE DOJO";
     serverDescription = "hehehe fnuny pokemon :)";
     maxPlayers = 16;
+
+    extraSettings = {
+      # minutes between supply drops (default 180)
+      SupplyDropSpan = "30";
+    };
   };
 
   networking.hostName = "palworld-nix";
