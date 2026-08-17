@@ -659,8 +659,14 @@ impl Controller {
         ))
     }
 
+    /// Stage only flake.lock, never `-A`.
+    ///
+    /// The pre-deploy commit has already captured the repository, and the only
+    /// file that can change during a deploy is the lock. A second `git add -A`
+    /// here would sweep up whatever someone happened to be editing while the
+    /// deploy ran. `--allow-empty` is what guarantees the commit exists.
     fn commit_summary(&self, message: &str) -> Result<()> {
-        self.git(&["add", "-A"], false)?;
+        self.git(&["add", "flake.lock"], true)?;
         self.git(&["commit", "--allow-empty", "-m", message], false)?;
         self.git(&["update-ref", &self.config.summary.marker_ref, "HEAD"], true)
     }
