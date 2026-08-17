@@ -11,32 +11,13 @@ let
   stack = cfg.stack;
   lanDomain = networkTopology.domains.lan;
 
-  defaultHosts = [
-    "server-nix"
-    "build-nix"
-    "monitoring-nix"
-    "local-nginx-nix"
-    "adguard-nix"
-    "arrs-nix"
-    "authentik-nix"
-    "deluge-nix"
-    "gotify-nix"
-    "homepage-nix"
-    "immich-nix"
-    "jellyfin-nix"
-    "jellyseerr-nix"
-    "llm-nix"
-    "nextcloud-nix"
-    "pufferpanel-nix"
-    "samba-nix"
-    "searx-nix"
-    "socks5-vpn-eu-nix"
-    "sunshine-nix"
-    "syncthing-nix"
-    "unbound-vpn-na-nix"
-    "unifi-nix"
-    "vaultwarden-nix"
-  ];
+  # Scrape targets are derived from the topology rather than duplicated here,
+  # so a host is registered in exactly one place. Hosts opt in with
+  # `monitoring.enable = true`, which nixos-factory writes for every container
+  # it creates; appliances and roaming machines simply omit it.
+  defaultHosts = lib.attrNames (
+    lib.filterAttrs (_: host: host.monitoring.enable or false) networkTopology.hosts
+  );
 
   fqdn = host: "${host}.${lanDomain}";
   mkTarget = port: host: "${fqdn host}:${toString port}";
@@ -99,10 +80,6 @@ let
     {
       name = "Jellyseerr";
       url = "https://request.tsawhill.org";
-    }
-    {
-      name = "Unifi";
-      url = "https://unifi.tsawhill.org";
     }
     {
       name = "Searx";
@@ -596,7 +573,10 @@ in
         enable = true;
         openFirewall = true;
         settings = {
-          security.secret_key = "$__file{${config.sops.secrets.grafana_secret_key.path}}";
+          security = {
+            secret_key = "$__file{${config.sops.secrets.grafana_secret_key.path}}";
+            admin_password = "$__file{${config.sops.secrets.grafana_admin_password.path}}";
+          };
           server = {
             http_addr = "0.0.0.0";
             http_port = 3000;

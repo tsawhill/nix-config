@@ -9,6 +9,7 @@ let
     server-nix = {
       lan.ip = "10.73.73.3";
       dns.enable = true;
+      monitoring.enable = true;
     };
     netgear-switch = {
       lan = {
@@ -23,6 +24,7 @@ let
         mac = "bc:24:11:0f:b8:97";
       };
       dns.enable = true;
+      monitoring.enable = true;
     };
     unbound-vpn-na-nix = {
       lan = {
@@ -30,6 +32,7 @@ let
         mac = "a6:1e:69:87:fb:f3";
       };
       dns.enable = true;
+      monitoring.enable = true;
     };
     adguard-nix = {
       lan = {
@@ -37,6 +40,7 @@ let
         mac = "bc:24:11:cd:cd:ec";
       };
       dns.enable = true;
+      monitoring.enable = true;
     };
     llm-nix = {
       lan = {
@@ -44,6 +48,7 @@ let
         mac = "bc:24:11:40:c1:43";
       };
       dns.enable = true;
+      monitoring.enable = true;
     };
     local-nginx-nix = {
       lan = {
@@ -57,6 +62,7 @@ let
           "*.tsawhill.org"
         ];
       };
+      monitoring.enable = true;
     };
     vaultwarden-nix = {
       lan = {
@@ -64,6 +70,7 @@ let
         mac = "bc:24:11:f5:ac:e2";
       };
       dns.enable = true;
+      monitoring.enable = true;
     };
     acme-nix = {
       lan = {
@@ -78,6 +85,7 @@ let
         mac = "bc:24:11:51:dd:4e";
       };
       dns.enable = true;
+      monitoring.enable = true;
     };
     immich-nix = {
       lan = {
@@ -85,6 +93,7 @@ let
         mac = "bc:24:11:de:09:b6";
       };
       dns.enable = true;
+      monitoring.enable = true;
     };
     arrs-nix = {
       lan = {
@@ -92,6 +101,7 @@ let
         mac = "bc:24:11:59:07:12";
       };
       dns.enable = true;
+      monitoring.enable = true;
     };
     syncthing-nix = {
       lan = {
@@ -99,6 +109,7 @@ let
         mac = "10:66:6a:aa:e3:ba";
       };
       dns.enable = true;
+      monitoring.enable = true;
     };
     jellyfin-nix = {
       lan = {
@@ -106,6 +117,7 @@ let
         mac = "bc:24:11:92:d7:50";
       };
       dns.enable = true;
+      monitoring.enable = true;
     };
     searx-nix = {
       lan = {
@@ -113,6 +125,7 @@ let
         mac = "02:ff:b9:66:68:1e";
       };
       dns.enable = true;
+      monitoring.enable = true;
     };
     nextcloud-nix = {
       lan = {
@@ -120,6 +133,7 @@ let
         mac = "bc:24:11:60:3d:cc";
       };
       dns.enable = true;
+      monitoring.enable = true;
     };
     deluge-nix = {
       lan = {
@@ -127,6 +141,7 @@ let
         mac = "bc:24:11:43:7d:c4";
       };
       dns.enable = true;
+      monitoring.enable = true;
     };
     amcrest-cameras = {
       lan = {
@@ -140,6 +155,7 @@ let
         mac = "bc:24:11:23:f8:93";
       };
       dns.enable = true;
+      monitoring.enable = true;
     };
     gotify-nix = {
       lan = {
@@ -147,6 +163,7 @@ let
         mac = "bc:24:11:2b:3d:4a";
       };
       dns.enable = true;
+      monitoring.enable = true;
     };
     monitoring-nix = {
       lan = {
@@ -154,6 +171,7 @@ let
         mac = "bc:24:11:4d:2c:9f";
       };
       dns.enable = true;
+      monitoring.enable = true;
     };
     authentik-nix = {
       lan = {
@@ -161,6 +179,7 @@ let
         mac = "8e:95:4f:6e:c7:13";
       };
       dns.enable = true;
+      monitoring.enable = true;
     };
     pufferpanel-nix = {
       lan = {
@@ -168,6 +187,7 @@ let
         mac = "bc:24:11:9d:2b:70";
       };
       dns.enable = true;
+      monitoring.enable = true;
     };
     homepage-nix = {
       lan = {
@@ -175,6 +195,7 @@ let
         mac = "bc:24:11:7a:e0:14";
       };
       dns.enable = true;
+      monitoring.enable = true;
     };
     build-nix = {
       lan = {
@@ -182,6 +203,7 @@ let
         mac = "bc:24:11:e1:63:a2";
       };
       dns.enable = true;
+      monitoring.enable = true;
     };
     unifi-nix = {
       lan = {
@@ -189,6 +211,9 @@ let
         mac = "bc:24:11:50:c5:51";
       };
       dns.enable = true;
+      # Only powered on to change settings, so scraping it would just show a
+      # permanently down exporter. Flip to true if it becomes always-on.
+      monitoring.enable = false;
     };
     pi-backup-nix = {
       lan = {
@@ -262,6 +287,7 @@ let
         mac = "02:7d:da:73:cc:0d";
       };
       dns.enable = true;
+      monitoring.enable = true;
     };
     remote-nginx-nix = {
       wgRemote.ip = "10.50.50.16";
@@ -288,6 +314,7 @@ let
         mac = "02:36:bc:73:0d:3b";
       };
       dns.enable = true;
+      monitoring.enable = true;
     };
   };
 

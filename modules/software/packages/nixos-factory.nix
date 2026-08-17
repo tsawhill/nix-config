@@ -265,6 +265,8 @@ let
         if any(mac_needle.search(line) for line in host_lines):
             raise SystemExit(f"topology MAC already exists: {mac}")
 
+        # monitoring.enable opts the host into Prometheus scraping; new hosts
+        # are always-on LXCs, so they are monitored from the start.
         block = [
             f"    {host} = {{\n",
             "      lan = {\n",
@@ -272,6 +274,7 @@ let
             f'        mac = "{mac.lower()}";\n',
             "      };\n",
             "      dns.enable = true;\n",
+            "      monitoring.enable = true;\n",
             "    };\n",
         ]
         lines[end:end] = block

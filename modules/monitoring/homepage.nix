@@ -96,16 +96,6 @@ let
       group = "Infra";
     }
     {
-      name = "Unifi";
-      url = "https://unifi.tsawhill.org";
-      icon = "si:ubiquiti";
-      group = "Infra";
-      altStatus = [
-        401
-        403
-      ];
-    }
-    {
       name = "Open WebUI";
       url = "https://llm.tsawhill.org";
       icon = "si:ollama";
@@ -119,9 +109,15 @@ let
     }
   ];
 
-  # Grafana, Prometheus and Gatus are LAN-only, so they are launcher links
-  # rather than monitored endpoints.
+  # Launcher links only: either LAN-only admin pages, or hosts that are
+  # usually powered off, where a health check would just show red.
   defaultInternalLinks = [
+    {
+      name = "Unifi";
+      url = "https://unifi.tsawhill.org";
+      icon = "si:ubiquiti";
+      group = "Infra";
+    }
     {
       name = "Grafana";
       url = "http://monitoring-nix.${lanDomain}:3000";
@@ -145,6 +141,48 @@ let
       url = "http://adguard-nix.${lanDomain}:3000";
       icon = "si:adguard";
       group = "Monitoring";
+    }
+    {
+      name = "YouTube";
+      url = "https://youtube.com";
+      icon = "si:youtube";
+      group = "Daily";
+    }
+    {
+      name = "Reddit";
+      url = "https://reddit.com";
+      icon = "si:reddit";
+      group = "Daily";
+    }
+    {
+      name = "Twitter";
+      url = "https://x.com";
+      icon = "si:x";
+      group = "Daily";
+    }
+    {
+      name = "Twitch";
+      url = "https://twitch.tv";
+      icon = "si:twitch";
+      group = "Daily";
+    }
+    {
+      name = "Amazon";
+      url = "https://amazon.com";
+      icon = "si:amazon";
+      group = "Daily";
+    }
+    {
+      name = "Claude";
+      url = "https://claude.ai";
+      icon = "si:anthropic";
+      group = "Daily";
+    }
+    {
+      name = "ChatGPT";
+      url = "https://chatgpt.com";
+      icon = "si:openai";
+      group = "Daily";
     }
   ];
 
@@ -232,7 +270,7 @@ in
     internalLinks = lib.mkOption {
       type = lib.types.listOf lib.types.attrs;
       default = defaultInternalLinks;
-      description = "LAN-only admin pages to link but not health-check.";
+      description = "Pages to link but not health-check: LAN-only admin UIs, hosts that are usually off, and everyday external sites.";
     };
 
     thresholds = {
