@@ -242,7 +242,7 @@ pub fn rank_closure_lines(text: &str, max_lines: usize) -> Vec<String> {
         if !line.contains('→') {
             resized.push(line.to_owned());
         } else if line.contains('∅') || line.contains('ε') {
-            moved.push(line.to_owned());
+            moved.push(describe_presence(line));
         } else {
             bumped.push(line.to_owned());
         }
@@ -256,6 +256,37 @@ pub fn rank_closure_lines(text: &str, max_lines: usize) -> Vec<String> {
         bumped.push(format!("... and {} more", total - max_lines));
     }
     bumped
+}
+
+/// Rewrite Nix's presence notation into words.
+///
+/// `nix store diff-closures` writes ∅ for "not present" and ε for "present
+/// with no version". A 7B model reads those symbols as decoration and guesses:
+/// asked to summarise a real diff it reported an added launcher as removed.
+/// Spelling the transition out removes the guesswork.
+fn describe_presence(line: &str) -> String {
+    let Some((name, change)) = line.split_once(": ") else {
+        return line.to_owned();
+    };
+    let Some((before, after)) = change.split_once(" → ") else {
+        return line.to_owned();
+    };
+    let version = |value: &str| match value.trim() {
+        "∅" | "ε" => None,
+        other => Some(other.to_owned()),
+    };
+
+    match (before.contains('∅'), after.contains('∅')) {
+        (true, false) => match version(after) {
+            Some(version) => format!("{name}: added at {version}"),
+            None => format!("{name}: added"),
+        },
+        (false, true) => match version(before) {
+            Some(version) => format!("{name}: removed, was {version}"),
+            None => format!("{name}: removed"),
+        },
+        _ => line.to_owned(),
+    }
 }
 
 fn strip_ansi(text: &str) -> String {
@@ -418,7 +449,26 @@ mod tests {
         let diff = "source: 9.3 KiB\nlinux: 6.12.1 → 6.12.4\nghc: ∅ → 9.6.4\n";
         assert_eq!(
             rank_closure_lines(diff, 10),
-            vec!["linux: 6.12.1 → 6.12.4", "ghc: ∅ → 9.6.4", "source: 9.3 KiB"]
+            vec![
+                "linux: 6.12.1 → 6.12.4",
+                "ghc: added at 9.6.4",
+                "source: 9.3 KiB"
+            ]
+        );
+    }
+
+    /// Regression: a real diff had an added launcher reported as removed.
+    #[test]
+    fn presence_notation_becomes_words() {
+        let diff = "a-launcher: ∅ → ε\nb-launcher: ε → ∅\nc: 1.0 → ∅\nd: ∅ → 2.0\n";
+        assert_eq!(
+            rank_closure_lines(diff, 10),
+            vec![
+                "a-launcher: added",
+                "b-launcher: removed",
+                "c: removed, was 1.0",
+                "d: added at 2.0"
+            ]
         );
     }
 
