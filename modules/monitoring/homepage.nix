@@ -120,19 +120,19 @@ let
     }
     {
       name = "Grafana";
-      url = "http://monitoring-nix.${lanDomain}:3000";
+      url = "https://grafana.tsawhill.org";
       icon = "si:grafana";
       group = "Monitoring";
     }
     {
       name = "Prometheus";
-      url = "${prometheus}";
+      url = "https://prom.tsawhill.org";
       icon = "si:prometheus";
       group = "Monitoring";
     }
     {
       name = "Gatus";
-      url = "http://monitoring-nix.${lanDomain}:8080";
+      url = "https://status.tsawhill.org";
       icon = "sh:gatus";
       group = "Monitoring";
     }
