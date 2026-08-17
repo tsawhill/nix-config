@@ -14,6 +14,11 @@ in
   # independently of the container root.
   services.mysql.dataDir = "/mnt/zpool/ffsync";
 
+  # On an empty database, firefox-syncserver-setup runs *after* the server (it
+  # needs the schema first), so the server caches an unregistered node and 500s
+  # every tokenserver request. Restart firefox-syncserver once after the first
+  # start. Restoring a populated DB from backup is unaffected.
+
   services.firefox-syncserver = {
     enable = true;
     secrets = config.sops.secrets.ffsync_env.path;
