@@ -22,7 +22,7 @@ let
     {
       name = "Jellyseerr";
       url = "https://request.tsawhill.org";
-      icon = "si:jellyfin";
+      icon = "sh:jellyseerr";
       group = "Media";
     }
     {
@@ -54,7 +54,7 @@ let
     {
       name = "Lidarr";
       url = "https://lid.tsawhill.org";
-      icon = "si:lidarr";
+      icon = "sh:lidarr";
       group = "Arrs";
       altStatus = [
         401
@@ -64,7 +64,7 @@ let
     {
       name = "Prowlarr";
       url = "https://pro.tsawhill.org";
-      icon = "si:prowlarr";
+      icon = "sh:prowlarr";
       group = "Arrs";
       altStatus = [
         401
@@ -80,25 +80,25 @@ let
     {
       name = "Vaultwarden";
       url = "https://vault.tsawhill.org";
-      icon = "si:bitwarden";
+      icon = "sh:vaultwarden";
       group = "Infra";
     }
     {
       name = "Authentik";
       url = "https://auth.tsawhill.org";
-      icon = "si:auth0";
+      icon = "sh:authentik";
       group = "Infra";
     }
     {
       name = "Gotify";
       url = "https://gotify.tsawhill.org";
-      icon = "si:gotify";
+      icon = "sh:gotify";
       group = "Infra";
     }
     {
       name = "Open WebUI";
       url = "https://llm.tsawhill.org";
-      icon = "si:ollama";
+      icon = "sh:open-webui";
       group = "Tools";
     }
     {
@@ -133,13 +133,13 @@ let
     {
       name = "Gatus";
       url = "http://monitoring-nix.${lanDomain}:8080";
-      icon = "si:statuspage";
+      icon = "sh:gatus";
       group = "Monitoring";
     }
     {
       name = "AdGuard";
       url = "http://adguard-nix.${lanDomain}:3000";
-      icon = "si:adguard";
+      icon = "sh:adguard-home";
       group = "Monitoring";
     }
     {
@@ -339,10 +339,6 @@ in
                     type = "bookmarks";
                     groups = map mkBookmarkGroup groupsInOrder;
                   }
-                  {
-                    type = "clock";
-                    hour-format = "12h";
-                  }
                 ];
               }
               {
@@ -390,6 +386,10 @@ in
               {
                 size = "small";
                 widgets = [
+                  {
+                    type = "clock";
+                    hour-format = "12h";
+                  }
                   {
                     type = "custom-api";
                     title = "Fleet";
