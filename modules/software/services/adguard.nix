@@ -175,6 +175,9 @@ in
         "||ubereats.com^"
         "||doordash.com^"
         "||grubhub.com^"
+        # Fail loudly instead of silently syncing to Mozilla when a client
+        # ignores identity.sync.tokenserver.uri. Remove once clients are proven.
+        "||token.services.mozilla.com^"
       ];
       dhcp = {
         enabled = false;
