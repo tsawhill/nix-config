@@ -521,6 +521,13 @@ in
         default = defaultServiceChecks;
         description = "Gatus endpoint checks for service status.";
       };
+
+      grafanaDomain = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        example = "grafana.tsawhill.org";
+        description = "Domain Grafana is reverse-proxied on; also sets root_url so generated links point at the proxy.";
+      };
     };
   };
 
@@ -580,7 +587,10 @@ in
           server = {
             http_addr = "0.0.0.0";
             http_port = 3000;
-            domain = "monitoring-nix.${lanDomain}";
+            domain = if stack.grafanaDomain != null then stack.grafanaDomain else "monitoring-nix.${lanDomain}";
+          }
+          // lib.optionalAttrs (stack.grafanaDomain != null) {
+            root_url = "https://${stack.grafanaDomain}/";
           };
         };
         provision = {

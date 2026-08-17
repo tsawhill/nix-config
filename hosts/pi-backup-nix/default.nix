@@ -255,4 +255,9 @@ in
     domain = "searx.tsawhill.org";
     mTLSCert = "mTLS-CA";
   };
+  proxy.homepage = {
+    enable = true;
+    domain = "home.tsawhill.org";
+    mTLSCert = "mTLS-CA";
+  };
 }

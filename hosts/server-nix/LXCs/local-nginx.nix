@@ -68,6 +68,22 @@
     enable = true;
     domain = "searx.tsawhill.org";
   };
+  proxy.homepage = {
+    enable = true;
+    domain = "home.tsawhill.org";
+  };
+  proxy.grafana = {
+    enable = true;
+    domain = "grafana.tsawhill.org";
+  };
+  proxy.gatus = {
+    enable = true;
+    domain = "status.tsawhill.org";
+  };
+  proxy.prometheus = {
+    enable = true;
+    domain = "prom.tsawhill.org";
+  };
 
   networking.hostName = "local-nginx-nix";
 }
