@@ -188,7 +188,13 @@ let
 
   allLinks = cfg.services ++ cfg.internalLinks;
 
-  groupsInOrder = lib.unique (map (s: s.group) allLinks);
+  presentGroups = lib.unique (map (s: s.group) allLinks);
+
+  # Listed groups come first in the order given; anything unlisted keeps its
+  # definition order and lands at the bottom.
+  groupsInOrder =
+    lib.filter (g: lib.elem g presentGroups) cfg.groupOrder
+    ++ lib.filter (g: !lib.elem g cfg.groupOrder) presentGroups;
 
   mkBookmarkGroup = group: {
     title = group;
@@ -267,6 +273,19 @@ in
       description = "Externally reachable services to monitor and link.";
     };
 
+    groupOrder = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [
+        "Daily"
+        "Media"
+        "Arrs"
+        "Infra"
+        "Tools"
+        "Monitoring"
+      ];
+      description = "Order bookmark groups are rendered in; unlisted groups are appended.";
+    };
+
     internalLinks = lib.mkOption {
       type = lib.types.listOf lib.types.attrs;
       default = defaultInternalLinks;
@@ -317,12 +336,12 @@ in
                 size = "small";
                 widgets = [
                   {
-                    type = "clock";
-                    hour-format = "12h";
-                  }
-                  {
                     type = "bookmarks";
                     groups = map mkBookmarkGroup groupsInOrder;
+                  }
+                  {
+                    type = "clock";
+                    hour-format = "12h";
                   }
                 ];
               }
