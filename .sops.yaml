@@ -17,6 +17,7 @@ keys:
   # Weekly services
   - &adguard-nix age1u96ec563v3cth2j7pjkjdj9cza70766uv50nzae9lg3geuxa49tqwqhstp
   - &arrs-nix age1sc4raxfl89mlnc4tjy9lny8zt4du59d4f6dmkvwnhlfhzts3s4jsvdd7s2
+  - &ffsync-nix age1k66a0gdf3u4t543ezhwurpeyx258vagzpqyx9ecu97mecqrlcvkqljxzy7
   - &gotify-nix age14qvg2gfkta6njmctl3cnkytu9spwwkjp8hx5mzcjhn5mjzzd9e4qcayh28
   - &jellyfin-nix age1ttr947d3e630m9y9hvnpyxxs54rjytnfz52m45j8gvh3nmjnkq0qp6mskn
   - &jellyseerr-nix age1z49zdj5uxmyhg6vtp77rz0u4kpat3zuvs8e2mergvje4caqxg32sfdtj3e
