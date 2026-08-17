@@ -68,7 +68,7 @@ impl Controller {
         // Read the marker before the pre-deploy commit so a first run still
         // sees the working-tree edits it is about to deploy.
         let base = self.summary_base();
-        self.pre_deploy_commit(&format!("manual deploy {selector}"))?;
+        let staged = self.pre_deploy_commit(&format!("manual deploy {selector}"))?;
         phase(format!("Manual deploy {selector}: resolving hosts"));
         let hosts = controller_last(expand_selector(&self.config, selector)?);
         if hosts.is_empty() {
@@ -130,7 +130,7 @@ impl Controller {
             display_set(&failed),
             goal.as_str()
         ));
-        let report = self.record_deploy(selector, base.as_deref(), deployed);
+        let report = self.record_deploy(selector, base.as_deref(), deployed, staged);
         if failed.is_empty() {
             let title = if had_warnings {
                 format!("⚠️ Manual deploy {selector} succeeded (with warnings)")
@@ -177,7 +177,7 @@ impl Controller {
         .context("blocking deploy lock unexpectedly returned no guard")?;
 
         let base = self.summary_base();
-        self.pre_deploy_commit(&format!("{schedule} pre-deploy"))?;
+        let staged = self.pre_deploy_commit(&format!("{schedule} pre-deploy"))?;
         phase(format!("Deploying {schedule} ({selector})"));
         let hosts = controller_last(expand_selector(&self.config, selector)?);
         if hosts.is_empty() {
@@ -273,7 +273,7 @@ impl Controller {
             display_set(&hard_failed),
             display_set(&deferred)
         ));
-        let report = self.record_deploy(schedule, base.as_deref(), deployed);
+        let report = self.record_deploy(schedule, base.as_deref(), deployed, staged);
         let (title, priority, body) = if !hard_failed.is_empty() {
             (
                 format!("⚠️ {schedule} deploy partial"),
@@ -555,9 +555,19 @@ impl Controller {
         );
     }
 
-    fn pre_deploy_commit(&self, label: &str) -> Result<()> {
+    /// Commit the working tree before building, and report whether it made a
+    /// commit.
+    ///
+    /// Colmena builds from the working tree, so a dirty deploy would otherwise
+    /// activate a configuration that matches no commit at all. Capturing it
+    /// first is what lets a deployed generation be traced back to a revision.
+    /// On success the summary replaces this placeholder message, so the
+    /// deployment ends up as one commit holding both the changes and their
+    /// description.
+    fn pre_deploy_commit(&self, label: &str) -> Result<bool> {
         phase(format!("{label}: committing pre-deploy state"));
         self.git(&["add", "-A"], false)?;
+        let before = self.rev_parse("HEAD");
         self.git(
             &[
                 "commit",
@@ -569,7 +579,8 @@ impl Controller {
             ],
             true,
         )?;
-        Ok(())
+        // A clean tree leaves nothing to commit, which `git` reports as failure.
+        Ok(self.rev_parse("HEAD") != before)
     }
 
     /// Compare a host's old and new closures, tolerating every way that can
@@ -632,6 +643,7 @@ impl Controller {
         label: &str,
         base: Option<&str>,
         hosts: Vec<HostChange>,
+        amend: bool,
     ) -> Option<String> {
         if hosts.is_empty() {
             return None;
@@ -649,7 +661,7 @@ impl Controller {
         println!("{message}");
         // A failure here must not turn a successful deployment into a failed
         // one, so it is reported and the run continues to its notifications.
-        if let Err(error) = self.commit_summary(&message) {
+        if let Err(error) = self.commit_summary(&message, amend) {
             eprintln!("warning: failed to commit the deploy summary: {error:#}");
         }
         Some(format!(
@@ -659,16 +671,41 @@ impl Controller {
         ))
     }
 
-    /// Stage only flake.lock, never `-A`.
+    /// Record the summary as the deployment's single commit.
     ///
-    /// The pre-deploy commit has already captured the repository, and the only
-    /// file that can change during a deploy is the lock. A second `git add -A`
-    /// here would sweep up whatever someone happened to be editing while the
-    /// deploy ran. `--allow-empty` is what guarantees the commit exists.
-    fn commit_summary(&self, message: &str) -> Result<()> {
+    /// When this run created a pre-deploy commit, its placeholder message is
+    /// replaced rather than a second commit added: the changes and the text
+    /// describing them belong together. Otherwise nothing was edited, and an
+    /// empty commit records the deployment and whatever package versions it
+    /// picked up.
+    ///
+    /// Staging is limited to flake.lock. A `git add -A` here would sweep up
+    /// whatever someone happened to be editing while the deploy ran.
+    fn commit_summary(&self, message: &str, amend: bool) -> Result<()> {
         self.git(&["add", "flake.lock"], true)?;
-        self.git(&["commit", "--allow-empty", "-m", message], false)?;
+        if amend && self.tip_is_unpushed() {
+            self.git(&["commit", "--amend", "--allow-empty", "-m", message], false)?;
+        } else {
+            self.git(&["commit", "--allow-empty", "-m", message], false)?;
+        }
         self.git(&["update-ref", &self.config.summary.marker_ref, "HEAD"], true)
+    }
+
+    /// Never rewrite a commit that a remote already has.
+    ///
+    /// deployctl does not push, so the pre-deploy commit is normally local and
+    /// safe to amend. Deploying from a tree whose tip was already published is
+    /// the exception, and there the amend is skipped in favour of a new commit.
+    fn tip_is_unpushed(&self) -> bool {
+        let output = run_capture(
+            Command::new("git")
+                .args(["branch", "--remotes", "--contains", "HEAD"])
+                .current_dir(&self.config.repo_path),
+        );
+        output
+            .ok()
+            .filter(RunOutput::success)
+            .is_some_and(|output| output.stdout.trim().is_empty())
     }
 
     fn git(&self, args: &[&str], allow_failure: bool) -> Result<()> {
