@@ -8,8 +8,9 @@
   options.software.apps.emulators.enable = lib.mkEnableOption "game emulators";
 
   config = lib.mkIf config.software.apps.emulators.enable {
-    # PCSX2 and RPCS3 still use AVCodec fields removed in FFmpeg 8. Keep only
-    # these emulators on the last compatible FFmpeg release until they migrate.
+    # RPCS3 still uses AVCodec fields removed in FFmpeg 8, so it stays on the
+    # last compatible release. PCSX2 has migrated: nixpkgs now asks it for
+    # ffmpeg_8 by name, so overriding `ffmpeg` there fails to evaluate.
     nixpkgs.overlays = [
       (
         _final: prev:
@@ -17,8 +18,6 @@
           rpcs3Ffmpeg7 = prev.rpcs3.override { ffmpeg = prev.ffmpeg_7; };
         in
         {
-          pcsx2 = prev.pcsx2.override { ffmpeg = prev.ffmpeg_7; };
-
           # RPCS3 links FFmpeg 7, while Qt Multimedia's default FFmpeg backend
           # links the current FFmpeg ABI. Loading both in one process crashes
           # when RPCS3 constructs its Qt music handler. The supported GStreamer
