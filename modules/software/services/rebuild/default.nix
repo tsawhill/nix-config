@@ -31,6 +31,23 @@ let
       gotify_token_file = notifications.gotify.tokenFile;
       recipient_email = notifications.recipientEmail;
     };
+    # Deploy summaries run on the LAN Ollama box. Every failure here degrades
+    # to a mechanical summary rather than failing the deploy.
+    summary = {
+      enabled = true;
+      endpoint = "http://${networkTopology.lib.fqdn "llm-nix"}:11434/api/chat";
+      model = "qwen2.5-coder:7b";
+      keep_alive = "5m";
+      # Ollama otherwise defaults to 4k and silently drops the rest of the
+      # prompt, which would cut the closure diff off mid-list.
+      num_ctx = 16384;
+      temperature = 0.2;
+      max_tokens = 400;
+      request_timeout_secs = 240;
+      max_closure_lines = 60;
+      max_diff_chars = 12000;
+      marker_ref = "refs/deployctl/last-deploy";
+    };
     # Physical hosts may be asleep. LXC containers do not need Wake-on-LAN.
     wol_macs = {
       taylor-desktop-nix = "c8:7f:54:6c:e2:96";
@@ -72,6 +89,9 @@ let
   deployRetry = pkgs.writeShellScriptBin "deploy-retry" ''
     exec ${deployctl}/bin/deployctl retry "$@"
   '';
+  deploySummary = pkgs.writeShellScriptBin "deploy-summary" ''
+    exec ${deployctl}/bin/deployctl summary "$@"
+  '';
 
   mkDeployService = name: selector: {
     description = "${name} Colmena Deploy";
@@ -107,6 +127,7 @@ in
     deploy
     deployOld
     deployRetry
+    deploySummary
   ];
 
   systemd.tmpfiles.rules = [

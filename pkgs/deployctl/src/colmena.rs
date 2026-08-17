@@ -121,6 +121,74 @@ impl Colmena {
         thread::sleep(Duration::from_secs(60));
     }
 
+    /// The closure a host is running now, for comparison against the new build.
+    ///
+    /// The host's own profile is the truth, but `nix store diff-closures` needs
+    /// both closures present locally, so an unknown remote path falls back to
+    /// the newest pin this controller took for that host. Call this before
+    /// pinning the new build, or the newest pin *is* the new build.
+    pub fn previous_system(&self, host: &str) -> Option<PathBuf> {
+        self.deployed_system(host)
+            .filter(|path| path.exists())
+            .or_else(|| self.latest_pin(host))
+    }
+
+    fn deployed_system(&self, host: &str) -> Option<PathBuf> {
+        let profile = self.config.system_profile.to_string_lossy().into_owned();
+        let output = if host == hostname().ok()? {
+            run_capture(Command::new("readlink").arg("-f").arg(&profile))
+        } else {
+            let target = ssh_host(&self.config, host);
+            run_capture(
+                Command::new("ssh")
+                    .args(["-o", "ConnectTimeout=5", "-o", "BatchMode=yes"])
+                    .arg(format!("root@{target}"))
+                    .arg(format!("readlink -f {profile}")),
+            )
+        };
+        let path = output.ok().filter(RunOutput::success)?.stdout.trim().to_owned();
+        if path.starts_with("/nix/store/") {
+            Some(PathBuf::from(path))
+        } else {
+            None
+        }
+    }
+
+    fn latest_pin(&self, host: &str) -> Option<PathBuf> {
+        self.recent_pins(host, 1).into_iter().next()
+    }
+
+    /// The most recently pinned closures for a host, newest first.
+    ///
+    /// Rebuilding an unchanged host pins the same store path again, so repeats
+    /// are collapsed: two identical entries would diff to nothing.
+    pub fn recent_pins(&self, host: &str, count: usize) -> Vec<PathBuf> {
+        let Ok(entries) = fs::read_dir(self.config.built_gcroot_dir.join(host)) else {
+            return Vec::new();
+        };
+        let mut roots: Vec<_> = entries
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .collect();
+        // Root names begin with a sortable timestamp.
+        roots.sort();
+
+        let mut pins: Vec<PathBuf> = Vec::with_capacity(count);
+        for root in roots.iter().rev() {
+            let Ok(path) = fs::canonicalize(root) else {
+                continue;
+            };
+            if pins.contains(&path) {
+                continue;
+            }
+            pins.push(path);
+            if pins.len() == count {
+                break;
+            }
+        }
+        pins
+    }
+
     pub fn pin_built_system(&self, host: &str, system_path: &Path) -> Result<()> {
         if !system_path.exists() {
             bail!("cannot pin missing system path {}", system_path.display());

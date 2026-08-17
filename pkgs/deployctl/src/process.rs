@@ -1,4 +1,4 @@
-use std::io::{BufRead, BufReader, Read};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::process::{Command, ExitStatus, Stdio};
 use std::sync::mpsc;
 use std::thread;
@@ -92,6 +92,38 @@ where
                 Err(_) => break,
             }
         }
+    })
+}
+
+/// Run a child that reads a request body on standard input.
+///
+/// The writer runs on its own thread so a body larger than the pipe buffer
+/// cannot deadlock against a child that has not started draining it yet.
+pub fn run_with_stdin(command: &mut Command, input: String) -> Result<RunOutput> {
+    command
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let display = format!("{command:?}");
+    let mut child = command
+        .spawn()
+        .with_context(|| format!("failed to start {display}"))?;
+
+    let mut stdin = child.stdin.take().context("child stdin was not piped")?;
+    let writer = thread::spawn(move || stdin.write_all(input.as_bytes()));
+
+    let output = child
+        .wait_with_output()
+        .with_context(|| format!("failed waiting for {display}"))?;
+    let _ = writer.join();
+
+    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+    let mut text = stdout.clone();
+    text.push_str(&String::from_utf8_lossy(&output.stderr));
+    Ok(RunOutput {
+        status: output.status,
+        stdout,
+        text,
     })
 }
 

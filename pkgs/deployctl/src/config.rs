@@ -19,8 +19,29 @@ pub struct Config {
     pub apply_timeout: String,
     pub keep_roots: usize,
     pub notifications: NotificationConfig,
+    pub summary: SummaryConfig,
     #[serde(default)]
     pub wol_macs: BTreeMap<String, String>,
+}
+
+/// Where deploy summaries come from and how much input the model may see.
+#[derive(Clone, Debug, Deserialize)]
+pub struct SummaryConfig {
+    pub enabled: bool,
+    /// Ollama chat endpoint, for example http://llm-nix.lan:11434/api/chat.
+    pub endpoint: String,
+    pub model: String,
+    pub keep_alive: String,
+    pub num_ctx: u32,
+    pub temperature: f32,
+    pub max_tokens: u32,
+    pub request_timeout_secs: u64,
+    /// Per-host cap on `nix store diff-closures` lines.
+    pub max_closure_lines: usize,
+    /// Byte cap on the configuration diff handed to the model.
+    pub max_diff_chars: usize,
+    /// Ref marking the last successfully deployed commit.
+    pub marker_ref: String,
 }
 
 #[derive(Clone, Debug, Deserialize)]

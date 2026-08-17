@@ -42,6 +42,16 @@ pub enum Command {
     /// Retry every deferred exact-path activation once.
     Retry,
 
+    /// Summarise the last recorded build without deploying or committing.
+    Summary {
+        #[arg(default_value = "@daily")]
+        selector: String,
+
+        /// Print the text sent to the model as well as its reply.
+        #[arg(long)]
+        show_prompt: bool,
+    },
+
     /// Activate an older generation on a remote host.
     Rollback {
         host: String,

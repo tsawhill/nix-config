@@ -35,7 +35,31 @@ and its Incus container.
 - `retry.rs`: atomic JSON records and their Nix GC roots.
 - `locking.rs`: the process-wide deployment lock.
 - `notifications.rs`: Gotify and email summaries.
+- `changes.rs`: closure diffs, flake input deltas, and the repository diff.
+- `summarize.rs`: the Ollama request and commit message assembly.
 - `process.rs`: timestamped command execution and retained logs.
+
+## Deploy summaries
+
+Every deployment that activates at least one host ends with a commit, even when
+no file was edited. The commit records what actually changed:
+
+1. `nix store diff-closures` between the closure each host was running and the
+   one it just activated. This is what makes a no-edit rebuild legible: the
+   package version bumps it picked up are the change.
+2. Locked flake inputs that moved, read out of `flake.lock` at both revisions.
+3. The repository diff since `refs/deployctl/last-deploy`, which this controller
+   advances only after a successful deployment.
+
+Those three inputs go to `qwen2.5-coder:7b` on llm-nix, which writes the commit
+subject and body. The prompt is capped (60 closure lines per host, 12 KB of
+diff) to fit the 16k context configured in the Nix module. Identical package
+changes across hosts are collapsed into one "all hosts" block so a fleet-wide
+nixpkgs bump costs one listing rather than twenty.
+
+If llm-nix is unreachable, the model is missing, or the reply does not parse as
+a commit message, the deploy still commits — with a mechanical summary and a
+`Deploy-Summary: fallback` trailer. Summarisation never fails a deployment.
 
 The compatibility commands remain available:
 
@@ -43,7 +67,12 @@ The compatibility commands remain available:
 deploy <host|@tag> [switch|boot|test]
 deploy-old <host> <-N>
 deploy-retry
+deploy-summary [host|@tag] [--show-prompt]
 ```
+
+`deploy-summary` re-summarises the last pinned build for a selector without
+building, deploying, or committing. Use it to check that llm-nix is answering
+and to see the exact prompt the model receives.
 
 `deployctl plan <selector>` resolves and prints ordering without building or
 activating a host.

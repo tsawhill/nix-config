@@ -1,10 +1,12 @@
 use std::collections::BTreeSet;
 use std::fs;
+use std::path::Path;
 use std::process::Command;
 
 use anyhow::{bail, Context, Result};
 use chrono::{Local, Utc};
 
+use crate::changes::{closure_packages, DeployChanges, HostChange};
 use crate::cli::DeployGoal;
 use crate::colmena::{is_retryable, BuildResult, Colmena};
 use crate::config::Config;
@@ -13,12 +15,14 @@ use crate::locking::{DeployLock, LockMode};
 use crate::notifications::{deploy_log_email_body, has_warnings, Notifier};
 use crate::process::{phase, run_capture, run_logged, RunOutput};
 use crate::retry::RetryStore;
+use crate::summarize::Summarizer;
 
 pub struct Controller {
     config: Config,
     colmena: Colmena,
     retries: RetryStore,
     notifier: Notifier,
+    summarizer: Summarizer,
 }
 
 impl Controller {
@@ -30,6 +34,7 @@ impl Controller {
                 config.retry_gcroot_dir.clone(),
             ),
             notifier: Notifier::new(config.notifications.clone()),
+            summarizer: Summarizer::new(config.summary.clone()),
             config,
         }
     }
@@ -60,6 +65,9 @@ impl Controller {
             bail!("manual deploy did not wait for the deploy lock");
         };
 
+        // Read the marker before the pre-deploy commit so a first run still
+        // sees the working-tree edits it is about to deploy.
+        let base = self.summary_base();
         self.pre_deploy_commit(&format!("manual deploy {selector}"))?;
         phase(format!("Manual deploy {selector}: resolving hosts"));
         let hosts = controller_last(expand_selector(&self.config, selector)?);
@@ -76,6 +84,7 @@ impl Controller {
 
         let mut succeeded = BTreeSet::new();
         let mut failed = BTreeSet::new();
+        let mut deployed = Vec::new();
         let mut had_warnings = false;
 
         for host in hosts {
@@ -88,6 +97,7 @@ impl Controller {
                 failed.insert(host);
                 continue;
             };
+            let previous = self.colmena.previous_system(&host);
             if let Err(error) = self.colmena.pin_built_system(&host, &system_path) {
                 eprintln!("warning: failed to pin {host}: {error:#}");
             }
@@ -102,6 +112,7 @@ impl Controller {
             if output.success() {
                 phase(format!("{host}: manual exact-path apply completed"));
                 succeeded.insert(host.clone());
+                deployed.push(self.host_change(&host, previous.as_deref(), &system_path));
                 self.retries.clear_host(&host)?;
             } else {
                 failed.insert(host.clone());
@@ -119,6 +130,7 @@ impl Controller {
             display_set(&failed),
             goal.as_str()
         ));
+        let report = self.record_deploy(selector, base.as_deref(), deployed);
         if failed.is_empty() {
             let title = if had_warnings {
                 format!("⚠️ Manual deploy {selector} succeeded (with warnings)")
@@ -128,23 +140,28 @@ impl Controller {
             self.notifier.notify(
                 &title,
                 if had_warnings { 4 } else { 3 },
-                &format!(
-                    "Succeeded: {}\nGoal: {}",
-                    display_set(&succeeded),
-                    goal.as_str()
+                &with_report(
+                    &format!(
+                        "Succeeded: {}\nGoal: {}",
+                        display_set(&succeeded),
+                        goal.as_str()
+                    ),
+                    report.as_deref(),
                 ),
             );
-            self.commit_flake_lock(&format!("auto: manual deploy {selector}"))?;
             Ok(())
         } else {
             self.notifier.notify(
                 &format!("⚠️ Manual deploy {selector} partial"),
                 6,
-                &format!(
-                    "Succeeded: {}\nFailed: {}\nGoal: {}",
-                    display_set(&succeeded),
-                    display_set(&failed),
-                    goal.as_str()
+                &with_report(
+                    &format!(
+                        "Succeeded: {}\nFailed: {}\nGoal: {}",
+                        display_set(&succeeded),
+                        display_set(&failed),
+                        goal.as_str()
+                    ),
+                    report.as_deref(),
                 ),
             );
             bail!("one or more manual deployments failed")
@@ -159,6 +176,7 @@ impl Controller {
         )?
         .context("blocking deploy lock unexpectedly returned no guard")?;
 
+        let base = self.summary_base();
         self.pre_deploy_commit(&format!("{schedule} pre-deploy"))?;
         phase(format!("Deploying {schedule} ({selector})"));
         let hosts = controller_last(expand_selector(&self.config, selector)?);
@@ -176,6 +194,7 @@ impl Controller {
         let mut succeeded = BTreeSet::new();
         let mut hard_failed = BTreeSet::new();
         let mut deferred = BTreeSet::new();
+        let mut deployed = Vec::new();
         let mut had_warnings = false;
 
         for host in hosts {
@@ -185,6 +204,7 @@ impl Controller {
                 hard_failed.insert(host);
                 continue;
             };
+            let previous = self.colmena.previous_system(&host);
             if let Err(error) = self.colmena.pin_built_system(&host, &system_path) {
                 eprintln!("warning: failed to pin {host}: {error:#}");
             }
@@ -212,6 +232,7 @@ impl Controller {
             if output.success() {
                 phase(format!("{host}: first exact-path apply completed"));
                 succeeded.insert(host.clone());
+                deployed.push(self.host_change(&host, previous.as_deref(), &system_path));
                 self.retries.delete(schedule, &host)?;
             } else if is_retryable(&output) {
                 deferred.insert(host.clone());
@@ -252,6 +273,7 @@ impl Controller {
             display_set(&hard_failed),
             display_set(&deferred)
         ));
+        let report = self.record_deploy(schedule, base.as_deref(), deployed);
         let (title, priority, body) = if !hard_failed.is_empty() {
             (
                 format!("⚠️ {schedule} deploy partial"),
@@ -286,10 +308,8 @@ impl Controller {
                 format!("All hosts: {}", display_set(&succeeded)),
             )
         };
-        self.notifier.notify(&title, priority, &body);
-        if !succeeded.is_empty() {
-            self.commit_versions(schedule, &succeeded)?;
-        }
+        self.notifier
+            .notify(&title, priority, &with_report(&body, report.as_deref()));
         if hard_failed.is_empty() {
             Ok(())
         } else {
@@ -383,6 +403,47 @@ impl Controller {
                 );
             }
         }
+        Ok(())
+    }
+
+    /// Summarise the newest pinned build against the one before it.
+    ///
+    /// Read-only: it takes no lock, commits nothing, and moves no ref, so the
+    /// model and the prompt can be exercised against real closures at any time.
+    pub fn summarize_last(&self, selector: &str, show_prompt: bool) -> Result<()> {
+        let hosts = expand_selector(&self.config, selector)?;
+        if hosts.is_empty() {
+            bail!(
+                "no hosts matched selector {selector:?}; known hosts: {}",
+                list_all(&self.config)?.join(" ")
+            );
+        }
+
+        let mut deployed = Vec::new();
+        for host in hosts {
+            match self.colmena.recent_pins(&host, 2).as_slice() {
+                [current, previous] => {
+                    deployed.push(self.host_change(&host, Some(previous.as_path()), current));
+                }
+                [current] => deployed.push(self.host_change(&host, None, current)),
+                _ => eprintln!("warning: no pinned builds for {host}; skipping"),
+            }
+        }
+        if deployed.is_empty() {
+            bail!("no pinned builds found for selector {selector:?}");
+        }
+
+        let versions: Vec<String> = deployed
+            .iter()
+            .map(|host| format!("{}: {}", host.host, host.version))
+            .collect();
+        let base = self.summary_base();
+        let changes = DeployChanges::collect(&self.config, selector, base.as_deref(), deployed);
+        if show_prompt {
+            println!("--- prompt ---\n{}\n--- reply ---", changes.prompt());
+        }
+        let summary = self.summarizer.summarize(&changes);
+        println!("{}", summary.commit_message(selector, &versions, base.as_deref()));
         Ok(())
     }
 
@@ -511,32 +572,97 @@ impl Controller {
         Ok(())
     }
 
-    fn commit_flake_lock(&self, label: &str) -> Result<()> {
-        self.git(&["add", "flake.lock"], false)?;
-        self.git(
-            &[
-                "commit",
-                "-m",
-                &format!("{label} {}", Local::now().format("%Y-%m-%d %H:%M")),
-            ],
-            true,
-        )?;
-        Ok(())
+    /// Compare a host's old and new closures, tolerating every way that can
+    /// fail: a summary is never worth aborting a successful deployment for.
+    fn host_change(&self, host: &str, previous: Option<&Path>, current: &Path) -> HostChange {
+        let (packages, note) = match previous {
+            None => (Vec::new(), Some("first recorded build".to_owned())),
+            Some(previous) if previous == current => {
+                (Vec::new(), Some("closure unchanged".to_owned()))
+            }
+            Some(previous) => {
+                match closure_packages(previous, current, self.config.summary.max_closure_lines) {
+                    Ok(packages) if packages.is_empty() => {
+                        (packages, Some("no package changes".to_owned()))
+                    }
+                    Ok(packages) => (packages, None),
+                    Err(error) => {
+                        eprintln!("warning: closure diff for {host} failed: {error:#}");
+                        (Vec::new(), Some("closure diff unavailable".to_owned()))
+                    }
+                }
+            }
+        };
+        HostChange {
+            host: host.to_owned(),
+            version: self.colmena.version(host),
+            packages,
+            note,
+        }
     }
 
-    fn commit_versions(&self, schedule: &str, hosts: &BTreeSet<String>) -> Result<()> {
-        let revisions = hosts
+    /// The commit a deployment is measured against: the last one this
+    /// controller deployed, or the current tip the first time through.
+    fn summary_base(&self) -> Option<String> {
+        self.rev_parse(&self.config.summary.marker_ref)
+            .or_else(|| self.rev_parse("HEAD"))
+    }
+
+    fn rev_parse(&self, reference: &str) -> Option<String> {
+        let output = run_capture(
+            Command::new("git")
+                .args(["rev-parse", "--verify", "--quiet"])
+                .arg(format!("{reference}^{{commit}}"))
+                .current_dir(&self.config.repo_path),
+        )
+        .ok()?;
+        output
+            .success()
+            .then(|| output.stdout.trim().to_owned())
+            .filter(|revision| !revision.is_empty())
+    }
+
+    /// Summarise what a successful deployment changed and commit it.
+    ///
+    /// The commit is unconditional. A rebuild that only picked up new package
+    /// versions edits no files, and that is exactly the deployment whose
+    /// history is worth having.
+    fn record_deploy(
+        &self,
+        label: &str,
+        base: Option<&str>,
+        hosts: Vec<HostChange>,
+    ) -> Option<String> {
+        if hosts.is_empty() {
+            return None;
+        }
+        phase(format!("{label}: summarising {} hosts", hosts.len()));
+        let versions: Vec<String> = hosts
             .iter()
-            .map(|host| format!("{host}: {}", self.colmena.version(host)))
-            .collect::<Vec<_>>()
-            .join("\n");
-        let message = format!(
-            "auto: {schedule} deploy {}\n\n{revisions}",
-            Local::now().format("%Y-%m-%d %H:%M")
-        );
-        self.git(&["add", "flake.lock"], false)?;
-        self.git(&["commit", "-m", &message], true)?;
-        Ok(())
+            .map(|host| format!("{}: {}", host.host, host.version))
+            .collect();
+        let changes = DeployChanges::collect(&self.config, label, base, hosts);
+        let summary = self.summarizer.summarize(&changes);
+        let message = summary.commit_message(label, &versions, base);
+
+        phase(format!("{label}: deploy summary"));
+        println!("{message}");
+        // A failure here must not turn a successful deployment into a failed
+        // one, so it is reported and the run continues to its notifications.
+        if let Err(error) = self.commit_summary(&message) {
+            eprintln!("warning: failed to commit the deploy summary: {error:#}");
+        }
+        Some(format!(
+            "{}\n\n{}",
+            summary.subject,
+            summary.body.trim_end()
+        ))
+    }
+
+    fn commit_summary(&self, message: &str) -> Result<()> {
+        self.git(&["add", "-A"], false)?;
+        self.git(&["commit", "--allow-empty", "-m", message], false)?;
+        self.git(&["update-ref", &self.config.summary.marker_ref, "HEAD"], true)
     }
 
     fn git(&self, args: &[&str], allow_failure: bool) -> Result<()> {
@@ -545,6 +671,13 @@ impl Controller {
             bail!("git {} failed", args.join(" "));
         }
         Ok(())
+    }
+}
+
+fn with_report(body: &str, report: Option<&str>) -> String {
+    match report {
+        Some(report) => format!("{body}\n\n{report}"),
+        None => body.to_owned(),
     }
 }
 

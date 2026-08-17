@@ -1,3 +1,4 @@
+mod changes;
 mod cli;
 mod colmena;
 mod config;
@@ -7,6 +8,7 @@ mod locking;
 mod notifications;
 mod process;
 mod retry;
+mod summarize;
 
 use anyhow::Result;
 use clap::Parser;
@@ -32,6 +34,10 @@ pub fn run() -> Result<()> {
             selector,
         } => controller.deploy_scheduled(&schedule, &selector),
         Command::Retry => controller.retry_deferred(),
+        Command::Summary {
+            selector,
+            show_prompt,
+        } => controller.summarize_last(&selector, show_prompt),
         Command::Rollback { host, offset } => controller.rollback(&host, offset),
     }
 }
