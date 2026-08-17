@@ -7,24 +7,41 @@ use crate::changes::DeployChanges;
 use crate::config::SummaryConfig;
 use crate::process::{run_with_stdin, RunOutput};
 
-/// Written for a 7B model: short, absolute rules, and an explicit ban on the
-/// two failure modes that matter here — chatty preambles and invented versions.
+/// Tuned against qwen2.5-coder:7b on llm-nix, and the wording is load-bearing.
+///
+/// Two things were tried and removed because they made the output worse. A
+/// worked example collapsed the model onto that example's shape: it led with
+/// routine libraries and dropped everything else. Raising the bullet ceiling
+/// and asking it to cover every host made it emit several subject/body
+/// sections instead of one commit message. The explicit ranking below is what
+/// finally stopped it spending the whole message on glibc and openssl.
 const SYSTEM_PROMPT: &str = "\
 You write git commit messages describing NixOS deployments.
 
-Your input has three parts: flake inputs that moved, package version changes \
-produced by `nix store diff-closures`, and a git diff of the configuration \
-repository.
+Input sections: flake inputs that moved, package version changes from \
+`nix store diff-closures`, and a git diff of the configuration repository.
+
+What matters, most to least:
+1. Configuration edits, described by what they do.
+2. Packages a person notices: kernel (linux), GPU drivers (mesa, nvidia), \
+browsers, desktop, database and media servers.
+3. Changes affecting only one host, named with that host.
+4. Routine shared libraries (glibc, openssl, curl, zstd, zlib, systemd). \
+These are the LEAST interesting.
 
 Rules:
 - Output the commit message only. No preamble, no explanation, no code fences.
-- The first line is a subject under 55 characters, imperative mood, naming the \
-single most significant change.
-- Then one blank line, then 2 to 5 bullet points, each starting with '- '.
-- Describe configuration edits by what they do, not by which file changed.
-- For package bumps, name the ones a person would care about (kernel, mesa, \
-nvidia, systemd, glibc, browsers, desktop) and give a count for the rest.
-- Never invent a package, version, host, or change that is not in the input. \
+- Line 1: a subject under 55 characters, imperative mood, naming the most \
+significant change by the ranking above, with its new version. A subject that \
+names only routine libraries is wrong. A vague subject like 'update packages' \
+is wrong.
+- Then one blank line, then 2 to 5 bullets starting with '- '.
+- A bullet that names a package must give its version transition, like \
+'linux 6.16.1 -> 6.16.3'.
+- Never spend a bullet on a single routine library. Collapse all of them into \
+one final bullet with an exact count.
+- Name the host when a change affects only that host.
+- Never invent a package, version, host, or change not present in the input. \
 If a section says nothing changed, say so plainly.";
 
 pub struct Summary {

@@ -190,15 +190,17 @@ impl DeployChanges {
 
     pub fn fallback_subject(&self) -> String {
         let packages = self.package_count();
-        let hosts = self.hosts.len();
         let files = self.diff_stat.lines().count().saturating_sub(1);
+        let hosts = plural(self.hosts.len(), "host");
         match (packages, files) {
-            (0, 0) => format!("{hosts} hosts, no changes"),
-            (0, files) => format!("{hosts} hosts, {files} files changed"),
-            (packages, 0) => format!("{hosts} hosts, {packages} package changes"),
-            (packages, files) => {
-                format!("{hosts} hosts, {packages} package changes, {files} files")
-            }
+            (0, 0) => format!("{hosts}, no changes"),
+            (0, files) => format!("{hosts}, {} changed", plural(files, "file")),
+            (packages, 0) => format!("{hosts}, {} changed", plural(packages, "package")),
+            (packages, files) => format!(
+                "{hosts}, {} and {} changed",
+                plural(packages, "package"),
+                plural(files, "file")
+            ),
         }
     }
 }
@@ -391,6 +393,14 @@ pub fn truncate_lines(text: &str, max_chars: usize) -> String {
     kept
 }
 
+fn plural(count: usize, noun: &str) -> String {
+    if count == 1 {
+        format!("{count} {noun}")
+    } else {
+        format!("{count} {noun}s")
+    }
+}
+
 pub fn join_or(values: &[String], empty: &str) -> String {
     if values.is_empty() {
         empty.to_owned()
@@ -438,6 +448,13 @@ mod tests {
             diff_flake_locks(previous, current),
             vec!["nixpkgs: 2026-08-11 (aaaaaaaa) → 2026-08-12 (bbbbbbbb)"]
         );
+    }
+
+    #[test]
+    fn fallback_subjects_are_grammatical() {
+        assert_eq!(super::plural(1, "host"), "1 host");
+        assert_eq!(super::plural(0, "package"), "0 packages");
+        assert_eq!(super::plural(6, "file"), "6 files");
     }
 
     #[test]
