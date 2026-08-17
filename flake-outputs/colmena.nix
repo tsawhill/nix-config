@@ -167,6 +167,7 @@ in
       mkHost "weekly" "socks5-vpn-eu-nix"
         "${self}/hosts/server-nix/LXCs/socks5-vpn-eu.nix";
     "sunshine-nix" = mkHost "weekly" "sunshine-nix" "${self}/hosts/server-nix/LXCs/sunshine.nix";
+    "ffsync-nix" = mkHost "weekly" "ffsync-nix" "${self}/hosts/server-nix/LXCs/ffsync.nix";
 
     # --- monthly ---
     "unifi-nix" = mkHost "monthly" "unifi-nix" "${self}/hosts/server-nix/LXCs/unifi.nix";

@@ -314,6 +314,14 @@ let
       dns.enable = true;
       monitoring.enable = true;
     };
+    ffsync-nix = {
+      lan = {
+        ip = "10.73.73.33";
+        mac = "02:f1:c9:4a:c9:61";
+      };
+      dns.enable = true;
+      monitoring.enable = true;
+    };
   };
 
   fqdn = host: "${host}.${lanDomain}";

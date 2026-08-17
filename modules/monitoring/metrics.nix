@@ -85,6 +85,11 @@ let
       name = "Searx";
       url = "https://searx.tsawhill.org";
     }
+    # / returns 404, which the default conditions would accept as healthy.
+    {
+      name = "Firefox Sync";
+      url = "https://ffsync.tsawhill.org/__heartbeat__";
+    }
   ];
 
   gatusEndpoint =

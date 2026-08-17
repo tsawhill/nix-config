@@ -84,6 +84,12 @@
     enable = true;
     domain = "prom.tsawhill.org";
   };
+  # Deliberately LAN/WireGuard only: an exposed tokenserver accepts any Firefox
+  # Account, and the sync client cannot do mTLS or Authentik.
+  proxy.ffsync = {
+    enable = true;
+    domain = "ffsync.tsawhill.org";
+  };
 
   networking.hostName = "local-nginx-nix";
 }
