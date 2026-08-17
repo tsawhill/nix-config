@@ -78,6 +78,14 @@ monitoring-nix:
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/monitoring-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:4d:2c:9f" }
 
+homepage-nix:
+  type: "container"
+  profiles: ["nixos-lxc"]
+  config: {}
+  devices:
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/homepage-nix" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:7a:e0:14" }
+
 immich-nix:
   type: "container"
   profiles: ["nixos-lxc", "immich-mount", "nvidia-gpu"]

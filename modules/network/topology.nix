@@ -169,6 +169,13 @@ let
       };
       dns.enable = true;
     };
+    homepage-nix = {
+      lan = {
+        ip = "10.73.73.32";
+        mac = "bc:24:11:7a:e0:14";
+      };
+      dns.enable = true;
+    };
     build-nix = {
       lan = {
         ip = "10.73.73.40";

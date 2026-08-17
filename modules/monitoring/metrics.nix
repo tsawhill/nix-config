@@ -21,6 +21,7 @@ let
     "authentik-nix"
     "deluge-nix"
     "gotify-nix"
+    "homepage-nix"
     "immich-nix"
     "jellyfin-nix"
     "jellyseerr-nix"
@@ -40,21 +41,73 @@ let
   fqdn = host: "${host}.${lanDomain}";
   mkTarget = port: host: "${fqdn host}:${toString port}";
 
+  # Keep legends readable: "immich-nix", not "immich-nix.lan:9100".
+  shortInstance = [
+    {
+      source_labels = [ "__address__" ];
+      regex = "([^.]+)\\..*";
+      target_label = "instance";
+      replacement = "$1";
+    }
+  ];
+
   defaultServiceChecks = [
-    { name = "Authentik"; url = "https://auth.tsawhill.org"; }
-    { name = "Vaultwarden"; url = "https://vault.tsawhill.org"; }
-    { name = "Immich"; url = "https://immich.tsawhill.org"; }
-    { name = "Jellyfin"; url = "https://jelly.tsawhill.org"; }
-    { name = "Nextcloud"; url = "https://nc.tsawhill.org"; }
-    { name = "Open WebUI"; url = "https://llm.tsawhill.org"; }
-    { name = "Gotify"; url = "https://gotify.tsawhill.org"; }
-    { name = "Radarr"; url = "https://rad.tsawhill.org"; }
-    { name = "Sonarr"; url = "https://son.tsawhill.org"; }
-    { name = "Lidarr"; url = "https://lid.tsawhill.org"; }
-    { name = "Prowlarr"; url = "https://pro.tsawhill.org"; }
-    { name = "Jellyseerr"; url = "https://request.tsawhill.org"; }
-    { name = "Unifi"; url = "https://unifi.tsawhill.org"; }
-    { name = "Searx"; url = "https://searx.tsawhill.org"; }
+    {
+      name = "Authentik";
+      url = "https://auth.tsawhill.org";
+    }
+    {
+      name = "Vaultwarden";
+      url = "https://vault.tsawhill.org";
+    }
+    {
+      name = "Immich";
+      url = "https://immich.tsawhill.org";
+    }
+    {
+      name = "Jellyfin";
+      url = "https://jelly.tsawhill.org";
+    }
+    {
+      name = "Nextcloud";
+      url = "https://nc.tsawhill.org";
+    }
+    {
+      name = "Open WebUI";
+      url = "https://llm.tsawhill.org";
+    }
+    {
+      name = "Gotify";
+      url = "https://gotify.tsawhill.org";
+    }
+    {
+      name = "Radarr";
+      url = "https://rad.tsawhill.org";
+    }
+    {
+      name = "Sonarr";
+      url = "https://son.tsawhill.org";
+    }
+    {
+      name = "Lidarr";
+      url = "https://lid.tsawhill.org";
+    }
+    {
+      name = "Prowlarr";
+      url = "https://pro.tsawhill.org";
+    }
+    {
+      name = "Jellyseerr";
+      url = "https://request.tsawhill.org";
+    }
+    {
+      name = "Unifi";
+      url = "https://unifi.tsawhill.org";
+    }
+    {
+      name = "Searx";
+      url = "https://searx.tsawhill.org";
+    }
   ];
 
   gatusEndpoint =
@@ -68,6 +121,149 @@ let
     }
     // endpoint;
 
+  promDatasource = {
+    type = "prometheus";
+    uid = "prometheus";
+  };
+
+  mkThresholds = steps: {
+    mode = "absolute";
+    inherit steps;
+  };
+
+  mkStat =
+    {
+      id,
+      title,
+      expr,
+      x,
+      y,
+      w ? 6,
+      h ? 4,
+      unit ? "none",
+      steps ? [
+        {
+          color = "text";
+          value = null;
+        }
+      ],
+    }:
+    {
+      inherit id title;
+      type = "stat";
+      gridPos = {
+        inherit
+          h
+          w
+          x
+          y
+          ;
+      };
+      datasource = promDatasource;
+      fieldConfig = {
+        defaults = {
+          inherit unit;
+          color.mode = "thresholds";
+          thresholds = mkThresholds steps;
+        };
+        overrides = [ ];
+      };
+      options = {
+        colorMode = "value";
+        graphMode = "area";
+        justifyMode = "auto";
+        orientation = "auto";
+        textMode = "auto";
+        reduceOptions = {
+          calcs = [ "lastNotNull" ];
+          fields = "";
+          values = false;
+        };
+      };
+      targets = [
+        {
+          refId = "A";
+          datasource = promDatasource;
+          inherit expr;
+          instant = true;
+        }
+      ];
+    };
+
+  mkGraph =
+    {
+      id,
+      title,
+      expr,
+      x,
+      y,
+      unit,
+      w ? 12,
+      h ? 8,
+      legend ? "{{instance}}",
+      min ? 0,
+      max ? null,
+      description ? "",
+    }:
+    {
+      inherit id title description;
+      type = "timeseries";
+      gridPos = {
+        inherit
+          h
+          w
+          x
+          y
+          ;
+      };
+      datasource = promDatasource;
+      fieldConfig = {
+        defaults = {
+          inherit unit min max;
+          color.mode = "palette-classic";
+          custom = {
+            axisPlacement = "auto";
+            drawStyle = "line";
+            fillOpacity = 8;
+            lineInterpolation = "smooth";
+            lineWidth = 1;
+            showPoints = "never";
+            spanNulls = true;
+          };
+          thresholds = mkThresholds [
+            {
+              color = "green";
+              value = null;
+            }
+          ];
+        };
+        overrides = [ ];
+      };
+      options = {
+        legend = {
+          calcs = [
+            "lastNotNull"
+            "max"
+          ];
+          displayMode = "table";
+          placement = "right";
+          showLegend = true;
+        };
+        tooltip = {
+          mode = "multi";
+          sort = "desc";
+        };
+      };
+      targets = [
+        {
+          refId = "A";
+          datasource = promDatasource;
+          inherit expr;
+          legendFormat = legend;
+        }
+      ];
+    };
+
   homelabDashboard = pkgs.writeText "homelab-overview-dashboard.json" (
     builtins.toJSON {
       uid = "homelab-overview";
@@ -75,6 +271,7 @@ let
       timezone = "browser";
       schemaVersion = 39;
       version = 1;
+      editable = true;
       refresh = "30s";
       tags = [
         "homelab"
@@ -84,97 +281,236 @@ let
         from = "now-6h";
         to = "now";
       };
+      annotations.list = [ ];
+      links = [ ];
+      templating.list = [
+        {
+          name = "host";
+          label = "Host";
+          type = "query";
+          datasource = promDatasource;
+          query = {
+            qryType = 1;
+            query = "label_values(node_uname_info, instance)";
+            refId = "PrometheusVariableQueryEditor-VariableQuery";
+          };
+          refresh = 1;
+          sort = 1;
+          multi = true;
+          includeAll = true;
+          allValue = ".*";
+          current = {
+            selected = true;
+            text = [ "All" ];
+            value = [ "$__all" ];
+          };
+        }
+      ];
       panels = [
-        {
+        (mkStat {
           id = 1;
-          title = "Exporter Up";
-          type = "stat";
-          gridPos = {
-            h = 6;
-            w = 8;
-            x = 0;
-            y = 0;
-          };
-          datasource.uid = "prometheus";
-          targets = [
+          title = "Hosts Up";
+          x = 0;
+          y = 0;
+          expr = ''sum(up{job="node"})'';
+          steps = [
             {
-              refId = "A";
-              expr = ''sum(up{job=~"node|systemd"}) by (job)'';
+              color = "red";
+              value = null;
+            }
+            {
+              color = "green";
+              value = 1;
             }
           ];
-        }
-        {
+        })
+        (mkStat {
           id = 2;
-          title = "CPU Busy";
-          type = "timeseries";
-          gridPos = {
-            h = 8;
-            w = 16;
-            x = 8;
-            y = 0;
-          };
-          datasource.uid = "prometheus";
-          fieldConfig.defaults.unit = "percent";
-          targets = [
+          title = "Hosts Down";
+          x = 6;
+          y = 0;
+          expr = ''count(up{job="node"} == 0) or vector(0)'';
+          steps = [
             {
-              refId = "A";
-              expr = ''100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)'';
+              color = "green";
+              value = null;
+            }
+            {
+              color = "red";
+              value = 1;
             }
           ];
-        }
-        {
+        })
+        (mkStat {
           id = 3;
-          title = "Memory Used";
-          type = "timeseries";
-          gridPos = {
-            h = 8;
-            w = 12;
-            x = 0;
-            y = 8;
-          };
-          datasource.uid = "prometheus";
-          fieldConfig.defaults.unit = "percent";
-          targets = [
+          title = "Services Up";
+          x = 12;
+          y = 0;
+          expr = "sum(gatus_results_endpoint_success)";
+          steps = [
             {
-              refId = "A";
-              expr = ''100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))'';
+              color = "red";
+              value = null;
+            }
+            {
+              color = "green";
+              value = 1;
             }
           ];
-        }
-        {
+        })
+        (mkStat {
           id = 4;
-          title = "Root Disk Used";
-          type = "timeseries";
-          gridPos = {
-            h = 8;
-            w = 12;
-            x = 12;
-            y = 8;
-          };
-          datasource.uid = "prometheus";
-          fieldConfig.defaults.unit = "percent";
-          targets = [
+          title = "Services Down";
+          x = 18;
+          y = 0;
+          expr = "count(gatus_results_endpoint_success == 0) or vector(0)";
+          steps = [
             {
-              refId = "A";
-              expr = ''100 * (1 - (node_filesystem_avail_bytes{mountpoint="/",fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{mountpoint="/",fstype!~"tmpfs|overlay"}))'';
+              color = "green";
+              value = null;
+            }
+            {
+              color = "red";
+              value = 1;
             }
           ];
-        }
+        })
+        (mkGraph {
+          id = 10;
+          title = "CPU Busy";
+          x = 0;
+          y = 4;
+          unit = "percent";
+          max = 100;
+          expr = ''100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle",instance=~"$host"}[5m])) * 100)'';
+        })
+        (mkGraph {
+          id = 11;
+          title = "Memory Used";
+          x = 12;
+          y = 4;
+          unit = "percent";
+          max = 100;
+          expr = ''100 * (1 - (node_memory_MemAvailable_bytes{instance=~"$host"} / node_memory_MemTotal_bytes{instance=~"$host"}))'';
+        })
+        (mkGraph {
+          id = 12;
+          title = "Root Disk Used";
+          x = 0;
+          y = 12;
+          unit = "percent";
+          max = 100;
+          expr = ''100 * (1 - (node_filesystem_avail_bytes{instance=~"$host",mountpoint="/",fstype!~"tmpfs|overlay|ramfs"} / node_filesystem_size_bytes{instance=~"$host",mountpoint="/",fstype!~"tmpfs|overlay|ramfs"}))'';
+        })
+        (mkGraph {
+          id = 13;
+          title = "Load (1m, per core)";
+          description = "Load average normalised by core count; sustained values above 1 mean the host is saturated.";
+          x = 12;
+          y = 12;
+          unit = "none";
+          max = null;
+          expr = ''node_load1{instance=~"$host"} / on(instance) group_left count by (instance) (node_cpu_seconds_total{mode="idle",instance=~"$host"})'';
+        })
+        (mkGraph {
+          id = 14;
+          title = "Network Received";
+          x = 0;
+          y = 20;
+          unit = "Bps";
+          max = null;
+          expr = ''sum by (instance) (rate(node_network_receive_bytes_total{instance=~"$host",device!~"lo|veth.*|docker.*|br-.*"}[5m]))'';
+        })
+        (mkGraph {
+          id = 15;
+          title = "Network Transmitted";
+          x = 12;
+          y = 20;
+          unit = "Bps";
+          max = null;
+          expr = ''sum by (instance) (rate(node_network_transmit_bytes_total{instance=~"$host",device!~"lo|veth.*|docker.*|br-.*"}[5m]))'';
+        })
+        (mkGraph {
+          id = 16;
+          title = "Disk Read";
+          x = 0;
+          y = 28;
+          unit = "Bps";
+          max = null;
+          expr = ''sum by (instance) (rate(node_disk_read_bytes_total{instance=~"$host"}[5m]))'';
+        })
+        (mkGraph {
+          id = 17;
+          title = "Disk Written";
+          x = 12;
+          y = 28;
+          unit = "Bps";
+          max = null;
+          expr = ''sum by (instance) (rate(node_disk_written_bytes_total{instance=~"$host"}[5m]))'';
+        })
         {
-          id = 5;
-          title = "Gatus Endpoint Health";
-          type = "stat";
+          id = 20;
+          title = "Service Health";
+          description = "Gatus endpoint checks over the selected window.";
+          type = "state-timeline";
           gridPos = {
-            h = 8;
+            h = 10;
             w = 24;
             x = 0;
-            y = 16;
+            y = 36;
           };
-          datasource.uid = "prometheus";
+          datasource = promDatasource;
+          fieldConfig = {
+            defaults = {
+              color.mode = "thresholds";
+              custom = {
+                fillOpacity = 80;
+                lineWidth = 0;
+              };
+              mappings = [
+                {
+                  type = "value";
+                  options = {
+                    "0" = {
+                      text = "Down";
+                      color = "red";
+                      index = 0;
+                    };
+                    "1" = {
+                      text = "Up";
+                      color = "green";
+                      index = 1;
+                    };
+                  };
+                }
+              ];
+              thresholds = mkThresholds [
+                {
+                  color = "red";
+                  value = null;
+                }
+              ];
+            };
+            overrides = [ ];
+          };
+          options = {
+            alignValue = "center";
+            mergeValues = true;
+            rowHeight = 0.9;
+            showValue = "never";
+            legend = {
+              displayMode = "list";
+              placement = "bottom";
+              showLegend = false;
+            };
+            tooltip.mode = "single";
+          };
           targets = [
             {
               refId = "A";
-              expr = "gatus_results_code";
+              datasource = promDatasource;
+              expr = "gatus_results_endpoint_success";
+              legendFormat = "{{name}}";
             }
           ];
         }
@@ -238,12 +574,14 @@ in
             static_configs = [
               { targets = map (mkTarget 9100) stack.monitoredHosts; }
             ];
+            relabel_configs = shortInstance;
           }
           {
             job_name = "systemd";
             static_configs = [
               { targets = map (mkTarget 9558) stack.monitoredHosts; }
             ];
+            relabel_configs = shortInstance;
           }
           {
             job_name = "gatus";
