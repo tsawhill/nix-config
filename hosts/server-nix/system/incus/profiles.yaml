@@ -44,6 +44,16 @@ downloadSSD-mount:
       source: "/mnt/downloadSSD"
       shift: "true"
 
+ffsync-mount:
+  description: "Disk passthrough for ffsync directory"
+  config: {}
+  devices:
+    mnt_zpool_ffsync:
+      type: "disk"
+      path: "/mnt/zpool/ffsync"
+      source: "/mnt/zpool/ffsync"
+      shift: "true"
+
 gameSSD-mount:
   description: "Disk passthrough for gameSSD directory"
   config: {}

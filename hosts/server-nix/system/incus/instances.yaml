@@ -224,9 +224,9 @@ vaultwarden-nix:
 
 ffsync-nix:
   type: "container"
-  profiles: ["nixos-lxc"]
+  profiles: ["nixos-lxc", "ffsync-mount"]
   config: {}
   devices:
-    root: { type: "disk", path: "/", pool: "rpool", size: "8GiB" }
+    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/ffsync-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "02:f1:c9:4a:c9:61" }

@@ -24,6 +24,7 @@ let
     "rpool/VMDisks"
     "rpool/home"
     "rpool/root"
+    "zpool/ffsync"
     "zpool/gamesaves"
     "zpool/immich"
     "zpool/nextcloud"

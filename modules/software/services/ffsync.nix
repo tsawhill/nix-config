@@ -10,6 +10,10 @@ in
   # database.createLocally enables services.mysql but picks no package.
   services.mysql.package = pkgs.mariadb;
 
+  # Keep sync data on its own zpool dataset so it is snapshotted and replicated
+  # independently of the container root.
+  services.mysql.dataDir = "/mnt/zpool/ffsync";
+
   services.firefox-syncserver = {
     enable = true;
     secrets = config.sops.secrets.ffsync_env.path;
