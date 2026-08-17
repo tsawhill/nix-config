@@ -11,9 +11,17 @@
     host = "0.0.0.0";
     openFirewall = true;
     # Pulled by ollama-model-loader.service, so a wiped model store heals on
-    # the next deploy. qwen2.5-coder:7b is ~4.7 GiB at Q4_K_M, which leaves the
-    # 2070 Super's 8 GiB enough room for deployctl's 16k context window.
-    loadModels = [ "qwen2.5-coder:7b" ];
+    # the next deploy. Only one model is resident at a time, so these coexist
+    # on the 2070 Super's 8 GiB; switching between them costs a reload.
+    loadModels = [
+      # Deploy summaries (deployctl). ~4.7 GiB at Q4_K_M, leaving room for the
+      # 16k context window deployctl asks for. A code model, so it makes a poor
+      # general assistant: given a tools array it parrots the schema back as
+      # text instead of answering.
+      "qwen2.5-coder:7b"
+      # General chat and anything needing real tool calling. ~5.2 GiB.
+      "qwen3:8b"
+    ];
   };
 
   # Ollama probes for GPUs exactly once, when the process starts, and keeps
