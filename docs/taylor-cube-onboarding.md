@@ -129,7 +129,6 @@ taylor-cube-nix = {
   lan = {
     ip = "10.73.73.74";
     mac = "TODO:fill-real-NIC-mac-at-install";   # Phase B — needed for the router's DHCP lease
-    dhcpHostname = "cube-nix";
   };
   wgRemote.ip = "10.50.50.6";
   dns.enable = true;

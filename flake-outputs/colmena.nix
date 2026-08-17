@@ -149,6 +149,11 @@ in
       mkHost "weekly" "unbound-vpn-na-nix"
         "${self}/hosts/server-nix/LXCs/unbound-vpn-na.nix";
     "adguard-nix" = mkHost "weekly" "adguard-nix" "${self}/hosts/server-nix/LXCs/adguard.nix";
+
+    # First slice of the OPNsense migration: LAN DHCP.
+    "networking-dhcp-nix" =
+      mkHost "weekly" "networking-dhcp-nix"
+        "${self}/hosts/server-nix/LXCs/networking-dhcp.nix";
     "nextcloud-nix" = mkHost "weekly" "nextcloud-nix" "${self}/hosts/server-nix/LXCs/nextcloud.nix";
     "jellyseerr-nix" = mkHost "weekly" "jellyseerr-nix" "${self}/hosts/server-nix/LXCs/jellyseerr.nix";
     "jellyfin-nix" = mkHost "weekly" "jellyfin-nix" "${self}/hosts/server-nix/LXCs/jellyfin.nix";

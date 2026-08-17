@@ -230,7 +230,6 @@ let
       lan = {
         ip = "10.73.73.68";
         mac = "b0:dc:ef:20:5c:ba";
-        dhcpHostname = "laptop-nix";
       };
       wgRemote.ip = "10.50.50.3";
       dns = {
@@ -242,7 +241,6 @@ let
       lan = {
         ip = "10.73.73.69";
         mac = "c8:7f:54:6c:e2:96";
-        dhcpHostname = "desktop-nix";
       };
       wgRemote.ip = "10.50.50.2";
       dns = {
