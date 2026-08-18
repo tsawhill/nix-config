@@ -15,6 +15,8 @@
       ${pkgs.zfs}/bin/zfs set mountpoint=/mnt/zpool zpool
       ${pkgs.zfs}/bin/zfs set mountpoint=/mnt/downloadHDD downloadHDD
       ${pkgs.zfs}/bin/zfs set mountpoint=/mnt/downloadSSD downloadSSD
+
+      ${pkgs.zfs}/bin/zfs set atime=off downloadHDD/nix-stores
     '';
   };
   boot.zfs.forceImportRoot = true; # Import root even if booting from the mirrored boot drive.
