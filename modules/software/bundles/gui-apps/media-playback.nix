@@ -28,7 +28,7 @@
       mpv
       feishin
       jellyfin-mpv-shim
-      jellyfin-desktop
+      self.packages.${pkgs.stdenv.hostPlatform.system}.jellium-desktop
       # self.packages.${pkgs.stdenv.hostPlatform.system}.kopuz
     ];
   };

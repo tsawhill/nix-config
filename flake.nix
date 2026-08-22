@@ -142,6 +142,7 @@
         yarc-launcher = pkgs.callPackage ./pkgs/yarc-launcher.nix { };
         hyprcrosshair = pkgs.callPackage ./pkgs/hyprcrosshair/package.nix { };
         santroller-configurator = pkgs.callPackage ./pkgs/santroller-configurator/package.nix { };
+        jellium-desktop = pkgs.callPackage ./pkgs/jellium-desktop.nix { };
         kopuz = inputs.kopuz.packages.x86_64-linux.default;
       };
 

@@ -16,4 +16,7 @@ in
 
   # jellyfin-mpv-shim includes its own config instead of reading ~/.config/mpv.
   xdg.configFile."jellyfin-mpv-shim/mpv.conf".text = lib.generators.toKeyValue { } hdrConfig;
+
+  # Jellium also uses an application-specific mpv home directory.
+  xdg.configFile."jellyfin-desktop/mpv/mpv.conf".text = lib.generators.toKeyValue { } hdrConfig;
 }
