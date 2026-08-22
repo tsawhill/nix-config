@@ -20,6 +20,7 @@
       walker.no_display = true;
       mpv.no_display = true;
       gamescope.no_display = true;
+      jellium-desktop.no_display = true;
     };
   };
 }
