@@ -25,7 +25,7 @@ let
     lan_domain = networkTopology.domains.lan;
     per_host_build_timeout = "6h";
     apply_timeout = "90m";
-    keep_roots = 5;
+    keep_roots = 2;
     notifications = {
       gotify_url = notifications.gotify.url;
       gotify_token_file = notifications.gotify.tokenFile;

@@ -2,6 +2,7 @@
   self,
   config,
   inputs,
+  lib,
   ...
 }:
 {
@@ -51,6 +52,10 @@
   };
   boot.binfmt.emulatedSystems = [ "aarch64-linux" ];
   nix.settings = {
+    # The deploy controller explicitly pins the system closures needed for
+    # retries and rollback. Do not also retain every build-time output reachable
+    # through those roots; that turned the builder into a permanent build cache.
+    keep-outputs = lib.mkForce false;
     substituters = [
       "https://nix-community.cachix.org"
       "https://nixos-raspberrypi.cachix.org"
@@ -65,6 +70,5 @@
   # Allow VS Code Remote SSH server to run
   programs.nix-ld.enable = true;
   software.dev.enable = true;
-  my.garbage.collection.prunePerHostProfiles = true;
   networking.hostName = "build-nix";
 }
