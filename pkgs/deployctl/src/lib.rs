@@ -4,6 +4,7 @@ mod colmena;
 mod config;
 mod controller;
 mod hosts;
+mod incus;
 mod locking;
 mod notifications;
 mod process;

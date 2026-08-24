@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
+use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
 use chrono::{Local, Utc};
@@ -11,6 +12,7 @@ use crate::cli::DeployGoal;
 use crate::colmena::{is_retryable, BuildResult, Colmena};
 use crate::config::Config;
 use crate::hosts::{controller_last, expand_selector, list_all, ssh_host};
+use crate::incus::{with_lifecycle, LifecycleOutcome, SshIncus};
 use crate::locking::{DeployLock, LockMode};
 use crate::notifications::{deploy_log_email_body, has_warnings, Notifier};
 use crate::process::{phase, run_capture, run_logged, RunOutput};
@@ -225,34 +227,127 @@ impl Controller {
                 "{host}: first exact-path apply started (timeout {})",
                 self.config.apply_timeout
             ));
-            let output = self
-                .colmena
-                .apply(&host, &system_path, DeployGoal::Switch)?;
-            had_warnings |= has_warnings(&output);
-            if output.success() {
-                phase(format!("{host}: first exact-path apply completed"));
-                succeeded.insert(host.clone());
-                deployed.push(self.host_change(&host, previous.as_deref(), &system_path));
-                self.retries.delete(schedule, &host)?;
-            } else if is_retryable(&output) {
-                deferred.insert(host.clone());
-                self.notifier.notify(
-                    &format!("⚠️ {schedule}: {host} deferred"),
-                    5,
-                    &format!(
-                        "First apply failed or timed out; retrying every 30 minutes until the next {schedule} build.\nSystem: {}\nLast 20 lines:\n{}",
-                        system_path.display(),
-                        output.tail(20)
-                    ),
+            let managed = self
+                .config
+                .incus_guests
+                .get(&host)
+                .filter(|guest| guest.intermittent)
+                .cloned();
+            let lifecycle = if let Some(guest) = &managed {
+                phase(format!(
+                    "{host}: checking intermittent Incus instance {} through {}",
+                    guest.instance, guest.manager
+                ));
+                let mut backend = SshIncus::new(
+                    guest,
+                    ssh_host(&self.config, &host),
+                    Duration::from_secs(self.config.incus_boot_timeout_secs),
                 );
+                match with_lifecycle(&mut backend, || {
+                    self.colmena
+                        .apply(&host, &system_path, DeployGoal::Switch)
+                }) {
+                    Ok(outcome) => outcome,
+                    Err(error) => {
+                        hard_failed.insert(host.clone());
+                        self.retries.delete(schedule, &host)?;
+                        self.notify_lifecycle_failure(
+                            schedule,
+                            &host,
+                            &format!("Incus lifecycle setup failed: {error:#}"),
+                            None,
+                        );
+                        continue;
+                    }
+                }
             } else {
+                LifecycleOutcome {
+                    operation: self
+                        .colmena
+                        .apply(&host, &system_path, DeployGoal::Switch),
+                    restoration_error: None,
+                    started: false,
+                }
+            };
+
+            let LifecycleOutcome {
+                operation,
+                restoration_error,
+                started,
+            } = lifecycle;
+            let output = match operation {
+                Ok(output) => output,
+                Err(error) if managed.is_some() => {
+                    hard_failed.insert(host.clone());
+                    self.retries.delete(schedule, &host)?;
+                    let restoration = restoration_error
+                        .map(|error| format!("\nState restoration also failed: {error:#}"))
+                        .unwrap_or_default();
+                    self.notify_lifecycle_failure(
+                        schedule,
+                        &host,
+                        &format!("Scheduled apply could not run: {error:#}{restoration}"),
+                        None,
+                    );
+                    continue;
+                }
+                Err(error) => return Err(error),
+            };
+            if started && restoration_error.is_none() {
+                phase(format!(
+                    "{host}: restored intermittent Incus instance to stopped"
+                ));
+            }
+            if let Some(error) = restoration_error {
+                if output.success() {
+                    deployed.push(self.host_change(&host, previous.as_deref(), &system_path));
+                }
                 hard_failed.insert(host.clone());
                 self.retries.delete(schedule, &host)?;
-                self.notify_host_failure(
-                    &format!("❌ {schedule}: {host} FAILED"),
-                    &output,
-                    &format!("Build log excerpt for {host} ({schedule})."),
+                self.notify_lifecycle_failure(
+                    schedule,
+                    &host,
+                    &format!(
+                        "Activation {} but the guest could not be restored to stopped: {error:#}",
+                        if output.success() { "succeeded" } else { "failed" }
+                    ),
+                    Some(&output),
                 );
+                continue;
+            }
+            had_warnings |= has_warnings(&output);
+            match scheduled_disposition(
+                managed.is_some(),
+                output.success(),
+                is_retryable(&output),
+            ) {
+                ScheduledDisposition::Succeeded => {
+                    phase(format!("{host}: first exact-path apply completed"));
+                    succeeded.insert(host.clone());
+                    deployed.push(self.host_change(&host, previous.as_deref(), &system_path));
+                    self.retries.delete(schedule, &host)?;
+                }
+                ScheduledDisposition::Deferred => {
+                    deferred.insert(host.clone());
+                    self.notifier.notify(
+                        &format!("⚠️ {schedule}: {host} deferred"),
+                        5,
+                        &format!(
+                            "First apply failed or timed out; retrying every 30 minutes until the next {schedule} build.\nSystem: {}\nLast 20 lines:\n{}",
+                            system_path.display(),
+                            output.tail(20)
+                        ),
+                    );
+                }
+                ScheduledDisposition::HardFailed => {
+                    hard_failed.insert(host.clone());
+                    self.retries.delete(schedule, &host)?;
+                    self.notify_host_failure(
+                        &format!("❌ {schedule}: {host} FAILED"),
+                        &output,
+                        &format!("Build log excerpt for {host} ({schedule})."),
+                    );
+                }
             }
         }
 
@@ -555,6 +650,28 @@ impl Controller {
         );
     }
 
+    fn notify_lifecycle_failure(
+        &self,
+        schedule: &str,
+        host: &str,
+        details: &str,
+        output: Option<&RunOutput>,
+    ) {
+        let email = match output {
+            Some(output) => format!(
+                "{details}\n\n{}",
+                deploy_log_email_body(output, "Scheduled Incus lifecycle log.")
+            ),
+            None => details.to_owned(),
+        };
+        self.notifier.notify_email(
+            &format!("❌ {schedule}: {host} Incus lifecycle FAILED"),
+            10,
+            details,
+            &email,
+        );
+    }
+
     /// Commit the working tree before building, and report whether it made a
     /// commit.
     ///
@@ -729,5 +846,59 @@ fn display_set(values: &BTreeSet<String>) -> String {
         "none".to_owned()
     } else {
         values.iter().cloned().collect::<Vec<_>>().join(" ")
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ScheduledDisposition {
+    Succeeded,
+    Deferred,
+    HardFailed,
+}
+
+fn scheduled_disposition(
+    intermittent: bool,
+    activation_succeeded: bool,
+    retryable: bool,
+) -> ScheduledDisposition {
+    if activation_succeeded {
+        ScheduledDisposition::Succeeded
+    } else if retryable && !intermittent {
+        ScheduledDisposition::Deferred
+    } else {
+        ScheduledDisposition::HardFailed
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{scheduled_disposition, ScheduledDisposition};
+
+    #[test]
+    fn ordinary_retryable_failure_is_deferred() {
+        assert_eq!(
+            scheduled_disposition(false, false, true),
+            ScheduledDisposition::Deferred
+        );
+    }
+
+    #[test]
+    fn intermittent_retryable_failure_is_hard_failed() {
+        assert_eq!(
+            scheduled_disposition(true, false, true),
+            ScheduledDisposition::HardFailed
+        );
+    }
+
+    #[test]
+    fn successful_activation_is_successful_for_both_host_types() {
+        assert_eq!(
+            scheduled_disposition(false, true, false),
+            ScheduledDisposition::Succeeded
+        );
+        assert_eq!(
+            scheduled_disposition(true, true, false),
+            ScheduledDisposition::Succeeded
+        );
     }
 }

@@ -17,11 +17,21 @@ pub struct Config {
     pub lan_domain: String,
     pub per_host_build_timeout: String,
     pub apply_timeout: String,
+    pub incus_boot_timeout_secs: u64,
     pub keep_roots: usize,
     pub notifications: NotificationConfig,
     pub summary: SummaryConfig,
     #[serde(default)]
     pub wol_macs: BTreeMap<String, String>,
+    #[serde(default)]
+    pub incus_guests: BTreeMap<String, IncusGuestConfig>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct IncusGuestConfig {
+    pub instance: String,
+    pub manager: String,
+    pub intermittent: bool,
 }
 
 /// Where deploy summaries come from and how much input the model may see.

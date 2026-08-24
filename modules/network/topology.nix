@@ -186,6 +186,10 @@ let
         ip = "10.73.73.30";
         mac = "bc:24:11:9d:2b:70";
       };
+      incus = {
+        manager = "server-nix";
+        intermittent = true;
+      };
       dns.enable = true;
       monitoring.enable = true;
     };
@@ -209,6 +213,10 @@ let
       lan = {
         ip = "10.73.73.41";
         mac = "bc:24:11:50:c5:51";
+      };
+      incus = {
+        manager = "server-nix";
+        intermittent = true;
       };
       dns.enable = true;
       # Only powered on to change settings, so scraping it would just show a

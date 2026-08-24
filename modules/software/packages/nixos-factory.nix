@@ -1,7 +1,20 @@
-{ pkgs, ... }:
+{
+  lib,
+  networkTopology,
+  pkgs,
+  ...
+}:
 
 let
   pythonWithYaml = pkgs.python3.withPackages (ps: [ ps.pyyaml ]);
+  factoryTopology = lib.mapAttrs (_: host: {
+    ip = host.lan.ip or null;
+    mac = host.lan.mac or null;
+    intermittent = host.incus.intermittent or false;
+  }) networkTopology.hosts;
+  factoryTopologyJson = pkgs.writeText "nixos-factory-topology.json" (
+    builtins.toJSON factoryTopology
+  );
 
   knownHostsManager = pkgs.writeText "known-hosts-manager.py" ''
     import sys
@@ -389,6 +402,7 @@ with open(sys.argv[2], 'w') as f:
     TOPOLOGY_NIX="$NIX_CONFIG/modules/network/topology.nix"
     KNOWN_HOSTS_FILE="$NIX_CONFIG/modules/ssh/known_hosts"
     SOPS_YAML="$NIX_CONFIG/.sops.yaml"
+    TOPOLOGY_JSON="${factoryTopologyJson}"
 
     server_cmd() {
       "$SSH" \
@@ -578,8 +592,28 @@ with open(sys.argv[2], 'w') as f:
       validate_hostname "$HOSTNAME"
 
       MANAGE_TOPOLOGY=false
-      if $GUM confirm "Add $HOSTNAME to topology and deploy AdGuard DNS?"; then
+      USE_EXISTING_TOPOLOGY=false
+      VERIFY_TOPOLOGY=false
+      INTERMITTENT=false
+      IP_ADDRESS=""
+      MAC_ADDR=""
+
+      if $JQ -e --arg host "$HOSTNAME" 'has($host)' "$TOPOLOGY_JSON" >/dev/null; then
+        IP_ADDRESS=$($JQ -r --arg host "$HOSTNAME" '.[$host].ip // empty' "$TOPOLOGY_JSON")
+        MAC_ADDR=$($JQ -r --arg host "$HOSTNAME" '.[$host].mac // empty' "$TOPOLOGY_JSON")
+        INTERMITTENT=$($JQ -r --arg host "$HOSTNAME" '.[$host].intermittent // false' "$TOPOLOGY_JSON")
+        if [ -z "$IP_ADDRESS" ] || [ -z "$MAC_ADDR" ]; then
+          $GUM style --foreground 196 --bold \
+            "$HOSTNAME exists in topology but does not have both a LAN IP and MAC"
+          exit 1
+        fi
+        USE_EXISTING_TOPOLOGY=true
+        VERIFY_TOPOLOGY=true
+        $GUM style --foreground 212 \
+          "Using existing topology: $HOSTNAME.lan → $IP_ADDRESS ($MAC_ADDR)"
+      elif $GUM confirm "Add $HOSTNAME to topology and deploy AdGuard DNS?"; then
         MANAGE_TOPOLOGY=true
+        VERIFY_TOPOLOGY=true
       fi
 
       # --- Pre-flight checks ---
@@ -602,7 +636,6 @@ with open(sys.argv[2], 'w') as f:
 
       # --- Collect parameters ---
 
-      IP_ADDRESS=""
       if [ "$MANAGE_TOPOLOGY" = true ]; then
         IP_ADDRESS=$($GUM input --placeholder "LAN IPv4 address (for example 10.73.73.31)")
         if [ -z "$IP_ADDRESS" ]; then exit 1; fi
@@ -614,10 +647,12 @@ with open(sys.argv[2], 'w') as f:
 
       # MAC can be manually specified (e.g. to match a DHCP reservation)
       # or auto-generated with a locally-administered prefix (02:xx:xx:xx:xx:xx).
-      MAC_ADDR=$($GUM input --placeholder "MAC address (leave blank to auto-generate)")
-      if [ -z "$MAC_ADDR" ]; then
-        MAC_ADDR=$(printf '02:%02X:%02X:%02X:%02X:%02X' $((RANDOM%256)) $((RANDOM%256)) $((RANDOM%256)) $((RANDOM%256)) $((RANDOM%256)))
-        $GUM style --foreground 212 "Generated MAC: $MAC_ADDR"
+      if [ "$USE_EXISTING_TOPOLOGY" = false ]; then
+        MAC_ADDR=$($GUM input --placeholder "MAC address (leave blank to auto-generate)")
+        if [ -z "$MAC_ADDR" ]; then
+          MAC_ADDR=$(printf '02:%02X:%02X:%02X:%02X:%02X' $((RANDOM%256)) $((RANDOM%256)) $((RANDOM%256)) $((RANDOM%256)) $((RANDOM%256)))
+          $GUM style --foreground 212 "Generated MAC: $MAC_ADDR"
+        fi
       fi
       validate_mac "$MAC_ADDR"
       MAC_ADDR=$(printf '%s' "$MAC_ADDR" | tr '[:upper:]' '[:lower:]')
@@ -630,7 +665,10 @@ with open(sys.argv[2], 'w') as f:
       echo "  MAC:       $MAC_ADDR"
       echo "  Store:     $NIX_HOST_MOUNT_BASE/$HOSTNAME"
       echo "  YAML:      $INSTANCES_YAML (will be updated)"
-      if [ "$MANAGE_TOPOLOGY" = true ]; then
+      if [ "$USE_EXISTING_TOPOLOGY" = true ]; then
+        echo "  Topology:  existing ($HOSTNAME.lan → $IP_ADDRESS)"
+        echo "  DNS:       unchanged"
+      elif [ "$MANAGE_TOPOLOGY" = true ]; then
         echo "  Topology:  $HOSTNAME.lan → $IP_ADDRESS"
         echo "  DNS:       deploy adguard-nix"
       else
@@ -767,7 +805,21 @@ with open(sys.argv[2], 'w') as f:
       # Append this instance to instances.yaml so incus-declarative-apply
       # and incus-sync know about it without needing a manual pull.
       echo "==> Adding $HOSTNAME to instances.yaml..."
-      cat >> "$INSTANCES_YAML" <<YAML
+      if [ "$INTERMITTENT" = true ]; then
+        cat >> "$INSTANCES_YAML" <<YAML
+
+$HOSTNAME:
+  type: "container"
+  profiles: ["nixos-lxc"]
+  config:
+    boot.autostart: "false"
+  devices:
+    root: { type: "disk", path: "/", pool: "$SELECTED_POOL", size: "4GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "$NIX_HOST_MOUNT_BASE/$HOSTNAME" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "$MAC_ADDR" }
+YAML
+      else
+        cat >> "$INSTANCES_YAML" <<YAML
 
 $HOSTNAME:
   type: "container"
@@ -778,6 +830,7 @@ $HOSTNAME:
     nix-store: { type: "disk", path: "/nix", source: "$NIX_HOST_MOUNT_BASE/$HOSTNAME" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "$MAC_ADDR" }
 YAML
+      fi
       INSTANCE_ADDED=true
 
       # --- Step 6: Start and wait for network ---
@@ -802,7 +855,7 @@ YAML
         rollback_create "Container did not acquire working network"
       fi
 
-      if [ "$MANAGE_TOPOLOGY" = true ]; then
+      if [ "$VERIFY_TOPOLOGY" = true ]; then
         if ! server_cmd incus query "/1.0/instances/$HOSTNAME/state" \
           | "$JQ" -e --arg ip "$IP_ADDRESS" \
             'any(.network.eth0.addresses[]?; .family == "inet" and .address == $ip)' \

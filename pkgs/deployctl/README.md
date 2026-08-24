@@ -20,6 +20,13 @@ the already-built closure later instead of evaluating a newer flake. A newer
 Daily, Weekly, or Monthly build for the same host supersedes retry state from
 every older cadence.
 
+Scheduled deployments for topology hosts marked as intermittent Incus guests
+preserve the guest's power state. A stopped guest is started through its Incus
+manager only after its closure has been built, then is stopped gracefully after
+the exact-path apply. Lifecycle failures are hard failures and are not queued
+for the ordinary unreachable-host retry timer. Manual deploys, retries, and
+rollbacks never change Incus power state.
+
 All deploy modes share one `flock`. Scheduled jobs wait for it; interactive
 deploys and retry passes skip when it is held. `build-nix` is ordered
 penultimate and `server-nix` last because those machines host the controller
@@ -32,6 +39,7 @@ and its Incus container.
 - `controller.rs`: manual, scheduled, retry, and rollback workflows.
 - `colmena.rs`: builds, exact-path copies/activation, Wake-on-LAN, and GC roots.
 - `hosts.rs`: Colmena selector expansion and safe deployment ordering.
+- `incus.rs`: scheduled intermittent-guest lifecycle orchestration.
 - `retry.rs`: atomic JSON records and their Nix GC roots.
 - `locking.rs`: the process-wide deployment lock.
 - `notifications.rs`: Gotify and email summaries.

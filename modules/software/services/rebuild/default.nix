@@ -12,6 +12,11 @@ let
   deployLockPath = "/run/lock/colmena-deploy.lock";
   retryStateDir = "/var/lib/colmena-deploy-retries";
   notifications = config.my.monitoring.notifications;
+  incusGuests = lib.mapAttrs (name: host: {
+    instance = name;
+    manager = networkTopology.lib.fqdn host.incus.manager;
+    intermittent = host.incus.intermittent or false;
+  }) (lib.filterAttrs (_: host: host ? incus) networkTopology.hosts);
 
   # Nix owns site-specific data; the Rust controller owns deployment behavior.
   deployctlConfig = (pkgs.formats.json { }).generate "deployctl.json" {
@@ -25,7 +30,9 @@ let
     lan_domain = networkTopology.domains.lan;
     per_host_build_timeout = "6h";
     apply_timeout = "90m";
+    incus_boot_timeout_secs = 180;
     keep_roots = 2;
+    incus_guests = incusGuests;
     notifications = {
       gotify_url = notifications.gotify.url;
       gotify_token_file = notifications.gotify.tokenFile;
