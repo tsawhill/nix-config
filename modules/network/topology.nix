@@ -41,7 +41,10 @@ let
       lan.ip = "10.73.73.3";
       dns.enable = true;
       monitoring.enable = true;
-      monitoring.networkDevices = [ "br0" ];
+      # The bridge device only counts traffic terminating on the host. Use its
+      # physical LAN member so server-nix reflects traffic crossing the box,
+      # including traffic forwarded to and from Incus guests.
+      monitoring.networkDevices = [ "lan0" ];
     };
     netgear-switch = {
       lan = {

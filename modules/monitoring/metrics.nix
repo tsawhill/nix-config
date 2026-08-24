@@ -82,7 +82,7 @@ let
 
   networkExpr =
     direction:
-    combineHostMetrics ''sum by (instance) (rate(node_network_${direction}_bytes_total{${nodeSelector},device=~"${independentNetworkDeviceRegex}"}[5m]))'' ''sum by (name) (rate(incus_network_${direction}_bytes_total{${incusSelector},device="eth0"}[5m]))'';
+    combineHostMetrics ''sum by (instance) (rate(node_network_${direction}_bytes_total{${nodeSelector},device=~"${independentNetworkDeviceRegex}"}[$__rate_interval]))'' ''sum by (name) (rate(incus_network_${direction}_bytes_total{${incusSelector},device="eth0"}[$__rate_interval]))'';
 
   diskExpr =
     direction:
