@@ -38,4 +38,4 @@ palworld-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGqCKfGRm25Dt77hMIGRPnm4h1G
 pufferpanel-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBb694rHRxlieAr0U4T95vW/Ds3+2zbNbIV4QiLvmzpV
 samba-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA2DvLOZJim3BWllYn0WZ1KUkBZ84Afb8h4AV3tvDCyB
 syncthing-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMQImR61c46TvHnqqs/dg3DzC/gljA0eY0Xw0m+GYDOg root@accepted-shark
-unifi-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOo+bqyboQXqvEMCAuUI0bEYCBESLE2Uq68+GbTBdFkW
+unifi-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIINsLbmWterwcfqSTq5xE7zoU3CZQw+z2Hs5YXGgtIx8 root@accepted-shark
