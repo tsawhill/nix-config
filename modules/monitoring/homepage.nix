@@ -490,13 +490,14 @@ in
                   {
                     type = "custom-api";
                     title = "Needs Attention";
+                    css-class = "needs-attention-widget";
                     cache = "1m";
                     url = "${prometheus}/api/v1/query";
                     parameters.query = alertsQuery;
                     template = ''
                       {{ $results := .JSON.Array "data.result" }}
                       {{ if eq (len $results) 0 }}
-                        <p class="color-positive size-h5">All hosts and services nominal</p>
+                        <style>.needs-attention-widget { display: none; }</style>
                       {{ else }}
                         <ul class="list list-gap-10">
                           {{ range $results }}
