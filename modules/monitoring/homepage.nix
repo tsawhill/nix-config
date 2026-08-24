@@ -474,6 +474,25 @@ in
         pages = [
           {
             name = "Home";
+            head-widgets = [
+              {
+                type = "search";
+                search-engine = "https://searx.tsawhill.org/search?q={QUERY}";
+                new-tab = false;
+                bangs = [
+                  {
+                    title = "Google";
+                    shortcut = "!g";
+                    url = "https://www.google.com/search?q={QUERY}";
+                  }
+                  {
+                    title = "DuckDuckGo";
+                    shortcut = "!ddg";
+                    url = "https://duckduckgo.com/?q={QUERY}";
+                  }
+                ];
+              }
+            ];
             columns = [
               {
                 size = "small";
