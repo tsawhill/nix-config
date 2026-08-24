@@ -734,6 +734,116 @@ let
             }
           ];
         }
+        (mkStat {
+          id = 21;
+          title = "VPN Tunnel";
+          x = 0;
+          y = 54;
+          w = 6;
+          expr = ''vpn_egress_tunnel_up{instance="networking-vpn-out-na1-nix"}'';
+          steps = [
+            {
+              color = "red";
+              value = null;
+            }
+            {
+              color = "green";
+              value = 1;
+            }
+          ];
+        })
+        (mkStat {
+          id = 22;
+          title = "VPN Handshake Age";
+          x = 6;
+          y = 54;
+          w = 6;
+          unit = "s";
+          expr = ''vpn_egress_handshake_age_seconds{instance="networking-vpn-out-na1-nix"}'';
+          steps = [
+            {
+              color = "green";
+              value = null;
+            }
+            {
+              color = "red";
+              value = 180;
+            }
+          ];
+        })
+        (mkStat {
+          id = 23;
+          title = "Blocked VPN Exits";
+          x = 12;
+          y = 54;
+          w = 6;
+          expr = ''vpn_egress_blocked_exit_ips{instance="networking-vpn-out-na1-nix"}'';
+          steps = [
+            {
+              color = "green";
+              value = null;
+            }
+            {
+              color = "yellow";
+              value = 1;
+            }
+          ];
+        })
+        (mkStat {
+          id = 24;
+          title = "VPN Rotations (24h)";
+          x = 18;
+          y = 54;
+          w = 6;
+          expr = ''sum(increase(vpn_egress_rotations_total{instance="networking-vpn-out-na1-nix"}[24h])) or vector(0)'';
+        })
+        {
+          id = 25;
+          title = "Current VPN Exit";
+          description = "The verified AirVPN endpoint and public exit address currently serving VPN clients.";
+          type = "table";
+          gridPos = {
+            h = 4;
+            w = 24;
+            x = 0;
+            y = 58;
+          };
+          datasource = promDatasource;
+          fieldConfig.defaults.custom = {
+            align = "auto";
+            cellOptions.type = "auto";
+            inspect = false;
+          };
+          options.showHeader = true;
+          targets = [
+            {
+              refId = "A";
+              datasource = promDatasource;
+              expr = ''vpn_egress_info{instance="networking-vpn-out-na1-nix"}'';
+              format = "table";
+              instant = true;
+              range = false;
+            }
+          ];
+          transformations = [
+            {
+              id = "organize";
+              options = {
+                excludeByName = {
+                  Time = true;
+                  Value = true;
+                  __name__ = true;
+                  job = true;
+                };
+                renameByName = {
+                  endpoint = "Endpoint";
+                  instance = "Host";
+                  public_ip = "Public IP";
+                };
+              };
+            }
+          ];
+        }
       ];
     }
   );

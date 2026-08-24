@@ -154,6 +154,9 @@ in
     "networking-dhcp-nix" =
       mkHost "weekly" "networking-dhcp-nix"
         "${self}/hosts/server-nix/LXCs/networking-dhcp.nix";
+    "networking-vpn-out-na1-nix" =
+      mkHost "weekly" "networking-vpn-out-na1-nix"
+        "${self}/hosts/server-nix/LXCs/networking-vpn-out-na1.nix";
     "nextcloud-nix" = mkHost "weekly" "nextcloud-nix" "${self}/hosts/server-nix/LXCs/nextcloud.nix";
     "jellyseerr-nix" = mkHost "weekly" "jellyseerr-nix" "${self}/hosts/server-nix/LXCs/jellyseerr.nix";
     "jellyfin-nix" = mkHost "weekly" "jellyfin-nix" "${self}/hosts/server-nix/LXCs/jellyfin.nix";

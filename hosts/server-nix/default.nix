@@ -68,6 +68,10 @@ in
 
   ];
   boot.binfmt.emulatedSystems = [ "aarch64-linux" ];
+  # Incus guests use the server's kernel. The dedicated VPN egress container
+  # therefore needs WireGuard loaded here rather than trying to load it inside
+  # its unprivileged container namespace.
+  boot.kernelModules = [ "wireguard" ];
   my.secrets = {
     gotify_token_zfs.enable = true;
     smtp_password_server.enable = true;

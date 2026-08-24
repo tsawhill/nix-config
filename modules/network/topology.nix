@@ -20,6 +20,7 @@ let
     "local-nginx-nix"
     "monitoring-nix"
     "nextcloud-nix"
+    "networking-vpn-out-na1-nix"
     "palworld-nix"
     "pufferpanel-nix"
     "samba-nix"
@@ -266,6 +267,14 @@ let
         enable = true;
         preferredAddress = "wgRemote";
       };
+    };
+    networking-vpn-out-na1-nix = {
+      lan = {
+        ip = "10.73.73.43";
+        mac = "02:5f:6e:64:7f:ef";
+      };
+      dns.enable = true;
+      monitoring.enable = true;
     };
     taylor-laptop-nix = {
       lan = {

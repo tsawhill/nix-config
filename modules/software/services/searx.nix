@@ -41,21 +41,30 @@
           engine = "startpage";
           shortcut = "sp";
           weight = 10;
-          categories = [ "general" "images" ];
+          categories = [
+            "general"
+            "images"
+          ];
         }
         {
-          name = "bing";
-          engine = "bing";
-          shortcut = "bi";
+          name = "google";
+          engine = "google";
+          shortcut = "g";
           weight = 1;
-          categories = [ "general" "images" ];
+          categories = [
+            "general"
+            "images"
+          ];
         }
         {
           name = "brave";
           engine = "brave";
           shortcut = "brave";
           weight = 1;
-          categories = [ "general" "images" ];
+          categories = [
+            "general"
+            "images"
+          ];
         }
 
         # --- Reference ---
