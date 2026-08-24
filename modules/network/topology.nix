@@ -1,7 +1,38 @@
 let
   lanDomain = "lan";
 
-  hosts = {
+  # Incus is the authoritative source for these guests' resource metrics. Keep
+  # the manager relationship in topology so deployment and monitoring can
+  # distinguish containers from independent hosts without separate host lists.
+  incusGuestNames = [
+    "adguard-nix"
+    "arrs-nix"
+    "authentik-nix"
+    "build-nix"
+    "deluge-nix"
+    "ffsync-nix"
+    "gotify-nix"
+    "homepage-nix"
+    "immich-nix"
+    "jellyfin-nix"
+    "jellyseerr-nix"
+    "llm-nix"
+    "local-nginx-nix"
+    "monitoring-nix"
+    "nextcloud-nix"
+    "palworld-nix"
+    "pufferpanel-nix"
+    "samba-nix"
+    "searx-nix"
+    "socks5-vpn-eu-nix"
+    "sunshine-nix"
+    "syncthing-nix"
+    "unbound-vpn-na-nix"
+    "unifi-nix"
+    "vaultwarden-nix"
+  ];
+
+  hostDefinitions = {
     opnsense = {
       lan.ip = "10.73.73.1";
       dns.enable = true;
@@ -10,6 +41,7 @@ let
       lan.ip = "10.73.73.3";
       dns.enable = true;
       monitoring.enable = true;
+      monitoring.networkDevices = [ "br0" ];
     };
     netgear-switch = {
       lan = {
@@ -187,7 +219,6 @@ let
         mac = "bc:24:11:9d:2b:70";
       };
       incus = {
-        manager = "server-nix";
         intermittent = true;
       };
       dns.enable = true;
@@ -215,7 +246,6 @@ let
         mac = "bc:24:11:50:c5:51";
       };
       incus = {
-        manager = "server-nix";
         intermittent = true;
       };
       dns.enable = true;
@@ -331,6 +361,21 @@ let
       monitoring.enable = true;
     };
   };
+
+  hosts = builtins.mapAttrs (
+    name: host:
+    host
+    // (
+      if builtins.elem name incusGuestNames then
+        {
+          incus = (host.incus or { }) // {
+            manager = "server-nix";
+          };
+        }
+      else
+        { }
+    )
+  ) hostDefinitions;
 
   fqdn = host: "${host}.${lanDomain}";
   lanIp = host: hosts.${host}.lan.ip;

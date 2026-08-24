@@ -15,8 +15,28 @@ let
   # so a host is registered in exactly one place. Hosts opt in with
   # `monitoring.enable = true`, which nixos-factory writes for every container
   # it creates; appliances and roaming machines simply omit it.
-  defaultHosts = lib.attrNames (
-    lib.filterAttrs (_: host: host.monitoring.enable or false) networkTopology.hosts
+  monitoredTopologyHosts = lib.filterAttrs (
+    _: host: host.monitoring.enable or false
+  ) networkTopology.hosts;
+  defaultHosts = lib.attrNames monitoredTopologyHosts;
+  incusHosts = lib.attrNames (lib.filterAttrs (_: host: host ? incus) monitoredTopologyHosts);
+  independentHosts = lib.attrNames (
+    lib.filterAttrs (_: host: !(host ? incus)) monitoredTopologyHosts
+  );
+  intermittentHosts = lib.attrNames (
+    lib.filterAttrs (_: host: host.incus.intermittent or false) monitoredTopologyHosts
+  );
+  mkHostRegex =
+    hosts: if hosts == [ ] then "a^" else "^(${lib.concatMapStringsSep "|" lib.escapeRegex hosts})$";
+  incusHostRegex = mkHostRegex incusHosts;
+  independentHostRegex = mkHostRegex independentHosts;
+  intermittentHostRegex = mkHostRegex intermittentHosts;
+  independentNetworkDeviceRegex = mkHostRegex (
+    lib.unique (
+      lib.concatMap (
+        host: networkTopology.hosts.${host}.monitoring.networkDevices or [ ]
+      ) independentHosts
+    )
   );
 
   fqdn = host: "${host}.${lanDomain}";
@@ -31,6 +51,42 @@ let
       replacement = "$1";
     }
   ];
+
+  nodeSelector = ''instance=~"$host",instance=~"${independentHostRegex}"'';
+  incusSelector = ''project="default",type="container",name=~"$host",name=~"${incusHostRegex}"'';
+
+  normaliseIncus = expression: ''
+    max by (instance) (
+      label_replace((${expression}), "instance", "$1", "name", "(.*)")
+    )
+  '';
+  combineHostMetrics = nodeExpression: incusExpression: ''
+    (${nodeExpression}) or (${normaliseIncus incusExpression})
+  '';
+
+  nodeCpuCores = ''count by (instance) (node_cpu_seconds_total{mode="idle",${nodeSelector}})'';
+  nodeCpuBusyFraction = ''1 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle",${nodeSelector}}[5m]))'';
+  incusCpuCores = "max by (name) (incus_cpu_effective_total{${incusSelector}})";
+  incusCpuUsedCores = ''sum by (name) (rate(incus_cpu_seconds_total{${incusSelector},mode=~"user|system"}[5m]))'';
+  cpuPercentExpr = combineHostMetrics "100 * (${nodeCpuBusyFraction})" "100 * (${incusCpuUsedCores}) / (${incusCpuCores})";
+  cpuUsedCoresExpr = combineHostMetrics "(${nodeCpuBusyFraction}) * on (instance) (${nodeCpuCores})" incusCpuUsedCores;
+  cpuAllocatedExpr = combineHostMetrics nodeCpuCores incusCpuCores;
+
+  nodeMemoryUsed = "node_memory_MemTotal_bytes{${nodeSelector}} - node_memory_MemAvailable_bytes{${nodeSelector}}";
+  nodeMemoryTotal = "node_memory_MemTotal_bytes{${nodeSelector}}";
+  incusMemoryUsed = "max by (name) (incus_memory_MemTotal_bytes{${incusSelector}} - incus_memory_MemAvailable_bytes{${incusSelector}})";
+  incusMemoryTotal = "max by (name) (incus_memory_MemTotal_bytes{${incusSelector}})";
+  memoryPercentExpr = combineHostMetrics "100 * (${nodeMemoryUsed}) / (${nodeMemoryTotal})" "100 * (${incusMemoryUsed}) / (${incusMemoryTotal})";
+  memoryUsedExpr = combineHostMetrics nodeMemoryUsed incusMemoryUsed;
+  memoryAllocatedExpr = combineHostMetrics nodeMemoryTotal incusMemoryTotal;
+
+  networkExpr =
+    direction:
+    combineHostMetrics ''sum by (instance) (rate(node_network_${direction}_bytes_total{${nodeSelector},device=~"${independentNetworkDeviceRegex}"}[5m]))'' ''sum by (name) (rate(incus_network_${direction}_bytes_total{${incusSelector},device="eth0"}[5m]))'';
+
+  diskExpr =
+    direction:
+    combineHostMetrics ''sum by (instance) (rate(node_disk_${direction}_bytes_total{${nodeSelector},device=~"sd[a-z]+|nvme[0-9]+n[0-9]+"}[5m]))'' "sum by (name) (rate(incus_disk_${direction}_bytes_total{${incusSelector}}[5m]))";
 
   defaultServiceChecks = [
     {
@@ -246,6 +302,181 @@ let
       ];
     };
 
+  resourceTable = {
+    id = 18;
+    title = "Current CPU & Memory";
+    description = "Current usage and the CPU/RAM allocated to each host or Incus guest.";
+    type = "table";
+    gridPos = {
+      h = 8;
+      w = 24;
+      x = 0;
+      y = 12;
+    };
+    datasource = promDatasource;
+    fieldConfig = {
+      defaults = {
+        custom = {
+          align = "auto";
+          cellOptions.type = "auto";
+          inspect = false;
+        };
+      };
+      overrides = [
+        {
+          matcher = {
+            id = "byName";
+            options = "CPU %";
+          };
+          properties = [
+            {
+              id = "unit";
+              value = "percent";
+            }
+            {
+              id = "decimals";
+              value = 1;
+            }
+          ];
+        }
+        {
+          matcher = {
+            id = "byName";
+            options = "CPU used (cores)";
+          };
+          properties = [
+            {
+              id = "unit";
+              value = "none";
+            }
+            {
+              id = "decimals";
+              value = 2;
+            }
+          ];
+        }
+        {
+          matcher = {
+            id = "byName";
+            options = "CPU allocated (cores)";
+          };
+          properties = [
+            {
+              id = "unit";
+              value = "none";
+            }
+            {
+              id = "decimals";
+              value = 0;
+            }
+          ];
+        }
+        {
+          matcher = {
+            id = "byRegexp";
+            options = "/^RAM (used|allocated)$/";
+          };
+          properties = [
+            {
+              id = "unit";
+              value = "bytes";
+            }
+            {
+              id = "decimals";
+              value = 2;
+            }
+          ];
+        }
+        {
+          matcher = {
+            id = "byName";
+            options = "RAM %";
+          };
+          properties = [
+            {
+              id = "unit";
+              value = "percent";
+            }
+            {
+              id = "decimals";
+              value = 1;
+            }
+          ];
+        }
+      ];
+    };
+    options = {
+      cellHeight = "sm";
+      showHeader = true;
+      footer.show = false;
+    };
+    transformations = [
+      {
+        id = "joinByField";
+        options = {
+          byField = "instance";
+          mode = "outer";
+        };
+      }
+      {
+        id = "organize";
+        options = {
+          excludeByName = {
+            Time = true;
+            "Time 1" = true;
+            "Time 2" = true;
+            "Time 3" = true;
+            "Time 4" = true;
+            "Time 5" = true;
+          };
+          indexByName = {
+            instance = 0;
+            "Value #A" = 1;
+            "Value #B" = 2;
+            "Value #C" = 3;
+            "Value #D" = 4;
+            "Value #E" = 5;
+            "Value #F" = 6;
+          };
+          renameByName = {
+            instance = "Host";
+            "Value #A" = "CPU %";
+            "Value #B" = "CPU used (cores)";
+            "Value #C" = "CPU allocated (cores)";
+            "Value #D" = "RAM %";
+            "Value #E" = "RAM used";
+            "Value #F" = "RAM allocated";
+          };
+        };
+      }
+    ];
+    targets =
+      lib.imap0
+        (index: target: {
+          refId = builtins.elemAt [
+            "A"
+            "B"
+            "C"
+            "D"
+            "E"
+            "F"
+          ] index;
+          datasource = promDatasource;
+          expr = target;
+          format = "table";
+          instant = true;
+          range = false;
+        })
+        [
+          cpuPercentExpr
+          cpuUsedCoresExpr
+          cpuAllocatedExpr
+          memoryPercentExpr
+          memoryUsedExpr
+          memoryAllocatedExpr
+        ];
+  };
+
   homelabDashboard = pkgs.writeText "homelab-overview-dashboard.json" (
     builtins.toJSON {
       uid = "homelab-overview";
@@ -294,7 +525,7 @@ let
           title = "Hosts Up";
           x = 0;
           y = 0;
-          expr = ''sum(up{job="node"})'';
+          expr = ''sum(up{job="node",instance!~"${intermittentHostRegex}"})'';
           steps = [
             {
               color = "red";
@@ -311,7 +542,7 @@ let
           title = "Hosts Down";
           x = 6;
           y = 0;
-          expr = ''count(up{job="node"} == 0) or vector(0)'';
+          expr = ''count(up{job="node",instance!~"${intermittentHostRegex}"} == 0) or vector(0)'';
           steps = [
             {
               color = "green";
@@ -360,75 +591,82 @@ let
         (mkGraph {
           id = 10;
           title = "CPU Busy";
+          description = "Percentage of each host's allocated logical CPUs currently in use; exact used/allocated values are listed below.";
           x = 0;
           y = 4;
           unit = "percent";
           max = 100;
-          expr = ''100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle",instance=~"$host"}[5m])) * 100)'';
+          expr = cpuPercentExpr;
         })
         (mkGraph {
           id = 11;
           title = "Memory Used";
+          description = "Percentage of each host's allocated memory currently in use; exact used/allocated values are listed below.";
           x = 12;
           y = 4;
           unit = "percent";
           max = 100;
-          expr = ''100 * (1 - (node_memory_MemAvailable_bytes{instance=~"$host"} / node_memory_MemTotal_bytes{instance=~"$host"}))'';
+          expr = memoryPercentExpr;
         })
+        resourceTable
         (mkGraph {
           id = 12;
           title = "Root Disk Used";
           x = 0;
-          y = 12;
+          y = 20;
           unit = "percent";
           max = 100;
           expr = ''100 * (1 - (node_filesystem_avail_bytes{instance=~"$host",mountpoint="/",fstype!~"tmpfs|overlay|ramfs"} / node_filesystem_size_bytes{instance=~"$host",mountpoint="/",fstype!~"tmpfs|overlay|ramfs"}))'';
         })
         (mkGraph {
           id = 13;
-          title = "Load (1m, per core)";
-          description = "Load average normalised by core count; sustained values above 1 mean the host is saturated.";
+          title = "CPU Used (logical cores)";
+          description = "Average logical CPU capacity in use; compare with the allocated totals in the table above.";
           x = 12;
-          y = 12;
+          y = 20;
           unit = "none";
           max = null;
-          expr = ''node_load1{instance=~"$host"} / on(instance) group_left count by (instance) (node_cpu_seconds_total{mode="idle",instance=~"$host"})'';
+          expr = cpuUsedCoresExpr;
         })
         (mkGraph {
           id = 14;
           title = "Network Received";
+          description = "Incus per-instance eth0 traffic for guests; br0 management traffic for server-nix. Bridge, tap, veth, loopback, and nested-container interfaces are not double-counted.";
           x = 0;
-          y = 20;
+          y = 28;
           unit = "Bps";
           max = null;
-          expr = ''sum by (instance) (rate(node_network_receive_bytes_total{instance=~"$host",device!~"lo|veth.*|docker.*|br-.*"}[5m]))'';
+          expr = networkExpr "receive";
         })
         (mkGraph {
           id = 15;
           title = "Network Transmitted";
+          description = "Incus per-instance eth0 traffic for guests; br0 management traffic for server-nix. Bridge, tap, veth, loopback, and nested-container interfaces are not double-counted.";
           x = 12;
-          y = 20;
+          y = 28;
           unit = "Bps";
           max = null;
-          expr = ''sum by (instance) (rate(node_network_transmit_bytes_total{instance=~"$host",device!~"lo|veth.*|docker.*|br-.*"}[5m]))'';
+          expr = networkExpr "transmit";
         })
         (mkGraph {
           id = 16;
           title = "Disk Read";
+          description = "Incus cgroup-attributed physical I/O for guests plus physical-device I/O for independent hosts.";
           x = 0;
-          y = 28;
+          y = 36;
           unit = "Bps";
           max = null;
-          expr = ''sum by (instance) (rate(node_disk_read_bytes_total{instance=~"$host"}[5m]))'';
+          expr = diskExpr "read";
         })
         (mkGraph {
           id = 17;
           title = "Disk Written";
+          description = "Incus cgroup-attributed physical I/O for guests plus physical-device I/O for independent hosts.";
           x = 12;
-          y = 28;
+          y = 36;
           unit = "Bps";
           max = null;
-          expr = ''sum by (instance) (rate(node_disk_written_bytes_total{instance=~"$host"}[5m]))'';
+          expr = diskExpr "written";
         })
         {
           id = 20;
@@ -439,7 +677,7 @@ let
             h = 10;
             w = 24;
             x = 0;
-            y = 36;
+            y = 44;
           };
           datasource = promDatasource;
           fieldConfig = {
@@ -510,6 +748,16 @@ in
         default = true;
         description = "Open exporter scrape ports on this host.";
       };
+
+      zfs = {
+        enable = lib.mkEnableOption "Prometheus ZFS pool exporter";
+
+        pools = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ ];
+          description = "ZFS pools whose capacity metrics should be exported.";
+        };
+      };
     };
 
     stack = {
@@ -519,6 +767,12 @@ in
         type = lib.types.listOf lib.types.str;
         default = defaultHosts;
         description = "Hostnames to scrape for node and systemd exporter metrics.";
+      };
+
+      zfsHosts = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [ ];
+        description = "Hostnames to scrape for ZFS pool capacity metrics.";
       };
 
       serviceChecks = lib.mkOption {
@@ -550,6 +804,19 @@ in
       };
     })
 
+    (lib.mkIf cfg.exporters.zfs.enable {
+      services.prometheus.exporters.zfs = {
+        enable = true;
+        openFirewall = cfg.exporters.openFirewall;
+        inherit (cfg.exporters.zfs) pools;
+        extraFlags = [
+          "--no-collector.dataset-filesystem"
+          "--no-collector.dataset-volume"
+          "--properties.pool=allocated,size"
+        ];
+      };
+    })
+
     (lib.mkIf stack.enable {
       services.prometheus = {
         enable = true;
@@ -578,7 +845,14 @@ in
               { targets = [ "127.0.0.1:8080" ]; }
             ];
           }
-        ];
+        ]
+        ++ lib.optional (stack.zfsHosts != [ ]) {
+          job_name = "zfs";
+          static_configs = [
+            { targets = map (mkTarget 9134) stack.zfsHosts; }
+          ];
+          relabel_configs = shortInstance;
+        };
       };
 
       services.grafana = {

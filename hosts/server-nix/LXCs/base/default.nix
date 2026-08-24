@@ -55,6 +55,10 @@ in
   };
   my.garbage.collection.generations = 1;
   my.monitoring.metrics.exporters.enable = true;
+  # /proc/diskstats is host-global inside these containers, so node_exporter
+  # would publish identical and misleading disk I/O for every guest. Incus's
+  # host-side metrics endpoint provides the attributable counters instead.
+  services.prometheus.exporters.node.disabledCollectors = [ "diskstats" ];
   environment.sessionVariables = {
     EDITOR = "nvim";
   };

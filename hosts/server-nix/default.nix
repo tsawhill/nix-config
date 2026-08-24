@@ -105,7 +105,18 @@ in
       trim.interval = "monthly";
     };
 
-    metrics.exporters.enable = true;
+    metrics.exporters = {
+      enable = true;
+      zfs = {
+        enable = true;
+        pools = [
+          "zpool"
+          "downloadHDD"
+          "downloadSSD"
+          "rpool"
+        ];
+      };
+    };
   };
   my.users.taylor = {
     enable = true;

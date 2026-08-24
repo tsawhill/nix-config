@@ -10,6 +10,16 @@ let
   lanDomain = networkTopology.domains.lan;
   prometheus = "http://${cfg.prometheusHost}.${lanDomain}:9090";
 
+  intermittentHosts = lib.attrNames (
+    lib.filterAttrs (_: host: host.incus.intermittent or false) networkTopology.hosts
+  );
+  intermittentHostRegex =
+    if intermittentHosts == [ ] then
+      "a^"
+    else
+      "^(${lib.concatMapStringsSep "|" lib.escapeRegex intermittentHosts})$";
+  zfsPoolRegex = "^(zpool|downloadHDD|downloadSSD|rpool)$";
+
   # One catalogue drives both the uptime checks and the bookmark tiles, so a
   # new service only has to be added once.
   defaultServices = [
@@ -214,13 +224,70 @@ let
     }
     // lib.optionalAttrs (s ? altStatus) { alt-status-codes = s.altStatus; };
 
+  asMeasurement = measurement: expression: ''
+    label_replace((${expression}), "measurement", "${measurement}", "", "")
+  '';
+
+  multiMeasurementQuery = measurements: lib.concatStringsSep " or " measurements;
+
+  cpuBusy = ''100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)'';
+  topCpuBusy = "topk(5, ${cpuBusy})";
+  memoryUsed = "node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes";
+  memoryPercent = "100 * (${memoryUsed}) / node_memory_MemTotal_bytes";
+  topMemoryPercent = "topk(5, ${memoryPercent})";
+  rootFilesystemFilter = ''mountpoint="/",fstype!~"tmpfs|overlay|ramfs"'';
+  rootUsed = "node_filesystem_size_bytes{${rootFilesystemFilter}} - node_filesystem_avail_bytes{${rootFilesystemFilter}}";
+  rootPercent = "100 * (${rootUsed}) / node_filesystem_size_bytes{${rootFilesystemFilter}}";
+  topRootPercent = "topk(5, ${rootPercent})";
+
+  cpuQuery = multiMeasurementQuery [
+    (asMeasurement "percent" topCpuBusy)
+    (asMeasurement "total" ''
+      count by (instance) (node_cpu_seconds_total{mode="idle"})
+        and on (instance) ${topCpuBusy}
+    '')
+  ];
+
+  memoryQuery = multiMeasurementQuery [
+    (asMeasurement "percent" topMemoryPercent)
+    (asMeasurement "used" "(${memoryUsed}) / 1073741824 and on (instance) ${topMemoryPercent}")
+    (asMeasurement "total" "node_memory_MemTotal_bytes / 1073741824 and on (instance) ${topMemoryPercent}")
+  ];
+
+  rootDiskQuery = multiMeasurementQuery [
+    (asMeasurement "percent" topRootPercent)
+    (asMeasurement "used" "(${rootUsed}) / 1073741824 and on (instance) ${topRootPercent}")
+    (asMeasurement "total" "node_filesystem_size_bytes{${rootFilesystemFilter}} / 1073741824 and on (instance) ${topRootPercent}")
+  ];
+
+  zfsPercent = ''
+    100 * zfs_pool_allocated_bytes{instance="server-nix",pool=~"${zfsPoolRegex}"}
+      / zfs_pool_size_bytes{instance="server-nix",pool=~"${zfsPoolRegex}"}
+  '';
+  zfsQuery = multiMeasurementQuery [
+    (asMeasurement "percent" zfsPercent)
+    (asMeasurement "used" ''zfs_pool_allocated_bytes{instance="server-nix",pool=~"${zfsPoolRegex}"} / 1099511627776'')
+    (asMeasurement "total" ''zfs_pool_size_bytes{instance="server-nix",pool=~"${zfsPoolRegex}"} / 1099511627776'')
+    (asMeasurement "online" ''
+      label_replace(
+        node_zfs_zpool_state{instance="server-nix",state="online",zpool=~"${zfsPoolRegex}"},
+        "pool", "$1", "zpool", "(.*)"
+      )
+    '')
+  ];
+
+  fleetQuery = multiMeasurementQuery [
+    (asMeasurement "up" ''sum(up{job="node",instance!~"${intermittentHostRegex}"}) or vector(0)'')
+    (asMeasurement "total" ''count(up{job="node",instance!~"${intermittentHostRegex}"}) or vector(0)'')
+  ];
+
   # Prometheus returns value[1] as a numeric string; gjson coerces it for us.
-  usageWidget = title: query: {
+  cpuWidget = {
     type = "custom-api";
-    inherit title;
+    title = "CPU Busy";
     cache = "1m";
     url = "${prometheus}/api/v1/query";
-    parameters.query = query;
+    parameters.query = cpuQuery;
     template = ''
       {{ $results := .JSON.Array "data.result" }}
       {{ if eq (len $results) 0 }}
@@ -228,27 +295,103 @@ let
       {{ else }}
         <ul class="list list-gap-10">
           {{ range $results }}
-            {{ $pct := .Float "value.1" }}
-            <li>
-              <div class="flex justify-between">
-                <span class="color-highlight text-truncate">{{ .String "metric.instance" }}</span>
-                <span class="size-h5">{{ printf "%.0f%%" $pct }}</span>
-              </div>
-              <div style="height:3px;background:var(--color-separator);margin-top:4px;">
-                <div style="height:3px;width:{{ printf "%.0f" $pct }}%;background:var(--color-primary);"></div>
-              </div>
-            </li>
+            {{ if eq (.String "metric.measurement") "percent" }}
+              {{ $instance := .String "metric.instance" }}
+              {{ $pct := .Float "value.1" }}
+              <li>
+                <div class="flex justify-between">
+                  <span class="color-highlight text-truncate">{{ $instance }}</span>
+                  <span class="size-h5">
+                    {{- printf "%.0f%% of " $pct -}}
+                    {{- range $results -}}
+                      {{- if and (eq (.String "metric.instance") $instance) (eq (.String "metric.measurement") "total") -}}
+                        {{- printf "%.0f logical CPUs" (.Float "value.1") -}}
+                      {{- end -}}
+                    {{- end -}}
+                  </span>
+                </div>
+                <div style="height:3px;background:var(--color-separator);margin-top:4px;">
+                  <div style="height:3px;width:{{ printf "%.0f" $pct }}%;background:var(--color-primary);"></div>
+                </div>
+              </li>
+            {{ end }}
           {{ end }}
         </ul>
       {{ end }}
     '';
   };
 
+  capacityWidget =
+    {
+      title,
+      query,
+      nameLabel ? "instance",
+      unit ? "GiB",
+      showHealth ? false,
+    }:
+    {
+      type = "custom-api";
+      inherit title;
+      cache = "1m";
+      url = "${prometheus}/api/v1/query";
+      parameters.query = query;
+      template = ''
+        {{ $results := .JSON.Array "data.result" }}
+        {{ if eq (len $results) 0 }}
+          <p class="color-subdue">no data</p>
+        {{ else }}
+          <ul class="list list-gap-10">
+            {{ range $results }}
+              {{ if eq (.String "metric.measurement") "percent" }}
+                {{ $name := .String "metric.${nameLabel}" }}
+                {{ $pct := .Float "value.1" }}
+                <li>
+                  <div class="flex justify-between">
+                    <span class="color-highlight text-truncate">{{ $name }}</span>
+                    ${lib.optionalString showHealth ''
+                      {{ range $results }}
+                        {{ if and (eq (.String "metric.${nameLabel}") $name) (eq (.String "metric.measurement") "online") }}
+                          {{ if eq (.String "value.1") "1" }}
+                            <span class="size-h6 color-positive">ONLINE</span>
+                          {{ else }}
+                            <span class="size-h6 color-negative">NOT ONLINE</span>
+                          {{ end }}
+                        {{ end }}
+                      {{ end }}
+                    ''}
+                  </div>
+                  <div class="flex justify-end size-h5">
+                    <span>
+                      {{- range $results -}}
+                        {{- if and (eq (.String "metric.${nameLabel}") $name) (eq (.String "metric.measurement") "used") -}}
+                          {{- printf "%.1f/" (.Float "value.1") -}}
+                        {{- end -}}
+                      {{- end -}}
+                      {{- range $results -}}
+                        {{- if and (eq (.String "metric.${nameLabel}") $name) (eq (.String "metric.measurement") "total") -}}
+                          {{- printf "%.1f" (.Float "value.1") -}}
+                        {{- end -}}
+                      {{- end -}}
+                      ${unit} ({{ printf "%.0f%%" $pct }})
+                    </span>
+                  </div>
+                  <div style="height:3px;background:var(--color-separator);margin-top:4px;">
+                    <div style="height:3px;width:{{ printf "%.0f" $pct }}%;background:var(--color-primary);"></div>
+                  </div>
+                </li>
+              {{ end }}
+            {{ end }}
+          </ul>
+        {{ end }}
+      '';
+    };
+
   alertsQuery = lib.concatStringsSep " or " [
     ''label_replace(100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > ${toString cfg.thresholds.cpu}, "alert", "cpu", "", "")''
     ''label_replace(100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) > ${toString cfg.thresholds.memory}, "alert", "memory", "", "")''
     ''label_replace(100 * (1 - node_filesystem_avail_bytes{mountpoint="/",fstype!~"tmpfs|overlay|ramfs"} / node_filesystem_size_bytes{mountpoint="/",fstype!~"tmpfs|overlay|ramfs"}) > ${toString cfg.thresholds.disk}, "alert", "disk", "", "")''
-    ''label_replace(up{job="node"} == 0, "alert", "down", "", "")''
+    ''label_replace(up{job="node",instance!~"${intermittentHostRegex}"} == 0, "alert", "down", "", "")''
+    ''label_replace(node_zfs_zpool_state{instance="server-nix",state!="online",zpool=~"${zfsPoolRegex}"} == 1, "alert", "zpool", "", "")''
   ];
 in
 {
@@ -363,6 +506,8 @@ in
                               <span class="size-h6 color-subdue">
                                 {{ if eq $kind "down" }}
                                   exporter down
+                                {{ else if eq $kind "zpool" }}
+                                  {{ .String "metric.zpool" }} {{ .String "metric.state" }}
                                 {{ else }}
                                   {{ $kind }} {{ printf "%.0f%%" (.Float "value.1") }}
                                 {{ end }}
@@ -379,8 +524,11 @@ in
                     cache = "2m";
                     sites = map mkMonitorSite cfg.services;
                   }
-                  (usageWidget "CPU Busy" ''topk(5, 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100))'')
-                  (usageWidget "Memory Used" "topk(5, 100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))")
+                  cpuWidget
+                  (capacityWidget {
+                    title = "Memory Used";
+                    query = memoryQuery;
+                  })
                 ];
               }
               {
@@ -395,15 +543,37 @@ in
                     title = "Fleet";
                     cache = "1m";
                     url = "${prometheus}/api/v1/query";
-                    parameters.query = ''sum(up{job="node"}) or vector(0)'';
+                    parameters.query = fleetQuery;
                     template = ''
+                      {{ $results := .JSON.Array "data.result" }}
                       <div class="flex justify-between">
                         <span class="color-subdue">Hosts up</span>
-                        <span class="size-h3 color-highlight">{{ (index (.JSON.Array "data.result") 0).Float "value.1" | printf "%.0f" }}</span>
+                        <span class="size-h3 color-highlight">
+                          {{- range $results -}}
+                            {{- if eq (.String "metric.measurement") "up" -}}
+                              {{- printf "%.0f/" (.Float "value.1") -}}
+                            {{- end -}}
+                          {{- end -}}
+                          {{- range $results -}}
+                            {{- if eq (.String "metric.measurement") "total" -}}
+                              {{- printf "%.0f" (.Float "value.1") -}}
+                            {{- end -}}
+                          {{- end -}}
+                        </span>
                       </div>
                     '';
                   }
-                  (usageWidget "Root Disk Used" ''topk(5, 100 * (1 - node_filesystem_avail_bytes{mountpoint="/",fstype!~"tmpfs|overlay|ramfs"} / node_filesystem_size_bytes{mountpoint="/",fstype!~"tmpfs|overlay|ramfs"}))'')
+                  (capacityWidget {
+                    title = "Root Disk Used";
+                    query = rootDiskQuery;
+                  })
+                  (capacityWidget {
+                    title = "Server ZFS Pools";
+                    query = zfsQuery;
+                    nameLabel = "pool";
+                    unit = "TiB";
+                    showHealth = true;
+                  })
                 ];
               }
             ];
