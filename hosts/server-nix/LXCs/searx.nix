@@ -20,6 +20,7 @@ in
 
   my.network.vpnEgress.client = {
     enable = vpnClientEnabled;
+    enableSearxWatchdog = true;
     gatewayAddress = networkTopology.lib.lanIp "networking-vpn-out-na1-nix";
     gatewayHost = networkTopology.lib.fqdn "networking-vpn-out-na1-nix";
     normalGateway = networkTopology.networks.lan.gateway;

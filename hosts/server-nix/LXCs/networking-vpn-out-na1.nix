@@ -46,7 +46,10 @@ in
     privateKeySecret = "vpn_egress_wireguard_private_key";
     presharedKeySecret = "vpn_egress_wireguard_preshared_key";
 
-    clientAddresses = [ (lanIp "searx-nix") ];
+    clientAddresses = [
+      (lanIp "searx-nix")
+      (lanIp "unbound-vpn-na-nix")
+    ];
     lanCidr = networkTopology.networks.lan.cidr;
     upstreamGateway = networkTopology.networks.lan.gateway;
     bypassRoutes = [
