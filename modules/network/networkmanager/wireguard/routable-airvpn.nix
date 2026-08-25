@@ -45,6 +45,12 @@ in
       description = "Optional AirVPN server profile to activate automatically.";
     };
 
+    enableWireless = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Whether NetworkManager should also start a Wi-Fi backend on the gateway.";
+    };
+
     peerPublicKey = lib.mkOption {
       type = lib.types.str;
       description = "Public key of the AirVPN peer for this dedicated device profile.";
@@ -137,6 +143,10 @@ in
 
   config = lib.mkIf cfg.enable {
     networking.networkmanager.enable = true;
+    # NetworkManager enables wpa_supplicant by default even on wired-only
+    # systems. Containers do not have /dev/rfkill, so keep that service out of
+    # the activation transaction unless this gateway explicitly needs Wi-Fi.
+    networking.wireless.enable = lib.mkForce cfg.enableWireless;
 
     my.network.airvpn = {
       enable = true;
