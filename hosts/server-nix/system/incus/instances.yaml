@@ -240,3 +240,12 @@ unifi-nix:
     root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/unifi-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:50:c5:51" }
+
+networking-vpn-out-na1-nix:
+  type: "container"
+  profiles: ["nixos-lxc"]
+  config: {}
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/networking-vpn-out-na1-nix" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "02:5f:6e:64:7f:ef" }

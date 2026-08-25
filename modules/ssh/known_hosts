@@ -23,6 +23,7 @@ jellyfin-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAeaK0Ra1oXfXmCX6zm8wfaXQcm
 jellyseerr-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAID0yjTA+0reP9iV8Kux4iuL5KTyUPaeW7UsEJd8Pfsjv
 llm-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPVp0FuCa4L/BtikcSR6OfLknJb8SfLTxofZZOtObfnA
 monitoring-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILvitGJPwEakrNFju9O1Y1rc2k+8ibo5+RGCysom6329
+networking-vpn-out-na1-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIvgW+lsm95s7os+KXUMT+ETVElCoCxZwvW3Q0OhO1Kg root@accepted-shark
 nextcloud-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFG3ffU1zfvBjLFj29FolIsxwL8sm/q8JszMF1mplXiE
 searx-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEkQnFXTyn5xJS70NwfnCyMnDfUyNF/c+8DZw94dd0MD
 socks5-vpn-eu-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILx2AagxI2lQWKPEFoCLDNOj+4OZ0NnJ/urVgQgiO0XP
