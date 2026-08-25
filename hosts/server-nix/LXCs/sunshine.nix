@@ -134,6 +134,17 @@ in
   services.desktopManager.plasma6.enable = true;
   services.displayManager.sddm.enable = false;
 
+  software.apps.gaming.enable = true;
+
+  # nvidia-runtime.nix bind-mounts the host driver over /run/opengl-driver, so
+  # the guest must not build its own. programs/steam.nix still reads package
+  # and package32, which graphics.nix only defines when enabled.
+  hardware.graphics = {
+    enable = lib.mkForce false;
+    package = pkgs.mesa;
+    package32 = pkgs.pkgsi686Linux.mesa;
+  };
+
   services.sunshine = {
     # KWin capture does not need CAP_SYS_ADMIN. Avoiding the capability wrapper
     # also preserves the EGL loader environment for Sunshine.
@@ -180,6 +191,13 @@ in
     ];
   };
   users.groups.games.gid = 1005;
+
+  # A lingering systemd --user never sources /etc/profile, so the session
+  # inherits no XDG_DATA_DIRS and Kickoff finds no .desktop files. Per-unit
+  # environments miss plasmashell, which Plasma starts from its own units.
+  systemd.user.extraConfig = ''
+    DefaultEnvironment=XDG_DATA_DIRS=/etc/profiles/per-user/${user}/share:/run/current-system/sw/share
+  '';
 
   # Without linger, user services never start on this headless container.
   systemd.tmpfiles.rules = [
