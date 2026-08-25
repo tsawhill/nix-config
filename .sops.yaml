@@ -334,6 +334,16 @@ creation_rules:
         - *searx-nix
   ##############################################################################
   #
+  #                         VPN egress gateway secrets
+  #
+  ##############################################################################
+  - path_regex: modules/secrets/server/LXCs/networking-vpn-out-na1-nix\.yaml$
+    key_groups:
+      - age:
+        - *build-nix
+        - *networking-vpn-out-na1-nix
+  ##############################################################################
+  #
   #                         Firefox Sync server secrets
   #
   ##############################################################################
