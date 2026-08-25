@@ -13,8 +13,7 @@ in
 {
   imports = [
     ./base
-    "${self}/modules/network/networkmanager/wireguard/airvpn.nix"
-    "${self}/modules/network/vpn-egress-gateway.nix"
+    "${self}/modules/network/networkmanager/wireguard/routable-airvpn.nix"
   ];
 
   networking.hostName = "networking-vpn-out-na1-nix";
@@ -34,7 +33,7 @@ in
   };
 
   my.secrets."networking-vpn-out-na1-nix".enable = vpnEnabled;
-  my.network.airvpn = {
+  my.network.routableAirvpn = {
     enable = vpnEnabled;
     address = "10.168.141.96/32";
     cities = [
@@ -46,15 +45,6 @@ in
     peerPublicKey = "PyLCXAQT8KkM4T+dUsOQfn+Ub3pGxfGlxkIApuig+hk=";
     privateKeySecret = "vpn_egress_wireguard_private_key";
     presharedKeySecret = "vpn_egress_wireguard_preshared_key";
-    allowedIPs = "0.0.0.0/0;";
-    dns = null;
-    peerRoutes = false;
-    neverDefault = true;
-    routeTable = 51820;
-  };
-
-  my.network.vpnEgress.gateway = {
-    enable = vpnEnabled;
 
     clientAddresses = [ (lanIp "searx-nix") ];
     lanCidr = networkTopology.networks.lan.cidr;
