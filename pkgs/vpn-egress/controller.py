@@ -85,14 +85,15 @@ class SystemRunner:
     def set_endpoint(self, endpoint: dict[str, Any]) -> None:
         self._run(
             [
-                self.commands["wg"],
-                "set",
-                self.config["interface"],
-                "peer",
-                self.config["peerPublicKey"],
-                "endpoint",
-                f'{endpoint["ip"]}:{endpoint["port"]}',
-            ]
+                self.commands["nmcli"],
+                "--wait",
+                str(self.config["probeTimeoutSeconds"]),
+                "connection",
+                "up",
+                "id",
+                endpoint["connectionId"],
+            ],
+            timeout=self.config["probeTimeoutSeconds"] + 2,
         )
 
     def public_ip(self) -> str:

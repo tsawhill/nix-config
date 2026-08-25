@@ -7,30 +7,54 @@
 }:
 
 let
-  # Provisioning is deliberately two-stage. Leave this false for the factory
-  # run; after the factory adds this host's age recipient, create its SOPS file,
-  # fill in tunnelAddress below, and flip this to true.
-  vpnEnabled = false;
+  vpnEnabled = true;
   inherit (networkTopology.lib) lanIp;
 in
 {
   imports = [
     ./base
+    "${self}/modules/network/networkmanager/wireguard/airvpn.nix"
     "${self}/modules/network/vpn-egress-gateway.nix"
   ];
 
   networking.hostName = "networking-vpn-out-na1-nix";
+  systemd.network.enable = lib.mkForce false;
+  networking.networkmanager = {
+    enable = true;
+    ensureProfiles.profiles.lan = {
+      connection = {
+        id = "lan";
+        type = "ethernet";
+        interface-name = "eth0";
+        autoconnect = "true";
+      };
+      ipv4.method = "auto";
+      ipv6.method = "disabled";
+    };
+  };
 
   my.secrets."networking-vpn-out-na1-nix".enable = vpnEnabled;
+  my.network.airvpn = {
+    enable = vpnEnabled;
+    address = "10.168.141.96/32";
+    cities = [
+      "Fremont-California"
+      "LosAngeles"
+      "Phoenix-Arizona"
+      "SanJose-California"
+    ];
+    peerPublicKey = "PyLCXAQT8KkM4T+dUsOQfn+Ub3pGxfGlxkIApuig+hk=";
+    privateKeySecret = "vpn_egress_wireguard_private_key";
+    presharedKeySecret = "vpn_egress_wireguard_preshared_key";
+    allowedIPs = "0.0.0.0/0;";
+    dns = null;
+    peerRoutes = false;
+    neverDefault = true;
+    routeTable = 51820;
+  };
+
   my.network.vpnEgress.gateway = {
     enable = vpnEnabled;
-
-    # Fill this with the IPv4 Interface/Address from the dedicated AirVPN
-    # WireGuard profile before enabling the gateway.
-    tunnelAddress = null;
-    # AirVPN currently uses this peer key across the existing device profiles;
-    # verify it against the dedicated profile before enabling.
-    peerPublicKey = "wwxzv1Fsw6egiLmJuwFKxqFD0lVwQrUKVnq+NmsXG20=";
 
     clientAddresses = [ (lanIp "searx-nix") ];
     lanCidr = networkTopology.networks.lan.cidr;
@@ -56,8 +80,6 @@ in
     gotifyUrl = "https://gotify.tsawhill.org/message";
   }
   // lib.optionalAttrs vpnEnabled {
-    privateKeyFile = config.sops.secrets.vpn_egress_wireguard_private_key.path;
-    presharedKeyFile = config.sops.secrets.vpn_egress_wireguard_preshared_key.path;
     gotifyTokenFile = config.sops.secrets.vpn_egress_gotify_token.path;
   };
 }

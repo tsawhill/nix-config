@@ -7,20 +7,8 @@
 
 let
   cfg = config.my.network.vpnEgress.gateway;
-  airvpn = import ./networkmanager/wireguard/airvpn-servers.nix;
-  validEndpointNames = lib.filter (name: builtins.hasAttr name airvpn.servers) cfg.endpointNames;
-  endpoints = map (
-    name:
-    let
-      server = airvpn.servers.${name};
-    in
-    {
-      inherit name;
-      inherit (server) ip;
-      port = airvpn.port;
-    }
-  ) validEndpointNames;
-  initialEndpoint = if endpoints == [ ] then null else builtins.head endpoints;
+  airvpnCfg = config.my.network.airvpn;
+  endpoints = airvpnCfg.endpoints;
   metricsDirectory = "/var/lib/prometheus-node-exporter-text-files";
   stateDirectory = "/var/lib/vpn-egress";
   controller = pkgs.writeShellScriptBin "vpn-egress-controller" ''
@@ -28,9 +16,9 @@ let
   '';
   controllerConfig = pkgs.writeText "vpn-egress-controller.json" (
     builtins.toJSON {
-      interface = cfg.interfaceName;
-      tunnelAddress = if cfg.tunnelAddress == null then "" else cfg.tunnelAddress;
-      peerPublicKey = if cfg.peerPublicKey == null then "" else cfg.peerPublicKey;
+      interface = airvpnCfg.interfaceName;
+      tunnelAddress = airvpnCfg.address;
+      peerPublicKey = if airvpnCfg.peerPublicKey == null then "" else airvpnCfg.peerPublicKey;
       inherit endpoints;
       allowedReasons = [
         "startup"
@@ -56,7 +44,7 @@ let
       lockFile = "${stateDirectory}/rotation.lock";
       commands = {
         wg = "${pkgs.wireguard-tools}/bin/wg";
-        ip = "${pkgs.iproute2}/bin/ip";
+        nmcli = "${pkgs.networkmanager}/bin/nmcli";
         curl = "${pkgs.curl}/bin/curl";
       };
     }
@@ -69,8 +57,7 @@ let
     );
   clientAddresses = lib.concatStringsSep ", " cfg.clientAddresses;
   clientSet = "{ ${clientAddresses} }";
-  tunnelIp =
-    if cfg.tunnelAddress == null then "0.0.0.0" else lib.head (lib.splitString "/" cfg.tunnelAddress);
+  tunnelIp = lib.head (lib.splitString "/" airvpnCfg.address);
   setupRoutes = pkgs.writeShellScript "vpn-egress-routes" ''
     set -eu
     IP=${pkgs.iproute2}/bin/ip
@@ -80,7 +67,6 @@ let
       $IP route replace ${route.cidr} via ${route.gateway} dev ${cfg.upstreamInterface} table ${toString cfg.routingTable}
     '') cfg.bypassRoutes}
     $IP route replace blackhole default metric 32760 table ${toString cfg.routingTable}
-    $IP route replace default dev ${cfg.interfaceName} metric 10 table ${toString cfg.routingTable}
 
     $IP rule add priority 900 from ${tunnelIp}/32 table ${toString cfg.routingTable} 2>/dev/null || true
     ${lib.concatMapStringsSep "\n" (address: ''
@@ -103,47 +89,7 @@ let
 in
 {
   options.my.network.vpnEgress.gateway = {
-    enable = lib.mkEnableOption "a dedicated health-driven WireGuard VPN egress gateway";
-
-    interfaceName = lib.mkOption {
-      type = lib.types.str;
-      default = "wg-airvpn";
-    };
-    tunnelAddress = lib.mkOption {
-      type = lib.types.nullOr lib.types.str;
-      default = null;
-      example = "10.128.0.2/32";
-      description = "AirVPN-assigned IPv4 tunnel address from the dedicated device profile.";
-    };
-    peerPublicKey = lib.mkOption {
-      type = lib.types.nullOr lib.types.str;
-      default = null;
-      description = "AirVPN WireGuard peer public key from the dedicated device profile.";
-    };
-    privateKeyFile = lib.mkOption {
-      type = lib.types.nullOr (lib.types.coercedTo lib.types.path toString lib.types.str);
-      default = null;
-    };
-    presharedKeyFile = lib.mkOption {
-      type = lib.types.nullOr (lib.types.coercedTo lib.types.path toString lib.types.str);
-      default = null;
-    };
-    endpointNames = lib.mkOption {
-      type = lib.types.listOf lib.types.str;
-      default = [
-        "Aquila"
-        "Bunda"
-        "Guniibuu"
-        "Imai"
-        "Khambalia"
-        "Maia"
-        "Revati"
-        "Sarin"
-        "Sheratan"
-        "Xamidimura"
-      ];
-      description = "AirVPN endpoint names used for health-driven rotation.";
-    };
+    enable = lib.mkEnableOption "health-driven gateway routing around NetworkManager AirVPN profiles";
     clientAddresses = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [ ];
@@ -239,20 +185,21 @@ in
   config = lib.mkIf cfg.enable {
     assertions = [
       {
-        assertion = cfg.tunnelAddress != null;
-        message = "my.network.vpnEgress.gateway.tunnelAddress must come from the dedicated AirVPN profile.";
+        assertion = airvpnCfg.enable;
+        message = "VPN egress gateway requires my.network.airvpn.enable.";
       }
       {
-        assertion = cfg.peerPublicKey != null;
-        message = "my.network.vpnEgress.gateway.peerPublicKey must come from the dedicated AirVPN profile.";
+        assertion = airvpnCfg.peerPublicKey != null;
+        message = "VPN egress gateway requires my.network.airvpn.peerPublicKey from its dedicated AirVPN profile.";
       }
       {
-        assertion = cfg.privateKeyFile != null && cfg.presharedKeyFile != null;
-        message = "VPN egress privateKeyFile and presharedKeyFile must be configured as runtime secret paths.";
+        assertion = endpoints != [ ];
+        message = "VPN egress gateway requires at least one selected my.network.airvpn endpoint.";
       }
       {
-        assertion = validEndpointNames == cfg.endpointNames && endpoints != [ ];
-        message = "Every VPN egress endpointNames entry must exist in airvpn-servers.nix.";
+        assertion =
+          !airvpnCfg.peerRoutes && airvpnCfg.neverDefault && airvpnCfg.routeTable == cfg.routingTable;
+        message = "VPN egress requires AirVPN peerRoutes = false, neverDefault = true, and the same routeTable.";
       }
       {
         assertion = cfg.clientAddresses != [ ];
@@ -291,36 +238,16 @@ in
 
             chain forward {
               type filter hook forward priority filter; policy drop;
-              iifname "${cfg.upstreamInterface}" ip saddr ${clientSet} oifname "${cfg.interfaceName}" accept
-              iifname "${cfg.interfaceName}" ip daddr ${clientSet} oifname "${cfg.upstreamInterface}" ct state established,related accept
+              iifname "${cfg.upstreamInterface}" ip saddr ${clientSet} oifname "${airvpnCfg.interfaceName}" accept
+              iifname "${airvpnCfg.interfaceName}" ip daddr ${clientSet} oifname "${cfg.upstreamInterface}" ct state established,related accept
             }
 
             chain postrouting {
               type nat hook postrouting priority srcnat; policy accept;
-              ip saddr ${clientSet} oifname "${cfg.interfaceName}" masquerade
+              ip saddr ${clientSet} oifname "${airvpnCfg.interfaceName}" masquerade
             }
           '';
         };
-      };
-      wireguard.interfaces.${cfg.interfaceName} = {
-        ips = lib.optional (cfg.tunnelAddress != null) cfg.tunnelAddress;
-        privateKeyFile =
-          if cfg.privateKeyFile == null then "/run/missing-vpn-private-key" else cfg.privateKeyFile;
-        allowedIPsAsRoutes = false;
-        peers = [
-          {
-            publicKey = if cfg.peerPublicKey == null then "missing" else cfg.peerPublicKey;
-            presharedKeyFile =
-              if cfg.presharedKeyFile == null then "/run/missing-vpn-preshared-key" else cfg.presharedKeyFile;
-            allowedIPs = [ "0.0.0.0/0" ];
-            endpoint =
-              if initialEndpoint == null then
-                "127.0.0.1:1"
-              else
-                "${initialEndpoint.ip}:${toString initialEndpoint.port}";
-            persistentKeepalive = 25;
-          }
-        ];
       };
     };
 
@@ -344,10 +271,14 @@ in
       after = [
         "network-online.target"
         "nftables.service"
-        "systemd-networkd.service"
+        "NetworkManager.service"
+        "NetworkManager-wait-online.service"
       ];
       wants = [ "network-online.target" ];
-      requires = [ "nftables.service" ];
+      requires = [
+        "NetworkManager.service"
+        "nftables.service"
+      ];
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;

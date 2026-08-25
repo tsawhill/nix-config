@@ -6,8 +6,9 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import Mock
 
-from controller import Controller, parse_remote_command, rotation_lock
+from controller import Controller, SystemRunner, parse_remote_command, rotation_lock
 from searx_watchdog import Watchdog, is_startpage_block, render_metrics
 
 
@@ -40,9 +41,24 @@ def config(directory):
         "stateFile": str(Path(directory) / "state.json"),
         "lockFile": str(Path(directory) / "lock"),
         "endpoints": [
-            {"name": "one", "ip": "192.0.2.1", "port": 1637},
-            {"name": "two", "ip": "192.0.2.2", "port": 1637},
-            {"name": "three", "ip": "192.0.2.3", "port": 1637},
+            {
+                "name": "one",
+                "ip": "192.0.2.1",
+                "port": 1637,
+                "connectionId": "wg-airvpn-one",
+            },
+            {
+                "name": "two",
+                "ip": "192.0.2.2",
+                "port": 1637,
+                "connectionId": "wg-airvpn-two",
+            },
+            {
+                "name": "three",
+                "ip": "192.0.2.3",
+                "port": 1637,
+                "connectionId": "wg-airvpn-three",
+            },
         ],
         "allowedReasons": ["startup", "tunnel-unhealthy", "searx-startpage-blocked"],
         "remoteAllowedReasons": ["searx-startpage-blocked"],
@@ -128,6 +144,33 @@ class ControllerTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 with rotation_lock(path):
                     pass
+
+    def test_system_runner_activates_the_networkmanager_profile(self):
+        runner = SystemRunner(
+            {
+                "commands": {"nmcli": "/run/current-system/sw/bin/nmcli"},
+                "probeTimeoutSeconds": 10,
+            }
+        )
+        runner._run = Mock()
+        runner.set_endpoint(
+            {
+                "name": "two",
+                "connectionId": "wg-airvpn-two",
+            }
+        )
+        runner._run.assert_called_once_with(
+            [
+                "/run/current-system/sw/bin/nmcli",
+                "--wait",
+                "10",
+                "connection",
+                "up",
+                "id",
+                "wg-airvpn-two",
+            ],
+            timeout=12,
+        )
 
 
 class WatchdogTests(unittest.TestCase):
