@@ -62,6 +62,7 @@ def config(directory):
         ],
         "allowedReasons": ["startup", "tunnel-unhealthy", "searx-startpage-blocked"],
         "remoteAllowedReasons": ["searx-startpage-blocked"],
+        "blockedExitReasons": ["searx-startpage-blocked"],
         "cooldownSeconds": 600,
         "blockedExitTtlSeconds": 86400,
         "maxCandidateAttempts": 3,
@@ -105,6 +106,14 @@ class ControllerTests(unittest.TestCase):
         controller.state.update({"currentEndpoint": "one", "currentPublicIp": "198.51.100.1"})
         controller.rotate("searx-startpage-blocked")
         self.assertEqual(controller.state["blockedExits"]["198.51.100.1"], 87400)
+
+    def test_other_rotation_reasons_do_not_block_current_exit(self):
+        runner = Runner({"two": "198.51.100.2"})
+        controller = self.make(runner)
+        controller.config["allowedReasons"].append("low-download-speed")
+        controller.state.update({"currentEndpoint": "one", "currentPublicIp": "198.51.100.1"})
+        controller.rotate("low-download-speed")
+        self.assertNotIn("198.51.100.1", controller.state["blockedExits"])
 
     def test_shared_blocked_exit_is_skipped(self):
         runner = Runner({"two": "198.51.100.1", "three": "198.51.100.3"})

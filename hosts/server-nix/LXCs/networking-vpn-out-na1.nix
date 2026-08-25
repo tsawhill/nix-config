@@ -69,6 +69,7 @@ in
         allowedReasons = [ "searx-startpage-blocked" ];
       }
     ];
+    blockedExitReasons = [ "searx-startpage-blocked" ];
 
     gotifyUrl = "https://gotify.tsawhill.org/message";
   }

@@ -229,7 +229,7 @@ class Controller:
 
         previous_endpoint = self.state.get("currentEndpoint")
         previous_public_ip = self.state.get("currentPublicIp")
-        if reason == "searx-startpage-blocked" and previous_public_ip:
+        if reason in self.config.get("blockedExitReasons", []) and previous_public_ip:
             self.state.setdefault("blockedExits", {})[previous_public_ip] = (
                 now + self.config["blockedExitTtlSeconds"]
             )

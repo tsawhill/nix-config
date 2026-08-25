@@ -95,6 +95,47 @@ in
       description = "Source- and key-restricted endpoint-rotation clients.";
     };
 
+    blockedExitReasons = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      description = "Rotation reasons which temporarily block reuse of the current public exit IP.";
+    };
+
+    portForwards = lib.mkOption {
+      type = lib.types.listOf (
+        lib.types.submodule {
+          options = {
+            protocols = lib.mkOption {
+              type = lib.types.listOf (
+                lib.types.enum [
+                  "tcp"
+                  "udp"
+                ]
+              );
+              default = [
+                "tcp"
+                "udp"
+              ];
+            };
+            port = lib.mkOption {
+              type = lib.types.port;
+              description = "Port assigned by AirVPN and received on the tunnel.";
+            };
+            destinationAddress = lib.mkOption {
+              type = lib.types.str;
+              description = "Authorized VPN client's LAN IPv4 address.";
+            };
+            destinationPort = lib.mkOption {
+              type = lib.types.nullOr lib.types.port;
+              default = null;
+            };
+          };
+        }
+      );
+      default = [ ];
+      description = "Inbound AirVPN ports forwarded to authorized VPN clients.";
+    };
+
     upstreamInterface = lib.mkOption {
       type = lib.types.str;
       default = "eth0";
@@ -170,11 +211,13 @@ in
     my.network.vpnEgress.gateway = {
       enable = true;
       inherit (cfg)
+        blockedExitReasons
         bypassRoutes
         clientAddresses
         gotifyTokenFile
         gotifyUrl
         lanCidr
+        portForwards
         remoteTriggers
         routingTable
         upstreamGateway

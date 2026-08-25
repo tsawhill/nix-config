@@ -20,18 +20,21 @@ let
       tunnelAddress = airvpnCfg.address;
       peerPublicKey = if airvpnCfg.peerPublicKey == null then "" else airvpnCfg.peerPublicKey;
       inherit endpoints;
-      allowedReasons = [
-        "startup"
-        "tunnel-unhealthy"
-        "searx-startpage-blocked"
-        "low-download-speed"
-      ];
       remoteAllowedReasons = lib.unique (
         lib.concatMap (trigger: trigger.allowedReasons) cfg.remoteTriggers
+      );
+      allowedReasons = lib.unique (
+        [
+          "startup"
+          "tunnel-unhealthy"
+          "low-download-speed"
+        ]
+        ++ lib.concatMap (trigger: trigger.allowedReasons) cfg.remoteTriggers
       );
       inherit (cfg)
         cooldownSeconds
         blockedExitTtlSeconds
+        blockedExitReasons
         maxCandidateAttempts
         maxHandshakeAgeSeconds
         healthFailuresBeforeRotation
@@ -57,6 +60,23 @@ let
     );
   clientAddresses = lib.concatStringsSep ", " cfg.clientAddresses;
   clientSet = "{ ${clientAddresses} }";
+  destinationPort =
+    forward: if forward.destinationPort == null then forward.port else forward.destinationPort;
+  portForwardKeys = lib.concatMap (
+    forward: map (protocol: "${protocol}:${toString forward.port}") forward.protocols
+  ) cfg.portForwards;
+  portForwardNatRules = lib.concatMapStringsSep "\n" (
+    forward:
+    lib.concatMapStringsSep "\n" (protocol: ''
+      iifname "${airvpnCfg.interfaceName}" ${protocol} dport ${toString forward.port} dnat ip to ${forward.destinationAddress}:${toString (destinationPort forward)}
+    '') forward.protocols
+  ) cfg.portForwards;
+  portForwardFilterRules = lib.concatMapStringsSep "\n" (
+    forward:
+    lib.concatMapStringsSep "\n" (protocol: ''
+      iifname "${airvpnCfg.interfaceName}" oifname "${cfg.upstreamInterface}" ip daddr ${forward.destinationAddress} ${protocol} dport ${toString (destinationPort forward)} accept
+    '') forward.protocols
+  ) cfg.portForwards;
   tunnelIp = lib.head (lib.splitString "/" airvpnCfg.address);
   setupRoutes = pkgs.writeShellScript "vpn-egress-routes" ''
     set -eu
@@ -116,6 +136,47 @@ in
       );
       default = [ ];
       description = "Source- and key-restricted remote rotation clients.";
+    };
+    blockedExitReasons = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      description = "Rotation reasons which temporarily block reuse of the current public exit IP.";
+    };
+    portForwards = lib.mkOption {
+      type = lib.types.listOf (
+        lib.types.submodule {
+          options = {
+            protocols = lib.mkOption {
+              type = lib.types.listOf (
+                lib.types.enum [
+                  "tcp"
+                  "udp"
+                ]
+              );
+              default = [
+                "tcp"
+                "udp"
+              ];
+              description = "Transport protocols forwarded for this AirVPN port.";
+            };
+            port = lib.mkOption {
+              type = lib.types.port;
+              description = "Port assigned by AirVPN and received on the tunnel.";
+            };
+            destinationAddress = lib.mkOption {
+              type = lib.types.str;
+              description = "Authorized VPN client's LAN IPv4 address.";
+            };
+            destinationPort = lib.mkOption {
+              type = lib.types.nullOr lib.types.port;
+              default = null;
+              description = "LAN destination port; defaults to the AirVPN port.";
+            };
+          };
+        }
+      );
+      default = [ ];
+      description = "Inbound AirVPN ports DNATed to explicitly authorized VPN clients.";
     };
     upstreamInterface = lib.mkOption {
       type = lib.types.str;
@@ -206,9 +267,22 @@ in
         message = "VPN egress must have at least one explicitly allowed clientAddress.";
       }
       {
-        assertion =
-          cfg.remoteTriggers != [ ] && lib.all (trigger: trigger.allowedReasons != [ ]) cfg.remoteTriggers;
-        message = "VPN egress requires at least one restricted remote trigger with an allowed reason.";
+        assertion = lib.all (trigger: trigger.allowedReasons != [ ]) cfg.remoteTriggers;
+        message = "Every VPN egress remote trigger must have an allowed reason.";
+      }
+      {
+        assertion = lib.all (forward: forward.protocols != [ ]) cfg.portForwards;
+        message = "Every VPN egress port forward must select at least one protocol.";
+      }
+      {
+        assertion = lib.all (
+          forward: builtins.elem forward.destinationAddress cfg.clientAddresses
+        ) cfg.portForwards;
+        message = "Every VPN egress port-forward destination must also be an authorized clientAddress.";
+      }
+      {
+        assertion = lib.unique portForwardKeys == portForwardKeys;
+        message = "VPN egress port forwards cannot reuse the same protocol and AirVPN port.";
       }
       {
         assertion = cfg.gotifyUrl != null && cfg.gotifyTokenFile != null;
@@ -240,6 +314,12 @@ in
               type filter hook forward priority filter; policy drop;
               iifname "${cfg.upstreamInterface}" ip saddr ${clientSet} oifname "${airvpnCfg.interfaceName}" accept
               iifname "${airvpnCfg.interfaceName}" ip daddr ${clientSet} oifname "${cfg.upstreamInterface}" ct state established,related accept
+              ${portForwardFilterRules}
+            }
+
+            chain prerouting {
+              type nat hook prerouting priority dstnat; policy accept;
+              ${portForwardNatRules}
             }
 
             chain postrouting {
