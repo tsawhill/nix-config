@@ -6,7 +6,7 @@
 }:
 
 let
-  credentialsPath = "/run/secrets/smb-nix-config-credentials";
+  credentialsPath = "/run/secrets/smb-desktop-credentials";
   sambaHost = networkTopology.lib.fqdn "samba-nix";
   automountOptions = "x-systemd.automount,noauto,nofail,x-systemd.idle-timeout=60,x-systemd.device-timeout=5s,x-systemd.mount-timeout=5s,x-systemd.requires=network-online.target,x-systemd.after=network-online.target,_netdev";
   mountOptions = "${automountOptions},credentials=${credentialsPath},uid=1000,mfsymlinks";
@@ -16,7 +16,7 @@ in
   my.secrets.immobile0783-pass.enable = true;
   sops.secrets.immobile0783-pass.neededForUsers = lib.mkForce false;
 
-  sops.templates."smb-nix-config-credentials" = {
+  sops.templates."smb-desktop-credentials" = {
     content = ''
       username=immobile0783
       domain=taylor-home
@@ -24,12 +24,6 @@ in
     '';
     path = credentialsPath;
     mode = "0400";
-  };
-
-  fileSystems."/mnt/nix-config" = {
-    device = "//${sambaHost}/nix-configs/";
-    fsType = "cifs";
-    options = [ mountOptions ];
   };
 
   fileSystems."/mnt/downloadHDD" = {
