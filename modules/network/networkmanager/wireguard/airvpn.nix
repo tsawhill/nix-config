@@ -165,15 +165,13 @@ in
           };
         }
       );
-      default = [ ];
+      default = endpoints;
       readOnly = true;
       description = "Selected AirVPN NetworkManager profiles for health-driven consumers.";
     };
   };
 
   config = lib.mkIf cfg.enable {
-    my.network.airvpn.endpoints = endpoints;
-
     assertions = [
       {
         assertion = cfg.autoconnect == null || selectedServers ? ${cfg.autoconnect};
