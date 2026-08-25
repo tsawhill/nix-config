@@ -6,9 +6,7 @@
 }:
 
 let
-  # Enable only after networking-vpn-out-na1-nix is provisioned, has a verified
-  # tunnel, and has passed the no-leak acceptance check.
-  vpnClientEnabled = false;
+  vpnClientEnabled = true;
 in
 {
   imports = [
