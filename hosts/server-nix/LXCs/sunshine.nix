@@ -192,11 +192,13 @@ in
   };
   users.groups.games.gid = 1005;
 
-  # A lingering systemd --user never sources /etc/profile, so the session
-  # inherits no XDG_DATA_DIRS and Kickoff finds no .desktop files. Per-unit
-  # environments miss plasmashell, which Plasma starts from its own units.
+  # No display manager runs here, so nothing supplies the session environment
+  # and a lingering systemd --user never sources /etc/profile. Plasma starts
+  # plasmashell from its own units, which inherit the manager, not the units
+  # above. Kickoff resolves $XDG_MENU_PREFIX + applications.menu, and only
+  # plasma-applications.menu exists, so without the prefix the menu is empty.
   systemd.user.extraConfig = ''
-    DefaultEnvironment=XDG_DATA_DIRS=/etc/profiles/per-user/${user}/share:/run/current-system/sw/share
+    DefaultEnvironment=XDG_DATA_DIRS=/etc/profiles/per-user/${user}/share:/run/current-system/sw/share XDG_MENU_PREFIX=plasma- XDG_CURRENT_DESKTOP=KDE
   '';
 
   # Without linger, user services never start on this headless container.
