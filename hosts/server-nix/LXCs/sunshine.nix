@@ -183,6 +183,7 @@ in
   users.users.taylor = {
     isNormalUser = true;
     extraGroups = [
+      "download"
       "games"
       "wheel"
       "video"
@@ -190,6 +191,7 @@ in
       "render"
     ];
   };
+  users.groups.download.gid = 1001;
   users.groups.games.gid = 1005;
 
   # No display manager runs here, so nothing supplies the session environment

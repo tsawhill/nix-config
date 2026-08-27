@@ -184,7 +184,7 @@ socks5-vpn-eu-nix:
 
 sunshine-nix:
   type: "container"
-  profiles: ["nixos-lxc", "nvidia-gpu", "gameSSD-mount"]
+  profiles: ["nixos-lxc", "nvidia-gpu", "gameSSD-mount", "downloadHDD-mount", "roms-mount"]
   config:
     limits.cpu: "4"
     limits.memory: "8GiB"
