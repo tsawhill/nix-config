@@ -58,6 +58,16 @@ deluge-nix:
     root: { type: "disk", path: "/", pool: "rpool", size: "12GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/deluge-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:43:7d:c4" }
+
+pyload-nix:
+  type: "container"
+  profiles: ["nixos-lxc", "downloadHDD-mount", "downloadSSD-mount"]
+  config: {}
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "8GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/pyload-nix" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "02:8a:3f:bc:67:d2" }
+
 gotify-nix:
   type: "container"
   profiles: ["nixos-lxc"]
@@ -248,4 +258,3 @@ networking-vpn-out-na1-nix:
     root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/networking-vpn-out-na1-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "02:5f:6e:64:7f:ef" }
-

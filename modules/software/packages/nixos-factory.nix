@@ -324,6 +324,27 @@ let
         raise SystemExit(f"unknown action: {action}")
   '';
 
+  instanceConfigReader = pkgs.writeText "instance-config-reader.py" ''
+    import sys
+    import yaml
+
+    path, host, field = sys.argv[1:]
+    with open(path) as config_file:
+        instances = yaml.safe_load(config_file) or {}
+
+    instance = instances.get(host)
+    if instance is None:
+        raise SystemExit(f"missing instance declaration: {host}")
+
+    if field == "profiles":
+        for profile in instance.get("profiles", []):
+            print(profile)
+    elif field in ("pool", "size"):
+        print(instance.get("devices", {}).get("root", {}).get(field, ""))
+    else:
+        raise SystemExit(f"unknown instance field: {field}")
+  '';
+
   # Helper: remove a top-level YAML block by key name from a file.
   # Operates on raw lines to preserve exact formatting.
   removeYamlBlock = pkgs.writeShellScript "remove-yaml-block" ''
@@ -562,7 +583,7 @@ with open(sys.argv[2], 'w') as f:
     #    4. Show plan and confirm
     #    5. Optionally add topology and deploy AdGuard
     #    6. Create the container and nix store on server-nix over SSH
-    #    7. Append the instance to instances.yaml
+    #    7. Preserve or append the instance in instances.yaml
     #    8. Start the container and verify its expected DHCP address
     #    9. Trust the new host key, add its age recipient, and deploy build-nix
     #   10. Deploy the new host from build-nix
@@ -628,6 +649,11 @@ with open(sys.argv[2], 'w') as f:
         exit 1
       fi
 
+      USE_EXISTING_INSTANCE=false
+      if grep -q "^$HOSTNAME:$" "$INSTANCES_YAML"; then
+        USE_EXISTING_INSTANCE=true
+      fi
+
       # Don't clobber an existing container
       if server_cmd incus info "$HOSTNAME" >/dev/null 2>&1; then
         $GUM style --foreground 196 "Container $HOSTNAME already exists in Incus."
@@ -642,8 +668,14 @@ with open(sys.argv[2], 'w') as f:
         validate_ipv4 "$IP_ADDRESS"
       fi
 
-      $GUM style --foreground 212 "Select target root storage pool:"
-      SELECTED_POOL=$($GUM choose "''${ROOT_POOLS[@]}")
+      if [ "$USE_EXISTING_INSTANCE" = true ]; then
+        SELECTED_POOL=$(${pythonWithYaml}/bin/python3 ${instanceConfigReader} \
+          "$INSTANCES_YAML" "$HOSTNAME" pool)
+      fi
+      if [ -z "''${SELECTED_POOL:-}" ]; then
+        $GUM style --foreground 212 "Select target root storage pool:"
+        SELECTED_POOL=$($GUM choose "''${ROOT_POOLS[@]}")
+      fi
 
       # MAC can be manually specified (e.g. to match a DHCP reservation)
       # or auto-generated with a locally-administered prefix (02:xx:xx:xx:xx:xx).
@@ -664,7 +696,11 @@ with open(sys.argv[2], 'w') as f:
       echo "  Pool:      $SELECTED_POOL"
       echo "  MAC:       $MAC_ADDR"
       echo "  Store:     $NIX_HOST_MOUNT_BASE/$HOSTNAME"
-      echo "  YAML:      $INSTANCES_YAML (will be updated)"
+      if [ "$USE_EXISTING_INSTANCE" = true ]; then
+        echo "  YAML:      $INSTANCES_YAML (existing declaration)"
+      else
+        echo "  YAML:      $INSTANCES_YAML (will be updated)"
+      fi
       if [ "$USE_EXISTING_TOPOLOGY" = true ]; then
         echo "  Topology:  existing ($HOSTNAME.lan → $IP_ADDRESS)"
         echo "  DNS:       unchanged"
@@ -764,15 +800,41 @@ with open(sys.argv[2], 'w') as f:
       fi
 
       # --- Step 2: Create the Incus container on server-nix ---
-      # Uses the base NixOS image and the nixos-lxc profile for defaults
-      # (2 CPU, 2GiB RAM, nesting, idmap, bridged networking).
+      # Uses profiles from an existing declaration when present so custom
+      # mounts are available on the first boot. Otherwise it uses nixos-lxc.
       echo "==> Initializing root FS on $SELECTED_POOL..."
+      INSTANCE_PROFILES=()
+      if [ "$USE_EXISTING_INSTANCE" = true ]; then
+        while IFS= read -r instance_profile; do
+          if [ -n "$instance_profile" ]; then
+            INSTANCE_PROFILES+=("$instance_profile")
+          fi
+        done < <(${pythonWithYaml}/bin/python3 ${instanceConfigReader} \
+          "$INSTANCES_YAML" "$HOSTNAME" profiles)
+      fi
+      if [ "''${#INSTANCE_PROFILES[@]}" -eq 0 ]; then
+        INSTANCE_PROFILES=("$PROFILE")
+      fi
+
+      PROFILE_ARGS=()
+      for instance_profile in "''${INSTANCE_PROFILES[@]}"; do
+        PROFILE_ARGS+=(-p "$instance_profile")
+      done
+
       if ! server_cmd incus init "$IMAGE_ALIAS" "$HOSTNAME" \
-        -p "$PROFILE" -s "$SELECTED_POOL"
+        "''${PROFILE_ARGS[@]}" -s "$SELECTED_POOL"
       then
         rollback_create "Incus initialization failed"
       fi
       CONTAINER_CREATED=true
+
+      if [ "$USE_EXISTING_INSTANCE" = true ]; then
+        ROOT_SIZE=$(${pythonWithYaml}/bin/python3 ${instanceConfigReader} \
+          "$INSTANCES_YAML" "$HOSTNAME" size)
+        if [ -n "$ROOT_SIZE" ]; then
+          server_cmd incus config device override "$HOSTNAME" root size="$ROOT_SIZE"
+        fi
+      fi
 
       # --- Step 3: Clone the template nix store ---
       # ZFS send/receive copies the pre-built /nix from the template snapshot
@@ -802,10 +864,12 @@ with open(sys.argv[2], 'w') as f:
       fi
 
       # --- Step 5: Add to declarative config ---
-      # Append this instance to instances.yaml so incus-declarative-apply
-      # and incus-sync know about it without needing a manual pull.
-      echo "==> Adding $HOSTNAME to instances.yaml..."
-      if [ "$INTERMITTENT" = true ]; then
+      # Preserve a predeclared instance or append a default declaration so
+      # incus-declarative-apply and incus-sync know about the new container.
+      if [ "$USE_EXISTING_INSTANCE" = true ]; then
+        echo "==> Preserving existing $HOSTNAME declaration in instances.yaml..."
+      elif [ "$INTERMITTENT" = true ]; then
+        echo "==> Adding $HOSTNAME to instances.yaml..."
         cat >> "$INSTANCES_YAML" <<YAML
 
 $HOSTNAME:
@@ -819,6 +883,7 @@ $HOSTNAME:
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "$MAC_ADDR" }
 YAML
       else
+        echo "==> Adding $HOSTNAME to instances.yaml..."
         cat >> "$INSTANCES_YAML" <<YAML
 
 $HOSTNAME:
@@ -831,7 +896,9 @@ $HOSTNAME:
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "$MAC_ADDR" }
 YAML
       fi
-      INSTANCE_ADDED=true
+      if [ "$USE_EXISTING_INSTANCE" = false ]; then
+        INSTANCE_ADDED=true
+      fi
 
       # --- Step 6: Start and wait for network ---
       # The container boots with the base NixOS image. We need it to get a
