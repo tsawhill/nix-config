@@ -832,7 +832,7 @@ with open(sys.argv[2], 'w') as f:
         ROOT_SIZE=$(${pythonWithYaml}/bin/python3 ${instanceConfigReader} \
           "$INSTANCES_YAML" "$HOSTNAME" size)
         if [ -n "$ROOT_SIZE" ]; then
-          server_cmd incus config device override "$HOSTNAME" root size="$ROOT_SIZE"
+          server_cmd incus config device set "$HOSTNAME" root size="$ROOT_SIZE"
         fi
       fi
 
