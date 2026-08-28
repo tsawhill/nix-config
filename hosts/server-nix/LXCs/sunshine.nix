@@ -99,6 +99,18 @@ let
       [ "$(<"$id_path/vendor")" = beef ] || continue
       [ "$(<"$id_path/product")" = dead ] || continue
 
+      # Sunshine's keyboard and two mouse devices live for the lifetime of
+      # the daemon, while its touch and pen devices are recreated for every
+      # client connection. Restarting KWin for those per-client devices tears
+      # down the Wayland session and kills open applications on every resume.
+      # Keep native touch/pen unavailable in this LXC so reconnecting only
+      # resumes the existing desktop.
+      device_name="$(<"/sys/class/input/$event/device/name")"
+      case "$device_name" in
+        "Keyboard passthrough" | "Mouse passthrough" | "Mouse passthrough (absolute)") ;;
+        *) continue ;;
+      esac
+
       device_number="$(${pkgs.coreutils}/bin/stat -c '%t:%T' "$device")"
       major_hex="''${device_number%%:*}"
       minor_hex="''${device_number##*:}"
