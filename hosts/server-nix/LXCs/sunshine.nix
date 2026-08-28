@@ -321,6 +321,10 @@ in
   systemd.user.services.plasma-plasmashell = {
     overrideStrategy = "asDropin";
     after = [ "plasma-kwin_wayland.service" ];
+    # NixOS gives a declaratively extended user service a minimal PATH. Since
+    # plasmashell launches desktop entries such as `Exec=dolphin %u`, it also
+    # needs the full system profile rather than only systemd's helper tools.
+    path = [ config.system.path ];
     environment = nvidiaClientEnvironment;
     unitConfig.StartLimitIntervalSec = 0;
     serviceConfig.RestartSec = "2s";
