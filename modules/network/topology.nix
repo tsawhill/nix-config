@@ -23,6 +23,7 @@ let
     "networking-vpn-out-na1-nix"
     "palworld-nix"
     "pufferpanel-nix"
+    "pyload-nix"
     "samba-nix"
     "searx-nix"
     "socks5-vpn-eu-nix"
@@ -175,6 +176,14 @@ let
       lan = {
         ip = "10.73.73.20";
         mac = "bc:24:11:43:7d:c4";
+      };
+      dns.enable = true;
+      monitoring.enable = true;
+    };
+    pyload-nix = {
+      lan = {
+        ip = "10.73.73.19";
+        mac = "02:8a:3f:bc:67:d2";
       };
       dns.enable = true;
       monitoring.enable = true;

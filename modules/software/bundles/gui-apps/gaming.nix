@@ -103,6 +103,8 @@ in
         mangohud
         vulkan-headers
 
+        moonlight-qt
+
       ]
       ++ lib.optionals cfg.lsfgVk.enable [
         lsfg-vk
