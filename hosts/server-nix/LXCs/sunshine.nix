@@ -9,7 +9,39 @@
 let
   user = "taylor";
   waylandDisplay = "wayland-0";
+  streamOutput = "HDMI-A-1";
   boltLauncher = pkgs.bolt-launcher.override { jdk17 = pkgs.openjdk; };
+
+  # Modes absent from the HDMI dummy plug's EDID. Native EDID modes remain
+  # available alongside these; refresh rates are expressed in millihertz.
+  customStreamModes = [
+    # AYN Thor lower display (landscape)
+    {
+      width = 1240;
+      height = 1080;
+      refreshMilliHz = 60000;
+      blanking = "reduced";
+    }
+    # Alienware AW3423DWF ultrawide
+    {
+      width = 3440;
+      height = 1440;
+      refreshMilliHz = 60000;
+      blanking = "reduced";
+    }
+    {
+      width = 3440;
+      height = 1440;
+      refreshMilliHz = 120000;
+      blanking = "reduced";
+    }
+    {
+      width = 3440;
+      height = 1440;
+      refreshMilliHz = 165000;
+      blanking = "reduced";
+    }
+  ];
 
   nvidiaClientEnvironment = {
     __EGL_EXTERNAL_PLATFORM_CONFIG_DIRS = "/run/opengl-driver/share/egl/egl_external_platform.d";
@@ -71,14 +103,88 @@ let
       outputs="$(${pkgs.coreutils}/bin/timeout --kill-after=0.2s 0.5s \
         ${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} -o 2>/dev/null || true)"
       if printf '%s\n' "$outputs" \
-        | ${pkgs.gnugrep}/bin/grep -q 'HDMI-A-1'; then
+        | ${pkgs.gnugrep}/bin/grep -q '${streamOutput}'; then
         exit 0
       fi
       sleep 0.1
     done
 
-    echo "HDMI-A-1 did not become ready" >&2
+    echo "${streamOutput} did not become ready" >&2
     exit 1
+  '';
+
+  ensureCustomStreamModes = pkgs.writeShellScript "sunshine-ensure-custom-stream-modes" ''
+    set -eu
+
+    ${waitForKWin}
+    ${waitForOutput}
+
+    modes="$(${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} -j)"
+    ${lib.concatMapStringsSep "\n" (
+      mode:
+      let
+        refreshHz = builtins.div mode.refreshMilliHz 1000;
+        modeName = "${toString mode.width}x${toString mode.height}@${toString refreshHz}";
+      in
+      ''
+        if ! printf '%s\n' "$modes" | ${lib.getExe pkgs.jq} -e \
+          --arg output ${lib.escapeShellArg streamOutput} \
+          --arg mode ${lib.escapeShellArg modeName} \
+          '[.outputs[] | select(.name == $output) | .modes[] | select(.name == $mode)] | length > 0' \
+          >/dev/null; then
+          ${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} \
+            ${lib.escapeShellArg "output.${streamOutput}.addCustomMode.${toString mode.width}.${toString mode.height}.${toString mode.refreshMilliHz}.${mode.blanking}"}
+          modes="$(${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} -j)"
+        fi
+      ''
+    ) customStreamModes}
+  '';
+
+  setClientStreamMode = pkgs.writeShellScript "sunshine-set-client-stream-mode" ''
+    set -eu
+
+    width=''${SUNSHINE_CLIENT_WIDTH:-}
+    height=''${SUNSHINE_CLIENT_HEIGHT:-}
+    fps=''${SUNSHINE_CLIENT_FPS:-}
+
+    if ! ${lib.getExe pkgs.jq} -en \
+      --arg width "$width" --arg height "$height" --arg fps "$fps" \
+      '($width | tonumber) > 0 and ($height | tonumber) > 0 and ($fps | tonumber) > 0' \
+      >/dev/null 2>&1; then
+      echo "Invalid Moonlight display mode: ''${width}x''${height}@''${fps}" >&2
+      exit 1
+    fi
+
+    mode_id="$(${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} -j \
+      | ${lib.getExe pkgs.jq} -r \
+        --arg output ${lib.escapeShellArg streamOutput} \
+        --argjson width "$width" --argjson height "$height" --argjson fps "$fps" '
+          first(
+            .outputs[]
+            | select(.name == $output)
+            | .modes[]
+            | select(
+                .size.width == $width
+                and .size.height == $height
+                and (.refreshRate - $fps) < 1
+                and (.refreshRate - $fps) > -1
+              )
+            | .id
+          ) // empty
+        ')"
+
+    if [ -z "$mode_id" ]; then
+      echo "Moonlight requested unavailable mode ''${width}x''${height}@''${fps}" >&2
+      echo "Available modes:" >&2
+      ${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} -j \
+        | ${lib.getExe pkgs.jq} -r \
+          --arg output ${lib.escapeShellArg streamOutput} \
+          '.outputs[] | select(.name == $output) | .modes[].name' >&2
+      exit 1
+    fi
+
+    exec ${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} \
+      "output.${streamOutput}.mode.$mode_id"
   '';
 
   # Incus hotplugs Sunshine's uinput event nodes, but an unprivileged LXC
@@ -165,9 +271,16 @@ in
     settings = {
       sunshine_name = "sunshine-nix";
       capture = "kwin";
-      output_name = "HDMI-A-1";
+      output_name = streamOutput;
       csrf_allowed_origins = "https://sunshine-nix.lan:47990,https://10.73.73.140:47990";
       system_tray = "disabled";
+      global_prep_cmd = builtins.toJSON [
+        {
+          do = "${setClientStreamMode}";
+          undo = "${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} output.${streamOutput}.mode.1920x1080@120";
+          elevated = false;
+        }
+      ];
     };
 
     applications.apps = [
@@ -302,6 +415,20 @@ in
     };
   };
 
+  systemd.user.services.sunshine-display-modes = {
+    description = "Add custom Sunshine display modes to KWin";
+    wantedBy = [ "default.target" ];
+    after = [ "plasma-kwin_wayland.service" ];
+    partOf = [ "plasma-kwin_wayland.service" ];
+    unitConfig.ConditionUser = user;
+    environment = sessionEnvironment;
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      ExecStart = "${ensureCustomStreamModes}";
+    };
+  };
+
   # The virtual backend does not initialize libinput, so Sunshine's synthetic
   # keyboard and mouse are invisible to Plasma. Use the passed NVIDIA DRM
   # device and its connected HDMI output instead.
@@ -347,8 +474,14 @@ in
     wantedBy = lib.mkForce [ "default.target" ];
     unitConfig.ConditionUser = user;
     partOf = lib.mkForce [ ];
-    wants = lib.mkForce [ "plasma-headless.service" ];
-    after = lib.mkForce [ "plasma-headless.service" ];
+    wants = lib.mkForce [
+      "plasma-headless.service"
+      "sunshine-display-modes.service"
+    ];
+    after = lib.mkForce [
+      "plasma-headless.service"
+      "sunshine-display-modes.service"
+    ];
     environment = sessionEnvironment // nvidiaGraphicsEnvironment // { DISPLAY = ":0"; };
     serviceConfig = {
       ExecStartPre = [
