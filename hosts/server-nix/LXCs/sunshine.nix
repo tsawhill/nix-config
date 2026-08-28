@@ -81,7 +81,7 @@ let
     # kwin_wayland_wrapper creates the socket before the compositor is ready.
     # Wait for the compositor's D-Bus name so clients do not connect to a
     # socket that no process is servicing yet.
-    for _ in $(seq 1 300); do
+    for _ in $(seq 1 1800); do
       if ${pkgs.systemd}/bin/busctl --user --no-pager list 2>/dev/null \
         | ${pkgs.gnugrep}/bin/grep -q '^org\.kde\.KWin '; then
         break
@@ -99,7 +99,7 @@ let
   waitForOutput = pkgs.writeShellScript "sunshine-wait-for-output" ''
     set -eu
 
-    for _ in $(seq 1 60); do
+    for _ in $(seq 1 600); do
       outputs="$(${pkgs.coreutils}/bin/timeout --kill-after=0.2s 0.5s \
         ${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} -o 2>/dev/null || true)"
       if printf '%s\n' "$outputs" \
@@ -482,7 +482,17 @@ in
       "plasma-headless.service"
       "sunshine-display-modes.service"
     ];
-    environment = sessionEnvironment // nvidiaGraphicsEnvironment // { DISPLAY = ":0"; };
+    environment =
+      sessionEnvironment
+      // nvidiaGraphicsEnvironment
+      // {
+        DISPLAY = ":0";
+        # FFmpeg dlopens libcuda.so.1, which ships only in the Incus driver mount
+        # and is missing from the guest loader cache, so NVENC probing fails and
+        # Sunshine falls back to the Vulkan encoder. This directory carries no
+        # GLVND dispatchers, so it cannot shadow the preloaded libglvnd libEGL.
+        LD_LIBRARY_PATH = "/run/opengl-driver/lib";
+      };
     serviceConfig = {
       ExecStartPre = [
         "${waitForKWin}"
