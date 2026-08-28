@@ -37,6 +37,7 @@ deluge-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBJHVRO4X5iaWF0/gRjeVb89KLsMm
 immich-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIK49kNa9HxbdBSKHvOhN3CtHFJiYr8wX1nv5Gv6b/gpC
 palworld-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGqCKfGRm25Dt77hMIGRPnm4h1Ge6Cj6POxsIXnMZQe7 root@accepted-shark
 pufferpanel-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBb694rHRxlieAr0U4T95vW/Ds3+2zbNbIV4QiLvmzpV
+pyload-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJQF54xh03Xw+rZYDyk8YPglQ0d3udE/q43PfBz73D57 root@accepted-shark
 samba-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA2DvLOZJim3BWllYn0WZ1KUkBZ84Afb8h4AV3tvDCyB
 syncthing-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMQImR61c46TvHnqqs/dg3DzC/gljA0eY0Xw0m+GYDOg root@accepted-shark
 unifi-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIINsLbmWterwcfqSTq5xE7zoU3CZQw+z2Hs5YXGgtIx8 root@accepted-shark

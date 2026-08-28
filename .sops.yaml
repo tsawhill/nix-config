@@ -37,6 +37,7 @@ keys:
   - &immich-nix age1n0hjc0p648e8klkcjds7ffa6mztjpfpzjwvflrcweaagm7m2yvusrlq0wa
   - &palworld-nix age1x3gwq4n5uk6cxqna88t5h69yhk7hjy098m0vtpunulkfmnk37akse4y759
   - &pufferpanel-nix age1awqq8a7sq40uusne7e4uwp74s5vzmpggcvs2ll782ycy2jfuspsqx5x7cy
+  - &pyload-nix age1qxptq9f9hnqv7ljuv2v2kskj8zqruj408zzdqzvdglhp2r0awy7ss93ymv
   - &samba-nix age1v6nlyg65w0uulha8y5usg82yy06yepld7fltt3q4959pqc8fhqvsvwhtrd
   - &syncthing-nix age128sk3eu6utjjpjjqdags9utl0th263d80g7t750etz575t8nhgeqnsjwuh
   - &unifi-nix age1me4w63lfuzexf9a97m444fh05tfvtd2snej5ud8qja64c3s0qc3sw7y7vt
