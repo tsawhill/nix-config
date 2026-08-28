@@ -4,7 +4,7 @@
   makeDesktopItem,
   symlinkJoin,
   umu-launcher,
-  protonPath ? "GE-Proton",
+  protonPath,
   prefixPath ? "$HOME/Games/saves/wine/default",
 }:
 
