@@ -11,10 +11,16 @@ let
   waylandDisplay = "wayland-0";
   streamOutput = "HDMI-A-1";
   boltLauncher = pkgs.bolt-launcher.override { jdk17 = pkgs.openjdk; };
-  sunshinePackage = pkgs.sunshine.overrideAttrs (oldAttrs: {
+  sunshinePackage = (pkgs.sunshine.override { cudaSupport = true; }).overrideAttrs (oldAttrs: {
     patches = (oldAttrs.patches or [ ]) ++ [
       ./patches/sunshine-probe-after-prep.patch
     ];
+
+    # Upstream's cudaSupport wrapper uses --set, dropping the driver mount the unit needs.
+    postFixup = ''
+      wrapProgram $out/bin/sunshine \
+        --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath [ pkgs.vulkan-loader ]}
+    '';
   });
 
   # Modes absent from the HDMI dummy plug's EDID. Native EDID modes remain
@@ -269,9 +275,10 @@ in
   };
 
   services.sunshine = {
-    # Sunshine 2026.516 probes encoders before global preparation commands.
-    # Our preparation changes the KWin output mode, so the probe and real
-    # capture otherwise use different frame sizes and NVENC returns black.
+    # Two fixes: nixpkgs builds Sunshine without CUDA, but the pipewire capture
+    # still negotiates DMA-BUF on a pure-NVIDIA host, so the encoder falls back
+    # to the software converter and every frame fails to scale. The patch also
+    # moves encoder probing after the prep commands change the KWin output mode.
     package = sunshinePackage;
 
     # KWin capture does not need CAP_SYS_ADMIN. Avoiding the capability wrapper
