@@ -1,0 +1,42 @@
+--- a/src/nvhttp.cpp
++++ b/src/nvhttp.cpp
+@@ -877,17 +877,6 @@
+       // change the active displays.
+       display_device::configure_display(config::video, *launch_session);
+ 
+-      // Probe encoders again before streaming to ensure our chosen
+-      // encoder matches the active GPU (which could have changed
+-      // due to hotplugging, driver crash, primary monitor change,
+-      // or any number of other factors).
+-      if (video::probe_encoders()) {
+-        tree.put("root.<xmlattr>.status_code", 503);
+-        tree.put("root.<xmlattr>.status_message", "Failed to initialize video capture/encoding. Is a display connected and turned on?");
+-        tree.put("root.gamesession", 0);
+-
+-        return;
+-      }
+     }
+ 
+     auto encryption_mode = net::encryption_mode_for_address(request->remote_endpoint().address());
+@@ -909,6 +898,21 @@
+         tree.put("root.gamesession", 0);
+ 
+         return;
++      }
++
++      // Application preparation commands can change the active output mode.
++      // Probe only after they finish so capture and encoder initialization
++      // use the same dimensions as the real streaming session.
++      if (rtsp_stream::session_count() == 0 && video::probe_encoders()) {
++        // execute() may have started an application and completed some prep
++        // commands. Undo those before returning a failed launch response.
++        proc::proc.terminate();
++
++        tree.put("root.<xmlattr>.status_code", 503);
++        tree.put("root.<xmlattr>.status_message", "Failed to initialize video capture/encoding. Is a display connected and turned on?");
++        tree.put("root.gamesession", 0);
++
++        return;
+       }
+     }
+ 

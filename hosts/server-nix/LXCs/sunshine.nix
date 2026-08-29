@@ -11,6 +11,11 @@ let
   waylandDisplay = "wayland-0";
   streamOutput = "HDMI-A-1";
   boltLauncher = pkgs.bolt-launcher.override { jdk17 = pkgs.openjdk; };
+  sunshinePackage = pkgs.sunshine.overrideAttrs (oldAttrs: {
+    patches = (oldAttrs.patches or [ ]) ++ [
+      ./patches/sunshine-probe-after-prep.patch
+    ];
+  });
 
   # Modes absent from the HDMI dummy plug's EDID. Native EDID modes remain
   # available alongside these; refresh rates are expressed in millihertz.
@@ -264,6 +269,11 @@ in
   };
 
   services.sunshine = {
+    # Sunshine 2026.516 probes encoders before global preparation commands.
+    # Our preparation changes the KWin output mode, so the probe and real
+    # capture otherwise use different frame sizes and NVENC returns black.
+    package = sunshinePackage;
+
     # KWin capture does not need CAP_SYS_ADMIN. Avoiding the capability wrapper
     # also preserves the EGL loader environment for Sunshine.
     capSysAdmin = lib.mkForce false;
