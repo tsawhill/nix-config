@@ -416,6 +416,10 @@ in
     after = [ "dbus.socket" ];
     unitConfig.ConditionUser = user;
 
+    # Re-running startplasma-wayland during a switch races the session teardown,
+    # which drops plasmashell's start job and leaves the desktop with no panel.
+    restartIfChanged = false;
+
     path = with pkgs; [
       kdePackages.kwin
       kdePackages.plasma-workspace
@@ -477,6 +481,8 @@ in
   systemd.user.services.plasma-plasmashell = {
     overrideStrategy = "asDropin";
     after = [ "plasma-kwin_wayland.service" ];
+    # No display manager relaunches plasmashell, so a switch must not stop it.
+    restartIfChanged = false;
     # NixOS gives a declaratively extended user service a minimal PATH. Since
     # plasmashell launches desktop entries such as `Exec=dolphin %u`, it also
     # needs the full system profile rather than only systemd's helper tools.
