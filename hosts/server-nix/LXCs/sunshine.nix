@@ -74,6 +74,9 @@ let
   # the driver-version-specific NVIDIA EGL implementation from server-nix.
   nvidiaGraphicsEnvironment = nvidiaClientEnvironment // {
     GBM_BACKEND = "nvidia-drm";
+    # Xwayland's mesa-libgbm ships no backends, so glamor cannot find
+    # nvidia-drm_gbm.so and Xwayland then offers no GLX fbconfigs.
+    GBM_BACKENDS_PATH = "/run/opengl-driver/lib/gbm";
     KWIN_DRM_DEVICES = "/dev/dri/card1";
     LD_PRELOAD = "${pkgs.libglvnd}/lib/libEGL.so.1";
     __GLX_VENDOR_LIBRARY_NAME = "nvidia";
