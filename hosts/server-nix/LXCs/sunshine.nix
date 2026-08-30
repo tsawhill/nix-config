@@ -105,7 +105,6 @@ let
     # Sunshine needs this preload for capture and encoding, but passing it to
     # Qt/Java clients prevents them from selecting the mounted NVIDIA driver.
     unset LD_PRELOAD GBM_BACKEND KWIN_DRM_DEVICES
-    export LD_LIBRARY_PATH=${glxClientLibraries}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
     exec ${boltLauncher}/bin/bolt-launcher "$@"
   '';
 
@@ -364,8 +363,11 @@ in
   # plasmashell from its own units, which inherit the manager, not the units
   # above. Kickoff resolves $XDG_MENU_PREFIX + applications.menu, and only
   # plasma-applications.menu exists, so without the prefix the menu is empty.
+  # LD_LIBRARY_PATH is set here rather than per-application because the GLX
+  # vendor libraries are unloadable for every X11 client in the session, not
+  # just the ones Sunshine launches.
   systemd.user.extraConfig = ''
-    DefaultEnvironment=XDG_DATA_DIRS=/etc/profiles/per-user/${user}/share:/run/current-system/sw/share XDG_MENU_PREFIX=plasma- XDG_CURRENT_DESKTOP=KDE
+    DefaultEnvironment=XDG_DATA_DIRS=/etc/profiles/per-user/${user}/share:/run/current-system/sw/share XDG_MENU_PREFIX=plasma- XDG_CURRENT_DESKTOP=KDE LD_LIBRARY_PATH=${glxClientLibraries}:/run/opengl-driver/lib
   '';
 
   # Without linger, user services never start on this headless container.
@@ -537,7 +539,9 @@ in
         # and is missing from the guest loader cache, so NVENC probing fails and
         # Sunshine falls back to the Vulkan encoder. This directory carries no
         # GLVND dispatchers, so it cannot shadow the preloaded libglvnd libEGL.
-        LD_LIBRARY_PATH = "/run/opengl-driver/lib";
+        # A unit's own Environment= replaces DefaultEnvironment for a variable,
+        # so the GLX libraries have to be repeated here to reach launched apps.
+        LD_LIBRARY_PATH = "${glxClientLibraries}:/run/opengl-driver/lib";
       };
     serviceConfig = {
       ExecStartPre = [
