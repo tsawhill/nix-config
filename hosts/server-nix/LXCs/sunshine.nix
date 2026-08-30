@@ -84,10 +84,28 @@ let
     __GLX_VENDOR_LIBRARY_NAME = "nvidia";
   };
 
+  # The Incus driver mount carries libGLX_nvidia and libGLX_mesa but not the
+  # X11 and xcb libraries they link against, so no GLX vendor can load at all.
+  glxClientLibraries = lib.makeLibraryPath (
+    with pkgs;
+    [
+      expat
+      libdrm
+      xorg.libX11
+      xorg.libXdamage
+      xorg.libXext
+      xorg.libXfixes
+      xorg.libXxf86vm
+      xorg.libxcb
+      xorg.libxshmfence
+    ]
+  );
+
   runRuneLite = pkgs.writeShellScript "sunshine-run-runelite" ''
     # Sunshine needs this preload for capture and encoding, but passing it to
     # Qt/Java clients prevents them from selecting the mounted NVIDIA driver.
     unset LD_PRELOAD GBM_BACKEND KWIN_DRM_DEVICES
+    export LD_LIBRARY_PATH=${glxClientLibraries}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
     exec ${boltLauncher}/bin/bolt-launcher "$@"
   '';
 
