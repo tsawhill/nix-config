@@ -60,6 +60,8 @@ let
   };
 
   sessionEnvironment = {
+    # Xwayland does not inherit KDE's cursorSize, so X11 clients fall back to 24px.
+    XCURSOR_SIZE = "48";
     DBUS_SESSION_BUS_ADDRESS = "unix:path=%t/bus";
     KDE_FULL_SESSION = "true";
     KDE_SESSION_VERSION = "6";
