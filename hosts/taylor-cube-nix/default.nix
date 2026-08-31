@@ -147,11 +147,12 @@ in
   # native (EDID) resolution.
   software.games.steamSync.stopSteamDuringSync = true;
 
-  # Games (or whole platforms) kept on the cube's local SSD: they sync there via
-  # the roms Syncthing share (into software.games.syncRoot, default
-  # ~/Games/synced) and launch locally; everything else launches from the full
-  # library over the /mnt/zpool/roms CIFS mount. Keep pc selective so only GH3
-  # syncs from that platform.
+  # Games (or whole platforms) kept on the cube's Lexar SD card: they sync there
+  # via the roms Syncthing share (syncRoot below feeds my.syncthing.sharePaths.roms)
+  # and launch locally; everything else launches from the full library over the
+  # /mnt/zpool/roms CIFS mount. Keep pc selective so only GH3 syncs from that
+  # platform.
+  software.games.syncRoot = "/mnt/lexarSD/Games/synced";
   software.games.syncGames = [
     "guitarHero3"
     "guitarHeroWorldTourDefinitiveEdition"
