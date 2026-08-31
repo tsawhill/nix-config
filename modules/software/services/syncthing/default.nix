@@ -204,6 +204,10 @@ in
           # run, so a folder with ignores (e.g. selective `roms`) never starts up
           # ignore-less and full-syncs the whole share on a fresh host.
           install -d -m 0755 -o ${cfg.user} -g ${cfg.group} ${lib.escapeShellArg path}
+          # Creating the dir ourselves suppresses syncthing's own marker creation.
+          install -d -m 0755 -o ${cfg.user} -g ${cfg.group} ${
+            lib.escapeShellArg (path + "/.stfolder")
+          }
           install -m 0644 -o ${cfg.user} -g ${cfg.group} ${mkStignore name} ${
             lib.escapeShellArg (path + "/.stignore")
           }
