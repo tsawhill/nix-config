@@ -479,6 +479,11 @@ in
   # keyboard and mouse are invisible to Plasma. Use the passed NVIDIA DRM
   # device and its connected HDMI output instead.
   systemd.user.services.plasma-kwin_wayland = {
+    # A restart races the outgoing compositor for DRM master. When it loses,
+    # the atomic modeset is refused, the output stays disabled and Sunshine
+    # then finds no wl_output to capture.
+    restartIfChanged = false;
+
     # The wrapper starts kwin_wayland and Xwayland by name. This unit otherwise
     # receives only systemd's basic PATH and silently remains as a socket-owning
     # wrapper with no compositor behind it.
