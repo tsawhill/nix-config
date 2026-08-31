@@ -68,6 +68,8 @@ let
   };
 in
 {
+  imports = [ ./airvpn-switch.nix ];
+
   options.my.network.airvpn = {
     enable = lib.mkEnableOption "AirVPN WireGuard NM profiles";
 

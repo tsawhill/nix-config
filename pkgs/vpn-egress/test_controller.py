@@ -132,6 +132,39 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual(runner.set_calls[-1], "one")
         self.assertEqual(controller.state["lastRotationStatus"], "failed")
 
+    def test_switch_pins_the_requested_endpoint(self):
+        runner = Runner({"three": "198.51.100.3"})
+        controller = self.make(runner)
+        controller.state.update({"currentEndpoint": "one", "currentPublicIp": "198.51.100.1"})
+        result = controller.switch("three")
+        self.assertEqual(result, {"endpoint": "three", "publicIp": "198.51.100.3", "blockedExit": False})
+        self.assertEqual(controller.state["currentEndpoint"], "three")
+        self.assertEqual(controller.state["lastRotation"], 1000)
+        self.assertEqual(controller.state["lastRotationStatus"], "success")
+
+    def test_switch_ignores_cooldown_but_reports_blocked_exits(self):
+        runner = Runner({"two": "198.51.100.2"})
+        controller = self.make(runner)
+        controller.state.update(
+            {"currentEndpoint": "one", "lastRotation": 900, "blockedExits": {"198.51.100.2": 90000}}
+        )
+        self.assertTrue(controller.switch("two")["blockedExit"])
+
+    def test_switch_restores_the_previous_endpoint_on_failure(self):
+        runner = Runner({"two": RuntimeError("down")})
+        controller = self.make(runner)
+        controller.state["currentEndpoint"] = "one"
+        with self.assertRaises(RuntimeError):
+            controller.switch("two")
+        self.assertEqual(runner.set_calls, ["two", "one"])
+        self.assertEqual(controller.state["currentEndpoint"], "one")
+        self.assertEqual(controller.state["lastRotationStatus"], "failed")
+
+    def test_switch_rejects_unknown_endpoints(self):
+        controller = self.make(Runner())
+        with self.assertRaises(ValueError):
+            controller.switch("nowhere")
+
     def test_health_rotates_after_consecutive_failures(self):
         runner = Runner({None: RuntimeError("down"), "one": RuntimeError("down"), "two": "203.0.113.2"})
         controller = self.make(runner)

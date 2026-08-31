@@ -280,6 +280,45 @@ class Controller:
             )
         raise RuntimeError("no VPN endpoint passed health checks")
 
+    def switch(self, name: str) -> dict[str, Any]:
+        now = int(self.now())
+        self.prune_blocked(now)
+        target = self.endpoint(name)
+        if target is None:
+            raise ValueError(f"endpoint is not configured: {name}")
+
+        previous_name = self.state.get("currentEndpoint")
+        try:
+            self.runner.set_endpoint(target)
+            public_ip = self.probe(now)
+        except (OSError, RuntimeError, subprocess.SubprocessError) as error:
+            previous = self.endpoint(previous_name)
+            if previous is not None:
+                with contextlib.suppress(Exception):
+                    self.runner.set_endpoint(previous)
+            self.record("manual-switch", "failed")
+            self.save()
+            raise RuntimeError(f"{name} did not pass health checks: {error}") from error
+
+        blocked = public_ip in self.state.get("blockedExits", {})
+        self.state.update(
+            {
+                "currentEndpoint": target["name"],
+                "currentPublicIp": public_ip,
+                "lastRotation": now,
+                "consecutiveHealthFailures": 0,
+            }
+        )
+        self.record("manual-switch", "success")
+        self.save()
+        with contextlib.suppress(Exception):
+            self.runner.notify(
+                "VPN egress switched",
+                f'manual-switch: now using {target["name"]} ({public_ip})',
+                3,
+            )
+        return {"endpoint": target["name"], "publicIp": public_ip, "blockedExit": blocked}
+
     def ensure(self) -> dict[str, Any]:
         now = int(self.now())
         current = self.endpoint(self.state.get("currentEndpoint")) or self.config["endpoints"][0]
@@ -383,6 +422,8 @@ def main(argv: list[str] | None = None) -> int:
     subparsers = parser.add_subparsers(dest="action", required=True)
     rotate = subparsers.add_parser("rotate")
     rotate.add_argument("--reason", required=True)
+    switch = subparsers.add_parser("switch")
+    switch.add_argument("--endpoint", required=True)
     subparsers.add_parser("ensure")
     subparsers.add_parser("health")
     metrics = subparsers.add_parser("metrics")
@@ -408,6 +449,8 @@ def main(argv: list[str] | None = None) -> int:
         with rotation_lock(lock_path):
             if args.action == "ensure":
                 result = controller.ensure()
+            elif args.action == "switch":
+                result = controller.switch(args.endpoint)
             else:
                 result = controller.rotate(reason)
         print(json.dumps(result, sort_keys=True))

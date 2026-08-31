@@ -290,6 +290,12 @@ in
       }
     ];
 
+    my.network.airvpn.switchTool = {
+      controllerCommand = "${controller}/bin/vpn-egress-controller --config ${controllerConfig}";
+      publicIpUrl = lib.mkDefault cfg.publicIpUrl;
+      probeTimeoutSeconds = lib.mkDefault cfg.probeTimeoutSeconds;
+    };
+
     boot.kernel.sysctl = {
       "net.ipv6.conf.all.disable_ipv6" = 1;
       "net.ipv6.conf.default.disable_ipv6" = 1;
