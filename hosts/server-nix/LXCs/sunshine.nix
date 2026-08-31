@@ -248,100 +248,99 @@ let
       "output.${streamOutput}.mode.$mode_id"
   '';
 
+  userctl = "${pkgs.systemd}/bin/systemctl --user --machine=${user}@";
+
+  # KWin alone paints a bare cursor on an empty screen, so a usable session
+  # needs both the compositor's output and the shell.
+  sessionReady = pkgs.writeShellScript "sunshine-session-ready" ''
+    set -u
+
+    ${pkgs.util-linux}/bin/runuser -u ${user} -- \
+      env XDG_RUNTIME_DIR=/run/user/1000 \
+        DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus \
+        WAYLAND_DISPLAY=${waylandDisplay} \
+        ${pkgs.coreutils}/bin/timeout --kill-after=0.2s 1s \
+          ${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} -j 2>/dev/null \
+      | ${lib.getExe pkgs.jq} -e \
+        --arg output ${lib.escapeShellArg streamOutput} \
+        '[.outputs[] | select(.name == $output and .enabled)] | length > 0' \
+        >/dev/null 2>&1 || exit 1
+
+    ${userctl} is-active --quiet plasma-plasmashell.service
+  '';
+
+  # plasma-workspace-wayland.target has BindsTo on the compositor unit, so
+  # restarting KWin on its own stops that target, which cascades through the
+  # StopWhenUnneeded plasma targets and stops plasmashell. startplasma-wayland
+  # then exits successfully and unsets the session environment, leaving KWin
+  # alive with no shell and no way back. Restart the session unit instead so
+  # the compositor and the shell come back together.
+  # A replacement compositor races the outgoing one for DRM master. Losing it
+  # refuses the atomic modeset and leaves the output disabled, so verify the
+  # session returned and restart again when it did not.
+  restartPlasmaSession = pkgs.writeShellScript "sunshine-restart-plasma-session" ''
+    set -u
+
+    for attempt in 1 2 3; do
+      ${userctl} stop plasma-headless.service || true
+      # KWin has its own unit, so the teardown can leave it running and holding
+      # the Wayland socket the replacement session needs.
+      ${userctl} stop plasma-kwin_wayland.service || true
+      ${userctl} start plasma-headless.service || true
+
+      for _ in $(seq 1 60); do
+        if ${sessionReady}; then
+          # partOf only propagates a restart, so this oneshot stays behind when
+          # the compositor is stopped rather than restarted.
+          ${userctl} start sunshine-display-modes.service || true
+          exit 0
+        fi
+        sleep 0.5
+      done
+
+      echo "Plasma session unusable after restart $attempt" >&2
+    done
+
+    echo "Plasma session did not recover after being restarted" >&2
+    exit 1
+  '';
+
   # The first KWin process after an LXC cold boot can wedge in the NVIDIA DRM
   # driver before it registers org.kde.KWin. systemd considers the wrapper
   # active immediately, so the user units waiting for a usable compositor do
-  # not trigger a restart themselves. A second KWin start succeeds.
+  # not trigger a restart themselves. A second session start succeeds.
   recoverKWinAtBoot = pkgs.writeShellScript "sunshine-recover-kwin-at-boot" ''
     set -u
-
-    kwin_ready() {
-      ${pkgs.util-linux}/bin/runuser -u ${user} -- \
-        env XDG_RUNTIME_DIR=/run/user/1000 \
-          DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus \
-          WAYLAND_DISPLAY=${waylandDisplay} \
-          ${pkgs.coreutils}/bin/timeout --kill-after=0.2s 1s \
-            ${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} -j 2>/dev/null \
-        | ${lib.getExe pkgs.jq} -e \
-          --arg output ${lib.escapeShellArg streamOutput} \
-          '[.outputs[] | select(.name == $output and .enabled)] | length > 0' \
-          >/dev/null 2>&1
-    }
 
     # startplasma-wayland generates and starts this unit at runtime. On a cold
     # boot that currently takes about a minute, so wait for the unit rather
     # than racing Plasma's systemd reload.
     for _ in $(seq 1 180); do
-      if ${pkgs.systemd}/bin/systemctl --user --machine=${user}@ \
-        is-active --quiet plasma-kwin_wayland.service; then
+      if ${userctl} is-active --quiet plasma-kwin_wayland.service; then
         break
       fi
       sleep 0.5
     done
 
-    if ! ${pkgs.systemd}/bin/systemctl --user --machine=${user}@ \
-      is-active --quiet plasma-kwin_wayland.service; then
+    if ! ${userctl} is-active --quiet plasma-kwin_wayland.service; then
       echo "KWin did not start during Plasma cold boot" >&2
       exit 1
     fi
 
-    for attempt in 1 2 3; do
-      for _ in $(seq 1 40); do
-        if kwin_ready; then
-          exit 0
-        fi
-        sleep 0.5
-      done
-
-      echo "KWin is not usable after cold-boot attempt $attempt; restarting it" >&2
-      ${pkgs.systemd}/bin/systemctl --user --machine=${user}@ \
-        restart plasma-kwin_wayland.service || true
+    for _ in $(seq 1 40); do
+      if ${sessionReady}; then
+        exit 0
+      fi
+      sleep 0.5
     done
 
-    echo "${streamOutput} did not become usable after cold-boot KWin recovery" >&2
-    exit 1
+    echo "Plasma session unusable after cold boot; restarting it" >&2
+    exec ${restartPlasmaSession}
   '';
 
   # Incus hotplugs Sunshine's uinput event nodes, but an unprivileged LXC
   # cannot synthesize the corresponding udev events. Mirror the host's udev
   # records so libinput can classify the passed keyboard and mouse.
-  # A replacement compositor races the outgoing one for DRM master. Losing it
-  # refuses the atomic modeset and leaves the output disabled, so verify the
-  # output returned and restart again when it did not.
-  restartKWinForInput = pkgs.writeShellScript "sunshine-restart-kwin-for-input" ''
-    set -u
-
-    output_enabled() {
-      ${pkgs.util-linux}/bin/runuser -u ${user} -- \
-        env XDG_RUNTIME_DIR=/run/user/1000 \
-          DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus \
-          WAYLAND_DISPLAY=${waylandDisplay} \
-          ${pkgs.coreutils}/bin/timeout --kill-after=0.2s 1s \
-            ${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} -j 2>/dev/null \
-        | ${lib.getExe pkgs.jq} -e \
-          --arg output ${lib.escapeShellArg streamOutput} \
-          '[.outputs[] | select(.name == $output and .enabled)] | length > 0' \
-          >/dev/null 2>&1
-    }
-
-    for attempt in 1 2 3; do
-      ${pkgs.systemd}/bin/systemctl --user --machine=${user}@ \
-        try-restart plasma-kwin_wayland.service || true
-
-      for _ in $(seq 1 60); do
-        if output_enabled; then
-          exit 0
-        fi
-        sleep 0.5
-      done
-
-      echo "${streamOutput} still disabled after KWin restart $attempt" >&2
-    done
-
-    echo "${streamOutput} did not return after restarting KWin" >&2
-    exit 1
-  '';
-
   syncInputMetadata = pkgs.writeShellScript "sunshine-sync-input-metadata" ''
     set -eu
     shopt -s nullglob
@@ -359,8 +358,8 @@ let
 
       # Sunshine's keyboard and two mouse devices live for the lifetime of
       # the daemon, while its touch and pen devices are recreated for every
-      # client connection. Restarting KWin for those per-client devices tears
-      # down the Wayland session and kills open applications on every resume.
+      # client connection. Restarting the session for those per-client devices
+      # kills open applications on every resume.
       # Keep native touch/pen unavailable in this LXC so reconnecting only
       # resumes the existing desktop.
       device_name="$(<"/sys/class/input/$event/device/name")"
@@ -386,8 +385,9 @@ let
     if [ "$changed" -eq 1 ]; then
       # KWin's DRM backend discovers input through libinput at startup. The
       # restart occurs only when a new udev record is linked. Keep Sunshine
-      # running so its uinput devices remain present while KWin restarts.
-      ${restartKWinForInput}
+      # running so its uinput devices remain present while the session
+      # restarts; Sunshine is not part of that session's units.
+      ${restartPlasmaSession}
     fi
   '';
 in
@@ -522,7 +522,11 @@ in
   systemd.services.sunshine-input-metadata = {
     description = "Expose Sunshine input udev metadata to libinput";
     wantedBy = [ "multi-user.target" ];
-    serviceConfig.Type = "oneshot";
+    serviceConfig = {
+      Type = "oneshot";
+      # A session restart with its retries outlasts the default start timeout.
+      TimeoutStartSec = "5min";
+    };
     script = ''
       # Coalesce the keyboard and both mouse hotplug events.
       ${pkgs.coreutils}/bin/sleep 1
@@ -590,7 +594,9 @@ in
     serviceConfig = {
       Type = "simple";
       ExecStart = "${pkgs.kdePackages.plasma-workspace}/bin/startplasma-wayland";
-      Restart = "on-failure";
+      # startplasma-wayland exits successfully whenever the session ends, so
+      # on-failure would leave a torn-down session dead with no shell.
+      Restart = "always";
       RestartSec = "5";
     };
   };
