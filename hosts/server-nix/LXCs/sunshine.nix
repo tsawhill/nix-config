@@ -120,6 +120,14 @@ let
   setClientStreamMode = pkgs.writeShellScript "sunshine-set-client-stream-mode" ''
     set -eu
 
+    # Sunshine swallows a prep command's stderr, so a rejected mode otherwise
+    # shows up only as "exited with code [1]" with no reason anywhere.
+    fail() {
+      ${pkgs.util-linux}/bin/logger -t sunshine-stream-mode -p user.err -- "$@"
+      echo "$@" >&2
+      exit 1
+    }
+
     width=''${SUNSHINE_CLIENT_WIDTH:-}
     height=''${SUNSHINE_CLIENT_HEIGHT:-}
     fps=''${SUNSHINE_CLIENT_FPS:-}
@@ -128,8 +136,7 @@ let
       --arg width "$width" --arg height "$height" --arg fps "$fps" \
       '($width | tonumber) > 0 and ($height | tonumber) > 0 and ($fps | tonumber) > 0' \
       >/dev/null 2>&1; then
-      echo "Invalid Moonlight display mode: ''${width}x''${height}@''${fps}" >&2
-      exit 1
+      fail "Invalid Moonlight display mode: ''${width}x''${height}@''${fps}"
     fi
 
     mode_id="$(${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} -j \
@@ -151,13 +158,11 @@ let
         ')"
 
     if [ -z "$mode_id" ]; then
-      echo "Moonlight requested unavailable mode ''${width}x''${height}@''${fps}" >&2
-      echo "Available modes:" >&2
-      ${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} -j \
+      available="$(${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} -j \
         | ${lib.getExe pkgs.jq} -r \
           --arg output ${lib.escapeShellArg streamOutput} \
-          '.outputs[] | select(.name == $output) | .modes[].name' >&2
-      exit 1
+          '[.outputs[] | select(.name == $output) | .modes[].name] | join(" ")')"
+      fail "Moonlight requested unavailable mode ''${width}x''${height}@''${fps}; available: $available"
     fi
 
     exec ${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} \

@@ -33,17 +33,26 @@ V_SIZE_MM = 340
 # A DTD stores its pixel clock in 10 kHz units across 16 bits.
 DTD_MAX_CLOCK_KHZ = 655350
 
-# Exact Moonlight client resolutions. 3440x1440 above 100 Hz is deliberately
-# absent: CVT-RB puts it at 659 MHz and up, past both the DTD field and the
-# plug's 600 MHz TMDS ceiling.
+# The plug's HDMI VSDB caps the connector here, and the driver enforces it.
+MAX_TMDS_KHZ = 600000
+
+# Exact Moonlight client resolutions. Clients report the refresh rate of their
+# own panel, so every 120 Hz device needs a 120 Hz entry or the stream is
+# refused outright. 3440x1440 above 100 Hz is deliberately absent: CVT-RB puts
+# it at 659 MHz and up, past both the DTD field and the TMDS ceiling.
 MODES = [
     (3440, 1440, 60),
     (3440, 1440, 100),
     (2856, 1280, 60),  # Pixel 9 Pro
+    (2856, 1280, 120),
     (2360, 1640, 60),  # iPad
+    (2360, 1640, 120),
     (1428, 640, 60),  # Pixel 9 Pro, half
+    (1428, 640, 120),
     (1240, 1080, 60),  # AYN Thor lower display
+    (1240, 1080, 120),
     (1180, 820, 60),  # iPad, half
+    (1180, 820, 120),
 ]
 
 
@@ -85,6 +94,8 @@ def dtd(t):
     clock = t["clock_khz"] // 10
     if t["clock_khz"] > DTD_MAX_CLOCK_KHZ:
         raise ValueError("%.2f MHz exceeds the DTD pixel clock field" % (t["clock_khz"] / 1000.0))
+    if t["clock_khz"] > MAX_TMDS_KHZ:
+        raise ValueError("%.2f MHz exceeds the connector's TMDS ceiling" % (t["clock_khz"] / 1000.0))
 
     w, h = t["width"], t["height"]
     hb, vb = t["h_blank"], t["v_blank"]
