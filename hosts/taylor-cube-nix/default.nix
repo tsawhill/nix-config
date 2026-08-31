@@ -152,7 +152,11 @@ in
   # ~/Games/synced) and launch locally; everything else launches from the full
   # library over the /mnt/zpool/roms CIFS mount. Keep pc selective so only GH3
   # syncs from that platform.
-  software.games.syncGames = [ "guitarHero3" ];
+  software.games.syncGames = [
+    "guitarHero3"
+    "guitarHeroWorldTourDefinitiveEdition"
+    "guitarHeroWorldTourDefinitiveEditionUpdater"
+  ];
   software.games.syncPlatforms = [
     "3ds"
     "arcade"
