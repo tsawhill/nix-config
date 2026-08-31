@@ -10,6 +10,7 @@
     ./autostart.nix
     ./walker.nix
     ./appearance.nix
+    ./render.nix
     ./bindings.nix
     ./workspaces.nix
     ./monitor-events.nix
