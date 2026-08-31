@@ -157,6 +157,8 @@ in
     "guitarHero3"
     "guitarHeroWorldTourDefinitiveEdition"
     "guitarHeroWorldTourDefinitiveEditionUpdater"
+    "skyrimAnniversaryEdition"
+    "skyrimAnniversaryEditionLauncher"
   ];
   software.games.syncPlatforms = [
     "3ds"
