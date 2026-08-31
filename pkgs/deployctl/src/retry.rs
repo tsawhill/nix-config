@@ -80,6 +80,9 @@ impl RetryStore {
     }
 
     fn pin(&self, record: &RetryRecord) -> Result<()> {
+        // This is another reference to the already-built store path, not a
+        // second copy of its closure. It keeps that exact build alive only
+        // until the queued apply succeeds or is discarded.
         let root = self.gcroot_path(&record.schedule, &record.host);
         fs::create_dir_all(root.parent().context("retry GC root has no parent")?)?;
         remove_file_if_present(&root)?;

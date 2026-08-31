@@ -58,10 +58,10 @@ in
     (import "${self}/modules/ssh/pubkeys/build-nix-root.nix" buildSSHUsers)
     (import "${self}/modules/ssh/pubkeys/phone-taylor.nix" phoneSSHUsers)
 
-    # Software. Only the core CLI bundle: the full modules/software/bundles
+    # Software. Only the server CLI bundle: the full modules/software/bundles
     # tree also pulls in the gui-apps option set, which this headless aarch64
     # box has no use for.
-    "${self}/modules/software/bundles/all.nix"
+    "${self}/modules/software/bundles/server.nix"
 
     # Nginx
     "${self}/modules/software/services/nginx/nginx.nix"
@@ -75,6 +75,7 @@ in
   my.users.root = {
     enable = true;
   };
+  software.server.enable = true;
 
   users.users.nginx = {
     # This tells NixOS not to use the 'nologin' shell

@@ -402,6 +402,7 @@ with open(sys.argv[2], 'w') as f:
     # Template nix store snapshot — cloned into each new container so it has a
     # working /nix from the start (avoids a full download on first deploy).
     NIX_TEMPLATE_SNAPSHOT="rpool/VMDisks/nix-templates/nixos-base-nix@ready"
+    NIX_TEMPLATE_SNAPSHOT_NAME="''${NIX_TEMPLATE_SNAPSHOT##*@}"
 
     # Parent ZFS dataset under which per-container nix stores live.
     # e.g. downloadHDD/nix-stores/jellyfin-nix
@@ -846,6 +847,15 @@ with open(sys.argv[2], 'w') as f:
         rollback_create "Nix store replication failed"
       fi
       DATASET_CREATED=true
+
+      # `zfs receive` preserves the source snapshot. It is only transport for
+      # provisioning; leaving it on every guest pins the initial store forever.
+      # The reusable template snapshot above remains untouched.
+      if ! server_cmd zfs destroy \
+        "$NIX_PARENT_DATASET/$HOSTNAME@$NIX_TEMPLATE_SNAPSHOT_NAME"
+      then
+        rollback_create "Removing received nix store template snapshot failed"
+      fi
 
       # --- Step 4: Wire up devices ---
       # - chown the nix store to the container's mapped UID/GID

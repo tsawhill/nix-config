@@ -49,7 +49,7 @@ in
     (import "${self}/modules/ssh/pubkeys/phone-taylor.nix" phoneSSHUsers)
 
     # Software
-    "${self}/modules/software/bundles"
+    "${self}/modules/software/bundles/server.nix"
 
     # Nginx
     "${self}/modules/software/services/nginx/nginx.nix"
@@ -59,6 +59,7 @@ in
   my.users.root = {
     enable = true;
   };
+  software.server.enable = true;
   users.users.nginx = {
     # This tells NixOS not to use the 'nologin' shell
     shell = pkgs.zsh;

@@ -395,6 +395,7 @@ in
   imports = [
     ./base
     ./nvidia-runtime.nix
+    "${self}/modules/software/bundles/gui-apps/gaming.nix"
     "${self}/modules/software/services/sunshine.nix"
   ];
 

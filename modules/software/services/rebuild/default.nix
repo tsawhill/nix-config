@@ -31,7 +31,11 @@ let
     per_host_build_timeout = "6h";
     apply_timeout = "90m";
     incus_boot_timeout_secs = 180;
+    # Physical and remote hosts retain two closures for offline comparisons.
+    # Reproducible Incus guests retain only their newest built closure; their
+    # own system profile remains the source of truth for activation rollback.
     keep_roots = 2;
+    incus_keep_roots = 1;
     incus_guests = incusGuests;
     notifications = {
       gotify_url = notifications.gotify.url;

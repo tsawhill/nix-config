@@ -8,6 +8,7 @@
 {
   imports = [
     ./base
+    "${self}/modules/software/bundles/dev.nix"
     "${self}/modules/software/services/rebuild-scripts.nix"
     "${self}/modules/software/packages/nixos-factory.nix"
 
@@ -56,6 +57,7 @@
     # retries and rollback. Do not also retain every build-time output reachable
     # through those roots; that turned the builder into a permanent build cache.
     keep-outputs = lib.mkForce false;
+    keep-derivations = lib.mkForce false;
     substituters = [
       "https://nix-community.cachix.org"
       "https://nixos-raspberrypi.cachix.org"

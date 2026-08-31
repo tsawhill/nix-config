@@ -215,18 +215,23 @@ impl Colmena {
         if !output.success() {
             bail!("failed to pin {}:\n{}", system_path.display(), output.text);
         }
-        self.prune_host_roots(&host_dir)?;
+        let keep_roots = if self.config.incus_guests.contains_key(host) {
+            self.config.incus_keep_roots
+        } else {
+            self.config.keep_roots
+        };
+        self.prune_host_roots(&host_dir, keep_roots)?;
         self.prune_removed_hosts()?;
         Ok(())
     }
 
-    fn prune_host_roots(&self, host_dir: &Path) -> Result<()> {
+    fn prune_host_roots(&self, host_dir: &Path, keep_roots: usize) -> Result<()> {
         let mut roots: Vec<_> = fs::read_dir(host_dir)?
             .filter_map(Result::ok)
             .map(|entry| entry.path())
             .collect();
         roots.sort_by(|left, right| right.file_name().cmp(&left.file_name()));
-        for root in roots.into_iter().skip(self.config.keep_roots) {
+        for root in roots.into_iter().skip(keep_roots) {
             let _ = fs::remove_file(root);
         }
         Ok(())

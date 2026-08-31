@@ -19,6 +19,7 @@ pub struct Config {
     pub apply_timeout: String,
     pub incus_boot_timeout_secs: u64,
     pub keep_roots: usize,
+    pub incus_keep_roots: usize,
     pub notifications: NotificationConfig,
     pub summary: SummaryConfig,
     #[serde(default)]

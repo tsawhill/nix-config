@@ -5,7 +5,7 @@
   home-manager = {
     users.root = {
       imports = [
-        "${self}/modules/home-manager/bundles/all.nix"
+        "${self}/modules/home-manager/bundles/server.nix"
       ];
 
       home.stateVersion = "26.05";

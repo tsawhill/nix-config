@@ -26,7 +26,6 @@ in
     "${self}/modules/nix/nixpkgs.nix"
     "${self}/modules/nix/features.nix"
     "${self}/modules/nix/cachix.nix"
-    "${self}/modules/nix/keep-outputs-derivations.nix"
     "${self}/modules/nix/garbage-collection.nix"
     "${self}/modules/monitoring"
 
@@ -47,13 +46,18 @@ in
     ./home-manager.nix
 
     # Software
-    "${self}/modules/software/bundles"
+    "${self}/modules/software/bundles/server.nix"
   ];
 
   my.users.root = {
     enable = true;
   };
   my.garbage.collection.generations = 1;
+  nix.settings = {
+    keep-outputs = false;
+    keep-derivations = false;
+  };
+  software.server.enable = true;
   my.monitoring.metrics.exporters.enable = true;
   # /proc/diskstats is host-global inside these containers, so node_exporter
   # would publish identical and misleading disk I/O for every guest. Incus's
