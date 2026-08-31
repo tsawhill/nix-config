@@ -248,6 +248,60 @@ let
       "output.${streamOutput}.mode.$mode_id"
   '';
 
+  # The first KWin process after an LXC cold boot can wedge in the NVIDIA DRM
+  # driver before it registers org.kde.KWin. systemd considers the wrapper
+  # active immediately, so the user units waiting for a usable compositor do
+  # not trigger a restart themselves. A second KWin start succeeds.
+  recoverKWinAtBoot = pkgs.writeShellScript "sunshine-recover-kwin-at-boot" ''
+    set -u
+
+    kwin_ready() {
+      ${pkgs.util-linux}/bin/runuser -u ${user} -- \
+        env XDG_RUNTIME_DIR=/run/user/1000 \
+          DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus \
+          WAYLAND_DISPLAY=${waylandDisplay} \
+          ${pkgs.coreutils}/bin/timeout --kill-after=0.2s 1s \
+            ${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} -j 2>/dev/null \
+        | ${lib.getExe pkgs.jq} -e \
+          --arg output ${lib.escapeShellArg streamOutput} \
+          '[.outputs[] | select(.name == $output and .enabled)] | length > 0' \
+          >/dev/null 2>&1
+    }
+
+    # startplasma-wayland generates and starts this unit at runtime. On a cold
+    # boot that currently takes about a minute, so wait for the unit rather
+    # than racing Plasma's systemd reload.
+    for _ in $(seq 1 180); do
+      if ${pkgs.systemd}/bin/systemctl --user --machine=${user}@ \
+        is-active --quiet plasma-kwin_wayland.service; then
+        break
+      fi
+      sleep 0.5
+    done
+
+    if ! ${pkgs.systemd}/bin/systemctl --user --machine=${user}@ \
+      is-active --quiet plasma-kwin_wayland.service; then
+      echo "KWin did not start during Plasma cold boot" >&2
+      exit 1
+    fi
+
+    for attempt in 1 2 3; do
+      for _ in $(seq 1 40); do
+        if kwin_ready; then
+          exit 0
+        fi
+        sleep 0.5
+      done
+
+      echo "KWin is not usable after cold-boot attempt $attempt; restarting it" >&2
+      ${pkgs.systemd}/bin/systemctl --user --machine=${user}@ \
+        restart plasma-kwin_wayland.service || true
+    done
+
+    echo "${streamOutput} did not become usable after cold-boot KWin recovery" >&2
+    exit 1
+  '';
+
   # Incus hotplugs Sunshine's uinput event nodes, but an unprivileged LXC
   # cannot synthesize the corresponding udev events. Mirror the host's udev
   # records so libinput can classify the passed keyboard and mouse.
@@ -259,8 +313,11 @@ let
 
     output_enabled() {
       ${pkgs.util-linux}/bin/runuser -u ${user} -- \
-        env XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=${waylandDisplay} \
-        ${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} -j 2>/dev/null \
+        env XDG_RUNTIME_DIR=/run/user/1000 \
+          DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus \
+          WAYLAND_DISPLAY=${waylandDisplay} \
+          ${pkgs.coreutils}/bin/timeout --kill-after=0.2s 1s \
+            ${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} -j 2>/dev/null \
         | ${lib.getExe pkgs.jq} -e \
           --arg output ${lib.escapeShellArg streamOutput} \
           '[.outputs[] | select(.name == $output and .enabled)] | length > 0' \
@@ -443,6 +500,21 @@ in
     pathConfig = {
       PathChanged = "/dev/input";
       Unit = "sunshine-input-metadata.service";
+    };
+  };
+
+  # Cold-boot readiness belongs to its own system unit. Input metadata is not
+  # guaranteed to change at boot, so its hotplug recovery path cannot be used
+  # to make compositor startup reliable.
+  systemd.services.sunshine-session-recovery = {
+    description = "Recover the Sunshine KWin session after cold boot";
+    wantedBy = [ "multi-user.target" ];
+    wants = [ "user@1000.service" ];
+    after = [ "user@1000.service" ];
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = "${recoverKWinAtBoot}";
+      TimeoutStartSec = "5min";
     };
   };
 
