@@ -75,6 +75,7 @@ in
       members = [
         "server"
         "cube"
+        "desktop"
       ];
       overrides.server = "/mnt/zpool/roms";
       ignoreDelete = true;
