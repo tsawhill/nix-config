@@ -139,22 +139,26 @@ let
       fail "Invalid Moonlight display mode: ''${width}x''${height}@''${fps}"
     fi
 
+    # Only the resolution has to match, because it sets the capture geometry.
+    # Clients pick all sorts of frame rates (24, 30, 48, 50, 90), so fall back
+    # to the cheapest refresh that still covers the request rather than
+    # refusing the stream outright.
     mode_id="$(${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} -j \
       | ${lib.getExe pkgs.jq} -r \
         --arg output ${lib.escapeShellArg streamOutput} \
         --argjson width "$width" --argjson height "$height" --argjson fps "$fps" '
-          first(
+          [
             .outputs[]
             | select(.name == $output)
             | .modes[]
-            | select(
-                .size.width == $width
-                and .size.height == $height
-                and (.refreshRate - $fps) < 1
-                and (.refreshRate - $fps) > -1
-              )
-            | .id
-          ) // empty
+            | select(.size.width == $width and .size.height == $height)
+          ]
+          | (
+              ([ .[] | select((.refreshRate - $fps) < 1 and (.refreshRate - $fps) > -1) ] | first)
+              // ([ .[] | select(.refreshRate >= $fps) ] | sort_by(.refreshRate) | first)
+              // (sort_by(.refreshRate) | last)
+            )
+          | .id // empty
         ')"
 
     if [ -z "$mode_id" ]; then
@@ -162,7 +166,7 @@ let
         | ${lib.getExe pkgs.jq} -r \
           --arg output ${lib.escapeShellArg streamOutput} \
           '[.outputs[] | select(.name == $output) | .modes[].name] | join(" ")')"
-      fail "Moonlight requested unavailable mode ''${width}x''${height}@''${fps}; available: $available"
+      fail "Moonlight requested unavailable resolution ''${width}x''${height}; available: $available"
     fi
 
     exec ${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} \

@@ -11,5 +11,10 @@
     # driver reaches nixpkgs-stable.
     package = config.boot.kernelPackages.nvidiaPackages.legacy_580;
     open = true;
+
+    # Without this nvidia_drm never loads, so the GPU exposes no DRM device and
+    # Incus has no /dev/dri to hand the GPU guests. It had been loaded by hand
+    # and survived only because this host went so long between reboots.
+    modesetting.enable = true;
   };
 }
