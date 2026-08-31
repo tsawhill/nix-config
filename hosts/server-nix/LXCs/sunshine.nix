@@ -223,6 +223,40 @@ let
   # Incus hotplugs Sunshine's uinput event nodes, but an unprivileged LXC
   # cannot synthesize the corresponding udev events. Mirror the host's udev
   # records so libinput can classify the passed keyboard and mouse.
+  # A replacement compositor races the outgoing one for DRM master. Losing it
+  # refuses the atomic modeset and leaves the output disabled, so verify the
+  # output returned and restart again when it did not.
+  restartKWinForInput = pkgs.writeShellScript "sunshine-restart-kwin-for-input" ''
+    set -u
+
+    output_enabled() {
+      ${pkgs.util-linux}/bin/runuser -u ${user} -- \
+        env XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=${waylandDisplay} \
+        ${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} -j 2>/dev/null \
+        | ${lib.getExe pkgs.jq} -e \
+          --arg output ${lib.escapeShellArg streamOutput} \
+          '[.outputs[] | select(.name == $output and .enabled)] | length > 0' \
+          >/dev/null 2>&1
+    }
+
+    for attempt in 1 2 3; do
+      ${pkgs.systemd}/bin/systemctl --user --machine=${user}@ \
+        try-restart plasma-kwin_wayland.service || true
+
+      for _ in $(seq 1 60); do
+        if output_enabled; then
+          exit 0
+        fi
+        sleep 0.5
+      done
+
+      echo "${streamOutput} still disabled after KWin restart $attempt" >&2
+    done
+
+    echo "${streamOutput} did not return after restarting KWin" >&2
+    exit 1
+  '';
+
   syncInputMetadata = pkgs.writeShellScript "sunshine-sync-input-metadata" ''
     set -eu
     shopt -s nullglob
@@ -268,8 +302,7 @@ let
       # KWin's DRM backend discovers input through libinput at startup. The
       # restart occurs only when a new udev record is linked. Keep Sunshine
       # running so its uinput devices remain present while KWin restarts.
-      ${pkgs.systemd}/bin/systemctl --user --machine=${user}@ \
-        try-restart plasma-kwin_wayland.service
+      ${restartKWinForInput}
     fi
   '';
 in
