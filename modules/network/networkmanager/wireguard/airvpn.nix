@@ -13,7 +13,7 @@ let
 
   endpoints = lib.mapAttrsToList (name: srv: {
     inherit name;
-    inherit (srv) ip;
+    inherit (srv) ip country city;
     port = airvpn.port;
     connectionId = "wg-airvpn-${name}";
   }) selectedServers;
@@ -162,6 +162,8 @@ in
           options = {
             name = lib.mkOption { type = lib.types.str; };
             ip = lib.mkOption { type = lib.types.str; };
+            country = lib.mkOption { type = lib.types.str; };
+            city = lib.mkOption { type = lib.types.str; };
             port = lib.mkOption { type = lib.types.port; };
             connectionId = lib.mkOption { type = lib.types.str; };
           };

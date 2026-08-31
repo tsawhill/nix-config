@@ -7,21 +7,8 @@
 
 let
   cfg = config.my.network.airvpn;
-  airvpn = import ./airvpn-servers.nix;
 
-  # cfg.endpoints only carries what a consumer needs to dial a profile. Re-join
-  # the server table so the picker can also be searched by country and city.
-  pickerEndpoints = map (endpoint: {
-    inherit (endpoint)
-      name
-      ip
-      port
-      connectionId
-      ;
-    inherit (airvpn.servers.${endpoint.name}) country city;
-  }) cfg.endpoints;
-
-  endpointsJson = pkgs.writeText "airvpn-switch-endpoints.json" (builtins.toJSON pickerEndpoints);
+  endpointsJson = pkgs.writeText "airvpn-switch-endpoints.json" (builtins.toJSON cfg.endpoints);
 
   # Empty on hosts without a vpn-egress gateway, which switch directly with nmcli.
   controllerArgs = lib.optionalString (
@@ -289,8 +276,8 @@ in
   options.my.network.airvpn.switchTool = {
     enable = lib.mkOption {
       type = lib.types.bool;
-      default = true;
-      description = "Install the interactive airvpn-switch endpoint picker.";
+      default = cfg.switchTool.controllerCommand != null;
+      description = "Install the interactive airvpn-switch endpoint picker. Defaults to gateway hosts, which are the ones reached over SSH.";
     };
 
     controllerCommand = lib.mkOption {
