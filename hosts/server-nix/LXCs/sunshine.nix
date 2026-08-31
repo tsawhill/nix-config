@@ -33,6 +33,34 @@ let
       refreshMilliHz = 60000;
       blanking = "reduced";
     }
+    # iPad
+    {
+      width = 2360;
+      height = 1640;
+      refreshMilliHz = 60000;
+      blanking = "reduced";
+    }
+    # iPad half res
+    {
+      width = 1180;
+      height = 820;
+      refreshMilliHz = 60000;
+      blanking = "reduced";
+    }
+    # Pixel 9 Pro
+    {
+      width = 2856;
+      height = 1280;
+      refreshMilliHz = 60000;
+      blanking = "reduced";
+    }
+    # Pixel 9 Pro half res
+    {
+      width = 1428;
+      height = 640;
+      refreshMilliHz = 60000;
+      blanking = "reduced";
+    }
     # Alienware AW3423DWF ultrawide
     {
       width = 3440;
