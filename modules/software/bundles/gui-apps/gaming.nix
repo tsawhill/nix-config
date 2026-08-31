@@ -2,6 +2,7 @@
   pkgs,
   lib,
   config,
+  inputs,
   ...
 }:
 let
@@ -97,6 +98,7 @@ in
         protonDefault
         wineWow64Packages.stable
         winetricks
+        inputs.grimoire.packages.${pkgs.system}.default
 
         # Performance
         gamemode

@@ -3,6 +3,7 @@
 
   inputs = {
     authentik-nix.url = "github:nix-community/authentik-nix";
+    grimoire.url = "github:Slush97/grimoire";
     nixos-raspberrypi.url = "github:nvmd/nixos-raspberrypi/main";
 
     kopuz.url = "github:temidaradev/kopuz";
