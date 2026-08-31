@@ -112,6 +112,15 @@ in
     lsfgVk.enable = true;
   };
   software.games.lsfgVk.enable = true;
+
+  software.games.syncGames = [
+    "guitarHero3"
+    "guitarHeroWorldTourDefinitiveEdition"
+    "guitarHeroWorldTourDefinitiveEditionUpdater"
+    "skyrimAnniversaryEdition"
+    "skyrimAnniversaryEditionLauncher"
+  ];
+
   software.games.gamescope.resolutions = [
     {
       width = 2560;
