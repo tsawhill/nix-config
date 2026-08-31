@@ -27,6 +27,8 @@ in
     # NVIDIA gpu
     ./hardware/nvidia.nix
     ./hardware/nvidia-runtime-host.nix
+    # Stream resolutions for the sunshine-nix dummy plug
+    ./hardware/sunshine-edid.nix
     # Disks and alerts
     ./system/disks.nix
     ./system/zfs-backups.nix

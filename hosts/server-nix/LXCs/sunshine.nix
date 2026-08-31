@@ -23,65 +23,6 @@ let
     '';
   });
 
-  # Modes absent from the HDMI dummy plug's EDID. Native EDID modes remain
-  # available alongside these; refresh rates are expressed in millihertz.
-  customStreamModes = [
-    # AYN Thor lower display (landscape)
-    {
-      width = 1240;
-      height = 1080;
-      refreshMilliHz = 60000;
-      blanking = "reduced";
-    }
-    # iPad
-    {
-      width = 2360;
-      height = 1640;
-      refreshMilliHz = 60000;
-      blanking = "reduced";
-    }
-    # iPad half res
-    {
-      width = 1180;
-      height = 820;
-      refreshMilliHz = 60000;
-      blanking = "reduced";
-    }
-    # Pixel 9 Pro
-    {
-      width = 2856;
-      height = 1280;
-      refreshMilliHz = 60000;
-      blanking = "reduced";
-    }
-    # Pixel 9 Pro half res
-    {
-      width = 1428;
-      height = 640;
-      refreshMilliHz = 60000;
-      blanking = "reduced";
-    }
-    # Alienware AW3423DWF ultrawide
-    {
-      width = 3440;
-      height = 1440;
-      refreshMilliHz = 60000;
-      blanking = "reduced";
-    }
-    {
-      width = 3440;
-      height = 1440;
-      refreshMilliHz = 120000;
-      blanking = "reduced";
-    }
-    {
-      width = 3440;
-      height = 1440;
-      refreshMilliHz = 165000;
-      blanking = "reduced";
-    }
-  ];
-
   nvidiaClientEnvironment = {
     __EGL_EXTERNAL_PLATFORM_CONFIG_DIRS = "/run/opengl-driver/share/egl/egl_external_platform.d";
     __EGL_VENDOR_LIBRARY_FILENAMES = "/run/opengl-driver/share/glvnd/egl_vendor.d/10_nvidia.json";
@@ -174,33 +115,8 @@ let
     exit 1
   '';
 
-  ensureCustomStreamModes = pkgs.writeShellScript "sunshine-ensure-custom-stream-modes" ''
-    set -eu
-
-    ${waitForKWin}
-    ${waitForOutput}
-
-    modes="$(${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} -j)"
-    ${lib.concatMapStringsSep "\n" (
-      mode:
-      let
-        refreshHz = builtins.div mode.refreshMilliHz 1000;
-        modeName = "${toString mode.width}x${toString mode.height}@${toString refreshHz}";
-      in
-      ''
-        if ! printf '%s\n' "$modes" | ${lib.getExe pkgs.jq} -e \
-          --arg output ${lib.escapeShellArg streamOutput} \
-          --arg mode ${lib.escapeShellArg modeName} \
-          '[.outputs[] | select(.name == $output) | .modes[] | select(.name == $mode)] | length > 0' \
-          >/dev/null; then
-          ${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} \
-            ${lib.escapeShellArg "output.${streamOutput}.addCustomMode.${toString mode.width}.${toString mode.height}.${toString mode.refreshMilliHz}.${mode.blanking}"}
-          modes="$(${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} -j)"
-        fi
-      ''
-    ) customStreamModes}
-  '';
-
+  # nvidia-drm rejects any mode outside its EDID-derived pool, so the client
+  # resolutions come from server-nix's hardware/sunshine-edid.nix instead.
   setClientStreamMode = pkgs.writeShellScript "sunshine-set-client-stream-mode" ''
     set -eu
 
@@ -290,9 +206,6 @@ let
 
       for _ in $(seq 1 60); do
         if ${sessionReady}; then
-          # partOf only propagates a restart, so this oneshot stays behind when
-          # the compositor is stopped rather than restarted.
-          ${userctl} start sunshine-display-modes.service || true
           exit 0
         fi
         sleep 0.5
@@ -601,20 +514,6 @@ in
     };
   };
 
-  systemd.user.services.sunshine-display-modes = {
-    description = "Add custom Sunshine display modes to KWin";
-    wantedBy = [ "default.target" ];
-    after = [ "plasma-kwin_wayland.service" ];
-    partOf = [ "plasma-kwin_wayland.service" ];
-    unitConfig.ConditionUser = user;
-    environment = sessionEnvironment;
-    serviceConfig = {
-      Type = "oneshot";
-      RemainAfterExit = true;
-      ExecStart = "${ensureCustomStreamModes}";
-    };
-  };
-
   # The virtual backend does not initialize libinput, so Sunshine's synthetic
   # keyboard and mouse are invisible to Plasma. Use the passed NVIDIA DRM
   # device and its connected HDMI output instead.
@@ -667,14 +566,8 @@ in
     wantedBy = lib.mkForce [ "default.target" ];
     unitConfig.ConditionUser = user;
     partOf = lib.mkForce [ ];
-    wants = lib.mkForce [
-      "plasma-headless.service"
-      "sunshine-display-modes.service"
-    ];
-    after = lib.mkForce [
-      "plasma-headless.service"
-      "sunshine-display-modes.service"
-    ];
+    wants = lib.mkForce [ "plasma-headless.service" ];
+    after = lib.mkForce [ "plasma-headless.service" ];
     environment =
       sessionEnvironment
       // nvidiaGraphicsEnvironment
