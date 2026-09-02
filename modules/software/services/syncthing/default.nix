@@ -62,12 +62,6 @@ let
       # fails (EPERM) and wedges the whole folder in a 60s retry loop. We don't
       # care about perms travelling between hosts for game saves anyway.
       ignorePerms = true;
-    }
-    # Opt-in per share (fleet.nix): never propagate deletions. Used by `roms` so a
-    # host (or the games prune) deleting a local copy cannot delete the master, while
-    # additions/modifications still sync both ways.
-    // lib.optionalAttrs (fleet.shares.${name}.ignoreDelete or false) {
-      ignoreDelete = true;
     };
 
   # Effective ignore patterns for a share on this host: the share's common

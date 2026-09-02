@@ -700,14 +700,17 @@ in
       my.syncthing.sharePaths.roms = cfg.syncRoot;
       my.syncthing.extraIgnores.roms = romsIgnores;
 
-      # Delete local copies of de-selected games. Safe: the roms folder is
-      # ignoreDelete, so this rm never propagates to the server, and the updated
-      # .stignore stops Syncthing re-fetching. Re-runs whenever the selection
-      # (managedFile) changes.
+      # Delete local copies of de-selected games. Safe because syncthing-stignore
+      # rewrites .stignore before syncthing starts, so a de-selected path is already
+      # excluded by the time this rm runs and its deletion is never propagated.
+      # Re-runs whenever the selection (managedFile) changes.
       systemd.services.game-local-prune = {
         description = "Prune de-selected local game copies under syncRoot";
         wantedBy = [ "multi-user.target" ];
-        after = [ "syncthing.service" ];
+        after = [
+          "syncthing-stignore.service"
+          "syncthing.service"
+        ];
         restartTriggers = [ managedFile ] ++ map pruneKeepFile excludeDirs;
         serviceConfig = {
           Type = "oneshot";
