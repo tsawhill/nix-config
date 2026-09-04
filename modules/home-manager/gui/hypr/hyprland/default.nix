@@ -1,4 +1,14 @@
-{ lib, config, ... }:
+{
+  lib,
+  config,
+  osConfig,
+  pkgs,
+  ...
+}:
+let
+  timeZone = osConfig.time.timeZone;
+  timeZoneDirectory = "${pkgs.tzdata}/share/zoneinfo";
+in
 # NOTE FOR DEVELOPERS:
 # config.my.hypr.layout             — "desktop" | "laptop"
 # config.my.hypr.monitors.primary   — primary monitor name (e.g. "DP-4"); empty = Hyprland auto
@@ -61,6 +71,8 @@
     GDK_SCALE = "1";
     ELECTRON_OZONE_PLATFORM_HINT = "wayland";
     EDITOR = "nvim";
+    TZ = timeZone;
+    TZDIR = timeZoneDirectory;
     _JAVA_AWT_WM_NONREPARENTING = "1";
   };
 
@@ -84,9 +96,36 @@
 
       # hl.env("NAME", "value")
       env = [
-        { _args = [ "GDK_SCALE" "1" ]; }
-        { _args = [ "ELECTRON_OZONE_PLATFORM_HINT" "wayland" ]; }
-        { _args = [ "EDITOR" "nvim" ]; }
+        {
+          _args = [
+            "GDK_SCALE"
+            "1"
+          ];
+        }
+        {
+          _args = [
+            "ELECTRON_OZONE_PLATFORM_HINT"
+            "wayland"
+          ];
+        }
+        {
+          _args = [
+            "EDITOR"
+            "nvim"
+          ];
+        }
+        {
+          _args = [
+            "TZ"
+            timeZone
+          ];
+        }
+        {
+          _args = [
+            "TZDIR"
+            timeZoneDirectory
+          ];
+        }
       ];
 
       # Config sections all live under a single hl.config({ ... }) call. Other

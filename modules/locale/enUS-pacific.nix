@@ -1,6 +1,20 @@
 {
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+{
   # Set your time zone.
   time.timeZone = "America/Los_Angeles";
+
+  # Use the real tzdata store path so sandboxed applications such as Proton's
+  # pressure-vessel runtime can resolve it. Also export the zone explicitly for
+  # applications that do not derive it reliably from /etc/localtime.
+  environment.sessionVariables = {
+    TZ = config.time.timeZone;
+    TZDIR = lib.mkForce "${pkgs.tzdata}/share/zoneinfo";
+  };
 
   # Select internationalisation properties.
   i18n.defaultLocale = "en_US.UTF-8";
