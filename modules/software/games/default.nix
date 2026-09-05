@@ -110,9 +110,9 @@ let
 
       protonPath =
         if useGeProton then
-          (if umuCfg.protonVersion == "latest" then "GE-Proton" else "${geProton}")
+          (if umuCfg.protonVersion == "latest" then "GE-Proton" else "${geProton.steamcompattool}")
         else
-          "${protonCachyos}/share/steam/compatibilitytools.d/proton-cachyos-slr";
+          "${protonCachyos.steamcompattool}";
 
       runner = pkgs.callPackage ../../../pkgs/games/runners/umu.nix { } {
         inherit exePath protonPath;

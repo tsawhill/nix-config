@@ -21,14 +21,20 @@ let
     "11.0.20260703-1" = latestVersion;
   };
   selectedVersion =
-    knownVersions.${version}
-      or (throw "Unsupported proton-cachyos version: ${version}");
+    knownVersions.${version} or (throw "Unsupported proton-cachyos version: ${version}");
 
   toolDir = "proton-cachyos-slr";
 in
 stdenvNoCC.mkDerivation rec {
   pname = "proton-cachyos";
   version = selectedVersion.packageVersion;
+
+  # Steam's NixOS module reads this output via extraCompatPackages. $out keeps
+  # the command-line wrapper and the legacy path used by existing UMU launchers.
+  outputs = [
+    "out"
+    "steamcompattool"
+  ];
 
   src = fetchurl {
     url = "https://cdn77.cachyos.org/repo/x86_64/cachyos/proton-cachyos-slr-1%3A${selectedVersion.packageVersion}-x86_64.pkg.tar.zst";
@@ -49,11 +55,12 @@ stdenvNoCC.mkDerivation rec {
   installPhase = ''
     runHook preInstall
 
-    mkdir -p "$out/bin" "$out/share/steam/compatibilitytools.d"
-    cp -a usr/share/steam/compatibilitytools.d/${toolDir} "$out/share/steam/compatibilitytools.d/"
+    mkdir -p "$out/bin" "$out/share/steam/compatibilitytools.d" "$steamcompattool"
+    cp -a usr/share/steam/compatibilitytools.d/${toolDir}/. "$steamcompattool/"
+    ln -s "$steamcompattool" "$out/share/steam/compatibilitytools.d/${toolDir}"
     cat > "$out/bin/proton-cachyos" <<EOF
     #!/bin/sh
-    exec "$out/share/steam/compatibilitytools.d/${toolDir}/proton" "\$@"
+    exec "$steamcompattool/proton" "\$@"
     EOF
     chmod +x "$out/bin/proton-cachyos"
 

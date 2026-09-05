@@ -8,17 +8,28 @@
 let
   # GE-Proton release tarball sha512 sums (from each release's .sha512sum).
   knownVersions = {
-    "8-32" = "8fbdd675daca620c257da8d3565cf234594a2db36da6acbd69597bd43eaf582768279a97042cf2e9144b6a3f34032a97dcf3d9d90b1a74699ee48a94a4c5cfe3";
-    "9-25" = "8fbfd40e72f72f9bbbf1349af2bd0bd98eafd62d95e5c19fd86c58f615c69b8e61b4cbf640c049c3394285df23976992c4ad79b4912b68db964a37df178a3ae9";
-    "10-34" = "9fd0b2cfbd501c0b5c892239c392c7283a029b5e5d5a77d3f85b0ce190d555456241a18eebca16b53f094b403499201c13550a3f0b9b365e1a5eb5737cbb7303";
-    "11-3" = "528ae7831f909c0a4fff5d83889ac6dab3c9706746cd148f05f3064ac042763853d68277e2a815f18f16c17285d5d128864a03c563956c0dce30bafcd16aa77c";
+    "8-32" =
+      "8fbdd675daca620c257da8d3565cf234594a2db36da6acbd69597bd43eaf582768279a97042cf2e9144b6a3f34032a97dcf3d9d90b1a74699ee48a94a4c5cfe3";
+    "9-25" =
+      "8fbfd40e72f72f9bbbf1349af2bd0bd98eafd62d95e5c19fd86c58f615c69b8e61b4cbf640c049c3394285df23976992c4ad79b4912b68db964a37df178a3ae9";
+    "10-34" =
+      "9fd0b2cfbd501c0b5c892239c392c7283a029b5e5d5a77d3f85b0ce190d555456241a18eebca16b53f094b403499201c13550a3f0b9b365e1a5eb5737cbb7303";
+    "11-3" =
+      "528ae7831f909c0a4fff5d83889ac6dab3c9706746cd148f05f3064ac042763853d68277e2a815f18f16c17285d5d128864a03c563956c0dce30bafcd16aa77c";
   };
-  sha512 =
-    knownVersions.${version} or (throw "Unsupported GE-Proton version: ${version}");
+  sha512 = knownVersions.${version} or (throw "Unsupported GE-Proton version: ${version}");
 in
 stdenvNoCC.mkDerivation {
   pname = "proton-ge";
   version = "GE-Proton${version}";
+
+  # programs.steam.extraCompatPackages consumes this output directly through
+  # STEAM_EXTRA_COMPAT_TOOLS_PATHS. Keep $out as a small breadcrumb so this
+  # package is not accidentally treated like a normal system package.
+  outputs = [
+    "out"
+    "steamcompattool"
+  ];
 
   src = fetchurl {
     url = "https://github.com/GloriousEggroll/proton-ge-custom/releases/download/GE-Proton${version}/GE-Proton${version}.tar.gz";
@@ -37,12 +48,15 @@ stdenvNoCC.mkDerivation {
 
   installPhase = ''
     runHook preInstall
-    mkdir -p "$out"
+    echo "Use this package with programs.steam.extraCompatPackages." > "$out"
+    mkdir -p "$steamcompattool"
     # The tarball's top-level GE-Proton${version}/ dir is the source root, so the
-    # build is already inside it; copy its contents into $out.
-    cp -a . "$out/"
+    # build is already inside it; copy its contents into the Steam tool output.
+    cp -a . "$steamcompattool/"
     runHook postInstall
   '';
+
+  passthru.supportedVersions = builtins.attrNames knownVersions;
 
   meta = {
     description = "GloriousEggroll's Proton-GE compatibility tool (pinned ${version})";

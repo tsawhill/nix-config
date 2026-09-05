@@ -8,8 +8,12 @@
 let
   cfg = config.software.apps.gaming;
   protonGe = pkgs.callPackage ../../../../pkgs/games/proton-ge.nix { };
+  protonGeVersions = map (
+    version: pkgs.callPackage ../../../../pkgs/games/proton-ge.nix { inherit version; }
+  ) protonGe.supportedVersions;
+  protonCachyos = pkgs.callPackage ../../../../pkgs/games/proton-cachyos.nix { };
   protonDefault = pkgs.callPackage ../../../../pkgs/games/proton-default.nix {
-    protonPath = protonGe;
+    protonPath = protonGe.steamcompattool;
   };
   miniHostGhGuitarControllerMapping = "03000000091200008228000001010000,MiniHost GH Guitar,platform:Linux,a:b0,b:b1,x:b3,y:b4,leftshoulder:b6,back:b10,start:b11,dpup:h0.1,dpdown:h0.4,leftx:a0,righty:a2";
 in
@@ -32,6 +36,7 @@ in
       dedicatedServer.openFirewall = true;
       localNetworkGameTransfers.openFirewall = true;
       extraPackages = lib.optionals cfg.lsfgVk.enable [ pkgs.lsfg-vk ];
+      extraCompatPackages = [ protonCachyos ] ++ protonGeVersions;
     };
 
     programs.gamescope = {
