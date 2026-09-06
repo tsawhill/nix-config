@@ -6,7 +6,6 @@
       basePath = "pc/Call of Duty/boiii";
       runner.umu = {
         exe = "boiii.exe";
-        proton = "ge-proton";
       };
     };
 
@@ -17,7 +16,6 @@
       basePath = "$HOME/Games/saves/wine/default/drive_c/Program Files (x86)/Steam";
       runner.umu = {
         exe = "Steam.exe";
-        proton = "ge-proton";
       };
     };
   };

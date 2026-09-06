@@ -5,7 +5,6 @@
     basePath = "pc/Cyberpunk 2077";
     runner.umu = {
       exe = "bin/x64/Cyberpunk2077.exe";
-      proton = "ge-proton";
     };
   };
 }

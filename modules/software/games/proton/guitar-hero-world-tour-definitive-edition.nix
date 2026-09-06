@@ -24,7 +24,6 @@
       basePath = "pc/GHWTDE";
       runner.umu = {
         exe = "GHWT_Definitive.exe";
-        proton = "ge-proton";
       };
     };
 
@@ -41,7 +40,6 @@
       network.enable = true;
       runner.umu = {
         exe = "Updater.exe";
-        proton = "ge-proton";
       };
     };
   };

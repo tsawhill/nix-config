@@ -17,7 +17,6 @@
       basePath = "pc/Call of Duty/IW4X";
       runner.umu = {
         exe = "iw4x-launcher.exe";
-        proton = "ge-proton";
       };
     };
   };

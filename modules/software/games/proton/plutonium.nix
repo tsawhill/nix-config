@@ -6,7 +6,6 @@
     network.enable = true;
     runner.umu = {
       exe = "plutonium.exe";
-      proton = "ge-proton";
     };
   };
 }
