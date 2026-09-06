@@ -31,11 +31,11 @@
     options = [ "fmask=0022" "dmask=0022" ];
   };
 
-  # Windows drive
+  # Manual access only: keep every partition unmounted while the Windows VM runs.
   fileSystems."/mnt/windows" = {
-    device = "/dev/nvme1n1p3";
+    device = "/dev/disk/by-id/nvme-SPCC_M.2_PCIe_SSD_30083920240-part3";
     fsType = "ntfs-3g";
-    options = [ "rw" "uid=1000" "nofail" ];
+    options = [ "noauto" "ro" "uid=1000" "nofail" ];
   };
 
   swapDevices = [ ];

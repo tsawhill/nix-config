@@ -31,6 +31,7 @@ in
     ./system/networking.nix
     ./system/syncthing.nix
     ./system/samba.nix
+    ./system/windows-vm.nix
 
     # NixOS Settings
     "${self}/modules/nix/nixpkgs.nix"
