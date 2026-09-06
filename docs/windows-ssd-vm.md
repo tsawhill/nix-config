@@ -55,6 +55,14 @@ Windows automatically, use its boot menu to select the SSD's
 
 ## USB firmware utilities
 
+Open **VM USB Port** from the application launcher (or run `vm-usb-port`).
+Select a running VM, then select the connected device whose physical port you
+want to assign. This attaches by port without filtering vendor/product IDs and
+uses `virsh attach-device --live` only: it does not change the saved VM definition.
+The assignment ends when the VM shuts down. Keep the upstream hub connected in
+the same place when swapping devices. USB 3 devices may enumerate on a companion
+bus and require selecting the new device again.
+
 Use **Add Hardware → USB Host Device** to attach the peripheral. It becomes
 unavailable to Linux while assigned. A firmware updater may reconnect the device
 with a different USB ID in bootloader mode; that device may also need attaching.

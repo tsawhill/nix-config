@@ -31,6 +31,7 @@
     '';
   };
   programs.virt-manager.enable = true;
+  environment.systemPackages = [ (import ../../../pkgs/vm-usb-port { inherit pkgs; }) ];
   virtualisation.spiceUSBRedirection.enable = true;
   my.users.taylor.extraGroups = [ "libvirtd" ];
 
