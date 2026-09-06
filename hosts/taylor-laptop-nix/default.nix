@@ -76,6 +76,7 @@ in
   ];
 
   desktop.hyprland.enable = true;
+  desktop.plymouth.enable = true;
   services.upower.enable = true;
 
   software.dev.enable = true;

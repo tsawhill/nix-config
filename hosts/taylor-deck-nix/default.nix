@@ -67,6 +67,7 @@ in
     # which we do not want — Jovian's autoStart is incompatible with a display
     # manager).
     "${self}/modules/software/desktop/kde.nix"
+    "${self}/modules/software/desktop/plymouth.nix"
     "${self}/modules/software/desktop/pipewire/base.nix"
     "${self}/modules/software/desktop/pipewire/low-latency.nix"
 
@@ -107,6 +108,7 @@ in
     # jovian.steamos.useSteamOSConfig defaults to jovian.steam.enable (true).
   };
   desktop.kde.enable = true;
+  desktop.plymouth.enable = true;
 
   # ---------------------------------------------------------------------------
   # Software set (follows the desktop/laptop, minus Hyprland)
