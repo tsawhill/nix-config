@@ -234,7 +234,7 @@ in
               end = "23h59m";
             };
           };
-          ids = [ "youtube" ];
+          ids = [ ];
         };
         protection_disabled_until = null;
         safe_search = {
