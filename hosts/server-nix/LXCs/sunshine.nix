@@ -404,11 +404,13 @@ in
   # plasmashell from its own units, which inherit the manager, not the units
   # above. Kickoff resolves $XDG_MENU_PREFIX + applications.menu, and only
   # plasma-applications.menu exists, so without the prefix the menu is empty.
+  # RuneLite runs sandboxed, where /etc/localtime resolves to a dangling
+  # symlink and Java silently falls back to GMT, so TZ has to be explicit.
   # LD_LIBRARY_PATH is set here rather than per-application because the GLX
   # vendor libraries are unloadable for every X11 client in the session, not
   # just the ones Sunshine launches.
   systemd.user.extraConfig = ''
-    DefaultEnvironment=XDG_DATA_DIRS=/etc/profiles/per-user/${user}/share:/run/current-system/sw/share XDG_MENU_PREFIX=plasma- XDG_CURRENT_DESKTOP=KDE LD_LIBRARY_PATH=${glxClientLibraries}:/run/opengl-driver/lib
+    DefaultEnvironment=XDG_DATA_DIRS=/etc/profiles/per-user/${user}/share:/run/current-system/sw/share XDG_MENU_PREFIX=plasma- XDG_CURRENT_DESKTOP=KDE TZ=${config.time.timeZone} TZDIR=${pkgs.tzdata}/share/zoneinfo LD_LIBRARY_PATH=${glxClientLibraries}:/run/opengl-driver/lib
   '';
 
   # Without linger, user services never start on this headless container.
