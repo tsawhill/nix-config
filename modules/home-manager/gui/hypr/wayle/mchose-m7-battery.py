@@ -6,6 +6,7 @@ Only the identity query (feature report 0x11, command 0x06) is sent.
 
 import fcntl
 import json
+import os
 from pathlib import Path
 import sys
 import time
@@ -50,7 +51,7 @@ def read_status(device):
     return None
 
 
-def main():
+def collect_output():
     for node in sorted(Path("/sys/class/hidraw").glob("hidraw*")):
         try:
             properties = dict(
@@ -74,17 +75,54 @@ def main():
                 debug(f"{node.name}: no valid status or mouse offline")
                 continue
             _, percentage, charging = status
-            print(json.dumps({
+            return json.dumps({
                 # Nerd Font bolt: monochrome, inherits the label's text color.
                 "text": f"{percentage}%" + (" \uf0e7 " if charging else ""),
                 "percentage": percentage,
                 "tooltip": f"MCHOSE M7: {percentage}%" + (" (charging)" if charging else ""),
-            }))
-            return
+            })
         except (OSError, ValueError) as error:
             print(f"MCHOSE battery: {node.name}: {error}", file=sys.stderr)
     debug("No connected mouse with a valid battery reading found")
-    print("")
+    return ""
+
+
+def shared_output():
+    # Each monitor starts its own command. Serialize the whole poll and share
+    # its result briefly, rather than hiding whichever bar loses the HID lock.
+    runtime = Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"))
+    with (runtime / "wayle-mchose-m7-status.json").open("a+") as cache:
+        deadline = time.monotonic() + 10
+        while True:
+            try:
+                fcntl.flock(cache, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    raise TimeoutError("timed out waiting for shared mouse status")
+                time.sleep(0.05)
+        cache.seek(0)
+        try:
+            saved = json.load(cache)
+            age = time.monotonic() - saved["time"]
+            if 0 <= age < 2 and isinstance(saved["output"], str):
+                return saved["output"]
+        except (ValueError, KeyError, TypeError):
+            pass
+        output = collect_output()
+        cache.seek(0)
+        cache.truncate()
+        json.dump({"time": time.monotonic(), "output": output}, cache)
+        cache.flush()
+        return output
+
+
+def main():
+    try:
+        print(shared_output())
+    except OSError as error:
+        print(f"MCHOSE battery: {error}", file=sys.stderr)
+        print("")
 
 
 if __name__ == "__main__":
