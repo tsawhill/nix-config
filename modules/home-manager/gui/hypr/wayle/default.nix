@@ -1,4 +1,9 @@
-{ lib, config, ... }:
+{
+  lib,
+  config,
+  pkgs,
+  ...
+}:
 let
   cfg = config.my.hypr;
 
@@ -14,6 +19,7 @@ let
       "microphone"
       "network"
       "bluetooth"
+      "custom-mchose-m7"
       "systray"
       "clock"
       "notifications"
@@ -35,6 +41,7 @@ let
       "microphone"
       "network"
       "bluetooth"
+      "custom-mchose-m7"
       "battery"
       "clock"
       "notifications"
@@ -78,6 +85,28 @@ in
       };
 
       modules = {
+        custom = [
+          (
+            {
+              id = "mchose-m7";
+              command = "${pkgs.python3}/bin/python3 ${./mchose-m7-battery.py}";
+              interval-ms = 15000;
+              hide-if-empty = true;
+              icon-name = "ld-mouse-symbolic";
+              format = "{{ output }}";
+              label-show = true;
+            }
+            // lib.optionalAttrs (cfg.panel.theme == "pink") {
+              border-show = true;
+              border-color = "fg-muted";
+              icon-color = "primary";
+              icon-bg-color = "bg";
+              label-color = "bg";
+              button-bg-color = "primary";
+            }
+          )
+        ];
+
         hyprland-workspaces = {
           min-workspace-count = 0;
           monitor-specific = true;
