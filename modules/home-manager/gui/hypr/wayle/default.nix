@@ -98,11 +98,11 @@ in
             }
             // lib.optionalAttrs (cfg.panel.theme == "pink") {
               border-show = true;
-              border-color = "fg-muted";
-              icon-color = "primary";
-              icon-bg-color = "bg";
-              label-color = "bg";
-              button-bg-color = "primary";
+              border-color = config.services.wayle.settings.styling.palette.fg-muted;
+              icon-color = config.services.wayle.settings.styling.palette.primary;
+              icon-bg-color = config.services.wayle.settings.styling.palette.bg;
+              label-color = config.services.wayle.settings.styling.palette.bg;
+              button-bg-color = config.services.wayle.settings.styling.palette.primary;
             }
           )
         ];

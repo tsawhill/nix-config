@@ -11,6 +11,14 @@ import sys
 import time
 
 
+DEBUG = "--debug" in sys.argv
+
+
+def debug(message):
+    if DEBUG:
+        print(f"MCHOSE battery: {message}", file=sys.stderr)
+
+
 def decode_status(report):
     if len(report) < 13 or report[:2] != bytes([0x11, 0xF9]):
         return None
@@ -27,11 +35,15 @@ def read_status(device):
         fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
         for attempt in range(4):
             request = bytes([0x11, 0xF9] + [0xFF] * 19)
+            debug(f"{device}: sending identity query, attempt {attempt + 1}")
             fcntl.ioctl(handle, 0xC0154806, request)
             time.sleep(0.025)
             response = bytearray([0x11] + [0] * 20)
+            debug(f"{device}: reading identity reply")
             length = fcntl.ioctl(handle, 0xC0154807, response, True)
+            debug(f"{device}: reply {bytes(response[:length]).hex(' ')}")
             status = decode_status(response[:length])
+            debug(f"{device}: decoded status {status}")
             if status is not None:
                 return status
             time.sleep(0.12 * (attempt + 1))
@@ -47,15 +59,19 @@ def main():
                 if "=" in line
             )
             ids = properties.get("HID_ID", "").split(":")
+            debug(f"{node.name}: HID_ID={properties.get('HID_ID', '?')}, "
+                  f"name={properties.get('HID_NAME', '?')}")
             if len(ids) != 3 or tuple(int(value, 16) for value in ids[1:]) not in {
                 (0x5253, 0x0031), (0x5253, 0x1020)
             }:
                 continue
             descriptor = (node / "device/report_descriptor").read_bytes()
             if b"\x06\x01\xff" not in descriptor:
+                debug(f"{node.name}: no vendor configuration collection")
                 continue
             status = read_status(Path("/dev") / node.name)
             if status is None or not status[0]:
+                debug(f"{node.name}: no valid status or mouse offline")
                 continue
             _, percentage, charging = status
             print(json.dumps({
@@ -66,6 +82,7 @@ def main():
             return
         except (OSError, ValueError) as error:
             print(f"MCHOSE battery: {node.name}: {error}", file=sys.stderr)
+    debug("No connected mouse with a valid battery reading found")
     print("")
 
 
