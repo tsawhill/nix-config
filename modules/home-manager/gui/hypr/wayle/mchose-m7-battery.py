@@ -76,7 +76,7 @@ def main():
             _, percentage, charging = status
             print(json.dumps({
                 # Nerd Font bolt: monochrome, inherits the label's text color.
-                "text": f"{percentage}%" + (" \uf0e7" if charging else ""),
+                "text": f"{percentage}%" + (" \uf0e7 " if charging else ""),
                 "percentage": percentage,
                 "tooltip": f"MCHOSE M7: {percentage}%" + (" (charging)" if charging else ""),
             }))
