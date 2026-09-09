@@ -67,6 +67,7 @@ in
 
     # Hardware services
     # "${self}/modules/software/services/openrgb.nix"
+    "${self}/modules/hardware/bluetooth.nix"
     "${self}/modules/hardware/udev"
   ];
 

@@ -78,6 +78,7 @@ in
     "${self}/modules/network/networkmanager/wifi/known-networks.nix"
 
     # Hardware services
+    "${self}/modules/hardware/bluetooth.nix"
     "${self}/modules/hardware/udev"
     "${self}/modules/hardware/lexar-sd.nix"
   ];

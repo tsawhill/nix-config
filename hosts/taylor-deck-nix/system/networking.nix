@@ -9,12 +9,6 @@ in
 {
   networking.networkmanager.enable = true;
 
-  hardware.bluetooth = {
-    enable = true;
-    powerOnBoot = true;
-  };
-  services.blueman.enable = true;
-
   # WireGuard tunnel back to the home network. allowedIPs cover the LAN and the
   # remote WG subnet so LAN services resolve when the deck is off-site.
   my.secrets.wireguard.pubkeys.enable = true;

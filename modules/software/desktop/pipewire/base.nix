@@ -17,7 +17,8 @@
         "bluez5.enable-sbc-xq" = true;
         "bluez5.enable-msbc" = false;
         "bluez5.enable-hw-volume" = true;
-        "bluez5.roles" = [ "a2dp_sink" ];
+        # hfp_ag is for battery reporting (AT+IPHONEACCEV), not audio.
+        "bluez5.roles" = [ "a2dp_sink" "hfp_ag" ];
       };
       "11-bluetooth-policy"."wireplumber.settings"."bluetooth.autoswitch-to-headset-profile" = false;
 

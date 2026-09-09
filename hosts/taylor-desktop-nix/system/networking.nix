@@ -38,17 +38,9 @@ in
     # autoconnect = "Bunda";
   };
 
-  hardware.bluetooth = {
-    enable = true;
-    powerOnBoot = true;
-    settings = {
-      General = {
-        Experimental = true;
-        FastConnectable = true;
-        DiscoverableTimeout = 0;
-      };
-    };
+  # Base Bluetooth config is shared; these two are desktop-only.
+  hardware.bluetooth.settings.General = {
+    FastConnectable = true;
+    DiscoverableTimeout = 0;
   };
-
-  services.blueman.enable = true;
 }
