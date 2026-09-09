@@ -1,5 +1,6 @@
 <domain type='kvm'>
   <name>windows-ssd</name>
+  <uuid>79395b52-a2f5-4164-803d-7490e3db026a</uuid>
   <memory unit='MiB'>8192</memory>
   <vcpu placement='static'>4</vcpu>
   <os firmware='efi'>
@@ -27,6 +28,7 @@
     <controller type='sata' index='0'/>
     <controller type='usb' model='qemu-xhci'/>
     <interface type='network'>
+      <mac address='52:54:00:7d:38:8a'/>
       <source network='default'/>
       <model type='e1000e'/>
     </interface>

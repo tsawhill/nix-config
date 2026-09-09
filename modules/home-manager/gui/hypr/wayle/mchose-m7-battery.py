@@ -75,7 +75,7 @@ def main():
                 continue
             _, percentage, charging = status
             print(json.dumps({
-                "text": f"{percentage}%",
+                "text": f"{percentage}%" + (" ⚡" if charging else ""),
                 "percentage": percentage,
                 "tooltip": f"MCHOSE M7: {percentage}%" + (" (charging)" if charging else ""),
             }))
