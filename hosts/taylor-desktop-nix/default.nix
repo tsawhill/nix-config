@@ -77,6 +77,15 @@ in
   ];
 
   desktop.hyprland.enable = true;
+  # Moonlight's native Wayland path changes brightness during window resizing
+  # on this HDR desktop. XWayland keeps the brightness stable.
+  nixpkgs.overlays = [
+    (_final: prev: {
+      moonlight-qt = prev.moonlight-qt.overrideAttrs (old: {
+        qtWrapperArgs = (old.qtWrapperArgs or [ ]) ++ [ "--set QT_QPA_PLATFORM xcb" ];
+      });
+    })
+  ];
   desktop.plymouth.enable = true;
   my.desktop.audio.motuMic.enable = true;
   my.desktop.audio.lowLatency = {
