@@ -5,6 +5,13 @@
   config = lib.mkIf config.my.hypr.windowRules.gaming.enable {
     wayland.windowManager.hyprland.settings.window_rule = [
       {
+        match = {
+          class = "^com\\.moonlight_stream\\.Moonlight$";
+          title = ".+ - Moonlight";
+        };
+        pseudo = true;
+      }
+      {
         match = { class = "gamescope"; };
         idle_inhibit = "focus";
         content = "game";
