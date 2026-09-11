@@ -129,6 +129,10 @@ in
   desktop.kde.enable = true;
   desktop.plymouth.enable = true;
 
+  # DrKonqi's dialog has no display in Game Mode: each crash report crashes and
+  # spawns another, which is how the user manager collected 130k failed units.
+  systemd.services."drkonqi-coredump-processor@".wantedBy = lib.mkForce [ ];
+
   my.desktop.audio.lowLatency = {
     enable = true;
     quantum = 128;
