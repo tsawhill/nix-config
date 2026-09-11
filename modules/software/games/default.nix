@@ -221,6 +221,7 @@ let
           ;
         inherit (runner) runnerCommand;
         setupScript = runner.setupScript or "";
+        launchPrefix = runner.launchPrefix or "";
         name = entryCfg.command;
         networkEnable = entryCfg.network.enable;
         inherit

@@ -1,6 +1,7 @@
 {
   lib,
   umu-launcher,
+  callPackage,
 }:
 
 {
@@ -9,6 +10,7 @@
   protonPath,
 }:
 let
+  fontGuard = callPackage ../proton-font-guard.nix { };
   shellPath =
     path:
     if path == "~" then
@@ -38,5 +40,7 @@ in
     export PROTONPATH=${lib.escapeShellArg protonPath}
     export WINEPREFIX="$prefix_path"
   '';
+  # Inspect host processes before gamescope/unshare enters another namespace.
+  launchPrefix = ''${fontGuard}/bin/proton-font-guard "$prefix_path" '';
   runnerCommand = ''${umu-launcher}/bin/umu-run "$exe_path"'';
 }

@@ -4,11 +4,13 @@
   makeDesktopItem,
   symlinkJoin,
   umu-launcher,
+  callPackage,
   protonPath,
   prefixPath ? "$HOME/Games/saves/wine/default",
 }:
 
 let
+  fontGuard = callPackage ./proton-font-guard.nix { };
   shellPath =
     path:
     if path == "~" then
@@ -56,7 +58,7 @@ let
           export PRESSURE_VESSEL_FILESYSTEMS_RW=${lib.escapeShellArg pressureVesselFilesystemsRw}
         ''}
 
-        exec ${umu-launcher}/bin/umu-run "$exe_name" "$@"
+        exec ${fontGuard}/bin/proton-font-guard "$prefix_path" ${umu-launcher}/bin/umu-run "$exe_name" "$@"
       '';
     };
 

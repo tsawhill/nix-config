@@ -13,6 +13,7 @@
   desktopName,
   runnerCommand,
   setupScript ? "",
+  launchPrefix ? "",
   gamescopeArgs ? null,
   gamescopeResolutions ? [ ],
   env ? [ ],
@@ -90,11 +91,11 @@ let
     entry:
     if entry.gamescopeArgs == null then
       ''
-        exec ${isolatedGameCommand}
+        exec ${launchPrefix}${isolatedGameCommand}
       ''
     else
       ''
-        exec ${lib.getExe gamescope} ${entry.gamescopeArgs} -- \
+        exec ${launchPrefix}${lib.getExe gamescope} ${entry.gamescopeArgs} -- \
           ${isolatedGameCommand}
       '';
 
