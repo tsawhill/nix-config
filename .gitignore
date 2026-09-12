@@ -7,3 +7,5 @@ AGENTS.md
 # Local Oracle provisioning notes and helper
 /docs/oracle-1-nix-onboarding.md
 /oci-grab-a1.sh
+
+__pycache__/

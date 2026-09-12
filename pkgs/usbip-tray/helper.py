@@ -122,8 +122,7 @@ def container_metadata(cfg, records):
     """Mirror the host's udev records so libinput can classify the devices."""
     if not records:
         return
-    # The container has no udev rules of its own for these devices: its udevd
-    # answers the injected event with an empty record, so relink afterwards.
+    # The container's udevd answers each injected event with an empty record.
     script = ('/run/current-system/sw/bin/mkdir -p /run/udev/data\n'
               'for record in "$@"; do\n'
               '  /run/current-system/sw/bin/ln -sfnT "/opt/host-udev-data/$record" '
@@ -147,11 +146,8 @@ def receive(cfg, device, tcp_port, container, vendor=None, product=None):
     with lock('receive-' + str(tcp_port)):
         try:
             if container:
-                # Incus injects a udev event only for devices that appear after
-                # its unix-hotplug watch is registered, and an unprivileged
-                # container cannot synthesize one. A compositor discovers input
-                # through libinput, which learns about devices no other way, so
-                # the watch has to exist before the import creates the nodes.
+                # Incus injects udev events only for devices that appear after
+                # this watch exists, and libinput needs them to see the import.
                 hotplug = 'usbip-tray-' + str(tcp_port)
                 run(cfg['incus'], 'config', 'device', 'add', cfg['container'], hotplug,
                     'unix-hotplug', 'vendorid=' + vendor, 'productid=' + product,
@@ -191,9 +187,7 @@ def receive(cfg, device, tcp_port, container, vendor=None, product=None):
                 elif deadline and time.monotonic() > deadline:
                     raise RuntimeError('USB device did not enumerate')
         finally:
-            # Detach first. The removal events reach the container the same way
-            # the additions did, so its compositor closes the devices before
-            # Incus deletes the nodes out from under it.
+            # Detach first, so the removal events reach the container.
             if port is not None:
                 run(cfg['usbip'], 'detach', '--port=' + str(port), check=False)
             if hotplug:

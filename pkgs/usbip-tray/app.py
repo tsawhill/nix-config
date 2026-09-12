@@ -34,8 +34,7 @@ def receive_command(action, bus, tcp, vendor, product):
 
 
 def usb_ids(bus):
-    # The recipient cannot read these: an imported device loses its USB
-    # ancestry, so only this host can tell Incus what to watch for.
+    # An imported device loses its USB ancestry, so only this host knows these.
     path = USB / bus
     return ((path / 'idVendor').read_text().strip(),
             (path / 'idProduct').read_text().strip())

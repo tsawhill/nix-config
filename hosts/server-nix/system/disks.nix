@@ -11,12 +11,18 @@
     after = [ "zfs-import.target" ];
     serviceConfig.Type = "oneshot";
     script = ''
-      ${pkgs.zfs}/bin/zfs set mountpoint=/mnt/nix-stores downloadHDD/nix-stores
-      ${pkgs.zfs}/bin/zfs set mountpoint=/mnt/zpool zpool
-      ${pkgs.zfs}/bin/zfs set mountpoint=/mnt/downloadHDD downloadHDD
-      ${pkgs.zfs}/bin/zfs set mountpoint=/mnt/downloadSSD downloadSSD
+      # Setting a property remounts the dataset, which Incus bind mounts block.
+      set_property() {
+        [ "$(${pkgs.zfs}/bin/zfs get -H -o value "$1" "$3")" = "$2" ] \
+          || ${pkgs.zfs}/bin/zfs set "$1=$2" "$3"
+      }
 
-      ${pkgs.zfs}/bin/zfs set atime=off downloadHDD/nix-stores
+      set_property mountpoint /mnt/nix-stores downloadHDD/nix-stores
+      set_property mountpoint /mnt/zpool zpool
+      set_property mountpoint /mnt/downloadHDD downloadHDD
+      set_property mountpoint /mnt/downloadSSD downloadSSD
+
+      set_property atime off downloadHDD/nix-stores
     '';
   };
   boot.zfs.forceImportRoot = true; # Import root even if booting from the mirrored boot drive.
