@@ -1,4 +1,11 @@
 {
+  imports = [ ../../../../modules/software/services/usbip-tray.nix ];
+  my.usbip = {
+    enable = true;
+    exporter = false;
+    containerRecipient = "sunshine-nix";
+  };
+
   # Sunshine creates its keyboard and mouse through /dev/uinput. Label only
   # those synthetic event devices so Incus's unix-hotplug matcher can pass
   # their device nodes and uevents into sunshine-nix for KWin/libinput.

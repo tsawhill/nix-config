@@ -59,6 +59,8 @@ in
     (import "${self}/modules/ssh/pubkeys/taylor-laptop-nix-taylor.nix" laptopSSHUsers)
     (import "${self}/modules/ssh/pubkeys/phone-taylor.nix" phoneSSHUsers)
 
+    "${self}/modules/software/services/usbip-tray.nix"
+
     # Software
     "${self}/modules/software/bundles"
     "${self}/modules/software/games"
@@ -82,6 +84,11 @@ in
     "${self}/modules/hardware/udev"
     "${self}/modules/hardware/lexar-sd.nix"
   ];
+
+  my.usbip = {
+    enable = true;
+    exporter = false;
+  };
 
   my.lexarSD.enable = true;
 
