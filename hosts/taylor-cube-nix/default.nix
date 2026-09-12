@@ -5,6 +5,13 @@
   ...
 }:
 
+# TEMPORARY: taylor-desktop-nix is torn down for a watercooling rebuild (from
+# 2026-09-12, expected ~1 week), so this host stands in for it — the desktop's
+# session, software set and Hyprland layout on the cube's own hardware.
+# Everything hardware- or storage-bound stays cube-local: Jovian's steammachine
+# profile, boot/disks/networking, the Lexar SD sync root, and the cube's samba
+# credentials. Revert this commit when the desktop comes back.
+
 let
   buildSSHUsers = [ "root" ];
   desktopSSHUsers = [ "taylor" ];
@@ -59,19 +66,17 @@ in
     (import "${self}/modules/ssh/pubkeys/taylor-laptop-nix-taylor.nix" laptopSSHUsers)
     (import "${self}/modules/ssh/pubkeys/phone-taylor.nix" phoneSSHUsers)
 
-    "${self}/modules/software/services/usbip-tray.nix"
-
     # Software
     "${self}/modules/software/bundles"
     "${self}/modules/software/games"
 
-    # Desktop: KDE Plasma only (the desktop/ dir auto-imports SDDM + Hyprland,
-    # which we do not want — Jovian's autoStart is incompatible with a display
-    # manager).
-    "${self}/modules/software/desktop/kde.nix"
-    "${self}/modules/software/desktop/plymouth.nix"
-    "${self}/modules/software/desktop/pipewire/base.nix"
-    "${self}/modules/software/desktop/pipewire/low-latency.nix"
+    # Desktop: the whole dir, same as taylor-desktop-nix — SDDM + Hyprland + KDE
+    # and the full pipewire set (virtual sinks and mic, not just base +
+    # low-latency). Only safe because jovian.steam.autoStart is off below:
+    # Jovian claims services.displayManager for itself when autoStart is on,
+    # which is why this used to be a cherry-picked list. Also brings
+    # desktop/usbip.nix, so the explicit usbip-tray import is no longer needed.
+    "${self}/modules/software/desktop"
 
     # WireGuard (remote tunnel home). AirVPN scaffolding is present but disabled —
     # see system/networking.nix to enable once you generate a cube AirVPN config.
@@ -99,14 +104,21 @@ in
   ];
 
   # ---------------------------------------------------------------------------
-  # Steam Machine UI (Game Mode) + KDE Plasma desktop session
+  # Session: Hyprland via SDDM (desktop stand-in), Game Mode still available
   # ---------------------------------------------------------------------------
   jovian = {
     steam = {
       enable = true;
-      autoStart = true; # boot straight into the Steam Big Picture UI
+      # Off for the stand-in. With autoStart on, Jovian sets
+      # services.displayManager.{sddm.enable, autoLogin, defaultSession =
+      # "gamescope-wayland"} and collides with
+      # modules/software/desktop/display-manager.nix. Game Mode is still built:
+      # log out and pick the "gamescope-wayland" session at the SDDM greeter.
+      autoStart = false;
       user = "taylor";
-      desktopSession = "plasma"; # "Switch to Desktop" lands in KDE Plasma
+      # desktopSession is deliberately unset: Jovian only consumes it under
+      # autoStart and warns at eval time if it is set without it. Restore
+      # `desktopSession = "hyprland-uwsm"` together with autoStart = true.
     };
     decky-loader.enable = true; # plugin loader
 
@@ -133,39 +145,100 @@ in
       # media gets explicit mounts instead (see modules/hardware/lexar-sd.nix).
     };
   };
-  desktop.kde.enable = true;
+
+  desktop.hyprland.enable = true;
+  desktop.kde.enable = true; # still selectable at the SDDM greeter
   desktop.plymouth.enable = true;
+
+  # Moonlight's native Wayland path changes brightness during window resizing on
+  # the HDR Alienware panels, which are now cabled here. XWayland keeps the
+  # brightness stable.
+  nixpkgs.overlays = [
+    (_final: prev: {
+      moonlight-qt = prev.moonlight-qt.overrideAttrs (old: {
+        qtWrapperArgs = (old.qtWrapperArgs or [ ]) ++ [ "--set QT_QPA_PLATFORM xcb" ];
+      });
+    })
+  ];
 
   # DrKonqi's dialog has no display in Game Mode: each crash report crashes and
   # spawns another, which is how the user manager collected 130k failed units.
   systemd.services."drkonqi-coredump-processor@".wantedBy = lib.mkForce [ ];
 
+  # MOTU M2 interface moved over from the desktop along with the monitors.
+  my.desktop.audio.motuMic.enable = true;
   my.desktop.audio.lowLatency = {
     enable = true;
     quantum = 128;
+    alsaHeadroom = 0;
+    # Recording is not latency-sensitive; batch its PulseAudio capture in
+    # 10.7 ms chunks while interactive streams keep the 128-sample quantum.
+    pulseCaptureQuantumByProcess.gpu-screen-recorder = 512;
   };
 
   # ---------------------------------------------------------------------------
-  # Software set (follows the deck, minus Deck-specific bits)
+  # Software set (desktop's, minus printing and media-creation)
   # ---------------------------------------------------------------------------
+  software.dev.enable = true;
   software.fonts.enable = true;
   software.apps.config.enable = true;
   software.apps.web.enable = true;
   software.apps.communication.enable = true;
+  software.apps.vesktop = {
+    enable = true;
+    hardwareVideoEncode = {
+      enable = true;
+      # The cube is single-GPU at 0000:03:00.0 (1002:7481); the desktop's
+      # pci-0000_6f_00_0 does not exist here.
+      driPrime = "pci-0000_03_00_0";
+      vaDriver = "radeonsi";
+    };
+  };
   software.apps.media-playback.enable = true;
-  software.apps.gaming.enable = true;
+  software.apps.gaming = {
+    enable = true;
+    lsfgVk.enable = true;
+  };
   software.apps.emulators.enable = true;
   software.apps.tools.enable = true;
+  software.games.lsfgVk.enable = true;
 
-  # No forced gamescope launcher resolutions — the session renders at the TV's
-  # native (EDID) resolution.
   software.games.steamSync.stopSteamDuringSync = true;
+
+  # The desktop's Alienware panels are cabled here for the rebuild, so the
+  # gamescope launchers take its resolutions instead of the TV's EDID native.
+  software.games.gamescope.resolutions = [
+    {
+      width = 2560;
+      height = 1440;
+      refresh = 360;
+    }
+    {
+      width = 3440;
+      height = 1440;
+      refresh = 165;
+    }
+  ];
+  # GH3 stays on its prior resolutions rather than following the global default.
+  software.games.entries.guitarHero3.gamescope.resolutions = [
+    {
+      width = 1920;
+      height = 1440;
+      refresh = 360;
+    }
+    {
+      width = 2560;
+      height = 1440;
+      refresh = 360;
+    }
+  ];
 
   # Games (or whole platforms) kept on the cube's Lexar SD card: they sync there
   # via the roms Syncthing share (syncRoot below feeds my.syncthing.sharePaths.roms)
   # and launch locally; everything else launches from the full library over the
   # /mnt/zpool/roms CIFS mount. Keep pc selective so only GH3 syncs from that
-  # platform.
+  # platform. Cube-local storage — do NOT repoint at the desktop's default while
+  # standing in, or Syncthing deletes the ~576 GB already on the card.
   software.games.syncRoot = "/mnt/lexarSD/Games/synced";
   software.games.syncGames = [
     "guitarHero3"

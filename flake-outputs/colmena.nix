@@ -185,9 +185,11 @@ in
     "syncthing-nix" = mkHost "monthly" "syncthing-nix" "${self}/hosts/server-nix/LXCs/syncthing.nix";
 
     # --- personal machines (unstable, manual-only) ---
-    "taylor-desktop-nix" =
-      mkUnstableHost "daily" "taylor-desktop-nix"
-        "${self}/hosts/taylor-desktop-nix";
+    # TEMPORARY (from 2026-09-12): torn down for a watercooling rebuild, so it is
+    # manual-only — the "daily" tag would Wake-on-LAN a machine that is in pieces
+    # and fail the scheduled fleet deploy every night. Restore the "daily" tag
+    # when it is back together.
+    "taylor-desktop-nix" = mkUnstableHost null "taylor-desktop-nix" "${self}/hosts/taylor-desktop-nix";
     "taylor-laptop-nix" = mkUnstableHost "daily" "taylor-laptop-nix" "${self}/hosts/taylor-laptop-nix";
     "taylor-deck-nix" = mkUnstableHost "daily" "taylor-deck-nix" "${self}/hosts/taylor-deck-nix";
     "taylor-cube-nix" = mkUnstableHost "daily" "taylor-cube-nix" "${self}/hosts/taylor-cube-nix";
