@@ -32,7 +32,6 @@ with tempfile.TemporaryDirectory() as tmp:
             if select.select([master],[],[],0.1)[0]:
                 try: output+=os.read(master,65536)
                 except OSError: break
-            if proc.poll() is not None: break
         if proc.poll() is None: proc.kill()
         code=proc.wait(); os.close(master)
         return code,output
@@ -42,6 +41,16 @@ with tempfile.TemporaryDirectory() as tmp:
     code,out=terminal_run(['-a',str(src/'missing'),str(dest)])
     assert code==23 and b'FAILED' in out, (code,out[-1000:])
     print('Error exit preserved: PASS')
+    # Exercise rsync's remote-shell path without contacting a real host.
+    remote_shell = pathlib.Path(tmp) / 'ssh-failure'
+    remote_shell.write_text(f'#!{sys.executable}\nimport sys\nsys.stderr.write("Permission denied (publickey).\\n")\nsys.exit(255)\n')
+    remote_shell.chmod(0o755)
+    code,out=terminal_run(['-rltDP','-e',str(remote_shell),str(src)+'/', 'example.invalid:destination/'])
+    assert code==255, (code,out[-2000:])
+    final=out[out.rfind(b'FAILED'):]
+    assert b'Permission denied (publickey).' in final and b'SSH / rsync diagnostics' in final, final
+    assert b'discovering files' not in final, final
+    print('SSH failure diagnostics survive final dashboard: PASS')
     code,out=terminal_run(['-a','--bwlimit=100',str(src)+'/',str(pathlib.Path(tmp)/'cancel')],True)
     assert code==130, (code,out[-1000:])
     print('Cancellation: PASS')

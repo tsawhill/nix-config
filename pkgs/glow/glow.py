@@ -161,13 +161,16 @@ def main():
         os.execvp('rsync', ['rsync', *args])
     console = Console(highlight=False)
     dashboard = Dashboard()
-    # Keep stdin and controlling TTY intact for SSH authentication. Stderr is
-    # inherited: prompts/errors remain visible and Rich restores its live region.
-    proc = subprocess.Popen(command(args), stdout=subprocess.PIPE,
+    # Keep stdin and the controlling TTY for SSH authentication. Child writes
+    # bypass Rich's Python stderr redirect, so explicitly capture diagnostics.
+    proc = subprocess.Popen(command(args), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                             env={**os.environ, 'LC_ALL': 'C'})
     selector = selectors.DefaultSelector()
-    selector.register(proc.stdout, selectors.EVENT_READ)
-    decoder = codecs.getincrementaldecoder('utf-8')(errors='replace')
+    selector.register(proc.stdout, selectors.EVENT_READ, 'stdout')
+    selector.register(proc.stderr, selectors.EVENT_READ, 'stderr')
+    decoders = {name: codecs.getincrementaldecoder('utf-8')(errors='replace')
+                for name in ('stdout', 'stderr')}
+    diagnostics = ''
     pending = ''
     cancelled = False
     previous = {}
@@ -183,21 +186,40 @@ def main():
             while selector.get_map():
                 for key, _ in selector.select(timeout=0.1):
                     data = os.read(key.fd, 65536)
-                    pending += decoder.decode(data, final=not data)
+                    decoded = decoders[key.data].decode(data, final=not data)
+                    if not data:
+                        selector.unregister(key.fileobj)
+                    if key.data == 'stderr':
+                        diagnostics = (diagnostics + decoded)[-65536:]
+                        if decoded:
+                            # Suspend painting while a diagnostic or prompt is
+                            # written, including prompts without a newline.
+                            live.stop()
+                            console.print(Text(''.join(c if c.isprintable() or c in '\n\t' else '?' for c in decoded)), end='')
+                        continue
+                    pending += decoded
                     records = re.split(r'[\r\n]', pending)
                     pending = records.pop()
                     for line in records:
                         dashboard.consume(line)
                     if not data:
                         dashboard.consume(pending)
-                        selector.unregister(key.fileobj)
-                live.update(dashboard.render(console), refresh=True)
+                # No repaint during connection/authentication: SSH may write
+                # password/host-key prompts directly to /dev/tty.
+                if dashboard.current is not None and proc.poll() is None:
+                    live.start()
+                    live.update(dashboard.render(console), refresh=True)
             code = proc.wait()
             dashboard.status = 'COMPLETE' if code == 0 else f'FAILED / EXIT {code}'
+            dashboard.scanning = False
             if code == 0:
                 dashboard.scanning = False
                 dashboard.checked = dashboard.total
+            live.start()
             live.update(dashboard.render(console), refresh=True)
+        if diagnostics.strip():
+            console.print(Panel(Text(''.join(c if c.isprintable() or c in '\n\t' else '?' for c in diagnostics).rstrip()),
+                                title='SSH / rsync diagnostics', border_style='red' if code else 'yellow'))
     except KeyboardInterrupt:
         cancelled = True
         proc.send_signal(signal.SIGINT)
@@ -210,6 +232,7 @@ def main():
     finally:
         selector.close()
         proc.stdout.close()
+        proc.stderr.close()
         if proc.poll() is None:
             proc.kill()
             proc.wait()
