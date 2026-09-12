@@ -140,7 +140,8 @@ def tray(cfg, config_path):
         def __init__(self):
             self.error = None
             self.snapshot = None
-            self.indicator = Indicator.Indicator.new('usbip-tray', 'drive-removable-media-usb-symbolic',
+            self.indicator = Indicator.Indicator.new('usbip-tray',
+                                                     str(Path(__file__).resolve().parent.parent / 'share/usbip-tray/icons/usb.png'),
                                                      Indicator.IndicatorCategory.HARDWARE)
             self.indicator.set_status(Indicator.IndicatorStatus.ACTIVE)
             self.refresh()

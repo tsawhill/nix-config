@@ -25,11 +25,11 @@ from gi.repository import AyatanaAppIndicator3 as AppIndicator  # noqa: E402
 from gi.repository import GLib, Gtk  # noqa: E402
 
 
+# Explicit packaged PNGs avoid missing theme names and low-contrast symbolic icons.
+ICON_DIR = Path(__file__).resolve().parent.parent / "share/airvpn-tray/icons"
 ICONS = {
-    "connected": "network-vpn-symbolic",
-    "switching": "network-vpn-acquiring-symbolic",
-    "disconnected": "network-vpn-disconnected-symbolic",
-    "error": "network-vpn-error-symbolic",
+    state: str(ICON_DIR / f"{state}.png")
+    for state in ("connected", "switching", "disconnected", "error")
 }
 
 POLL_SECONDS = 5
