@@ -19,8 +19,11 @@
       sddm = {
         enable = true;
         wayland.enable = true;
-        # Use the specific package for the Qt6 version of SDDM
-        package = pkgs.kdePackages.sddm;
+        # Use the specific package for the Qt6 version of SDDM. mkDefault so a
+        # host can enable desktop.kde alongside this dir: nixpkgs' plasma6.nix
+        # sets this same package at normal priority, and two normal-priority
+        # definitions are an eval error even when the derivation is identical.
+        package = lib.mkDefault pkgs.kdePackages.sddm;
 
         # The theme name to use
         theme = "${pkgs.sddm-astronaut}/share/sddm/themes/sddm-astronaut-theme";
