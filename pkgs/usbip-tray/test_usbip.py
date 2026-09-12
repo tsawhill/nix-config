@@ -116,6 +116,25 @@ class Leases(unittest.TestCase):
             with self.assertRaises(ValueError):
                 helper.receive({}, '1-2', port, False)
 
+    def test_export_uses_resolved_helper_path(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            helper_path = root / 'store-helper'
+            helper_path.touch()
+            alias = root / 'profile-helper'
+            alias.symlink_to(helper_path)
+            with patch.object(app, 'HELPER', str(alias)):
+                self.assertEqual(app.export_command('1-2'),
+                                 [app.SUDO, '-n', str(helper_path), 'export', '1-2'])
+
+    def test_receive_resolves_on_remote_host_and_quotes_arguments(self):
+        command = app.receive_command('receive', '1-2', 30000)
+        self.assertIn('"$(/run/current-system/sw/bin/readlink -e ' + app.HELPER + ')"', command)
+        self.assertTrue(command.endswith(' receive 1-2 30000'))
+        # Arguments must not become remote shell syntax.
+        self.assertTrue(app.receive_command('receive', '1-2;false', 30000)
+                        .endswith(" receive '1-2;false' 30000"))
+
     def test_unit_names_are_validated(self):
         self.assertEqual(app.unit('1-2.3'), 'usbip-port-1-2.3.service')
         with self.assertRaises(ValueError):

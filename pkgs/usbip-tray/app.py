@@ -8,6 +8,7 @@ from pathlib import Path
 import random
 import re
 import select
+import shlex
 import signal
 import subprocess
 import sys
@@ -18,6 +19,18 @@ import time
 USB = Path('/sys/bus/usb/devices')
 HELPER = '/run/current-system/sw/bin/usbip-tray-helper'
 SUDO = '/run/wrappers/bin/sudo'
+
+
+def export_command(bus):
+    # sudoers authorizes the immutable store path, not the system-profile alias.
+    return [SUDO, '-n', str(Path(HELPER).resolve(strict=True)), 'export', bus]
+
+
+def receive_command(action, bus, tcp):
+    # Resolve on the recipient: its helper has a different store path/config.
+    resolve = shlex.join(['/run/current-system/sw/bin/readlink', '-e', HELPER])
+    return (shlex.join([SUDO, '-n']) + ' "$(' + resolve + ')" '
+            + shlex.join([action, bus, str(tcp)]))
 
 
 def runtime():
@@ -96,24 +109,27 @@ def session(cfg, bus, target):
         while not stopping.is_set():
             exporter = receiver = None
             with tempfile.TemporaryFile() as log:
+                phase = 'USB session'
                 try:
                     if not (USB / bus).exists():
                         status('Waiting for a device in this port')
                         stopping.wait(2)
                         continue
+                    phase = 'Local USB export'
                     status('Connecting…')
-                    exporter = subprocess.Popen([SUDO, '-n', HELPER, 'export', bus],
+                    exporter = subprocess.Popen(export_command(bus),
                                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=log)
                     ready(exporter, log)
                     tcp = random.randint(20000, 60000)
                     action = 'receive-container' if destination.get('container', False) else 'receive'
+                    phase = 'Receiver ' + target
                     receiver = subprocess.Popen([
                         cfg['ssh'], '-T', '-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes',
                         '-o', 'ConnectTimeout=8', '-o', 'ServerAliveInterval=5',
                         '-o', 'ServerAliveCountMax=3', '-o', 'ExitOnForwardFailure=yes',
                         '-o', 'ControlMaster=no', '-o', 'ControlPath=none',
                         '-R', f'127.0.0.1:{tcp}:127.0.0.1:3240',
-                        destination['ssh'], SUDO, '-n', HELPER, action, bus, str(tcp)],
+                        destination['ssh'], receive_command(action, bus, tcp)],
                         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=log)
                     ready(receiver, log)
                     status('Connected')
@@ -121,7 +137,7 @@ def session(cfg, bus, target):
                         if exporter.poll() is not None or receiver.poll() is not None:
                             raise RuntimeError('Connection ended; retrying')
                 except Exception as error:
-                    status(str(error))
+                    status(phase + ': ' + str(error))
                 finally:
                     close(receiver)
                     close(exporter)
