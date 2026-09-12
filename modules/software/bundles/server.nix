@@ -8,12 +8,14 @@
 {
   imports = [
     "${self}/modules/software/packages/ssh-copy.nix"
+    ../packages/glow.nix
   ];
 
   options.software.server.enable = lib.mkEnableOption "headless server CLI tools";
 
   config = lib.mkIf config.software.server.enable {
     software.ssh-copy.enable = true;
+    software.glow.enable = lib.mkDefault true;
     programs.zsh.enable = true;
 
     environment.systemPackages =
