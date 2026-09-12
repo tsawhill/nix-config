@@ -26,11 +26,19 @@ def export_command(bus):
     return [SUDO, '-n', str(Path(HELPER).resolve(strict=True)), 'export', bus]
 
 
-def receive_command(action, bus, tcp):
+def receive_command(action, bus, tcp, vendor, product):
     # Resolve on the recipient: its helper has a different store path/config.
     resolve = shlex.join(['/run/current-system/sw/bin/readlink', '-e', HELPER])
     return (shlex.join([SUDO, '-n']) + ' "$(' + resolve + ')" '
-            + shlex.join([action, bus, str(tcp)]))
+            + shlex.join([action, bus, str(tcp), vendor, product]))
+
+
+def usb_ids(bus):
+    # The recipient cannot read these: an imported device loses its USB
+    # ancestry, so only this host can tell Incus what to watch for.
+    path = USB / bus
+    return ((path / 'idVendor').read_text().strip(),
+            (path / 'idProduct').read_text().strip())
 
 
 def runtime():
@@ -117,6 +125,7 @@ def session(cfg, bus, target):
                         continue
                     phase = 'Local USB export'
                     status('Connecting…')
+                    identity = usb_ids(bus)
                     exporter = subprocess.Popen(export_command(bus),
                                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=log)
                     ready(exporter, log)
@@ -129,7 +138,7 @@ def session(cfg, bus, target):
                         '-o', 'ServerAliveCountMax=3', '-o', 'ExitOnForwardFailure=yes',
                         '-o', 'ControlMaster=no', '-o', 'ControlPath=none',
                         '-R', f'127.0.0.1:{tcp}:127.0.0.1:3240',
-                        destination['ssh'], receive_command(action, bus, tcp)],
+                        destination['ssh'], receive_command(action, bus, tcp, *identity)],
                         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=log)
                     ready(receiver, log)
                     status('Connected')

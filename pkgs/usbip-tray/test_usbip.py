@@ -111,10 +111,38 @@ class Leases(unittest.TestCase):
 
     def test_container_and_tunnel_validation(self):
         with self.assertRaises(ValueError):
-            helper.receive({}, '1-2', 30000, True)
+            helper.receive({}, '1-2', 30000, True, '046d', 'c52b')
         for port in [22, -1, 65536]:
             with self.assertRaises(ValueError):
                 helper.receive({}, '1-2', port, False)
+
+    def test_device_ids_reject_non_hex_and_wrong_width(self):
+        self.assertEqual(helper.deviceid('046d'), '046d')
+        for value in ['46d', '046D', '046g', '', '0046d', '046d;x']:
+            with self.assertRaises(ValueError):
+                helper.deviceid(value)
+
+    def test_container_watch_registered_before_attach(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'port3').write_text('127.0.0.1 30000 1-2\n')
+            calls = []
+            cfg = {'usbip': 'usbip', 'incus': 'incus', 'container': 'sunshine-nix'}
+            with patch.object(helper, 'RUNTIME', root), patch.object(helper, 'RECORDS', root), \
+                 patch.object(helper, 'ports', side_effect=[{3: (4, '0-0')}, {3: (6, '8-2')}]), \
+                 patch.object(helper, 'alive', return_value=False), \
+                 patch.object(helper, 'run', side_effect=lambda *a, **k: calls.append(a)):
+                helper.receive(cfg, '1-2', 30000, True, '046d', 'c52b')
+            # Incus injects no event for a device that already exists.
+            self.assertEqual(calls[0], ('incus', 'config', 'device', 'add', 'sunshine-nix',
+                                        'usbip-tray-30000', 'unix-hotplug', 'vendorid=046d',
+                                        'productid=c52b', 'mode=0660', 'uid=1000', 'gid=174',
+                                        'required=false'))
+            self.assertIn('attach', calls[1])
+            # The import has to go before the watch does, not after.
+            self.assertEqual(calls[-2], ('usbip', 'detach', '--port=3'))
+            self.assertEqual(calls[-1], ('incus', 'config', 'device', 'remove',
+                                         'sunshine-nix', 'usbip-tray-30000'))
 
     def test_export_uses_resolved_helper_path(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -128,12 +156,12 @@ class Leases(unittest.TestCase):
                                  [app.SUDO, '-n', str(helper_path), 'export', '1-2'])
 
     def test_receive_resolves_on_remote_host_and_quotes_arguments(self):
-        command = app.receive_command('receive', '1-2', 30000)
+        command = app.receive_command('receive', '1-2', 30000, '046d', 'c52b')
         self.assertIn('"$(/run/current-system/sw/bin/readlink -e ' + app.HELPER + ')"', command)
-        self.assertTrue(command.endswith(' receive 1-2 30000'))
+        self.assertTrue(command.endswith(' receive 1-2 30000 046d c52b'))
         # Arguments must not become remote shell syntax.
-        self.assertTrue(app.receive_command('receive', '1-2;false', 30000)
-                        .endswith(" receive '1-2;false' 30000"))
+        self.assertTrue(app.receive_command('receive', '1-2;false', 30000, '046d', 'c52b')
+                        .endswith(" receive '1-2;false' 30000 046d c52b"))
 
     def test_unit_names_are_validated(self):
         self.assertEqual(app.unit('1-2.3'), 'usbip-port-1-2.3.service')

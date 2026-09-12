@@ -28,6 +28,13 @@ def busid(value):
     return value
 
 
+def deviceid(value):
+    # Incus compares these against udev's own lowercase, zero-padded properties.
+    if not re.fullmatch(r'[0-9a-f]{4}', value):
+        raise ValueError('Invalid USB device ID')
+    return value
+
+
 def eligible(path):
     if 'vhci_hcd' in str(path.resolve()):
         raise ValueError('Cannot re-export an imported device')
@@ -86,47 +93,69 @@ def ports():
     return result
 
 
-def container_nodes(cfg, device, prefix, added):
-    """Pass only character devices descended from this particular imported USB."""
-    root = (USB / device).resolve()
-    for entry in root.rglob('dev'):
-        uevent = entry.parent / 'uevent'
-        if not uevent.exists():
+def container_records(device):
+    """Host udev record names for the input nodes of this imported USB."""
+    found = []
+    try:
+        root = (USB / device).resolve(strict=True)
+        entries = list(root.rglob('dev'))
+    except OSError:
+        return ()
+    for entry in entries:
+        try:
+            uevent = entry.parent / 'uevent'
+            if not uevent.exists():
+                continue
+            attrs = dict(line.split('=', 1) for line in uevent.read_text().splitlines() if '=' in line)
+            if not attrs.get('DEVNAME', '').startswith(('input/', 'hidraw')):
+                continue
+            number = entry.read_text().strip()
+        except OSError:
+            # An unplug removes sysfs entries while this walk is in progress.
             continue
-        attrs = dict(line.split('=', 1) for line in uevent.read_text().splitlines() if '=' in line)
-        node = attrs.get('DEVNAME', '')
-        is_block = '/block/' in str(entry)
-        if not is_block and not node.startswith(('bus/usb/', 'input/', 'hidraw', 'snd/', 'tty', 'video', 'media')):
-            continue
-        if not node or '..' in Path(node).parts or node.startswith('/'):
-            continue
-        name = prefix + '-' + entry.read_text().strip().replace(':', '-')
-        if name in added:
-            continue
-        # Record before the command, so a timed-out add is still cleaned up.
-        added.add(name)
-        if node.startswith(('input/', 'hidraw')):
-            record = 'c' + entry.read_text().strip()
-            run(cfg['incus'], 'exec', cfg['container'], '--',
-                '/run/current-system/sw/bin/mkdir', '-p', '/run/udev/data')
-            run(cfg['incus'], 'exec', cfg['container'], '--',
-                '/run/current-system/sw/bin/ln', '-sfn',
-                '/opt/host-udev-data/' + record, '/run/udev/data/' + record)
-        run(cfg['incus'], 'config', 'device', 'add', cfg['container'], name,
-            'unix-block' if is_block else 'unix-char', 'source=/dev/' + node, 'path=/dev/' + node,
-            'mode=0660', 'uid=1000', 'gid=174', 'required=false')
+        if re.fullmatch(r'\d+:\d+', number):
+            found.append('c' + number)
+    return tuple(sorted(found))
 
 
-def receive(cfg, device, tcp_port, container):
+def container_metadata(cfg, records):
+    """Mirror the host's udev records so libinput can classify the devices."""
+    if not records:
+        return
+    # The container has no udev rules of its own for these devices: its udevd
+    # answers the injected event with an empty record, so relink afterwards.
+    script = ('/run/current-system/sw/bin/mkdir -p /run/udev/data\n'
+              'for record in "$@"; do\n'
+              '  /run/current-system/sw/bin/ln -sfnT "/opt/host-udev-data/$record" '
+              '"/run/udev/data/$record"\n'
+              'done')
+    run(cfg['incus'], 'exec', cfg['container'], '--',
+        '/run/current-system/sw/bin/sh', '-c', script, 'sh', *records)
+
+
+def receive(cfg, device, tcp_port, container, vendor=None, product=None):
     if container and not cfg.get('container'):
         raise ValueError('This host is not a container receiver')
     if not 20000 <= tcp_port <= 60000:
         raise ValueError('Invalid tunnel port')
     port = None
-    added = set()
+    hotplug = None
+    imported = ''
+    records = ()
+    settle = 0
     # A per-tunnel lock prevents another lease from cleaning up its devices.
     with lock('receive-' + str(tcp_port)):
         try:
+            if container:
+                # Incus injects a udev event only for devices that appear after
+                # its unix-hotplug watch is registered, and an unprivileged
+                # container cannot synthesize one. A compositor discovers input
+                # through libinput, which learns about devices no other way, so
+                # the watch has to exist before the import creates the nodes.
+                hotplug = 'usbip-tray-' + str(tcp_port)
+                run(cfg['incus'], 'config', 'device', 'add', cfg['container'], hotplug,
+                    'unix-hotplug', 'vendorid=' + vendor, 'productid=' + product,
+                    'mode=0660', 'uid=1000', 'gid=174', 'required=false')
             # Serialize allocation and identify the port from usbip's own record.
             with (RUNTIME / 'attach.lock').open('w') as allocation:
                 fcntl.flock(allocation, fcntl.LOCK_EX)
@@ -148,24 +177,34 @@ def receive(cfg, device, tcp_port, container):
                 if state in (4, 7):
                     break
                 if state == 6 and (USB / local).exists():
+                    imported = local
                     if container:
-                        container_nodes(cfg, local, 'usbip-tray-' + str(tcp_port), added)
+                        found = container_records(local)
+                        if found != records:
+                            records, settle = found, 10
+                        if settle:
+                            settle -= 1
+                            container_metadata(cfg, records)
                     if deadline:
                         print('READY', flush=True)
                         deadline = 0
                 elif deadline and time.monotonic() > deadline:
                     raise RuntimeError('USB device did not enumerate')
         finally:
-            errors = []
-            for name in added:
-                try:
-                    run(cfg['incus'], 'config', 'device', 'remove', cfg['container'], name)
-                except Exception as error:
-                    errors.append(str(error))
+            # Detach first. The removal events reach the container the same way
+            # the additions did, so its compositor closes the devices before
+            # Incus deletes the nodes out from under it.
             if port is not None:
                 run(cfg['usbip'], 'detach', '--port=' + str(port), check=False)
-            if errors:
-                raise RuntimeError('Container cleanup failed: ' + '; '.join(errors))
+            if hotplug:
+                grace = time.monotonic() + 5
+                while imported and (USB / imported).exists() and time.monotonic() < grace:
+                    time.sleep(0.1)
+                time.sleep(1)
+                try:
+                    run(cfg['incus'], 'config', 'device', 'remove', cfg['container'], hotplug)
+                except Exception as error:
+                    raise RuntimeError('Container cleanup failed: ' + str(error))
 
 
 def main():
@@ -173,6 +212,8 @@ def main():
     parser.add_argument('action', choices=['export', 'receive', 'receive-container'])
     parser.add_argument('device', type=busid)
     parser.add_argument('port', type=int, nargs='?')
+    parser.add_argument('vendor', type=deviceid, nargs='?')
+    parser.add_argument('product', type=deviceid, nargs='?')
     args = parser.parse_args(sys.argv[2:])
     cfg = json.loads(Path(sys.argv[1]).read_text())
     if os.geteuid() != 0:
@@ -182,7 +223,10 @@ def main():
     if args.action == 'export' and cfg['exporter']:
         export(cfg, args.device)
     elif args.action.startswith('receive') and cfg['receiver'] and args.port is not None:
-        receive(cfg, args.device, args.port, args.action == 'receive-container')
+        container = args.action == 'receive-container'
+        if container and not (args.vendor and args.product):
+            raise ValueError('Container receivers need the device IDs')
+        receive(cfg, args.device, args.port, container, args.vendor, args.product)
     else:
         raise ValueError('Action not enabled on this host')
 
