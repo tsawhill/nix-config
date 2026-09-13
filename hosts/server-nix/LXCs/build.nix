@@ -5,9 +5,15 @@
   lib,
   ...
 }:
+let
+  cubeSSHUsers = [ "root" ];
+in
 {
   imports = [
     ./base
+
+    # SSH Access: taylor@taylor-cube-nix, on top of base's key set
+    (import "${self}/modules/ssh/pubkeys/taylor-cube-nix-taylor.nix" cubeSSHUsers)
     "${self}/modules/software/bundles/dev.nix"
     "${self}/modules/software/services/rebuild-scripts.nix"
     "${self}/modules/software/packages/nixos-factory.nix"
