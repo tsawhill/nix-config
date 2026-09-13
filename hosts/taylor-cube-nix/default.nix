@@ -146,6 +146,10 @@ in
     };
   };
 
+  # Jovian setcaps gamescope unconditionally, which aborts under Steam's
+  # no-new-privs sandbox and kills any game launched via a gamescope launch option.
+  security.wrappers.gamescope.capabilities = lib.mkForce "";
+
   desktop.hyprland.enable = true;
   desktop.kde.enable = true; # still selectable at the SDDM greeter
   desktop.plymouth.enable = true;
