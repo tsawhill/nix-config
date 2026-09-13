@@ -9,6 +9,7 @@
 let
   desktopSSHUsers = [ "taylor" ];
   laptopSSHUsers = [ "taylor" ];
+  cubeSSHUsers = [ "taylor" ];
   buildSSHUsers = [ "root" ];
   phoneSSHUsers = [ "taylor" ];
 in
@@ -59,6 +60,8 @@ in
     "${self}/modules/ssh/openssh.nix"
     (import "${self}/modules/ssh/pubkeys/taylor-desktop-nix-taylor.nix" desktopSSHUsers)
     (import "${self}/modules/ssh/pubkeys/taylor-laptop-nix-taylor.nix" laptopSSHUsers)
+    # USB/IP sharing from the cube into sunshine-nix
+    (import "${self}/modules/ssh/pubkeys/taylor-cube-nix-taylor.nix" cubeSSHUsers)
     (import "${self}/modules/ssh/pubkeys/build-nix-root.nix" buildSSHUsers)
     (import "${self}/modules/ssh/pubkeys/phone-taylor.nix" phoneSSHUsers)
 

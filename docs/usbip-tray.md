@@ -10,8 +10,9 @@ The current machine is omitted from its own menu. Sunshine is received by
 `server-nix`, which hotplugs the imported device nodes into the Incus container.
 The existing host udev-data mount provides input metadata there.
 
-The applet is enabled with the shared Hyprland desktop configuration (including
-the desktop and laptop). The cube is configured as a receiver only. The reusable
+The applet is enabled with the shared Hyprland desktop configuration (the
+desktop, the laptop, and the cube). The cube both exports and receives; its
+user key is authorized on `taylor-desktop-nix` and `server-nix`. The reusable
 Home Manager module also supports a regular graphical session, such as Plasma.
 
 ## Session behavior

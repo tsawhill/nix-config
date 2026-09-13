@@ -16,6 +16,8 @@ let
     protonPath = protonGe.steamcompattool;
   };
   miniHostGhGuitarControllerMapping = "03000000091200008228000001010000,MiniHost GH Guitar,platform:Linux,a:b0,b:b1,x:b3,y:b4,leftshoulder:b6,back:b10,start:b11,dpup:h0.1,dpdown:h0.4,leftx:a0,righty:a2";
+  # Same adapter as the mapping above, in SDL's vendor/product filter form.
+  miniHostGhGuitarVidPid = "0x1209/0x2882";
 in
 {
   options.software.apps.gaming = {
@@ -37,6 +39,11 @@ in
       localNetworkGameTransfers.openFirewall = true;
       extraPackages = lib.optionals cfg.lsfgVk.enable [ pkgs.lsfg-vk ];
       extraCompatPackages = [ protonCachyos ] ++ protonGeVersions;
+      # Hide the guitar from the Steam client only; mk-game-launcher unsets this
+      # again so games Steam launches still see the real device.
+      package = pkgs.steam.override {
+        extraEnv.SDL_GAMECONTROLLER_IGNORE_DEVICES = miniHostGhGuitarVidPid;
+      };
     };
 
     programs.gamescope = {

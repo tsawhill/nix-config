@@ -90,10 +90,8 @@ in
     "${self}/modules/hardware/lexar-sd.nix"
   ];
 
-  my.usbip = {
-    enable = true;
-    exporter = false;
-  };
+  # Both directions: the cube shares its own ports and receives from others.
+  my.usbip.enable = true;
 
   my.lexarSD.enable = true;
 

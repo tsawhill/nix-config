@@ -45,8 +45,15 @@ let
 
   # Enable lsfg-vk only for the game runner. In particular, keep the implicit
   # layer disabled while gamescope creates its own Vulkan instance and device.
+  # SDL_GAMECONTROLLER_IGNORE_DEVICES is Steam's; the game must still see the guitar.
+  unsetForGame = [
+    "SDL_GAMECONTROLLER_IGNORE_DEVICES"
+  ]
+  ++ lib.optional lsfgVkEnable "DISABLE_LSFG";
+
   gameCommand =
-    lib.optionalString lsfgVkEnable "${lib.getExe' coreutils "env"} -u DISABLE_LSFG " + runnerCommand;
+    "${lib.getExe' coreutils "env"} ${lib.concatMapStringsSep " " (v: "-u ${v}") unsetForGame} "
+    + runnerCommand;
 
   # Games are offline by default. A user namespace lets an unprivileged caller
   # create the network namespace, while mapping the caller to the same UID/GID
