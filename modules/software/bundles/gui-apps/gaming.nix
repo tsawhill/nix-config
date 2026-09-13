@@ -15,20 +15,13 @@ let
   protonDefault = pkgs.callPackage ../../../../pkgs/games/proton-default.nix {
     protonPath = protonGe.steamcompattool;
   };
-  miniHostGhGuitarControllerMapping = "03000000091200008228000001010000,MiniHost GH Guitar,platform:Linux,a:b0,b:b1,x:b3,y:b4,leftshoulder:b6,back:b10,start:b11,dpup:h0.1,dpdown:h0.4,leftx:a0,righty:a2";
-  # Same adapter as the mapping above, in SDL's vendor/product filter form.
-  miniHostGhGuitarVidPid = "0x1209/0x2882";
 in
 {
+  imports = [ ../../guitars ];
+
   options.software.apps.gaming = {
     enable = lib.mkEnableOption "gaming tools and launchers";
     lsfgVk.enable = lib.mkEnableOption "lsfg-vk frame generation layer";
-
-    sdlGameControllerMappings = lib.mkOption {
-      type = lib.types.listOf lib.types.str;
-      default = [ miniHostGhGuitarControllerMapping ];
-      description = "SDL game controller mapping strings exported through SDL_GAMECONTROLLERCONFIG.";
-    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -39,11 +32,6 @@ in
       localNetworkGameTransfers.openFirewall = true;
       extraPackages = lib.optionals cfg.lsfgVk.enable [ pkgs.lsfg-vk ];
       extraCompatPackages = [ protonCachyos ] ++ protonGeVersions;
-      # Hide the guitar from the Steam client only; mk-game-launcher unsets this
-      # again so games Steam launches still see the real device.
-      package = pkgs.steam.override {
-        extraEnv.SDL_GAMECONTROLLER_IGNORE_DEVICES = miniHostGhGuitarVidPid;
-      };
     };
 
     programs.gamescope = {
@@ -72,19 +60,11 @@ in
 
     services.udev = {
       packages = [ pkgs.game-devices-udev-rules ];
-      extraRules = ''
-        # Wine's raw HID path needs access to the MiniHost hidraw node.
-        KERNEL=="hidraw*", ATTRS{idVendor}=="1209", ATTRS{idProduct}=="2882", GROUP="input", MODE="0660", TAG+="uaccess"
-      '';
     };
 
-    environment.sessionVariables =
-      lib.optionalAttrs (cfg.sdlGameControllerMappings != [ ]) {
-        SDL_GAMECONTROLLERCONFIG = lib.concatStringsSep "\n" cfg.sdlGameControllerMappings;
-      }
-      // lib.optionalAttrs cfg.lsfgVk.enable {
-        DISABLE_LSFG = "1";
-      };
+    environment.sessionVariables = lib.optionalAttrs cfg.lsfgVk.enable {
+      DISABLE_LSFG = "1";
+    };
 
     environment.systemPackages =
       with pkgs;
