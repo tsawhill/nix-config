@@ -150,6 +150,10 @@ in
   # no-new-privs sandbox and kills any game launched via a gamescope launch option.
   security.wrappers.gamescope.capabilities = lib.mkForce "";
 
+  # Steam's FHS sandbox maps only uid 1000, so a root-owned /tmp/.X11-unix reads as
+  # nobody inside it and wlroots refuses to start gamescope's Xwayland. Own it as taylor.
+  systemd.tmpfiles.rules = [ "d /tmp/.X11-unix 1777 taylor users -" ];
+
   desktop.hyprland.enable = true;
   desktop.kde.enable = true; # still selectable at the SDDM greeter
   desktop.plymouth.enable = true;
