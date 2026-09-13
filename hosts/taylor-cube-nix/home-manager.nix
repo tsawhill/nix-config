@@ -56,7 +56,7 @@
         monitors.fallback.enable = false;
         crosshair.monitor = "primary";
         gpuRecorder = {
-          enable = true;
+          enable = false;
           captureTarget = "primary";
           videoCodec = "hevc_hdr";
           # quality = "ultra";
