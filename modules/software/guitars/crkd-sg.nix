@@ -1,42 +1,65 @@
 { config, lib, ... }:
 {
   config = lib.mkIf config.software.apps.gaming.enable {
-    software.apps.gaming.guitarProfiles.crkd-sg = {
-      # PC mode: xpad claims this device, so it has no hidraw node and the rule
-      # generated here is inert. The IDs still match the guitar for the Steam
-      # exclusion and for the shim, which is what has to find it.
+    software.apps.gaming.guitarProfiles."crkd-sg" = {
       usb = {
         vendor = "3651";
         product = "1000";
       };
-      sdl = "0300b280513600000010000005010000,CRKD SG,a:b0,b:b1,y:b3,x:b2,leftshoulder:b4,dpup:h0.1,dpdown:h0.4,back:b6,start:b10,rightx:a3,righty:-a4,dpleft:h0.8,dpright:h0.2,rightshoulder:b5,guide:b8,leftstick:b9,lefttrigger:a2,righttrigger:a5,leftx:a0,lefty:a1,platform:Linux,";
-      # Derived from the sdl line above, not measured: with no hidraw node Wine
-      # synthesises the descriptor from what SDL reports, passing joystick
-      # indices through in order, so DirectInput index N is SDL index N. Axes
-      # follow the same order into X/Y/Z/Rx/Ry/Rz, and dinput reports its
-      # default 0..65535 range rather than SDL's signed one.
+      sdl = "0300b280513600000010000005010000,CRKD SG,a:b0,b:b1,y:b3,x:b2,leftshoulder:b4,dpup:h0.1,dpdown:h0.4,back:b6,start:b7,rightx:a3,righty:-a4,dpleft:h0.8,dpright:h0.2,rightshoulder:b5,guide:b8,leftstick:b9,rightstick:b10,lefttrigger:a2,righttrigger:a5,leftx:a0,lefty:a1~,misc1:b6,platform:Linux,";
+      # Derived from the sdl line above, not measured: this device exposes
+      # no hidraw node, so Wine synthesises its descriptor from what SDL
+      # reports and joystick indices pass through in order. Confirm with a
+      # traced launch (GUITAR_SHIM_TRACE=1) if a control misbehaves.
       dinput = {
         buttons = {
-          a = 0; # b0, green
-          b = 1; # b1, red
-          x = 2; # b2, blue
-          y = 3; # b3, yellow
-          leftshoulder = 4; # b4, orange
-          back = 6; # b6
-          start = 10; # b10, where this guitar reports it
+          a = 0;
+          b = 1;
+          y = 3;
+          x = 2;
+          leftshoulder = 4;
+          back = 6;
+          start = 7;
+          rightshoulder = 5;
+          guide = 8;
+          leftstick = 9;
+          rightstick = 10;
+          misc1 = 6;
         };
         povs = {
-          dpup = 0; # h0, strum up
-          dpdown = 0; # h0, strum down
+          dpup = 0;
+          dpdown = 0;
+          dpleft = 0;
+          dpright = 0;
         };
         axes = {
           rightx = {
-            member = "lRx"; # a3, whammy
+            member = "lRx";
             min = 0;
             max = 65535;
           };
           righty = {
-            member = "lRy"; # a4, tilt
+            member = "lRy";
+            min = 0;
+            max = 65535;
+          };
+          lefttrigger = {
+            member = "lZ";
+            min = 0;
+            max = 65535;
+          };
+          righttrigger = {
+            member = "lRz";
+            min = 0;
+            max = 65535;
+          };
+          leftx = {
+            member = "lX";
+            min = 0;
+            max = 65535;
+          };
+          lefty = {
+            member = "lY";
             min = 0;
             max = 65535;
           };
