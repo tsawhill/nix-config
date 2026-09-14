@@ -30,10 +30,10 @@ No config is applied by the wizard itself.
 ## DirectInput measurement
 
 Each capture records the control twice: as an SDL binding, and as the
-DIJOYSTATE2 member Wine's DirectInput exposes it on. The two never have to
-agree — SDL numbers buttons by evdev `BTN_*` code, while DirectInput fills
-`rgbButtons` in HID declaration order — so the shim's table cannot be derived
-from the SDL mapping and has to be measured separately.
+DIJOYSTATE2 member Wine's DirectInput exposes it on. When the device has a real
+HID descriptor the two need not agree — SDL numbers buttons by evdev `BTN_*`
+code, while DirectInput fills `rgbButtons` in HID declaration order — so that
+case is measured rather than assumed.
 
 The wizard reads the guitar's `hidraw` node and parses its HID report
 descriptor, because Wine's hidraw backend passes that descriptor through to
@@ -42,16 +42,26 @@ view alongside the SDL one, and the emitted profile records each measured
 control's `rgbButtons`/`rgdwPOV` index or axis member, with each axis's logical
 range — a whammy is not always the 0..65535 the shim used to assume.
 
-This needs read access to `/dev/hidraw*`, which the profile's own `usb` block
+That needs read access to `/dev/hidraw*`, which the profile's own `usb` block
 grants: save the profile, rebuild, replug the guitar, then re-run the wizard to
-fill in the DirectInput half. Until then the wizard records the SDL mapping in
-full and writes an empty `dinput` with the reason as a comment.
+measure it. Until then the wizard writes an empty `dinput` with the reason as a
+comment.
 
-Measured DirectInput members only hold while Wine actually uses its hidraw
-backend. If `winebus` uses the SDL backend instead — which it prefers for
-devices that have an SDL controller mapping — Wine synthesises an Xbox-style
-descriptor and the game sees a gamepad, not this layout. The shim's log names
-the device it found and its capabilities, which is how to tell the two apart.
+**Devices with no hidraw node at all** are derived instead, with no second pass
+and nothing to measure. An XInput-mode controller is the common case: its USB
+interface is vendor-specific rather than HID, so `xpad` claims it and no HID
+descriptor exists — not for guitar-map to read and not for Wine either. Wine
+then synthesises a descriptor from what SDL reports, passing joystick indices
+through in order, so SDL index N lands on DirectInput index N and axes fill
+X/Y/Z/Rx/Ry/Rz in the same order. Ranges come out as dinput's own 0..65535
+default rather than SDL's signed range. The wizard applies that mapping to the
+bindings it just recorded and emits a complete `dinput`, labelled derived
+rather than measured.
+
+A derived layout rests on Wine's synthesis behaving that way; a traced launch
+(`GUITAR_SHIM_TRACE=1`) is the way to check when a control misbehaves. The
+shim's log also names the device it bound and its button/axis/POV counts, which
+is how to tell a passed-through descriptor from a synthesised one.
 
 ## How a profile reaches the game
 

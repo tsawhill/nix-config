@@ -2,9 +2,9 @@ import ctypes as C
 import os
 import unittest
 
-from guitar_map import (SDL, candidates, describe_observation, dinput_members, field_value,
-                        hid_observe, mapping_string, nix_profile, parse_report_descriptor,
-                        profile_entry, profile_slug)
+from guitar_map import (SDL, candidates, derive_dinput, derived_entry, describe_observation,
+                        dinput_members, field_value, hid_observe, mapping_string, nix_profile,
+                        parse_report_descriptor, profile_entry, profile_slug)
 
 # Two 8-bit axes (X, Rx), a 4-bit hat with 4 bits of padding, then six buttons
 # and 2 bits of padding: the shape a simple guitar reports over raw HID.
@@ -81,6 +81,40 @@ class ReportDescriptorTests(unittest.TestCase):
                          {"kind": "axis", "member": "lRx", "min": 0, "max": 255})
 
 
+class DerivationTests(unittest.TestCase):
+    def test_sdl_indices_pass_straight_through(self):
+        self.assertEqual(derived_entry("b10"), {"kind": "button", "index": 10})
+        self.assertEqual(derived_entry("h0.4"), {"kind": "pov", "index": 0})
+        self.assertEqual(derived_entry("a3"),
+                         {"kind": "axis", "member": "lRx", "min": 0, "max": 65535})
+
+    def test_half_and_inverted_axes_keep_their_member(self):
+        for binding in ("a4~", "+a4", "-a4"):
+            with self.subTest(binding=binding):
+                self.assertEqual(derived_entry(binding)["member"], "lRy")
+
+    def test_unplaceable_bindings_are_dropped(self):
+        self.assertIsNone(derived_entry("a99"))
+        self.assertIsNone(derived_entry("nonsense"))
+        self.assertEqual(derive_dinput({"a": "b0", "guide": "a99"}),
+                         {"a": {"kind": "button", "index": 0}})
+
+    def test_a_real_guitar_mapping_derives_its_whole_layout(self):
+        # The CRKD SG in PC mode: xpad binds it, so there is no hidraw node.
+        derived = derive_dinput({
+            "a": "b0", "b": "b1", "x": "b2", "y": "b3", "leftshoulder": "b4",
+            "back": "b6", "start": "b10", "dpup": "h0.1", "dpdown": "h0.4",
+            "rightx": "a3", "righty": "-a4",
+        })
+        self.assertEqual({t: e["index"] for t, e in derived.items() if e["kind"] == "button"},
+                         {"a": 0, "b": 1, "x": 2, "y": 3, "leftshoulder": 4, "back": 6,
+                          "start": 10})
+        self.assertEqual({t: e["index"] for t, e in derived.items() if e["kind"] == "pov"},
+                         {"dpup": 0, "dpdown": 0})
+        self.assertEqual({t: e["member"] for t, e in derived.items() if e["kind"] == "axis"},
+                         {"rightx": "lRx", "righty": "lRy"})
+
+
 class ProfileTests(unittest.TestCase):
     def profile(self, **kwargs):
         return nix_profile("crkd-sg", mapping_string("0" * 32, "Guitar", {"a": "b0"}),
@@ -104,6 +138,14 @@ class ProfileTests(unittest.TestCase):
         self.assertIn("# DirectInput NOT measured: No read access to /dev/hidraw3.\n", snippet)
         self.assertIn("buttons = { };", snippet)
         self.assertIn("axes = { };", snippet)
+
+    def test_derived_layout_says_so_instead_of_reporting_a_failure(self):
+        snippet = self.profile(dinput=derive_dinput({"a": "b0"}),
+                               hid_error="This device exposes no hidraw node.",
+                               derived=True)
+        self.assertIn("# Derived from the sdl line above, not measured", snippet)
+        self.assertNotIn("NOT measured", snippet)
+        self.assertIn("buttons = {\n          a = 0;\n        };", snippet)
 
     def test_device_without_usb_ids_skips_the_hidraw_rule(self):
         self.assertIn("usb = null;", nix_profile("g", "0" * 32 + ",G,a:b0,", None))

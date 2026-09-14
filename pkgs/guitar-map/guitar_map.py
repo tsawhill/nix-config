@@ -49,6 +49,15 @@ HID_AXIS_MEMBERS = {0x30: "lX", 0x31: "lY", 0x32: "lZ", 0x33: "lRx", 0x34: "lRy"
 HidField = namedtuple("HidField", "report_id offset size page usage logical_min logical_max")
 DiMember = namedtuple("DiMember", "kind name index")
 
+# Fallback for devices with no hidraw node, where there is no descriptor to
+# measure: Wine synthesises one from what SDL reports and passes joystick
+# indices straight through, so SDL index N lands on DirectInput index N and
+# axes fill these members in order. Ranges are dinput's own default, not SDL's
+# signed one -- the value the shim's original hardcoded whammy assumed.
+SDL_AXIS_MEMBERS = ["lX", "lY", "lZ", "lRx", "lRy", "lRz", "rglSlider[0]", "rglSlider[1]"]
+DINPUT_AXIS_MIN = 0
+DINPUT_AXIS_MAX = 65535
+
 
 class HidUnavailable(Exception):
     """Raw HID is unreadable; SDL capture still works, DirectInput cannot be measured."""
@@ -308,6 +317,31 @@ def profile_entry(seen):
     return {"kind": member.kind, "index": member.index}
 
 
+def derived_entry(binding):
+    """The DirectInput member an SDL binding lands on when Wine has to
+    synthesise the descriptor. Returns None for a binding it cannot place."""
+    button = re.fullmatch(r"b(\d+)", binding)
+    if button:
+        return {"kind": "button", "index": int(button.group(1))}
+    hat = re.fullmatch(r"h(\d+)\.\d+", binding)
+    if hat:
+        return {"kind": "pov", "index": int(hat.group(1))}
+    axis = re.fullmatch(r"[-+]?a(\d+)~?", binding)
+    if axis and int(axis.group(1)) < len(SDL_AXIS_MEMBERS):
+        return {"kind": "axis", "member": SDL_AXIS_MEMBERS[int(axis.group(1))],
+                "min": DINPUT_AXIS_MIN, "max": DINPUT_AXIS_MAX}
+    return None
+
+
+def derive_dinput(bindings):
+    entries = {}
+    for target, binding in bindings.items():
+        entry = derived_entry(binding)
+        if entry:
+            entries[target] = entry
+    return entries
+
+
 def entry_label(entry):
     if entry["kind"] == "axis":
         return f"{entry['member']} ({entry['min']}..{entry['max']})"
@@ -378,12 +412,19 @@ def nix_dinput(dinput):
             + '      };\n')
 
 
-def nix_profile(slug, mapping, usb, dinput=None, hid_error=None):
+def nix_profile(slug, mapping, usb, dinput=None, hid_error=None, derived=False):
     usb_block = ('      usb = null;\n' if not usb else
                  f'      usb = {{\n        vendor = "{usb[0]}";\n'
                  f'        product = "{usb[1]}";\n      }};\n')
-    note = ("      # DirectInput NOT measured: " + re.sub(r"\s+", " ", hid_error) + "\n"
-            if hid_error else "")
+    if derived and dinput:
+        note = ("      # Derived from the sdl line above, not measured: this device exposes\n"
+                "      # no hidraw node, so Wine synthesises its descriptor from what SDL\n"
+                "      # reports and joystick indices pass through in order. Confirm with a\n"
+                "      # traced launch (GUITAR_SHIM_TRACE=1) if a control misbehaves.\n")
+    elif hid_error:
+        note = "      # DirectInput NOT measured: " + re.sub(r"\s+", " ", hid_error) + "\n"
+    else:
+        note = ""
     return ('{ config, lib, ... }:\n{\n'
             '  config = lib.mkIf config.software.apps.gaming.enable {\n'
             f'    software.apps.gaming.guitarProfiles.{nix_quote(slug)} = {{\n'
@@ -577,7 +618,9 @@ def preview(screen, sdl, hid, joy, guid, name, bindings, dinput):
                     f"  {hid.members[field].name:16} {values.get(field, '-')}"
                     for field in hid.fields if field in hid.members]
             else:
-                details.append("not measured; the shim table cannot be derived from SDL")
+                details.append("no hidraw node; derived from the SDL bindings")
+                details += [f"{target:14} {entry_label(dinput[target])}" for target, _ in CONTROLS
+                            if target in dinput]
             draw(screen, lines + details[offset:])
             k = key(screen)
             if k in (10, 13):
@@ -618,6 +661,8 @@ def wizard(screen, sdl, threshold):
         while True:
             if not bindings:
                 raise RuntimeError("No inputs mapped; no configuration generated.")
+            if hid is None:
+                dinput = derive_dinput(bindings)
             if not preview(screen, sdl, hid, joy, guid, name, bindings, dinput):
                 break
             selected = choose(screen, "Select input to re-record (s removes its mapping)", [
@@ -631,7 +676,7 @@ def wizard(screen, sdl, threshold):
                 if entry:
                     dinput[target] = entry
         return (profile_slug(name), mapping_string(guid, name, bindings), usb,
-                dinput, hid_error)
+                dinput, hid_error, hid is None)
     finally:
         sdl.JoystickClose(joy)
         if hid:
@@ -654,12 +699,14 @@ def main():
     sdl = None
     try:
         sdl = SDL()
-        slug, mapping, usb, dinput, hid_error = curses.wrapper(wizard, sdl, args.threshold)
-        snippet = nix_profile(slug, mapping, usb, dinput, hid_error)
+        slug, mapping, usb, dinput, hid_error, derived = curses.wrapper(wizard, sdl, args.threshold)
+        snippet = nix_profile(slug, mapping, usb, dinput, hid_error, derived)
         print(f"\nSave this as modules/software/guitars/{slug}.nix (auto-imported),")
         print("or import it as a host module:\n")
         print(snippet)
-        if hid_error:
+        if hid_error and derived and dinput:
+            print(f"DirectInput derived rather than measured: {hid_error}")
+        elif hid_error:
             print(f"DirectInput not measured: {hid_error}")
         print("Log out/in after applying the Nix config so games inherit the mapping.")
         print("The profile also supplies the hidraw rule and the Steam exclusion.")
