@@ -19,11 +19,15 @@ stdenvNoCC.mkDerivation {
   buildPhase = ''
     runHook preBuild
 
+    # -static-libgcc: 64-bit axis scaling pulls in libgcc helpers, and a
+    # dynamic libgcc_s_dw2-1.dll dependency cannot be resolved inside a Wine
+    # prefix, so the native DLL fails to load at all.
     i686-w64-mingw32-gcc \
       -O2 \
       -Wall \
       -Wextra \
       -shared \
+      -static-libgcc \
       -o xinput1_3.dll \
       xinput-guitar-dll.c \
       xinput-guitar-dll.def \
