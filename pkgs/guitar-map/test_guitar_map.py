@@ -2,8 +2,9 @@ import ctypes as C
 import os
 import unittest
 
-from guitar_map import (SDL, candidates, dinput_members, field_value, hid_candidates,
-                        mapping_string, nix_snippet, parse_report_descriptor)
+from guitar_map import (SDL, candidates, describe_observation, dinput_members, field_value,
+                        hid_observe, mapping_string, nix_profile, parse_report_descriptor,
+                        profile_entry, profile_slug)
 
 # Two 8-bit axes (X, Rx), a 4-bit hat with 4 bits of padding, then six buttons
 # and 2 bits of padding: the shape a simple guitar reports over raw HID.
@@ -28,8 +29,10 @@ class ReportDescriptorTests(unittest.TestCase):
 
     def test_members_follow_hid_usage_and_declaration_order(self):
         members = dinput_members(parse_report_descriptor(GUITAR_DESCRIPTOR))
-        self.assertEqual(list(members.values()),
+        self.assertEqual([m.name for m in members.values()],
                          ["lX", "lRx", "rgdwPOV[0]"] + [f"rgbButtons[{i}]" for i in range(6)])
+        self.assertEqual([m.kind for m in members.values()],
+                         ["axis", "axis", "pov"] + ["button"] * 6)
 
     def test_logical_range_is_captured_for_axis_scaling(self):
         axis = parse_report_descriptor(GUITAR_DESCRIPTOR)[0]
@@ -49,27 +52,65 @@ class ReportDescriptorTests(unittest.TestCase):
         fields = parse_report_descriptor(GUITAR_DESCRIPTOR)
         members = dinput_members(fields)
         rest = {f: v for f, v in zip(fields, [128, 0, 8, 0, 0, 0, 0, 0, 0])}
-        current = {**rest, fields[1]: 255, fields[5]: 1}
-        self.assertEqual(hid_candidates(rest, current, members),
-                         ["lRx 0->255 of 0..255", "rgbButtons[2]"])
+        observed = hid_observe({}, rest, {**rest, fields[1]: 255, fields[5]: 1}, members)
+        self.assertEqual([describe_observation(observed[n]) for n in sorted(observed)],
+                         ["lRx 0->255..255 of 0..255", "rgbButtons[2]"])
+
+    def test_axis_sweep_collapses_to_one_record_with_extremes(self):
+        fields = parse_report_descriptor(GUITAR_DESCRIPTOR)
+        members = dinput_members(fields)
+        rest, observed = {fields[1]: 128}, {}
+        for value in (140, 255, 200, 10):
+            hid_observe(observed, rest, {fields[1]: value}, members)
+        self.assertEqual(list(observed), ["lRx"])
+        self.assertEqual(describe_observation(observed["lRx"]), "lRx 128->10..255 of 0..255")
 
     def test_released_button_is_not_offered(self):
         fields = parse_report_descriptor(GUITAR_DESCRIPTOR)
         members = dinput_members(fields)
-        self.assertEqual(hid_candidates({fields[3]: 1}, {fields[3]: 0}, members), [])
+        self.assertEqual(hid_observe({}, {fields[3]: 1}, {fields[3]: 0}, members), {})
+
+    def test_profile_entries_carry_index_or_axis_range(self):
+        fields = parse_report_descriptor(GUITAR_DESCRIPTOR)
+        members = dinput_members(fields)
+        observed = hid_observe({}, {fields[1]: 0, fields[2]: 8, fields[5]: 0},
+                               {fields[1]: 255, fields[2]: 0, fields[5]: 1}, members)
+        self.assertEqual(profile_entry(observed["rgbButtons[2]"]), {"kind": "button", "index": 2})
+        self.assertEqual(profile_entry(observed["rgdwPOV[0]"]), {"kind": "pov", "index": 0})
+        self.assertEqual(profile_entry(observed["lRx"]),
+                         {"kind": "axis", "member": "lRx", "min": 0, "max": 255})
 
 
-class SnippetTests(unittest.TestCase):
-    def test_measured_members_are_emitted_as_comments(self):
-        snippet = nix_snippet(mapping_string("0" * 32, "Guitar", {"a": "b0"}),
-                              {"a": "rgbButtons[2]", "rightx": "lRx"})
-        self.assertIn("#   a              rgbButtons[2]", snippet)
-        self.assertIn("#   rightx         lRx", snippet)
+class ProfileTests(unittest.TestCase):
+    def profile(self, **kwargs):
+        return nix_profile("crkd-sg", mapping_string("0" * 32, "Guitar", {"a": "b0"}),
+                           ("3651", "0010"), **kwargs)
 
-    def test_failure_reason_stays_on_one_comment_line(self):
-        snippet = nix_snippet(mapping_string("0" * 32, "Guitar", {"a": "b0"}),
-                              None, "No read access to\n/dev/hidraw3.")
+    def test_measured_members_render_as_module_options(self):
+        snippet = self.profile(dinput={
+            "a": {"kind": "button", "index": 2},
+            "dpup": {"kind": "pov", "index": 0},
+            "rightx": {"kind": "axis", "member": "lRx", "min": 0, "max": 255},
+        })
+        self.assertIn('software.apps.gaming.guitarProfiles."crkd-sg" = {', snippet)
+        self.assertIn('vendor = "3651";', snippet)
+        self.assertIn("buttons = {\n          a = 2;\n        };", snippet)
+        self.assertIn("povs = {\n          dpup = 0;\n        };", snippet)
+        self.assertIn('rightx = {\n            member = "lRx";\n'
+                      "            min = 0;\n            max = 255;\n          };", snippet)
+
+    def test_unmeasured_profile_is_still_valid_nix(self):
+        snippet = self.profile(hid_error="No read access to\n/dev/hidraw3.")
         self.assertIn("# DirectInput NOT measured: No read access to /dev/hidraw3.\n", snippet)
+        self.assertIn("buttons = { };", snippet)
+        self.assertIn("axes = { };", snippet)
+
+    def test_device_without_usb_ids_skips_the_hidraw_rule(self):
+        self.assertIn("usb = null;", nix_profile("g", "0" * 32 + ",G,a:b0,", None))
+
+    def test_slug_is_a_file_and_attribute_name(self):
+        self.assertEqual(profile_slug("CRKD SG (PC mode)"), "crkd-sg-pc-mode")
+        self.assertEqual(profile_slug("???"), "guitar")
 
 
 class CaptureTests(unittest.TestCase):
@@ -97,8 +138,9 @@ class CaptureTests(unittest.TestCase):
     def test_output_escapes_nix_and_mapping_delimiters(self):
         mapping = mapping_string("0" * 32, 'Guitar,\n${oops}"', {"a": "b0"})
         self.assertNotIn("\n", mapping)
-        self.assertIn(r'\${oops}\"', nix_snippet(mapping))
-        self.assertIn("lib.mkAfter", nix_snippet(mapping))
+        snippet = nix_profile("guitar", mapping, ("1209", "2882"))
+        self.assertIn(r'\${oops}\"', snippet)
+        self.assertIn("guitarProfiles", snippet)
 
 
 @unittest.skipUnless(os.environ.get("GUITAR_MAP_SDL_LIBRARY"), "set SDL library for virtual-controller test")

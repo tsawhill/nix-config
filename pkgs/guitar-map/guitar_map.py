@@ -47,6 +47,7 @@ HID_AXIS_MEMBERS = {0x30: "lX", 0x31: "lY", 0x32: "lZ", 0x33: "lRx", 0x34: "lRy"
                     0x35: "lRz", 0x36: "rglSlider[0]", 0x37: "rglSlider[1]"}
 
 HidField = namedtuple("HidField", "report_id offset size page usage logical_min logical_max")
+DiMember = namedtuple("DiMember", "kind name index")
 
 
 class HidUnavailable(Exception):
@@ -184,15 +185,15 @@ def dinput_members(fields):
     members, buttons, hats = {}, 0, 0
     for field in fields:
         if field.page == HID_BUTTON_PAGE:
-            members[field] = f"rgbButtons[{buttons}]"
+            members[field] = DiMember("button", f"rgbButtons[{buttons}]", buttons)
             buttons += 1
         elif field.page != HID_DESKTOP_PAGE:
             continue
         elif field.usage == HID_HAT_USAGE:
-            members[field] = f"rgdwPOV[{hats}]"
+            members[field] = DiMember("pov", f"rgdwPOV[{hats}]", hats)
             hats += 1
         elif field.usage in HID_AXIS_MEMBERS:
-            members[field] = HID_AXIS_MEMBERS[field.usage]
+            members[field] = DiMember("axis", HID_AXIS_MEMBERS[field.usage], None)
     return members
 
 
@@ -271,19 +272,46 @@ class HidRaw:
         return values
 
 
-def hid_candidates(rest, current, members):
-    """DirectInput members that moved, labelled the way the shim indexes them."""
-    result = []
+def hid_observe(observed, rest, current, members):
+    """Fold a gesture into one record per member, keeping the extremes reached.
+
+    An axis sweep produces a report per intermediate value, so the extremes are
+    accumulated rather than each step being offered as its own candidate.
+    """
     for field, after in current.items():
         before, member = rest.get(field), members.get(field)
         if member is None or before is None or before == after:
             continue
-        if field.size == 1:
-            if after:
-                result.append(member)
-        else:
-            result.append(f"{member} {before}->{after} of {field.logical_min}..{field.logical_max}")
-    return result
+        if member.kind == "button" and not after:
+            continue
+        seen = observed.setdefault(member.name, {"member": member, "field": field,
+                                                 "rest": before, "low": after, "high": after})
+        seen["low"], seen["high"] = min(seen["low"], after), max(seen["high"], after)
+    return observed
+
+
+def describe_observation(seen):
+    """Buttons and hats are presence; axes show the travel and declared range."""
+    member, field = seen["member"], seen["field"]
+    if member.kind != "axis":
+        return member.name
+    return (f"{member.name} {seen['rest']}->{seen['low']}..{seen['high']} "
+            f"of {field.logical_min}..{field.logical_max}")
+
+
+def profile_entry(seen):
+    """The Nix-ready form of one measured control."""
+    member, field = seen["member"], seen["field"]
+    if member.kind == "axis":
+        return {"kind": "axis", "member": member.name,
+                "min": field.logical_min, "max": field.logical_max}
+    return {"kind": member.kind, "index": member.index}
+
+
+def entry_label(entry):
+    if entry["kind"] == "axis":
+        return f"{entry['member']} ({entry['min']}..{entry['max']})"
+    return ("rgbButtons" if entry["kind"] == "button" else "rgdwPOV") + f"[{entry['index']}]"
 
 
 def candidates(rest, current, target, threshold):
@@ -318,29 +346,52 @@ def nix_quote(value):
     return json.dumps(value, ensure_ascii=False).replace("${", r"\${")
 
 
-def dinput_block(dinput, hid_error):
-    """Comments, not options: no module consumes a DirectInput table yet."""
-    if hid_error:
-        return ("    # DirectInput NOT measured: " + re.sub(r"\s+", " ", hid_error) + "\n"
-                "    # xinput-guitar-dll's table cannot be derived from the SDL mapping.\n")
-    if not dinput:
-        return "    # No DirectInput members recorded.\n"
-    return ("    # DirectInput members measured from this device's raw HID reports.\n"
-            "    # Wine's hidraw backend passes that descriptor through, so these are\n"
-            "    # the DIJOYSTATE2 fields xinput-guitar-dll must read for this guitar.\n"
-            "    # They deliberately do not match the SDL button numbers above.\n"
-            + "".join(f"    #   {target:14} {dinput[target]}\n"
-                      for target, _ in CONTROLS if target in dinput))
+def profile_slug(name):
+    """Profile attribute and file name; one per SDL GUID, not per unit."""
+    return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "guitar"
 
 
-def nix_snippet(mapping, dinput=None, hid_error=None):
+def nix_attrs(name, entries, indent):
+    """Empty sets stay inline, populated ones expand: what nixfmt would produce."""
+    pad = " " * indent
+    if not entries:
+        return f"{pad}{name} = {{ }};\n"
+    body = "".join(f"{pad}  {key} = {value};\n" for key, value in entries)
+    return f"{pad}{name} = {{\n{body}{pad}}};\n"
+
+
+def nix_dinput(dinput):
+    """Group measured members the way the profile module's submodule expects."""
+    ordered = [(target, dinput[target]) for target, _ in CONTROLS if target in dinput]
+    indexed = {
+        kind: [(target, entry["index"]) for target, entry in ordered if entry["kind"] == kind]
+        for kind in ("button", "pov")
+    }
+    axes = "".join(
+        nix_attrs(target, [("member", f'"{entry["member"]}"'), ("min", entry["min"]),
+                           ("max", entry["max"])], 10)
+        for target, entry in ordered if entry["kind"] == "axis")
+    return ('      dinput = {\n'
+            + nix_attrs("buttons", indexed["button"], 8)
+            + nix_attrs("povs", indexed["pov"], 8)
+            + ('        axes = {\n' + axes + '        };\n' if axes else '        axes = { };\n')
+            + '      };\n')
+
+
+def nix_profile(slug, mapping, usb, dinput=None, hid_error=None):
+    usb_block = ('      usb = null;\n' if not usb else
+                 f'      usb = {{\n        vendor = "{usb[0]}";\n'
+                 f'        product = "{usb[1]}";\n      }};\n')
+    note = ("      # DirectInput NOT measured: " + re.sub(r"\s+", " ", hid_error) + "\n"
+            if hid_error else "")
     return ('{ config, lib, ... }:\n{\n'
             '  config = lib.mkIf config.software.apps.gaming.enable {\n'
-            '    software.apps.gaming.sdlGameControllerMappings = lib.mkAfter [\n'
-            f'      {nix_quote(mapping)}\n'
-            '    ];\n'
-            + dinput_block(dinput or {}, hid_error)
-            + '  };\n}\n')
+            f'    software.apps.gaming.guitarProfiles.{nix_quote(slug)} = {{\n'
+            + usb_block
+            + f'      sdl = {nix_quote(mapping)};\n'
+            + note
+            + nix_dinput(dinput or {})
+            + '    };\n  };\n}\n')
 
 
 def draw(screen, lines):
@@ -399,15 +450,16 @@ def capture(screen, sdl, hid, joy, target, label, threshold):
             continue
         rest = sdl.snapshot(joy)
         hid_rest = hid.snapshot() if hid else {}
-        found, hid_found = set(), set()
+        found, observed = set(), {}
         while True:
             found.update(candidates(rest, sdl.snapshot(joy), target, threshold))
             if hid:
-                hid_found.update(hid_candidates(hid_rest, hid.snapshot(), hid.members))
+                hid_observe(observed, hid_rest, hid.snapshot(), hid.members)
             draw(screen, [label, "Perform ONLY this input, through its full travel, then release.",
                           "Enter: review detected inputs   r: retry   s: skip   q: quit",
                           "Detected: " + (", ".join(sorted(found)) or "waiting..."),
-                          "DirectInput: " + (", ".join(sorted(hid_found)) or "waiting...")])
+                          "DirectInput: " + (", ".join(describe_observation(observed[name])
+                                                       for name in sorted(observed)) or "waiting...")])
             k = key(screen)
             if k == ord("s"):
                 return None
@@ -429,15 +481,17 @@ def capture(screen, sdl, hid, joy, target, label, threshold):
                         break
                     if choice == 1:
                         binding = binding.rstrip("~") if binding.endswith("~") else binding + "~"
-                member = None
-                if len(hid_found) == 1:
-                    member = next(iter(hid_found))
-                elif hid_found:
-                    picks = sorted(hid_found)
+                entry = None
+                if len(observed) == 1:
+                    entry = profile_entry(next(iter(observed.values())))
+                elif observed:
+                    picks = sorted(observed)
                     selected = choose(screen, f"{label}: select the DirectInput member",
-                                      picks + ["None of these"])
-                    member = picks[selected] if selected < len(picks) else None
-                return binding, member
+                                      [describe_observation(observed[name]) for name in picks]
+                                      + ["None of these"])
+                    if selected < len(picks):
+                        entry = profile_entry(observed[picks[selected]])
+                return binding, entry
 
 
 def select_device(screen, sdl, threshold):
@@ -517,10 +571,10 @@ def preview(screen, sdl, hid, joy, guid, name, bindings, dinput):
             details += ["", "DIRECTINPUT VIEW (raw HID; what the Wine shim reads)"]
             if hid:
                 values = hid.snapshot()
-                details += [f"{target:14} {dinput[target]}" for target, _ in CONTROLS
+                details += [f"{target:14} {entry_label(dinput[target])}" for target, _ in CONTROLS
                             if target in dinput]
                 details += ["", "Live DIJOYSTATE2 members:"] + [
-                    f"  {hid.members[field]:16} {values.get(field, '-')}"
+                    f"  {hid.members[field].name:16} {values.get(field, '-')}"
                     for field in hid.fields if field in hid.members]
             else:
                 details.append("not measured; the shim table cannot be derived from SDL")
@@ -552,13 +606,15 @@ def wizard(screen, sdl, threshold):
         hid_error = str(error)
     try:
         guid = bytes(sdl.JoystickGetGUID(joy).data).hex()
+        vendor, product = sdl.JoystickGetVendor(joy), sdl.JoystickGetProduct(joy)
+        usb = (f"{vendor:04x}", f"{product:04x}") if vendor and product else None
         bindings, dinput = {}, {}
         for target, label in CONTROLS:
             recorded = capture(screen, sdl, hid, joy, target, label, threshold)
             if recorded and recorded[0]:
-                bindings[target], member = recorded[0], recorded[1]
-                if member:
-                    dinput[target] = member
+                bindings[target], entry = recorded[0], recorded[1]
+                if entry:
+                    dinput[target] = entry
         while True:
             if not bindings:
                 raise RuntimeError("No inputs mapped; no configuration generated.")
@@ -571,10 +627,11 @@ def wizard(screen, sdl, threshold):
             bindings.pop(target, None)
             dinput.pop(target, None)
             if recorded and recorded[0]:
-                bindings[target], member = recorded[0], recorded[1]
-                if member:
-                    dinput[target] = member
-        return mapping_string(guid, name, bindings), dinput, hid_error
+                bindings[target], entry = recorded[0], recorded[1]
+                if entry:
+                    dinput[target] = entry
+        return (profile_slug(name), mapping_string(guid, name, bindings), usb,
+                dinput, hid_error)
     finally:
         sdl.JoystickClose(joy)
         if hid:
@@ -597,17 +654,17 @@ def main():
     sdl = None
     try:
         sdl = SDL()
-        mapping, dinput, hid_error = curses.wrapper(wizard, sdl, args.threshold)
-        snippet = nix_snippet(mapping, dinput, hid_error)
-        print("\nSave this as modules/software/guitars/<device-mode>.nix (auto-imported),")
+        slug, mapping, usb, dinput, hid_error = curses.wrapper(wizard, sdl, args.threshold)
+        snippet = nix_profile(slug, mapping, usb, dinput, hid_error)
+        print(f"\nSave this as modules/software/guitars/{slug}.nix (auto-imported),")
         print("or import it as a host module:\n")
         print(snippet)
         if hid_error:
             print(f"DirectInput not measured: {hid_error}")
         print("Log out/in after applying the Nix config so games inherit the mapping.")
-        print("This maps SDL inputs; it does not install a Windows DLL or change firmware.")
-        print("The DirectInput comments are for xinput-guitar-dll.c, which still hardcodes")
-        print("the MiniHost layout; nothing consumes them automatically yet.")
+        print("The profile also supplies the hidraw rule and the Steam exclusion.")
+        print("Its dinput block is for xinput-guitar-dll.c, which still hardcodes the")
+        print("MiniHost layout; the DLL does not read profiles yet.")
         if args.output:
             with args.output.open("x") as output:
                 output.write(snippet)

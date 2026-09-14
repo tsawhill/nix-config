@@ -16,12 +16,14 @@ again. If several raw inputs change, choose the intended one or retry.
 
 The final preview shows SDL's actual mapped values and raw inputs, including
 unmapped axes/buttons. Scroll with arrow keys; `e` lets you re-record any input.
-Enter accepts the mapping. The snippet is printed and optionally saved to a new
+Enter accepts the mapping. The profile is printed and optionally saved to a new
 file (existing files are never overwritten). Put it in
-`modules/software/guitars/<device-mode>.nix` to auto-import it on gaming hosts,
-or import it into a single host config. The output contains an SDL mapping in
-a gated Nix module; it does not generate udev rules, Steam exclusions, DLL
-configuration, or firmware settings.
+`modules/software/guitars/<slug>.nix` — the name the wizard suggests — to
+auto-import it on gaming hosts, or import it into a single host config. The
+output is a complete `guitarProfiles` entry: SDL mapping, USB IDs (which drive
+the hidraw rule and Steam exclusion), and the measured DirectInput layout. It
+is nixfmt-clean as printed. It does not change firmware, and no DLL reads the
+DirectInput half yet.
 After applying the configuration, log out and back in to refresh session env.
 No config is applied by the wizard itself.
 
@@ -36,28 +38,59 @@ from the SDL mapping and has to be measured separately.
 The wizard reads the guitar's `hidraw` node and parses its HID report
 descriptor, because Wine's hidraw backend passes that descriptor through to
 `dinput` unchanged. The capture and preview screens show the live DirectInput
-view alongside the SDL one, and the emitted snippet carries the result as
-comments, including each axis's logical range (`xinput-guitar-dll.c` assumes a
-0..65535 whammy, which is not universal).
+view alongside the SDL one, and the emitted profile records each measured
+control's `rgbButtons`/`rgdwPOV` index or axis member, with each axis's logical
+range — a whammy is not always the 0..65535 the shim used to assume.
 
-This needs read access to `/dev/hidraw*`: give the guitar a udev rule tagging
-its node `uaccess`, as `minihost.nix` does, then replug it. Without access the
-wizard still records the SDL mapping in full and says why the DirectInput half
-is missing. Nothing consumes the comments automatically — `xinput-guitar-dll.c`
-still hardcodes one table, shared by GH3 and GHWTDE.
+This needs read access to `/dev/hidraw*`, which the profile's own `usb` block
+grants: save the profile, rebuild, replug the guitar, then re-run the wizard to
+fill in the DirectInput half. Until then the wizard records the SDL mapping in
+full and writes an empty `dinput` with the reason as a comment.
 
 Measured DirectInput members only hold while Wine actually uses its hidraw
 backend. If `winebus` uses the SDL backend instead — which it prefers for
 devices that have an SDL controller mapping — Wine synthesises an Xbox-style
-descriptor and the game sees a gamepad, not this layout.
+descriptor and the game sees a gamepad, not this layout. The shim's log names
+the device it found and its capabilities, which is how to tell the two apart.
+
+## How a profile reaches the game
+
+`guitarShimConfig` renders every profile that has USB IDs and a measured layout
+into one line per guitar, and the Guitar Hero launchers export it as
+`GUITAR_SHIM_CONFIG`:
+
+```
+1209:2882 a=b0 b=b1 back=b6 leftshoulder=b4 start=b7,b11 x=b2 y=b3 dpdown=p0 dpup=p0 rightx=lX:0:65535
+```
+
+`xinput-guitar-dll.c` parses that, matches a device by the VID/PID in its
+DirectInput `guidProduct`, and applies that guitar's table. The DLL itself is
+one fixed build shared by GH3 and GHWTDE — only the config varies, so adding a
+guitar never rebuilds it.
+
+The `dinput` keys name the XInput control the shim drives, not the SDL binding:
+`rightx` is the whammy even on a guitar whose SDL line puts it on `leftx`.
+Multiple indices are allowed (`start=b7,b11`) for controls that sit on more
+than one physical button.
+
+Every launch logs each enumerated device to `C:\gh-xinput-guitar.log` in the
+game's prefix with its name, VID/PID and button/axis/POV counts, then whether it
+matched a profile. `GUITAR_SHIM_TRACE=1` additionally logs every input change,
+which is how to read a layout off a guitar from the Wine side. A guitar with no
+matching profile is skipped and named in the log rather than being bound to some
+other guitar's table. With no `GUITAR_SHIM_CONFIG` at all the DLL falls back to
+the MiniHost layout it used to hardcode.
 
 ## Profile layout
 
-`modules/software/guitars/default.nix` imports every sibling `.nix` profile,
-exports the merged SDL mappings, and combines optional Steam device exclusions.
-`gaming.nix` imports this directory. `minihost.nix` owns the existing adapter's
-mapping, Steam exclusion, and hidraw access rule. New profiles can carry their
-own device-specific rules when needed; these are not inferred from capture.
+`modules/software/guitars/default.nix` imports every sibling `.nix` profile and
+defines `software.apps.gaming.guitarProfiles`. Each entry is one guitar and the
+single source for everything derived from it: the merged SDL mappings file, the
+`hidraw` uaccess rule, the Steam client exclusion, and the DirectInput layout.
+`gaming.nix` imports this directory. A profile with `usb = null` contributes
+only its SDL mapping. Host modules can still append to
+`sdlGameControllerMappings` directly for one-off mappings that are not a
+device profile.
 
 Use one file per device/mode with a distinct mapping, for example
 `crkd-les-paul-pc.nix`. A controller's mode/transport and SDL GUID matter more
@@ -118,13 +151,13 @@ Reference: [SDL GUID identity documentation](https://wiki.libsdl.org/SDL2/SDL_GU
   mode, missing drivers, or sensors not presented as joystick axes. Changing
   firmware modes or USB/Bluetooth transport may require a separate mapping.
 - Mappings identify the device's SDL GUID, not its serial number. Two devices
-  with the same GUID use the same mapping. New mappings are appended after the
-  MiniHost baseline, allowing a newly recorded mapping for that GUID to win.
-  `lib.mkForce [ ... ]` can replace all mappings including the baseline.
+  with the same GUID use the same mapping. Profiles are keyed by name rather
+  than ordered, so re-recording a guitar means replacing that profile's `sdl`
+  line; two profiles carrying the same GUID leave which one wins undefined.
 - Steam Input, Wine's raw HID backend, and game-local DLLs can bypass or override
   SDL mappings. Test with Steam Input disabled for the game where appropriate.
-  The custom `xinput-guitar-dll.c` still hardcodes buttons and clears several axes;
-  it must not be expected to pass these new controls through. This tool does not
+  `xinput-guitar-dll.c` passes through only the controls a profile's `dinput`
+  block names; anything unmapped stays at rest. This tool does not
   modify/install/delete that DLL. Testing BetterGH3's bundled fix remains a
   separate game-folder step; preserve `WINEDLLOVERRIDES=xinput1_3=n,b` for a
   native DLL. A mapping by itself does not set XInput's guitar subtype.
