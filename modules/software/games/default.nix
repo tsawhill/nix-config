@@ -92,6 +92,23 @@ let
   };
 
   mkGameLauncher = pkgs.callPackage ../../../pkgs/games/mk-game-launcher.nix { };
+
+  guitarDll = pkgs.callPackage ../../../pkgs/games/xinput-guitar-dll.nix { };
+  guitarShimConfig = config.software.apps.gaming.guitarShimConfig or "";
+
+  # Wine only loads a native xinput1_3 from beside the executable, so the game
+  # directory has to hold a copy. Refreshing it per launch keeps it in step with
+  # the store instead of a hand-copied DLL that silently goes stale. The compare
+  # avoids rewriting a file inside the Syncthing-shared library every launch,
+  # and a read-only library mount warns rather than blocking the game.
+  guitarShimSetup = ''
+    shim_dll=${lib.escapeShellArg "${guitarDll}/share/games/xinput-guitar-dll/xinput1_3.dll"}
+    if ! ${lib.getExe' pkgs.diffutils "cmp"} -s "$shim_dll" "$game_dir/xinput1_3.dll"; then
+      ${lib.getExe' pkgs.coreutils "install"} -m0644 "$shim_dll" "$game_dir/xinput1_3.dll" \
+        || echo "guitar shim: could not refresh $game_dir/xinput1_3.dll" >&2
+    fi
+  '';
+
   lsfgToml = pkgs.formats.toml { };
 
   mkUmuRunner =
@@ -211,16 +228,21 @@ let
         else
           entryCfg.command;
       lsfgVkConfig = lsfgConfig;
+      guitarShimEnv = lib.optionals entryCfg.guitarShim.enable (
+        [ "WINEDLLOVERRIDES=xinput1_3=n,b" ]
+        ++ lib.optional (guitarShimConfig != "") "GUITAR_SHIM_CONFIG=${guitarShimConfig}"
+      );
     in
     {
       package = mkGameLauncher {
         inherit (entryCfg)
           desktopName
           gamescopeArgs
-          env
           ;
         inherit (runner) runnerCommand;
-        setupScript = runner.setupScript or "";
+        env = entryCfg.env ++ guitarShimEnv;
+        setupScript =
+          (runner.setupScript or "") + lib.optionalString entryCfg.guitarShim.enable guitarShimSetup;
         launchPrefix = runner.launchPrefix or "";
         name = entryCfg.command;
         networkEnable = entryCfg.network.enable;
@@ -527,6 +549,12 @@ in
           }
           // lsfgSettingsOptions;
 
+          guitarShim.enable = lib.mkEnableOption ''
+            the XInput guitar shim for this game. Overrides Wine's xinput1_3,
+            refreshes the DLL beside the executable on each launch, and passes
+            the guitar profiles it reads. umu entries only
+          '';
+
           network.enable = lib.mkEnableOption "network access for this game";
 
           runner.umu = lib.mkOption {
@@ -666,6 +694,10 @@ in
                   || entryCfg.runner.emulator.type != "retroarch"
                   || entryCfg.runner.emulator.core != null;
                 message = "software.games.entries.${entryName}.runner.emulator.core is required for retroarch entries.";
+              }
+              {
+                assertion = !entryCfg.guitarShim.enable || entryCfg.runner.umu != null;
+                message = "software.games.entries.${entryName}.guitarShim.enable needs a umu runner (the DLL is installed beside the Windows executable).";
               }
             ]
           ) cfg.entries

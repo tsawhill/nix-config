@@ -68,6 +68,16 @@ DirectInput `guidProduct`, and applies that guitar's table. The DLL itself is
 one fixed build shared by GH3 and GHWTDE — only the config varies, so adding a
 guitar never rebuilds it.
 
+`guitarShim.enable` on a game entry does the whole job: it overrides Wine's
+`xinput1_3`, exports the config, and refreshes `xinput1_3.dll` beside the
+executable on each launch. Wine only loads a native DLL from the game
+directory, so a copy has to live there; installing it per launch keeps it in
+step with the store rather than going stale. It is skipped when the file
+already matches, so a library on Syncthing is not rewritten every launch, and a
+read-only library mount warns instead of blocking the game. The DLL is also in
+`environment.systemPackages`, with `xinput-guitar-dll-path` printing its store
+path for a manual copy elsewhere.
+
 The `dinput` keys name the XInput control the shim drives, not the SDL binding:
 `rightx` is the whammy even on a guitar whose SDL line puts it on `leftx`.
 Multiple indices are allowed (`start=b7,b11`) for controls that sit on more
