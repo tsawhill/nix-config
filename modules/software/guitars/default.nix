@@ -32,8 +32,15 @@ in
 
   config = lib.mkIf cfg.enable {
     software.guitarMap.enable = lib.mkDefault true;
+    # pam_env's file holds one line per variable, so mappings cannot be inlined
+    # in SDL_GAMECONTROLLERCONFIG once there is more than one: the newline
+    # truncates the entry and every later mapping is parsed as a stray line.
     environment.sessionVariables = lib.optionalAttrs (cfg.sdlGameControllerMappings != [ ]) {
-      SDL_GAMECONTROLLERCONFIG = lib.concatStringsSep "\n" cfg.sdlGameControllerMappings;
+      SDL_GAMECONTROLLERCONFIG_FILE = toString (
+        pkgs.writeText "sdl-gamecontrollerdb.txt" (
+          lib.concatMapStrings (mapping: mapping + "\n") cfg.sdlGameControllerMappings
+        )
+      );
     };
     # mk-game-launcher removes this filter so launched games see the guitars.
     programs.steam.package = lib.mkIf (cfg.steamIgnoredGuitarDevices != [ ]) (

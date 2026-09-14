@@ -2,7 +2,74 @@ import ctypes as C
 import os
 import unittest
 
-from guitar_map import SDL, candidates, mapping_string, nix_snippet
+from guitar_map import (SDL, candidates, dinput_members, field_value, hid_candidates,
+                        mapping_string, nix_snippet, parse_report_descriptor)
+
+# Two 8-bit axes (X, Rx), a 4-bit hat with 4 bits of padding, then six buttons
+# and 2 bits of padding: the shape a simple guitar reports over raw HID.
+GUITAR_DESCRIPTOR = bytes([
+    0x05, 0x01, 0x09, 0x05, 0xa1, 0x01, 0x09, 0x01, 0xa1, 0x00,
+    0x09, 0x30, 0x09, 0x33, 0x15, 0x00, 0x26, 0xff, 0x00, 0x75, 0x08, 0x95, 0x02, 0x81, 0x02,
+    0xc0,
+    0x09, 0x39, 0x15, 0x00, 0x25, 0x07, 0x75, 0x04, 0x95, 0x01, 0x81, 0x42,
+    0x75, 0x04, 0x95, 0x01, 0x81, 0x03,
+    0x05, 0x09, 0x19, 0x01, 0x29, 0x06, 0x15, 0x00, 0x25, 0x01,
+    0x75, 0x01, 0x95, 0x06, 0x81, 0x02,
+    0x75, 0x01, 0x95, 0x02, 0x81, 0x03,
+    0xc0,
+])
+
+
+class ReportDescriptorTests(unittest.TestCase):
+    def test_padding_advances_offsets_without_becoming_a_field(self):
+        fields = parse_report_descriptor(GUITAR_DESCRIPTOR)
+        self.assertEqual([(f.offset, f.size) for f in fields],
+                         [(0, 8), (8, 8), (16, 4)] + [(24 + i, 1) for i in range(6)])
+
+    def test_members_follow_hid_usage_and_declaration_order(self):
+        members = dinput_members(parse_report_descriptor(GUITAR_DESCRIPTOR))
+        self.assertEqual(list(members.values()),
+                         ["lX", "lRx", "rgdwPOV[0]"] + [f"rgbButtons[{i}]" for i in range(6)])
+
+    def test_logical_range_is_captured_for_axis_scaling(self):
+        axis = parse_report_descriptor(GUITAR_DESCRIPTOR)[0]
+        self.assertEqual((axis.logical_min, axis.logical_max), (0, 255))
+
+    def test_values_decode_from_a_packed_report(self):
+        fields = parse_report_descriptor(GUITAR_DESCRIPTOR)
+        report = bytes([0x80, 0xff, 0x03, 0x3f])
+        self.assertEqual([field_value(report, f) for f in fields],
+                         [128, 255, 3] + [1] * 6)
+
+    def test_short_report_yields_no_value(self):
+        fields = parse_report_descriptor(GUITAR_DESCRIPTOR)
+        self.assertIsNone(field_value(bytes([0x00]), fields[-1]))
+
+    def test_only_changed_members_are_offered(self):
+        fields = parse_report_descriptor(GUITAR_DESCRIPTOR)
+        members = dinput_members(fields)
+        rest = {f: v for f, v in zip(fields, [128, 0, 8, 0, 0, 0, 0, 0, 0])}
+        current = {**rest, fields[1]: 255, fields[5]: 1}
+        self.assertEqual(hid_candidates(rest, current, members),
+                         ["lRx 0->255 of 0..255", "rgbButtons[2]"])
+
+    def test_released_button_is_not_offered(self):
+        fields = parse_report_descriptor(GUITAR_DESCRIPTOR)
+        members = dinput_members(fields)
+        self.assertEqual(hid_candidates({fields[3]: 1}, {fields[3]: 0}, members), [])
+
+
+class SnippetTests(unittest.TestCase):
+    def test_measured_members_are_emitted_as_comments(self):
+        snippet = nix_snippet(mapping_string("0" * 32, "Guitar", {"a": "b0"}),
+                              {"a": "rgbButtons[2]", "rightx": "lRx"})
+        self.assertIn("#   a              rgbButtons[2]", snippet)
+        self.assertIn("#   rightx         lRx", snippet)
+
+    def test_failure_reason_stays_on_one_comment_line(self):
+        snippet = nix_snippet(mapping_string("0" * 32, "Guitar", {"a": "b0"}),
+                              None, "No read access to\n/dev/hidraw3.")
+        self.assertIn("# DirectInput NOT measured: No read access to /dev/hidraw3.\n", snippet)
 
 
 class CaptureTests(unittest.TestCase):

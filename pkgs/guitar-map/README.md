@@ -25,6 +25,32 @@ configuration, or firmware settings.
 After applying the configuration, log out and back in to refresh session env.
 No config is applied by the wizard itself.
 
+## DirectInput measurement
+
+Each capture records the control twice: as an SDL binding, and as the
+DIJOYSTATE2 member Wine's DirectInput exposes it on. The two never have to
+agree — SDL numbers buttons by evdev `BTN_*` code, while DirectInput fills
+`rgbButtons` in HID declaration order — so the shim's table cannot be derived
+from the SDL mapping and has to be measured separately.
+
+The wizard reads the guitar's `hidraw` node and parses its HID report
+descriptor, because Wine's hidraw backend passes that descriptor through to
+`dinput` unchanged. The capture and preview screens show the live DirectInput
+view alongside the SDL one, and the emitted snippet carries the result as
+comments, including each axis's logical range (`xinput-guitar-dll.c` assumes a
+0..65535 whammy, which is not universal).
+
+This needs read access to `/dev/hidraw*`: give the guitar a udev rule tagging
+its node `uaccess`, as `minihost.nix` does, then replug it. Without access the
+wizard still records the SDL mapping in full and says why the DirectInput half
+is missing. Nothing consumes the comments automatically — `xinput-guitar-dll.c`
+still hardcodes one table, shared by GH3 and GHWTDE.
+
+Measured DirectInput members only hold while Wine actually uses its hidraw
+backend. If `winebus` uses the SDL backend instead — which it prefers for
+devices that have an SDL controller mapping — Wine synthesises an Xbox-style
+descriptor and the game sees a gamepad, not this layout.
+
 ## Profile layout
 
 `modules/software/guitars/default.nix` imports every sibling `.nix` profile,

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Interactive raw SDL2 joystick to GameController mapping, without root access."""
 import argparse
+from collections import namedtuple
 import ctypes as C
 import ctypes.util
 import curses
@@ -33,6 +34,23 @@ BUTTONS = ["a", "b", "x", "y", "back", "guide", "start", "leftstick",
            "rightstick", "leftshoulder", "rightshoulder", "dpup", "dpdown",
            "dpleft", "dpright", "misc1", "paddle1", "paddle2", "paddle3",
            "paddle4", "touchpad"]
+
+
+# Wine's hidraw backend passes the device's own report descriptor through to
+# dinput, which assigns fixed DIJOYSTATE2 members per HID usage and fills
+# rgbButtons in declaration order. SDL instead numbers buttons by evdev BTN_*
+# code, so the two never have to agree -- hence measuring both.
+HID_DESKTOP_PAGE = 0x01
+HID_BUTTON_PAGE = 0x09
+HID_HAT_USAGE = 0x39
+HID_AXIS_MEMBERS = {0x30: "lX", 0x31: "lY", 0x32: "lZ", 0x33: "lRx", 0x34: "lRy",
+                    0x35: "lRz", 0x36: "rglSlider[0]", 0x37: "rglSlider[1]"}
+
+HidField = namedtuple("HidField", "report_id offset size page usage logical_min logical_max")
+
+
+class HidUnavailable(Exception):
+    """Raw HID is unreadable; SDL capture still works, DirectInput cannot be measured."""
 
 
 class GUID(C.Structure):
@@ -104,6 +122,170 @@ class SDL:
         raise RuntimeError("Selected controller disconnected. Reconnect it and restart guitar-map.")
 
 
+def parse_report_descriptor(blob):
+    """Input-report fields in HID declaration order, with their bit positions."""
+    fields, offsets, stack = [], {}, []
+    state = {"page": 0, "size": 0, "count": 0, "id": 0, "min": 0, "max": 0}
+    usages, usage_min = [], None
+    position = 0
+    while position < len(blob):
+        prefix = blob[position]
+        position += 1
+        if prefix == 0xFE:  # long item: payload size, tag, then payload
+            if position >= len(blob):
+                break
+            position += 2 + blob[position]
+            continue
+        width = (0, 1, 2, 4)[prefix & 0x03]
+        if position + width > len(blob):
+            break
+        value = int.from_bytes(blob[position:position + width], "little")
+        position += width
+        tag, kind = prefix >> 4, (prefix >> 2) & 0x03
+        if kind == 1:
+            for item, field in [(0x0, "page"), (0x1, "min"), (0x2, "max"),
+                                (0x7, "size"), (0x8, "id"), (0x9, "count")]:
+                if tag == item:
+                    state[field] = value
+            if tag == 0xA:
+                stack.append(dict(state))
+            elif tag == 0xB and stack:
+                state = stack.pop()
+        elif kind == 2:
+            if tag == 0x0:
+                usages.append((value >> 16, value & 0xFFFF) if width == 4 else (state["page"], value))
+            elif tag == 0x1:
+                usage_min = value
+        elif kind == 0:
+            if tag == 0x8:  # input
+                offset = offsets.get(state["id"], 0)
+                variable = bool(value & 0x02)
+                for index in range(state["count"]):
+                    if not value & 0x01:  # data, not constant padding
+                        if usages and variable:
+                            page, usage = usages[min(index, len(usages) - 1)]
+                        elif usages:
+                            page, usage = usages[0]
+                        elif usage_min is not None and variable:
+                            page, usage = state["page"], usage_min + index
+                        else:
+                            page, usage = state["page"], usage_min or 0
+                        fields.append(HidField(state["id"], offset, state["size"], page,
+                                               usage, state["min"], state["max"]))
+                    offset += state["size"]
+                offsets[state["id"]] = offset
+            if tag in (0x8, 0x9, 0xA, 0xB, 0xC):
+                usages, usage_min = [], None
+    return fields
+
+
+def dinput_members(fields):
+    """DIJOYSTATE2 member each field feeds, in Wine's assignment order."""
+    members, buttons, hats = {}, 0, 0
+    for field in fields:
+        if field.page == HID_BUTTON_PAGE:
+            members[field] = f"rgbButtons[{buttons}]"
+            buttons += 1
+        elif field.page != HID_DESKTOP_PAGE:
+            continue
+        elif field.usage == HID_HAT_USAGE:
+            members[field] = f"rgdwPOV[{hats}]"
+            hats += 1
+        elif field.usage in HID_AXIS_MEMBERS:
+            members[field] = HID_AXIS_MEMBERS[field.usage]
+    return members
+
+
+def field_value(payload, field):
+    """HID packs report fields little-endian from the start of the report."""
+    first, last = field.offset // 8, (field.offset + field.size + 7) // 8
+    if len(payload) < last:
+        return None
+    return (int.from_bytes(payload[first:last], "little") >> (field.offset - first * 8)) \
+        & ((1 << field.size) - 1)
+
+
+def locate_hidraw(evdev_path):
+    """Walk from SDL's evdev node up to the owning HID device's hidraw node."""
+    name = os.path.basename(evdev_path or "")
+    if not re.fullmatch(r"event\d+", name):
+        raise HidUnavailable(f"SDL reports no evdev node for this device ({evdev_path or 'none'}).")
+    try:
+        node = (Path("/sys/class/input") / name).resolve(strict=True)
+    except OSError as error:
+        raise HidUnavailable(f"Cannot resolve /sys/class/input/{name}: {error}")
+    for parent in node.parents:
+        nodes = sorted(entry.name for entry in (parent / "hidraw").iterdir()) \
+            if (parent / "hidraw").is_dir() else []
+        if nodes:
+            return Path("/dev") / nodes[0], parent
+    raise HidUnavailable("This device exposes no hidraw node, so Wine cannot use its "
+                         "hidraw backend and DirectInput sees a synthesised layout.")
+
+
+class HidRaw:
+    """The guitar as Wine's hidraw backend sees it, for the DirectInput table."""
+
+    def __init__(self, evdev_path):
+        self.node, sysfs = locate_hidraw(evdev_path)
+        try:
+            descriptor = (sysfs / "report_descriptor").read_bytes()
+        except OSError as error:
+            raise HidUnavailable(f"Cannot read {sysfs / 'report_descriptor'}: {error}")
+        self.fields = parse_report_descriptor(descriptor)
+        self.members = dinput_members(self.fields)
+        if not self.members:
+            raise HidUnavailable(f"{self.node} declares no buttons or axes DirectInput would expose.")
+        self.uses_ids = any(field.report_id for field in self.fields)
+        self.latest = {}
+        try:
+            self.fd = os.open(str(self.node), os.O_RDONLY | os.O_NONBLOCK)
+        except PermissionError:
+            raise HidUnavailable(
+                f"No read access to {self.node}. Give this guitar a udev rule tagging its "
+                "hidraw node uaccess (see minihost.nix), then replug it.")
+        except OSError as error:
+            raise HidUnavailable(f"Cannot open {self.node}: {error}")
+
+    def close(self):
+        os.close(self.fd)
+
+    def snapshot(self):
+        """Drain pending reports; devices that only report on change keep the last."""
+        while True:
+            try:
+                data = os.read(self.fd, 512)
+            except BlockingIOError:
+                break
+            except OSError as error:
+                raise RuntimeError(f"hidraw read failed on {self.node}: {error}")
+            if not data:
+                break
+            self.latest[data[0] if self.uses_ids else 0] = data[1:] if self.uses_ids else data
+        values = {}
+        for field in self.fields:
+            payload = self.latest.get(field.report_id)
+            value = None if payload is None else field_value(payload, field)
+            if value is not None:
+                values[field] = value
+        return values
+
+
+def hid_candidates(rest, current, members):
+    """DirectInput members that moved, labelled the way the shim indexes them."""
+    result = []
+    for field, after in current.items():
+        before, member = rest.get(field), members.get(field)
+        if member is None or before is None or before == after:
+            continue
+        if field.size == 1:
+            if after:
+                result.append(member)
+        else:
+            result.append(f"{member} {before}->{after} of {field.logical_min}..{field.logical_max}")
+    return result
+
+
 def candidates(rest, current, target, threshold):
     """Require explicit selection when a gesture changes multiple inputs."""
     result = []
@@ -136,12 +318,29 @@ def nix_quote(value):
     return json.dumps(value, ensure_ascii=False).replace("${", r"\${")
 
 
-def nix_snippet(mapping):
+def dinput_block(dinput, hid_error):
+    """Comments, not options: no module consumes a DirectInput table yet."""
+    if hid_error:
+        return ("    # DirectInput NOT measured: " + re.sub(r"\s+", " ", hid_error) + "\n"
+                "    # xinput-guitar-dll's table cannot be derived from the SDL mapping.\n")
+    if not dinput:
+        return "    # No DirectInput members recorded.\n"
+    return ("    # DirectInput members measured from this device's raw HID reports.\n"
+            "    # Wine's hidraw backend passes that descriptor through, so these are\n"
+            "    # the DIJOYSTATE2 fields xinput-guitar-dll must read for this guitar.\n"
+            "    # They deliberately do not match the SDL button numbers above.\n"
+            + "".join(f"    #   {target:14} {dinput[target]}\n"
+                      for target, _ in CONTROLS if target in dinput))
+
+
+def nix_snippet(mapping, dinput=None, hid_error=None):
     return ('{ config, lib, ... }:\n{\n'
             '  config = lib.mkIf config.software.apps.gaming.enable {\n'
             '    software.apps.gaming.sdlGameControllerMappings = lib.mkAfter [\n'
             f'      {nix_quote(mapping)}\n'
-            '    ];\n  };\n}\n')
+            '    ];\n'
+            + dinput_block(dinput or {}, hid_error)
+            + '  };\n}\n')
 
 
 def draw(screen, lines):
@@ -180,24 +379,35 @@ def choose(screen, title, choices):
             return selected
 
 
-def capture(screen, sdl, joy, target, label, threshold):
+def capture(screen, sdl, hid, joy, target, label, threshold):
+    """Record one control as both an SDL binding and a DirectInput member."""
     while True:
         draw(screen, [label, "Release all buttons; leave whammy/sticks at rest.",
                       "Hold the guitar in normal playing position.",
-                      "Enter: ready   s: skip/remove mapping   q: quit"])
+                      "Enter: ready   s: skip/remove mapping   q: quit",
+                      "DirectInput: measuring via " + str(hid.node) if hid
+                      else "DirectInput: not measured (SDL mapping only)"])
         k = key(screen)
         sdl.snapshot(joy)
+        # Keep the raw HID baseline fresh: devices that report only on change
+        # would otherwise have no resting report to diff the gesture against.
+        if hid:
+            hid.snapshot()
         if k == ord("s"):
             return None
         if k not in (10, 13):
             continue
         rest = sdl.snapshot(joy)
-        found = set()
+        hid_rest = hid.snapshot() if hid else {}
+        found, hid_found = set(), set()
         while True:
             found.update(candidates(rest, sdl.snapshot(joy), target, threshold))
+            if hid:
+                hid_found.update(hid_candidates(hid_rest, hid.snapshot(), hid.members))
             draw(screen, [label, "Perform ONLY this input, through its full travel, then release.",
                           "Enter: review detected inputs   r: retry   s: skip   q: quit",
-                          "Detected: " + (", ".join(sorted(found)) or "waiting...")])
+                          "Detected: " + (", ".join(sorted(found)) or "waiting..."),
+                          "DirectInput: " + (", ".join(sorted(hid_found)) or "waiting...")])
             k = key(screen)
             if k == ord("s"):
                 return None
@@ -219,7 +429,15 @@ def capture(screen, sdl, joy, target, label, threshold):
                         break
                     if choice == 1:
                         binding = binding.rstrip("~") if binding.endswith("~") else binding + "~"
-                return binding
+                member = None
+                if len(hid_found) == 1:
+                    member = next(iter(hid_found))
+                elif hid_found:
+                    picks = sorted(hid_found)
+                    selected = choose(screen, f"{label}: select the DirectInput member",
+                                      picks + ["None of these"])
+                    member = picks[selected] if selected < len(picks) else None
+                return binding, member
 
 
 def select_device(screen, sdl, threshold):
@@ -262,13 +480,13 @@ def select_device(screen, sdl, threshold):
                     break
                 if k in (10, 13) and seen:
                     accepted = True
-                    return joy, name
+                    return joy, name, path
         finally:
             if not accepted:
                 sdl.JoystickClose(joy)
 
 
-def preview(screen, sdl, joy, guid, name, bindings):
+def preview(screen, sdl, hid, joy, guid, name, bindings, dinput):
     mapping = mapping_string(guid, name, bindings)
     if sdl.GameControllerAddMapping(mapping.encode()) < 0:
         raise RuntimeError("SDL rejected mapping: " + sdl.error())
@@ -296,6 +514,16 @@ def preview(screen, sdl, joy, guid, name, bindings):
                         "Hats: " + "  ".join(f"h{i}={v}" for i, v in enumerate(hats))]
             details += [f"a{i}: {v:7}  " + "#" * int((v + 32768) * 24 / 65535)
                         for i, v in enumerate(axes)]
+            details += ["", "DIRECTINPUT VIEW (raw HID; what the Wine shim reads)"]
+            if hid:
+                values = hid.snapshot()
+                details += [f"{target:14} {dinput[target]}" for target, _ in CONTROLS
+                            if target in dinput]
+                details += ["", "Live DIJOYSTATE2 members:"] + [
+                    f"  {hid.members[field]:16} {values.get(field, '-')}"
+                    for field in hid.fields if field in hid.members]
+            else:
+                details.append("not measured; the shim table cannot be derived from SDL")
             draw(screen, lines + details[offset:])
             k = key(screen)
             if k in (10, 13):
@@ -316,29 +544,41 @@ def wizard(screen, sdl, threshold):
         curses.curs_set(0)
     except curses.error:
         pass
-    joy, name = select_device(screen, sdl, threshold)
+    joy, name, path = select_device(screen, sdl, threshold)
+    hid, hid_error = None, None
+    try:
+        hid = HidRaw(path)
+    except HidUnavailable as error:
+        hid_error = str(error)
     try:
         guid = bytes(sdl.JoystickGetGUID(joy).data).hex()
-        bindings = {}
+        bindings, dinput = {}, {}
         for target, label in CONTROLS:
-            binding = capture(screen, sdl, joy, target, label, threshold)
-            if binding:
-                bindings[target] = binding
+            recorded = capture(screen, sdl, hid, joy, target, label, threshold)
+            if recorded and recorded[0]:
+                bindings[target], member = recorded[0], recorded[1]
+                if member:
+                    dinput[target] = member
         while True:
             if not bindings:
                 raise RuntimeError("No inputs mapped; no configuration generated.")
-            if not preview(screen, sdl, joy, guid, name, bindings):
+            if not preview(screen, sdl, hid, joy, guid, name, bindings, dinput):
                 break
             selected = choose(screen, "Select input to re-record (s removes its mapping)", [
                 f"{label}: {bindings.get(target, 'unmapped')}" for target, label in CONTROLS])
             target, label = CONTROLS[selected]
-            binding = capture(screen, sdl, joy, target, label, threshold)
+            recorded = capture(screen, sdl, hid, joy, target, label, threshold)
             bindings.pop(target, None)
-            if binding:
-                bindings[target] = binding
-        return mapping_string(guid, name, bindings)
+            dinput.pop(target, None)
+            if recorded and recorded[0]:
+                bindings[target], member = recorded[0], recorded[1]
+                if member:
+                    dinput[target] = member
+        return mapping_string(guid, name, bindings), dinput, hid_error
     finally:
         sdl.JoystickClose(joy)
+        if hid:
+            hid.close()
 
 
 def main():
@@ -357,13 +597,17 @@ def main():
     sdl = None
     try:
         sdl = SDL()
-        mapping = curses.wrapper(wizard, sdl, args.threshold)
-        snippet = nix_snippet(mapping)
+        mapping, dinput, hid_error = curses.wrapper(wizard, sdl, args.threshold)
+        snippet = nix_snippet(mapping, dinput, hid_error)
         print("\nSave this as modules/software/guitars/<device-mode>.nix (auto-imported),")
         print("or import it as a host module:\n")
         print(snippet)
+        if hid_error:
+            print(f"DirectInput not measured: {hid_error}")
         print("Log out/in after applying the Nix config so games inherit the mapping.")
         print("This maps SDL inputs; it does not install a Windows DLL or change firmware.")
+        print("The DirectInput comments are for xinput-guitar-dll.c, which still hardcodes")
+        print("the MiniHost layout; nothing consumes them automatically yet.")
         if args.output:
             with args.output.open("x") as output:
                 output.write(snippet)
