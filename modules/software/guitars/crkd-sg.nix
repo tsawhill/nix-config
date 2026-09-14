@@ -2,13 +2,12 @@
 {
   config = lib.mkIf config.software.apps.gaming.enable {
     software.apps.gaming.guitarProfiles.crkd-sg = {
-      # Decoded from the SDL GUID, not yet confirmed against lsusb. In PC mode
-      # this guitar binds to xpad and exposes no hidraw node, so the rule the
-      # usb block generates is inert here -- it still earns the Steam exclusion,
-      # and applies if a HID-based mode is ever profiled instead.
+      # PC mode: xpad claims this device, so it has no hidraw node and the rule
+      # generated here is inert. The IDs still match the guitar for the Steam
+      # exclusion and for the shim, which is what has to find it.
       usb = {
         vendor = "3651";
-        product = "0010";
+        product = "1000";
       };
       sdl = "0300b280513600000010000005010000,CRKD SG,a:b0,b:b1,y:b3,x:b2,leftshoulder:b4,dpup:h0.1,dpdown:h0.4,back:b6,start:b10,rightx:a3,righty:-a4,dpleft:h0.8,dpright:h0.2,rightshoulder:b5,guide:b8,leftstick:b9,lefttrigger:a2,righttrigger:a5,leftx:a0,lefty:a1,platform:Linux,";
       # UNCONFIRMED. guitar-map cannot measure this guitar: with no hidraw node

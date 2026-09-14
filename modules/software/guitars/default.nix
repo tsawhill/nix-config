@@ -61,7 +61,12 @@ let
 
       sdl = lib.mkOption {
         type = lib.types.str;
-        description = "SDL GameController mapping line recorded by guitar-map.";
+        default = "";
+        description = ''
+          SDL GameController mapping line recorded by guitar-map. Empty is
+          allowed so a profile can exist only to grant its hidraw rule, which
+          guitar-map needs before it can measure the device at all.
+        '';
       };
 
       dinput = lib.mkOption {
@@ -176,7 +181,9 @@ in
 
     software.apps.gaming = {
       guitarShimConfig = lib.concatMapStrings (profile: shimLine profile + "\n") shimProfiles;
-      sdlGameControllerMappings = map (profile: profile.sdl) (lib.attrValues cfg.guitarProfiles);
+      sdlGameControllerMappings = map (profile: profile.sdl) (
+        lib.filter (profile: profile.sdl != "") (lib.attrValues cfg.guitarProfiles)
+      );
       steamIgnoredGuitarDevices = map (
         profile: "0x${profile.usb.vendor}/0x${profile.usb.product}"
       ) usbProfiles;
