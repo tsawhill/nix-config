@@ -115,6 +115,22 @@ let
 
   usbProfiles = lib.filter (profile: profile.usb != null) (lib.attrValues cfg.guitarProfiles);
 
+  # Bytes 2-3 of an SDL GUID are a CRC16 of the device name, which SDL only
+  # began filling in around 2.26; older builds leave them zeroed and match
+  # mappings by straight comparison, so a mapping recorded by a newer SDL is
+  # invisible to them. Unity games bundle their own SDL and are usually the
+  # older vintage, so ship both spellings and let each runtime match its own.
+  crcVariants =
+    mapping:
+    let
+      guid = lib.head (lib.splitString "," mapping);
+      zeroed = lib.substring 0 4 guid + "0000" + lib.substring 8 24 guid;
+    in
+    [ mapping ]
+    ++ lib.optional (lib.stringLength guid == 32 && lib.substring 4 4 guid != "0000") (
+      zeroed + lib.removePrefix guid mapping
+    );
+
   hasLayout =
     profile: profile.dinput.buttons != { } || profile.dinput.povs != { } || profile.dinput.axes != { };
 
@@ -181,8 +197,10 @@ in
 
     software.apps.gaming = {
       guitarShimConfig = lib.concatMapStrings (profile: shimLine profile + "\n") shimProfiles;
-      sdlGameControllerMappings = map (profile: profile.sdl) (
-        lib.filter (profile: profile.sdl != "") (lib.attrValues cfg.guitarProfiles)
+      sdlGameControllerMappings = lib.concatMap crcVariants (
+        map (profile: profile.sdl) (
+          lib.filter (profile: profile.sdl != "") (lib.attrValues cfg.guitarProfiles)
+        )
       );
       steamIgnoredGuitarDevices = map (
         profile: "0x${profile.usb.vendor}/0x${profile.usb.product}"
