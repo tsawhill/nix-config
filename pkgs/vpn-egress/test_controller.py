@@ -6,9 +6,10 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from controller import Controller, SystemRunner, parse_remote_command, rotation_lock
+from dns_recovery import recover, query
 from searx_watchdog import Watchdog, is_startpage_block, render_metrics
 
 
@@ -180,6 +181,51 @@ class ControllerTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 parse_remote_command(command, allowed)
 
+    def test_packet_loss_rotates_even_during_switch_cooldown(self):
+        self.cfg.update(packetLossTargets=["1.1.1.1"], packetLossThresholdPercent=40)
+        runner = Runner()
+        runner.packet_loss = Mock(side_effect=[60, 40, 0])
+        controller = self.make(runner)
+        controller.state.update(currentEndpoint="one", lastRotation=999)
+        controller.health()
+        self.assertEqual(runner.set_calls, [])
+        controller.health()
+        self.assertEqual(controller.state["currentEndpoint"], "two")
+        self.assertEqual(controller.state["packetLossPercent"], 0)
+
+    def test_healthy_sample_resets_loss_failure_streak(self):
+        self.cfg.update(packetLossTargets=["1.1.1.1"], packetLossThresholdPercent=40)
+        runner = Runner()
+        runner.packet_loss = Mock(side_effect=[60, 0, 60])
+        controller = self.make(runner)
+        for _ in range(3):
+            controller.health()
+        self.assertEqual(runner.set_calls, [])
+        self.assertEqual(controller.state["consecutiveHealthFailures"], 1)
+
+    def test_packet_loss_uses_best_target_and_tunnel_source(self):
+        runner = SystemRunner({
+            "commands": {"ping": "ping"}, "tunnelAddress": "10.1.2.3/32",
+            "packetLossProbeCount": 5, "packetLossTargets": ["1.1.1.1", "9.9.9.9"],
+        })
+        with patch("controller.subprocess.run", side_effect=[
+            subprocess.CompletedProcess([], 1, "100% packet loss", ""),
+            subprocess.CompletedProcess([], 0, "20% packet loss", ""),
+        ]) as run:
+            self.assertEqual(runner.packet_loss(), 20)
+            self.assertIn("10.1.2.3", run.call_args.args[0])
+
+    def test_literal_ip_probe_parses_trace_and_rejects_garbage(self):
+        runner = SystemRunner({
+            "commands": {"curl": "curl"}, "tunnelAddress": "10.1.2.3/32",
+            "probeTimeoutSeconds": 10, "publicIpUrl": "https://1.1.1.1/cdn-cgi/trace",
+        })
+        runner._run = Mock(return_value=Mock(stdout="fl=123\nip=198.51.100.2\n"))
+        self.assertEqual(runner.public_ip(), "198.51.100.2")
+        runner._run.return_value.stdout = "error page"
+        with self.assertRaises(RuntimeError):
+            runner.public_ip()
+
     def test_lock_rejects_concurrent_rotation(self):
         path = Path(self.tmp.name) / "lock"
         with rotation_lock(path):
@@ -213,6 +259,44 @@ class ControllerTests(unittest.TestCase):
             ],
             timeout=12,
         )
+
+
+class DnsRecoveryTests(unittest.TestCase):
+    def setUp(self):
+        self.cfg = {"port": 5335, "service": "unbound", "systemctl": "systemctl",
+                    "upstreams": [["@9.9.9.9", "+tls-ca"]]}
+
+    def test_upstream_outage_never_restarts_local_dns(self):
+        state = {}
+        run = Mock()
+        for _ in range(5):
+            recover(self.cfg, state, probe=lambda *_: False, run=run, now=lambda: 1000)
+        run.assert_not_called()
+
+    def test_recovery_requires_repeated_failure_and_working_upstream(self):
+        state = {}
+        run = Mock()
+        probe = lambda _cfg, args, _name: args[0] != "@127.0.0.1"
+        recover(self.cfg, state, probe=probe, run=run, now=lambda: 1000)
+        run.assert_not_called()
+        recover(self.cfg, state, probe=probe, run=run, now=lambda: 1030)
+        run.assert_called_once_with(["systemctl", "restart", "unbound.service"], check=True, timeout=30)
+        recover(self.cfg, state, probe=probe, run=run, now=lambda: 1060)
+        self.assertEqual(run.call_count, 1)
+
+    def test_healthy_resolver_resets_failure_count(self):
+        state = {"failures": 4}
+        run = Mock()
+        recover(self.cfg, state, probe=lambda *_: True, run=run)
+        self.assertEqual(state["failures"], 0)
+        run.assert_not_called()
+
+    def test_servfail_is_not_a_successful_dns_probe(self):
+        with patch("dns_recovery.subprocess.run") as run:
+            run.return_value = subprocess.CompletedProcess([], 0, "status: SERVFAIL", "")
+            self.assertFalse(query({"kdig": "kdig"}, [], "example.com"))
+            run.return_value.stdout = "status: NXDOMAIN"
+            self.assertTrue(query({"kdig": "kdig"}, [], "example.com"))
 
 
 class WatchdogTests(unittest.TestCase):

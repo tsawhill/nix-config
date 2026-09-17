@@ -92,8 +92,14 @@ let
     }
 
     public_ip() {
-      $CURL --fail --silent --show-error --max-time "$PROBE_TIMEOUT" \
-        --interface "$TUNNEL_IP" "$PUBLIC_IP_URL" 2>/dev/null || true
+      local response
+      response=$($CURL --fail --silent --show-error --max-time "$PROBE_TIMEOUT" \
+        --interface "$TUNNEL_IP" "$PUBLIC_IP_URL" 2>/dev/null) || return 0
+      if [[ "$PUBLIC_IP_URL" == */cdn-cgi/trace ]]; then
+        printf '%s\n' "$response" | ${pkgs.gnused}/bin/sed -n 's/^ip=//p'
+      else
+        printf '%s\n' "$response"
+      fi
     }
 
     # A profile is only considered up once the peer has handshaked and traffic

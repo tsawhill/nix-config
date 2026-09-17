@@ -6,9 +6,11 @@ from __future__ import annotations
 import argparse
 import contextlib
 import fcntl
+import ipaddress
 import json
 import os
 import random
+import re
 import shlex
 import subprocess
 import sys
@@ -112,9 +114,29 @@ class SystemRunner:
             timeout=self.config["probeTimeoutSeconds"] + 2,
         )
         value = result.stdout.strip()
-        if not value or len(value) > 64:
-            raise RuntimeError("public-IP probe returned an invalid response")
-        return value
+        if self.config["publicIpUrl"].endswith("/cdn-cgi/trace"):
+            value = next((line[3:] for line in value.splitlines() if line.startswith("ip=")), "")
+        try:
+            return str(ipaddress.IPv4Address(value))
+        except ValueError as error:
+            raise RuntimeError("public-IP probe returned an invalid response") from error
+
+    def packet_loss(self) -> float:
+        losses = []
+        count = self.config["packetLossProbeCount"]
+        for address in self.config["packetLossTargets"]:
+            # The tunnel source address has a fail-closed policy routing rule.
+            result = subprocess.run(
+                [self.commands["ping"], "-n", "-I",
+                 self.config["tunnelAddress"].split("/", 1)[0],
+                 "-c", str(count), "-i", "0.2", "-W", "2", "-w", str(count + 2), address],
+                text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                timeout=count + 4, env={**os.environ, "LC_ALL": "C"},
+            )
+            match = re.search(r"([0-9.]+)% packet loss", result.stdout)
+            losses.append(float(match.group(1)) if match else 100.0)
+        # A single ICMP-filtered destination must not trigger rotation.
+        return min(losses)
 
     def handshake_age(self, now: int) -> int:
         result = self._run(
@@ -217,6 +239,11 @@ class Controller:
         age = self.runner.handshake_age(now)
         if age > self.config["maxHandshakeAgeSeconds"]:
             raise RuntimeError(f"WireGuard handshake is stale ({age}s)")
+        if self.config.get("packetLossTargets"):
+            loss = self.runner.packet_loss()
+            self.state["packetLossPercent"] = loss
+            if loss >= self.config["packetLossThresholdPercent"]:
+                raise RuntimeError(f"Tunnel packet loss is {loss}%")
         return public_ip
 
     def rotate(self, reason: str, *, force: bool = False) -> dict[str, Any]:
@@ -322,8 +349,8 @@ class Controller:
     def ensure(self) -> dict[str, Any]:
         now = int(self.now())
         current = self.endpoint(self.state.get("currentEndpoint")) or self.config["endpoints"][0]
-        self.runner.set_endpoint(current)
         try:
+            self.runner.set_endpoint(current)
             public_ip = self.probe(now)
             if public_ip in self.state.get("blockedExits", {}):
                 raise RuntimeError("current public IP is temporarily blocked")
@@ -355,7 +382,8 @@ class Controller:
             self.save()
             if failures >= self.config["healthFailuresBeforeRotation"]:
                 try:
-                    self.rotate("tunnel-unhealthy")
+                    # Sustained failure overrides the cooldown for discretionary switches.
+                    self.rotate("tunnel-unhealthy", force=True)
                 except TimeoutError:
                     pass
                 except RuntimeError:
@@ -389,6 +417,7 @@ class Controller:
             "# HELP vpn_egress_tunnel_up Whether the VPN tunnel passed its latest health check.",
             "# TYPE vpn_egress_tunnel_up gauge",
             f"vpn_egress_tunnel_up {tunnel_up}",
+            f"vpn_egress_packet_loss_percent {self.state.get('packetLossPercent', 0)}",
             f"vpn_egress_handshake_age_seconds {handshake_age}",
             f'vpn_egress_info{{endpoint="{endpoint}",public_ip="{public_ip}"}} 1',
             f'vpn_egress_last_rotation_timestamp_seconds {int(self.state.get("lastRotation", 0))}',
@@ -434,19 +463,21 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     config = json.loads(args.config.read_text())
-    controller = Controller(config, SystemRunner(config))
     lock_path = Path(config["lockFile"])
     try:
         if args.action == "metrics":
+            controller = Controller(config, SystemRunner(config))
             write_metrics(args.output, controller.metrics())
             return 0
-        if args.action == "health":
-            return 0 if controller.health() else 1
         reason = args.reason if args.action == "rotate" else None
         if args.action == "remote":
             allowed_reasons = args.allowed_reason or config.get("remoteAllowedReasons", [])
             reason = parse_remote_command(args.command, allowed_reasons)
         with rotation_lock(lock_path):
+            # Load state only after acquiring the lock, including timer-driven rotations.
+            controller = Controller(config, SystemRunner(config))
+            if args.action == "health":
+                return 0 if controller.health() else 1
             if args.action == "ensure":
                 result = controller.ensure()
             elif args.action == "switch":

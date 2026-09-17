@@ -40,12 +40,16 @@ let
         healthFailuresBeforeRotation
         probeTimeoutSeconds
         publicIpUrl
+        packetLossTargets
+        packetLossProbeCount
+        packetLossThresholdPercent
         gotifyUrl
         ;
       gotifyTokenFile = if cfg.gotifyTokenFile == null then null else toString cfg.gotifyTokenFile;
       stateFile = "${stateDirectory}/state.json";
       lockFile = "${stateDirectory}/rotation.lock";
       commands = {
+        ping = "${pkgs.iputils}/bin/ping";
         wg = "${pkgs.wireguard-tools}/bin/wg";
         nmcli = "${pkgs.networkmanager}/bin/nmcli";
         curl = "${pkgs.curl}/bin/curl";
@@ -229,9 +233,27 @@ in
       type = lib.types.int;
       default = 10;
     };
+    packetLossTargets = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [
+        "1.1.1.1"
+        "9.9.9.9"
+      ];
+      description = "Literal IPv4 ICMP targets; all must meet the loss threshold to fail a check. Empty disables loss checks.";
+    };
+    packetLossProbeCount = lib.mkOption {
+      type = lib.types.ints.between 2 20;
+      default = 5;
+    };
+    packetLossThresholdPercent = lib.mkOption {
+      type = lib.types.ints.between 1 100;
+      default = 40;
+      description = "Loss percentage triggering a failed check, subject to healthFailuresBeforeRotation.";
+    };
     publicIpUrl = lib.mkOption {
       type = lib.types.str;
-      default = "https://api.ipify.org";
+      default = "https://1.1.1.1/cdn-cgi/trace";
+      description = "Exit-IP probe; the default uses a literal IP and does not require DNS.";
     };
     gotifyUrl = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
@@ -388,7 +410,10 @@ in
       serviceConfig = {
         Type = "oneshot";
         ExecStart = "${controller}/bin/vpn-egress-controller --config ${controllerConfig} health";
-        SuccessExitStatus = [ 1 ];
+        SuccessExitStatus = [
+          1
+          76
+        ];
       };
     };
     systemd.timers.vpn-egress-health = {
