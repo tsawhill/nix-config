@@ -110,6 +110,20 @@ let
       ${natRules forwards}
     }
   '';
+  # Stand-in for the runtime fragment during the build-time ruleset check. Real
+  # ports are secrets, so arbitrary in-range ones are substituted for syntax.
+  privateRulesCheckFile = pkgs.writeText "vpn-forward-check.nft" (
+    privateRules (
+      lib.imap0 (
+        index: forward:
+        forward
+        // {
+          port = 49152 + index;
+          portSecret = null;
+        }
+      ) privateForwards
+    )
+  );
   tunnelIp = lib.head (lib.splitString "/" airvpnCfg.address);
   setupRoutes = pkgs.writeShellScript "vpn-egress-routes" ''
     set -eu
@@ -362,20 +376,14 @@ in
         reloadUnits = [ "nftables.service" ];
       };
     };
-    networking.nftables.checkRulesetRedirects = lib.mkIf hasPrivateForwards {
-      "${privateRulesPath}" = pkgs.writeText "vpn-forward-check.nft" (
-        privateRules (
-          lib.imap0 (
-            index: forward:
-            forward
-            // {
-              port = 49152 + index;
-              portSecret = null;
-            }
-          ) privateForwards
-        )
-      );
-    };
+    # nft resolves include paths through glob(), whose internal stat calls
+    # libredirect cannot intercept, so checkRulesetRedirects has no effect on an
+    # include. Rewrite the path instead; nixpkgs seds its own deletions include
+    # in the same phase. Defining checkRulesetRedirects would also drop its
+    # default /etc/hosts, /etc/protocols and /etc/services entries.
+    networking.nftables.preCheckRuleset = lib.mkIf hasPrivateForwards ''
+      sed 's|include "${privateRulesPath}"|include "${privateRulesCheckFile}"|' -i ruleset.conf
+    '';
     systemd.services.nftables = lib.mkIf hasPrivateForwards {
       after = [ "sops-install-secrets.service" ];
       requires = lib.optionals config.sops.useSystemdActivation [ "sops-install-secrets.service" ];
