@@ -25,7 +25,9 @@ in
     systemd.services.deluged = {
       enable = true;
       path = [ pkgs.deluged ];
-      after = lib.optionals privatePort [ "sops-install-secrets.service" ];
+      # Must go through the after option, not unitConfig.After; systemd.nix
+      # generates unitConfig.After from it and two definitions conflict.
+      after = [ "network-online.target" ] ++ lib.optionals privatePort [ "sops-install-secrets.service" ];
       requires = lib.optionals (privatePort && config.sops.useSystemdActivation) [
         "sops-install-secrets.service"
       ];
@@ -37,7 +39,6 @@ in
       unitConfig = {
         Description = "Deluge Bittorrent Client Daemon";
         Documentation = "man:deluged";
-        After = "network-online.target";
       };
 
       serviceConfig = {
