@@ -22,6 +22,10 @@ in
       assertion = !vpnEnabled || settings.peerPublicKey != "";
       message = "Set the AirVPN [Peer] PublicKey before enabling the EU gateway.";
     }
+    {
+      assertion = !vpnEnabled || settings.address != "";
+      message = "Set the AirVPN device [Interface] Address before enabling the EU gateway.";
+    }
   ];
   networking.hostName = "networking-vpn-out-eu1-nix";
   # Also needed during bootstrap, before routableAirvpn.enable is set.
@@ -45,7 +49,7 @@ in
   my.secrets.deluge-vpn.enable = vpnEnabled;
   my.network.routableAirvpn = {
     enable = vpnEnabled;
-    address = "10.169.2.22/32";
+    address = settings.address;
     countries = [ "CH" ];
     peerPublicKey = settings.peerPublicKey;
     privateKeySecret = "vpn_egress_wireguard_private_key";

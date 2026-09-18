@@ -1,9 +1,16 @@
 # Swiss AirVPN gateway and Deluge cutover
 
 The new Incus guest is `networking-vpn-out-eu1-nix`, proposed LAN address
-`10.73.73.44`, MAC `02:5f:6e:64:80:44`. Its dedicated AirVPN device address
-is `10.169.2.22/32`. Only Swiss (`CH`) endpoints are selected, including
-automatic failover. The NA gateway and its clients are independent.
+`10.73.73.44`, MAC `02:5f:6e:64:80:44`. Only Swiss (`CH`) endpoints are
+selected, including automatic failover. The NA gateway and its clients are
+independent.
+
+Its dedicated AirVPN device address is **not yet known**. Create a separate
+AirVPN device for this gateway, then copy the `[Interface] Address` from its
+downloaded WireGuard config into `address` in `vpn-eu-settings.nix`. The value
+is per-device and cannot be copied from the NA gateway. `peerPublicKey` is
+prefilled with the key AirVPN uses across all its endpoints (na1 uses it for
+four cities); confirm it matches the `[Peer] PublicKey` in the CH config.
 
 `hosts/server-nix/LXCs/vpn-eu-settings.nix` contains two rollout switches:
 `gatewayEnable` and `delugeEnable`. Both start false so the container can
@@ -78,8 +85,10 @@ prevents publishing the reservation in source, not observation of traffic.
 
 ## 3. Enable the gateway, then Deluge
 
-1. Set `gatewayEnable = true`, leaving `delugeEnable = false`. Commit and
-   push the config and encrypted files. Deploy `networking-vpn-out-eu1-nix`.
+1. Set `address` to the new device's `[Interface] Address` and
+   `gatewayEnable = true`, leaving `delugeEnable = false`. Commit and push the
+   config and encrypted files. Deploy `networking-vpn-out-eu1-nix`. Enabling
+   the gateway without `address` fails evaluation by assertion.
 2. Check `systemctl status vpn-egress-initialise.service` and use
    `sudo airvpn-switch` on that host to verify a working Swiss exit.
 3. Set `delugeEnable = true`, commit and push, then deploy `deluge-nix`.
