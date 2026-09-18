@@ -7,7 +7,7 @@
 let
   # Leave false until the EU gateway is deployed and verified; see
   # docs/airvpn-eu-deluge.md.
-  vpnClientEnabled = false;
+  vpnClientEnabled = true;
 in
 {
   imports = [
