@@ -11,9 +11,9 @@ let
   # run; after the factory adds this host's age recipient, create its SOPS file,
   # fill in tunnelAddress below, and flip this to true.
   vpnEnabled = false;
-  # [Interface] Address from this device's own WireGuard config. Per-device, so
-  # it cannot be copied from another gateway.
-  tunnelAddress = "";
+  # [Interface] Address from this device's own WireGuard config. IPv4 only; the
+  # gateway disables IPv6, so the device's v6 address is intentionally unused.
+  tunnelAddress = "10.169.2.22/32";
   inherit (networkTopology.lib) lanIp;
 in
 {
