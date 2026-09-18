@@ -258,3 +258,12 @@ networking-vpn-out-na1-nix:
     root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/networking-vpn-out-na1-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "02:5f:6e:64:7f:ef" }
+
+networking-vpn-out-eu1-nix:
+  type: "container"
+  profiles: ["nixos-lxc"]
+  config: {}
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/networking-vpn-out-eu1-nix" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "02:5f:6e:64:80:44" }
