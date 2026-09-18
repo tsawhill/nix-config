@@ -10,7 +10,7 @@ let
   # Provisioning is deliberately two-stage. Leave this false for the factory
   # run; after the factory adds this host's age recipient, create its SOPS file,
   # fill in tunnelAddress below, and flip this to true.
-  vpnEnabled = false;
+  vpnEnabled = true;
   # [Interface] Address from this device's own WireGuard config. IPv4 only; the
   # gateway disables IPv6, so the device's v6 address is intentionally unused.
   tunnelAddress = "10.169.2.22/32";
