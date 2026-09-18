@@ -64,23 +64,36 @@ let
     );
   clientAddresses = lib.concatStringsSep ", " cfg.clientAddresses;
   clientSet = "{ ${clientAddresses} }";
-  destinationPort =
-    forward: if forward.destinationPort == null then forward.port else forward.destinationPort;
+  forwardedPort = forward:
+    if forward.portSecret == null then toString forward.port
+    else config.sops.placeholder.${forward.portSecret};
+  destinationPort = forward:
+    if forward.destinationPort == null then forwardedPort forward else toString forward.destinationPort;
+  publicForwards = lib.filter (forward: forward.portSecret == null) cfg.portForwards;
+  privateForwards = lib.filter (forward: forward.portSecret != null) cfg.portForwards;
+  hasPrivateForwards = privateForwards != [ ];
+  privateRulesPath = config.sops.templates.vpn-egress-private-forwards.path;
   portForwardKeys = lib.concatMap (
-    forward: map (protocol: "${protocol}:${toString forward.port}") forward.protocols
+    forward: map (protocol: "${protocol}:${if forward.portSecret == null then toString forward.port else "secret:" + forward.portSecret}") forward.protocols
   ) cfg.portForwards;
-  portForwardNatRules = lib.concatMapStringsSep "\n" (
-    forward:
-    lib.concatMapStringsSep "\n" (protocol: ''
-      iifname "${airvpnCfg.interfaceName}" ${protocol} dport ${toString forward.port} dnat ip to ${forward.destinationAddress}:${toString (destinationPort forward)}
+  natRules = forwards: lib.concatMapStringsSep "\n" (
+    forward: lib.concatMapStringsSep "\n" (protocol: ''
+      iifname "${airvpnCfg.interfaceName}" ${protocol} dport ${forwardedPort forward} dnat ip to ${forward.destinationAddress}:${destinationPort forward}
     '') forward.protocols
-  ) cfg.portForwards;
-  portForwardFilterRules = lib.concatMapStringsSep "\n" (
-    forward:
-    lib.concatMapStringsSep "\n" (protocol: ''
-      iifname "${airvpnCfg.interfaceName}" oifname "${cfg.upstreamInterface}" ip daddr ${forward.destinationAddress} ${protocol} dport ${toString (destinationPort forward)} accept
+  ) forwards;
+  filterRules = forwards: lib.concatMapStringsSep "\n" (
+    forward: lib.concatMapStringsSep "\n" (protocol: ''
+      iifname "${airvpnCfg.interfaceName}" oifname "${cfg.upstreamInterface}" ip daddr ${forward.destinationAddress} ${protocol} dport ${destinationPort forward} accept
     '') forward.protocols
-  ) cfg.portForwards;
+  ) forwards;
+  privateRules = forwards: ''
+    chain private_forward {
+      ${filterRules forwards}
+    }
+    chain private_prerouting {
+      ${natRules forwards}
+    }
+  '';
   tunnelIp = lib.head (lib.splitString "/" airvpnCfg.address);
   setupRoutes = pkgs.writeShellScript "vpn-egress-routes" ''
     set -eu
@@ -164,8 +177,14 @@ in
               description = "Transport protocols forwarded for this AirVPN port.";
             };
             port = lib.mkOption {
-              type = lib.types.port;
-              description = "Port assigned by AirVPN and received on the tunnel.";
+              type = lib.types.nullOr lib.types.port;
+              default = null;
+              description = "Publicly configured forwarded port; use portSecret to keep it private.";
+            };
+            portSecret = lib.mkOption {
+              type = lib.types.nullOr lib.types.str;
+              default = null;
+              description = "SOPS secret containing the forwarded port, substituted only at runtime.";
             };
             destinationAddress = lib.mkOption {
               type = lib.types.str;
@@ -268,6 +287,10 @@ in
   config = lib.mkIf cfg.enable {
     assertions = [
       {
+        assertion = lib.all (forward: (forward.port != null) != (forward.portSecret != null)) cfg.portForwards;
+        message = "Each VPN port forward must set exactly one of port and portSecret.";
+      }
+      {
         assertion = airvpnCfg.enable;
         message = "VPN egress gateway requires my.network.airvpn.enable.";
       }
@@ -312,6 +335,25 @@ in
       }
     ];
 
+    # Only placeholders enter the store. A dummy fragment preserves build-time
+    # nftables syntax checks; activation/reload uses the root-only SOPS file.
+    sops.templates = lib.mkIf hasPrivateForwards {
+      vpn-egress-private-forwards = {
+        content = privateRules privateForwards;
+        mode = "0400";
+        reloadUnits = [ "nftables.service" ];
+      };
+    };
+    networking.nftables.checkRulesetRedirects = lib.mkIf hasPrivateForwards {
+      "${privateRulesPath}" = pkgs.writeText "vpn-forward-check.nft" (privateRules (
+        lib.imap0 (index: forward: forward // { port = 49152 + index; portSecret = null; }) privateForwards
+      ));
+    };
+    systemd.services.nftables = lib.mkIf hasPrivateForwards {
+      after = [ "sops-install-secrets.service" ];
+      requires = [ "sops-install-secrets.service" ];
+    };
+
     my.network.airvpn.switchTool = {
       controllerCommand = "${controller}/bin/vpn-egress-controller --config ${controllerConfig}";
       publicIpUrl = lib.mkDefault cfg.publicIpUrl;
@@ -330,6 +372,7 @@ in
         tables.vpn-egress = {
           family = "inet";
           content = ''
+            ${lib.optionalString hasPrivateForwards ''include "${privateRulesPath}"''}
             chain input {
               type filter hook input priority filter; policy drop;
               iifname "lo" accept
@@ -342,12 +385,14 @@ in
               type filter hook forward priority filter; policy drop;
               iifname "${cfg.upstreamInterface}" ip saddr ${clientSet} oifname "${airvpnCfg.interfaceName}" accept
               iifname "${airvpnCfg.interfaceName}" ip daddr ${clientSet} oifname "${cfg.upstreamInterface}" ct state established,related accept
-              ${portForwardFilterRules}
+              ${filterRules publicForwards}
+              ${lib.optionalString hasPrivateForwards "jump private_forward"}
             }
 
             chain prerouting {
               type nat hook prerouting priority dstnat; policy accept;
-              ${portForwardNatRules}
+              ${natRules publicForwards}
+              ${lib.optionalString hasPrivateForwards "jump private_prerouting"}
             }
 
             chain postrouting {

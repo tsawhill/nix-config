@@ -118,8 +118,14 @@ in
               ];
             };
             port = lib.mkOption {
-              type = lib.types.port;
-              description = "Port assigned by AirVPN and received on the tunnel.";
+              type = lib.types.nullOr lib.types.port;
+              default = null;
+              description = "Publicly configured forwarded port; use portSecret to keep it private.";
+            };
+            portSecret = lib.mkOption {
+              type = lib.types.nullOr lib.types.str;
+              default = null;
+              description = "SOPS secret containing the forwarded port, substituted only at runtime.";
             };
             destinationAddress = lib.mkOption {
               type = lib.types.str;
