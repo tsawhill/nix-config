@@ -36,7 +36,10 @@ impl Colmena {
         ));
         let mut command = timeout_command(&self.config.per_host_build_timeout);
         command
-            .args(["colmena", "build", "--on", host])
+            // The legacy Colmena evaluator constructs a temporary flake with
+            // an unlocked `hive` input. Nix >= 2.21 rejects that in pure mode.
+            // Scope impurity to this invocation; keep the repository inputs locked.
+            .args(["colmena", "--impure", "build", "--on", host])
             .args(["--no-build-on-target", "--parallel", "1"])
             .current_dir(&self.config.repo_path);
         let output = run_logged(&mut command)?;
