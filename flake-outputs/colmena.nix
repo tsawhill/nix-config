@@ -154,6 +154,10 @@ in
     "networking-dhcp-nix" =
       mkHost "weekly" "networking-dhcp-nix"
         "${self}/hosts/server-nix/LXCs/networking-dhcp.nix";
+    # Manual-only until the new container and its SOPS keys are provisioned.
+    "networking-vpn-out-eu1-nix" =
+      mkHost null "networking-vpn-out-eu1-nix"
+        "${self}/hosts/server-nix/LXCs/networking-vpn-out-eu1.nix";
     "networking-vpn-out-na1-nix" =
       mkHost "weekly" "networking-vpn-out-na1-nix"
         "${self}/hosts/server-nix/LXCs/networking-vpn-out-na1.nix";

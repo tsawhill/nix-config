@@ -396,3 +396,17 @@ creation_rules:
         - *taylor-laptop-nix
         - *taylor-deck-nix
         - *taylor-cube-nix
+
+  # EU gateway bootstrap: nixos-factory adds its age anchor. Then uncomment
+  # that recipient below BEFORE creating either encrypted file.
+  - path_regex: modules/secrets/server/LXCs/networking-vpn-out-eu1-nix\.yaml$
+    key_groups:
+      - age:
+        - *build-nix
+        # - *networking-vpn-out-eu1-nix
+  - path_regex: modules/secrets/server/LXCs/deluge-vpn\.yaml$
+    key_groups:
+      - age:
+        - *build-nix
+        - *deluge-nix
+        # - *networking-vpn-out-eu1-nix

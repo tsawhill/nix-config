@@ -64,28 +64,44 @@ let
     );
   clientAddresses = lib.concatStringsSep ", " cfg.clientAddresses;
   clientSet = "{ ${clientAddresses} }";
-  forwardedPort = forward:
-    if forward.portSecret == null then toString forward.port
-    else config.sops.placeholder.${forward.portSecret};
-  destinationPort = forward:
+  forwardedPort =
+    forward:
+    if forward.portSecret == null then
+      toString forward.port
+    else
+      config.sops.placeholder.${forward.portSecret};
+  destinationPort =
+    forward:
     if forward.destinationPort == null then forwardedPort forward else toString forward.destinationPort;
   publicForwards = lib.filter (forward: forward.portSecret == null) cfg.portForwards;
   privateForwards = lib.filter (forward: forward.portSecret != null) cfg.portForwards;
   hasPrivateForwards = privateForwards != [ ];
   privateRulesPath = config.sops.templates.vpn-egress-private-forwards.path;
   portForwardKeys = lib.concatMap (
-    forward: map (protocol: "${protocol}:${if forward.portSecret == null then toString forward.port else "secret:" + forward.portSecret}") forward.protocols
+    forward:
+    map (
+      protocol:
+      "${protocol}:${
+        if forward.portSecret == null then toString forward.port else "secret:" + forward.portSecret
+      }"
+    ) forward.protocols
   ) cfg.portForwards;
-  natRules = forwards: lib.concatMapStringsSep "\n" (
-    forward: lib.concatMapStringsSep "\n" (protocol: ''
-      iifname "${airvpnCfg.interfaceName}" ${protocol} dport ${forwardedPort forward} dnat ip to ${forward.destinationAddress}:${destinationPort forward}
-    '') forward.protocols
-  ) forwards;
-  filterRules = forwards: lib.concatMapStringsSep "\n" (
-    forward: lib.concatMapStringsSep "\n" (protocol: ''
-      iifname "${airvpnCfg.interfaceName}" oifname "${cfg.upstreamInterface}" ip daddr ${forward.destinationAddress} ${protocol} dport ${destinationPort forward} accept
-    '') forward.protocols
-  ) forwards;
+  natRules =
+    forwards:
+    lib.concatMapStringsSep "\n" (
+      forward:
+      lib.concatMapStringsSep "\n" (protocol: ''
+        iifname "${airvpnCfg.interfaceName}" ${protocol} dport ${forwardedPort forward} dnat ip to ${forward.destinationAddress}:${destinationPort forward}
+      '') forward.protocols
+    ) forwards;
+  filterRules =
+    forwards:
+    lib.concatMapStringsSep "\n" (
+      forward:
+      lib.concatMapStringsSep "\n" (protocol: ''
+        iifname "${airvpnCfg.interfaceName}" oifname "${cfg.upstreamInterface}" ip daddr ${forward.destinationAddress} ${protocol} dport ${destinationPort forward} accept
+      '') forward.protocols
+    ) forwards;
   privateRules = forwards: ''
     chain private_forward {
       ${filterRules forwards}
@@ -287,7 +303,9 @@ in
   config = lib.mkIf cfg.enable {
     assertions = [
       {
-        assertion = lib.all (forward: (forward.port != null) != (forward.portSecret != null)) cfg.portForwards;
+        assertion = lib.all (
+          forward: (forward.port != null) != (forward.portSecret != null)
+        ) cfg.portForwards;
         message = "Each VPN port forward must set exactly one of port and portSecret.";
       }
       {
@@ -345,13 +363,22 @@ in
       };
     };
     networking.nftables.checkRulesetRedirects = lib.mkIf hasPrivateForwards {
-      "${privateRulesPath}" = pkgs.writeText "vpn-forward-check.nft" (privateRules (
-        lib.imap0 (index: forward: forward // { port = 49152 + index; portSecret = null; }) privateForwards
-      ));
+      "${privateRulesPath}" = pkgs.writeText "vpn-forward-check.nft" (
+        privateRules (
+          lib.imap0 (
+            index: forward:
+            forward
+            // {
+              port = 49152 + index;
+              portSecret = null;
+            }
+          ) privateForwards
+        )
+      );
     };
     systemd.services.nftables = lib.mkIf hasPrivateForwards {
       after = [ "sops-install-secrets.service" ];
-      requires = [ "sops-install-secrets.service" ];
+      requires = lib.optionals config.sops.useSystemdActivation [ "sops-install-secrets.service" ];
     };
 
     my.network.airvpn.switchTool = {
