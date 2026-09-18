@@ -7,8 +7,13 @@
 }:
 
 let
-  settings = import ./vpn-eu-settings.nix;
-  vpnEnabled = settings.gatewayEnable;
+  # Provisioning is deliberately two-stage. Leave this false for the factory
+  # run; after the factory adds this host's age recipient, create its SOPS file,
+  # fill in tunnelAddress below, and flip this to true.
+  vpnEnabled = false;
+  # [Interface] Address from this device's own WireGuard config. Per-device, so
+  # it cannot be copied from another gateway.
+  tunnelAddress = "";
   inherit (networkTopology.lib) lanIp;
 in
 {
@@ -19,11 +24,7 @@ in
 
   assertions = [
     {
-      assertion = !vpnEnabled || settings.peerPublicKey != "";
-      message = "Set the AirVPN [Peer] PublicKey before enabling the EU gateway.";
-    }
-    {
-      assertion = !vpnEnabled || settings.address != "";
+      assertion = !vpnEnabled || tunnelAddress != "";
       message = "Set the AirVPN device [Interface] Address before enabling the EU gateway.";
     }
   ];
@@ -49,9 +50,11 @@ in
   my.secrets.deluge-vpn.enable = vpnEnabled;
   my.network.routableAirvpn = {
     enable = vpnEnabled;
-    address = settings.address;
+    address = tunnelAddress;
     countries = [ "CH" ];
-    peerPublicKey = settings.peerPublicKey;
+    # AirVPN shares one server key across all endpoints; na1 uses this same key
+    # for four cities. Confirm it against the downloaded CH config anyway.
+    peerPublicKey = "PyLCXAQT8KkM4T+dUsOQfn+Ub3pGxfGlxkIApuig+hk=";
     privateKeySecret = "vpn_egress_wireguard_private_key";
     presharedKeySecret = "vpn_egress_wireguard_preshared_key";
 

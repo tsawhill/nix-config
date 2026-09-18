@@ -5,7 +5,9 @@
   ...
 }:
 let
-  settings = import ./vpn-eu-settings.nix;
+  # Leave false until the EU gateway is deployed and verified; see
+  # docs/airvpn-eu-deluge.md.
+  vpnClientEnabled = false;
 in
 {
   imports = [
@@ -20,16 +22,10 @@ in
     gid = 1001;
   };
   networking.hostName = "deluge-nix";
-  assertions = [
-    {
-      assertion = !settings.delugeEnable || settings.gatewayEnable;
-      message = "Enable and verify the EU gateway before routing Deluge through it.";
-    }
-  ];
-  my.secrets.deluge-vpn.enable = settings.delugeEnable;
-  my.services.deluge.portSecret = lib.mkIf settings.delugeEnable "deluge_vpn_port";
+  my.secrets.deluge-vpn.enable = vpnClientEnabled;
+  my.services.deluge.portSecret = lib.mkIf vpnClientEnabled "deluge_vpn_port";
   my.network.vpnEgress.client = {
-    enable = settings.delugeEnable;
+    enable = vpnClientEnabled;
     gatewayAddress = networkTopology.lib.lanIp "networking-vpn-out-eu1-nix";
     normalGateway = networkTopology.networks.lan.gateway;
     bypassCidrs = [ networkTopology.networks.wgRemote.routedCidr ];

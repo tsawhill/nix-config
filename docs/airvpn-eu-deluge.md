@@ -7,13 +7,14 @@ independent.
 
 Its dedicated AirVPN device address is **not yet known**. Create a separate
 AirVPN device for this gateway, then copy the `[Interface] Address` from its
-downloaded WireGuard config into `address` in `vpn-eu-settings.nix`. The value
-is per-device and cannot be copied from the NA gateway. `peerPublicKey` is
-prefilled with the key AirVPN uses across all its endpoints (na1 uses it for
+downloaded WireGuard config into `tunnelAddress` in the gateway host file. The
+value is per-device and cannot be copied from the NA gateway. `peerPublicKey`
+is prefilled with the key AirVPN uses across all its endpoints (na1 uses it for
 four cities); confirm it matches the `[Peer] PublicKey` in the CH config.
 
-`hosts/server-nix/LXCs/vpn-eu-settings.nix` contains two rollout switches:
-`gatewayEnable` and `delugeEnable`. Both start false so the container can
+Rollout follows the same two-stage pattern na1 used. Each host carries its own
+local flag: `vpnEnabled` in `networking-vpn-out-eu1.nix` and `vpnClientEnabled`
+in `deluge.nix`, matching `searx.nix`. Both start false so the container can
 bootstrap without secrets and Deluge is not routed to an unprovisioned guest.
 The new Colmena host is manual-only until onboarding is finished.
 
@@ -39,8 +40,8 @@ records its SSH trust and public age recipient in `.sops.yaml`, updates
 build-nix, and deploys the guest's bootstrap configuration. It performs
 deployments, so an agent must obtain approval before running it.
 
-Keep `gatewayEnable = false` during this step. No AirVPN secret is needed
-for the initial container deployment.
+Keep `vpnEnabled = false` during this step. No AirVPN secret is needed for the
+initial container deployment.
 
 ## 2. Add the encrypted runtime values
 
@@ -85,13 +86,14 @@ prevents publishing the reservation in source, not observation of traffic.
 
 ## 3. Enable the gateway, then Deluge
 
-1. Set `address` to the new device's `[Interface] Address` and
-   `gatewayEnable = true`, leaving `delugeEnable = false`. Commit and push the
-   config and encrypted files. Deploy `networking-vpn-out-eu1-nix`. Enabling
-   the gateway without `address` fails evaluation by assertion.
+1. In `networking-vpn-out-eu1.nix`, set `tunnelAddress` to the new device's
+   `[Interface] Address` and `vpnEnabled = true`. Commit and push the config
+   and encrypted files. Deploy `networking-vpn-out-eu1-nix`. Enabling the
+   gateway without `tunnelAddress` fails evaluation by assertion.
 2. Check `systemctl status vpn-egress-initialise.service` and use
    `sudo airvpn-switch` on that host to verify a working Swiss exit.
-3. Set `delugeEnable = true`, commit and push, then deploy `deluge-nix`.
+3. Set `vpnClientEnabled = true` in `deluge.nix`, commit and push, then deploy
+   `deluge-nix`.
    Deluge now has its default route through `.44`, with LAN and remote
    management routes retained. IPv6 is disabled by the VPN client module.
    Its existing `/root/.config/deluge/core.conf` is preserved except for
