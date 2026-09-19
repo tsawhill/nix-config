@@ -511,25 +511,30 @@ let
         minutes = "/${toString tuning.reconcileMinutes}";
       }
     ];
+    # Off is restated too, and that matters more than restating on. A missed
+    # off leaves the head running while Home Assistant shows it stopped, with
+    # nothing to notice or correct it; that is how a deselected room can heat
+    # all night.
     actions = map (room: {
       choose = [
         {
           conditions = [
             {
               condition = "template";
-              value_template = "{{ is_state('${climateEntity room}', 'cool') }}";
+              value_template = "{{ is_state('${climateEntity room}', 'off') }}";
             }
           ];
-          sequence = [
-            {
-              action = "climate.set_temperature";
-              target.entity_id = climateEntity room;
-              data = {
-                hvac_mode = "cool";
-                temperature = "{{ state_attr('${climateEntity room}', 'temperature') | round(0) }}";
-              };
-            }
-          ];
+          sequence = [ (offAction room) ];
+        }
+      ];
+      default = [
+        {
+          action = "climate.set_temperature";
+          target.entity_id = climateEntity room;
+          data = {
+            hvac_mode = "{{ states('${climateEntity room}') }}";
+            temperature = "{{ state_attr('${climateEntity room}', 'temperature') | round(0) }}";
+          };
         }
       ];
     }) roomNames;
@@ -869,17 +874,16 @@ in
       icon = "mdi:hvac";
     };
 
-    # initial, because Home Assistant creates an input_boolean in the off
-    # state rather than an unknown one, which would leave every room excluded
-    # until someone noticed. A restart therefore re-enables all three: a
-    # temporary exclusion should not outlive a restart silently.
+    # No initial: it forces the value at every start, so a deploy silently
+    # re-enabled rooms that had been deselected. Without it these restore
+    # their last state, which is what deselecting a room has to mean. They
+    # are all on today, so nothing is stranded off by the change.
     input_boolean = lib.listToAttrs (
       map (room: {
         name = "hvac_enable_${room}";
         value = {
           name = "${rooms.${room}} enabled";
           icon = "mdi:air-conditioner";
-          initial = true;
         };
       }) roomNames
     );
