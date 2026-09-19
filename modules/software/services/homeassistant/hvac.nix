@@ -75,26 +75,30 @@ let
     rooms = blockRooms;
   };
 
+  # heatBelow only applies when the system mode is set to heat. The house does
+  # not drop below 68 in practice, so these are placeholders to be revisited
+  # before winter rather than numbers anyone has lived with.
+
   # Asleep: only the bedroom matters, the rest just must not bake.
   sleeping = {
-    bedroom = { coolAbove = 72; priority = 10; };
-    office = { coolAbove = 82; priority = 1; };
-    living_room = { coolAbove = 82; priority = 1; };
+    bedroom = { coolAbove = 72; heatBelow = 66; priority = 10; };
+    office = { coolAbove = 82; heatBelow = 60; priority = 1; };
+    living_room = { coolAbove = 82; heatBelow = 60; priority = 1; };
   };
 
   # Working. Taylor is in the office every day, weekends included.
   working = {
-    office = { coolAbove = 75; priority = 10; };
-    living_room = { coolAbove = 78; priority = 5; };
-    bedroom = { coolAbove = 80; priority = 1; };
+    office = { coolAbove = 75; heatBelow = 68; priority = 10; };
+    living_room = { coolAbove = 78; heatBelow = 66; priority = 5; };
+    bedroom = { coolAbove = 80; heatBelow = 60; priority = 1; };
   };
 
   # The bedroom pulls down while the office is still occupied, so it is at
   # temperature on arrival rather than starting from 80.
   preBed = {
-    bedroom = { coolAbove = 72; priority = 10; };
-    office = { coolAbove = 75; priority = 5; };
-    living_room = { coolAbove = 80; priority = 1; };
+    bedroom = { coolAbove = 72; heatBelow = 66; priority = 10; };
+    office = { coolAbove = 75; heatBelow = 68; priority = 5; };
+    living_room = { coolAbove = 80; heatBelow = 60; priority = 1; };
   };
 
   schedule = {
@@ -144,7 +148,13 @@ let
   minRunTimer = room: "timer.hvac_min_run_${room}";
   minOffTimer = room: "timer.hvac_min_off_${room}";
   targetSensor = room: "sensor.hvac_target_${room}";
+  heatTargetSensor = room: "sensor.hvac_heat_target_${room}";
   prioritySensor = room: "sensor.hvac_priority_${room}";
+
+  # One outdoor unit means the heads cannot run opposing modes, so this is a
+  # single system-wide choice rather than a per-room one.
+  systemMode = "input_select.hvac_system_mode";
+  enableToggle = room: "input_boolean.hvac_enable_${room}";
 
   # Resolve today's pattern and the block covering the current minute. Every
   # tag trims its own whitespace: Home Assistant types rendered results
@@ -167,6 +177,14 @@ let
       {{ ns.current.rooms['${room}'].coolAbove }}
     {%- endif -%}'';
 
+  heatTargetTemplate = room: ''
+    ${currentBlock}
+    {%- if is_state('${overrideTimer room}', 'active') -%}
+      {{ states('${overrideNumber room}') | round(0) }}
+    {%- else -%}
+      {{ ns.current.rooms['${room}'].heatBelow }}
+    {%- endif -%}'';
+
   priorityTemplate = room: ''
     ${currentBlock}
     {%- if is_state('${overrideTimer room}', 'active') -%}
@@ -175,20 +193,49 @@ let
       {{ ns.current.rooms['${room}'].priority }}
     {%- endif -%}'';
 
+  # Resolve what the room should be doing into one value, so the automation
+  # below is "apply this" rather than a tree of cool and heat branches. Holding
+  # the current mode inside the hysteresis band is what stops a room chattering
+  # on and off around a single number.
+  desiredTemplate = room: ''
+    {%- set sys = states('${systemMode}') -%}
+    {%- set enabled = not is_state('${enableToggle room}', 'off') -%}
+    {%- set r = states('${tempSensor room}') | float(-999) -%}
+    {%- set ct = states('${targetSensor room}') | float(999) -%}
+    {%- set ht = states('${heatTargetSensor room}') | float(-999) -%}
+    {%- set cur = states('${climateEntity room}') -%}
+    {%- set blocked = (not enabled) or sys == 'off' or is_state('${shedTimer room}', 'active')
+        or states('${tempSensor room}') in ['unknown', 'unavailable']
+        or (as_timestamp(now()) - as_timestamp(states.sensor.ac_controller_${room}_temperature.last_reported, 0)) > ${toString (tuning.staleMinutes * 60)} -%}
+    {%- if blocked -%}off
+    {%- elif sys == 'cool' -%}
+      {{ 'cool' if r > ct else ('off' if r <= ct - ${toString tuning.hysteresis} else cur) }}
+    {%- elif sys == 'heat' -%}
+      {{ 'heat' if r < ht else ('off' if r >= ht + ${toString tuning.hysteresis} else cur) }}
+    {%- else -%}off
+    {%- endif -%}'';
+
+  # The gap below (cooling) or above (heating) the threshold scales with how
+  # far off the room is, because the head treats its own error as a throttle.
+  setpointTemplate = room: ''
+    {%- set sys = states('${systemMode}') -%}
+    {%- set r = states('${tempSensor room}') | float(0) -%}
+    {%- if sys == 'heat' -%}
+      {%- set ht = states('${heatTargetSensor room}') | float(68) -%}
+      {{ [[ht + (${toString tuning.setpointBase} + ${toString tuning.setpointGain} * [ht - r, 0] | max), 86] | min, ${toString tuning.setpointFloor}] | max | round(0) }}
+    {%- else -%}
+      {%- set ct = states('${targetSensor room}') | float(75) -%}
+      {{ [[ct - (${toString tuning.setpointBase} + ${toString tuning.setpointGain} * [r - ct, 0] | max), ${toString tuning.setpointFloor}] | max, 86] | min | round(0) }}
+    {%- endif -%}'';
+
   # Single-line on purpose, for the same native-typing reason. as_timestamp
   # takes a default, which covers an entity that does not exist yet.
   roomVariables = room: {
-    room_temp = "{{ states('${tempSensor room}') | float(-999) }}";
-    target = "{{ states('${targetSensor room}') | float(999) }}";
-    shed = "{{ is_state('${shedTimer room}', 'active') }}";
+    desired = desiredTemplate room;
     current_mode = "{{ states('${climateEntity room}') }}";
-    # last_reported, not last_updated: Home Assistant does not rewrite a state
-    # object whose value and attributes are unchanged, so a genuinely steady
-    # temperature would otherwise look like a dead sensor after 15 minutes.
-    stale = "{{ states('${tempSensor room}') in ['unknown', 'unavailable'] or (as_timestamp(now()) - as_timestamp(states.sensor.ac_controller_${room}_temperature.last_reported, 0)) > ${toString (tuning.staleMinutes * 60)} }}";
     min_run_active = "{{ is_state('${minRunTimer room}', 'active') }}";
     min_off_active = "{{ is_state('${minOffTimer room}', 'active') }}";
-    setpoint = "{% set t = states('${targetSensor room}') | float(999) %}{% set r = states('${tempSensor room}') | float(t) %}{% set e = [r - t, 0] | max %}{{ [[t - (${toString tuning.setpointBase} + ${toString tuning.setpointGain} * e), ${toString tuning.setpointFloor}] | max, 86] | min | round(0) }}";
+    setpoint = setpointTemplate room;
   };
 
   offAction = room: {
@@ -199,52 +246,43 @@ let
 
   mkRoomAutomation = room: {
     alias = "HVAC ${rooms.${room}}";
-    description = "Threshold cooling for ${rooms.${room}}, with shedding and a stale-sensor stop.";
+    description = "Drive ${rooms.${room}} toward the threshold in force for the current mode.";
     mode = "single";
     triggers = [
       { trigger = "state"; entity_id = tempSensor room; }
       { trigger = "state"; entity_id = targetSensor room; }
+      { trigger = "state"; entity_id = heatTargetSensor room; }
       { trigger = "state"; entity_id = shedTimer room; }
+      { trigger = "state"; entity_id = systemMode; }
+      { trigger = "state"; entity_id = enableToggle room; }
       { trigger = "time_pattern"; minutes = "/1"; }
     ];
     actions = [
       { variables = roomVariables room; }
       {
         choose = [
-          # Nothing trustworthy to act on, so stop rather than run blind.
-          {
-            conditions = [
-              {
-                condition = "template";
-                value_template = "{{ (stale or room_temp < -900) and current_mode != 'off' }}";
-              }
-            ];
-            sequence = [ (offAction room) ];
-          }
-          # Shed by the capacity guard, or satisfied. Either way stop, once the
-          # compressor has run long enough to be worth having started.
+          # Stopping covers everything at once: disabled, system off, shed,
+          # satisfied, or a sensor we cannot trust.
           {
             conditions = [
               {
                 condition = "template";
                 value_template = ''
-                  {{ (shed or room_temp <= target - ${toString tuning.hysteresis})
-                     and current_mode != 'off'
-                     and not min_run_active }}'';
+                  {{ desired == 'off' and current_mode != 'off' and not min_run_active }}'';
               }
             ];
             sequence = [ (offAction room) ];
           }
-          # Too warm. Start cooling, or correct a setpoint that has drifted.
+          # Start, switch mode, or correct a setpoint that has drifted.
           {
             conditions = [
               {
                 condition = "template";
                 value_template = ''
-                  {{ not shed and not stale and room_temp > target
-                     and (current_mode != 'cool'
+                  {{ desired != 'off'
+                     and (current_mode != desired
                           or (state_attr('${climateEntity room}', 'temperature') | float(0)) != setpoint)
-                     and (current_mode == 'cool' or not min_off_active) }}'';
+                     and (current_mode != 'off' or not min_off_active) }}'';
               }
             ];
             sequence = [
@@ -252,9 +290,30 @@ let
                 action = "climate.set_temperature";
                 target.entity_id = climateEntity room;
                 data = {
-                  hvac_mode = "cool";
+                  hvac_mode = "{{ desired }}";
                   temperature = "{{ setpoint }}";
                 };
+              }
+            ];
+          }
+          # Idle and staying idle: keep the dial showing the setpoint this room
+          # would use. With the head off, SmartIR stores the value without
+          # transmitting, so this costs no IR and stops a never-commanded room
+          # displaying its minimum temperature.
+          {
+            conditions = [
+              {
+                condition = "template";
+                value_template = ''
+                  {{ desired == 'off' and current_mode == 'off'
+                     and (state_attr('${climateEntity room}', 'temperature') | float(0)) != setpoint }}'';
+              }
+            ];
+            sequence = [
+              {
+                action = "climate.set_temperature";
+                target.entity_id = climateEntity room;
+                data.temperature = "{{ setpoint }}";
               }
             ];
           }
@@ -505,6 +564,22 @@ let
             }) roomNames;
           }
           {
+            type = "entities";
+            title = "System";
+            # Mode is shared because the heads share an outdoor unit. The
+            # per-room switches are the temporary "leave this one alone".
+            entities = [
+              {
+                entity = systemMode;
+                name = "Mode";
+              }
+            ]
+            ++ (map (room: {
+              entity = enableToggle room;
+              name = rooms.${room};
+            }) roomNames);
+          }
+          {
             # The thermostat dials already show each room's temperature, so this
             # only has to answer "why is it doing that": the threshold in force
             # right now, whether from the schedule or an override.
@@ -670,6 +745,31 @@ in
       ]) roomNames
     );
 
+    # One system-wide mode, because the heads share an outdoor unit and cannot
+    # run opposing ones. The per-room toggles are the temporary "not this room"
+    # switch; they read as enabled unless explicitly off, so a room is never
+    # left out just because its toggle has never been touched.
+    input_select.hvac_system_mode = {
+      name = "System mode";
+      options = [
+        "cool"
+        "heat"
+        "off"
+      ];
+      initial = "cool";
+      icon = "mdi:hvac";
+    };
+
+    input_boolean = lib.listToAttrs (
+      map (room: {
+        name = "hvac_enable_${room}";
+        value = {
+          name = "${rooms.${room}} enabled";
+          icon = "mdi:air-conditioner";
+        };
+      }) roomNames
+    );
+
     template = [
       {
         sensor =
@@ -677,11 +777,20 @@ in
             name = "hvac_target_${room}";
             unique_id = "hvac_target_${room}";
             unit_of_measurement = "°F";
+            icon = "mdi:thermometer-chevron-up";
             state = targetTemplate room;
+          }) roomNames)
+          ++ (map (room: {
+            name = "hvac_heat_target_${room}";
+            unique_id = "hvac_heat_target_${room}";
+            unit_of_measurement = "°F";
+            icon = "mdi:thermometer-chevron-down";
+            state = heatTargetTemplate room;
           }) roomNames)
           ++ (map (room: {
             name = "hvac_priority_${room}";
             unique_id = "hvac_priority_${room}";
+            icon = "mdi:sort-numeric-variant";
             state = priorityTemplate room;
           }) roomNames);
       }
