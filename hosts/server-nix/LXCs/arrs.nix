@@ -1,4 +1,4 @@
-{ self, ... }:
+{ self, networkTopology, ... }:
 {
   imports = [
     ./base
@@ -7,6 +7,7 @@
     "${self}/modules/software/services/sonarr.nix"
     "${self}/modules/software/services/lidarr.nix"
     "${self}/modules/software/services/yt-dlp.nix"
+    "${self}/modules/software/services/qbit-promote.nix"
 
   ];
   my.secrets = {
@@ -27,5 +28,13 @@
       gid = 1001;
     };
   };
+
+  # Called by each *arr on successful import; see docs/qbittorrent-migration.md.
+  my.services.qbit-promote = {
+    enable = true;
+    intakeUrl = "http://${networkTopology.lib.fqdn "qbit-gen-nix"}:8080";
+    seedingUrl = "http://${networkTopology.lib.fqdn "qbit-lts-nix"}:8080";
+  };
+
   networking.hostName = "arrs-nix";
 }

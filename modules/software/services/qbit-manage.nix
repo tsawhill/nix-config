@@ -1,0 +1,159 @@
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+let
+  cfg = config.my.services.qbit-manage;
+
+  # The rendered template is root-only under /run. qbit-manage rewrites its own
+  # config across schema migrations, so it runs against a writable copy.
+  runtimeConfig = "/run/qbit-manage/config.yml";
+
+  # Tracker keywords identify which private trackers are in use, so they come
+  # from SOPS. Group names and limits stay in the repo where they can be reviewed.
+  trackerSection =
+    lib.mapAttrs' (
+      tag: secret: lib.nameValuePair config.sops.placeholder.${secret} { inherit tag; }
+    ) cfg.trackerSecrets
+    // {
+      other.tag = "other";
+    };
+
+  # YAML is a superset of JSON and qbit-manage parses with PyYAML, so JSON is a
+  # valid config and the structure stays a real Nix attrset.
+  configContent = builtins.toJSON {
+    commands = {
+      dry_run = cfg.dryRun;
+      # tag_update applies the tracker section's tags; share_limits then filters
+      # on those tags. Without it the groups match nothing.
+      tag_update = true;
+      share_limits = true;
+      cat_update = false;
+      recheck = false;
+      rem_unregistered = false;
+      tag_tracker_error = false;
+      rem_orphaned = false;
+      tag_nohardlinks = false;
+      skip_cleanup = true;
+    };
+
+    qbt = {
+      host = "localhost:${toString cfg.qbittorrentPort}";
+      user = "";
+      pass = "";
+    };
+
+    settings = {
+      # Must stay false: forcing AutoTMM would relocate adopted seed data.
+      force_auto_tmm = false;
+      tracker_error_tag = "issue";
+      nohardlinks_tag = "noHL";
+      share_limits_tag = "~share_limit";
+      share_limits_filter_completed = true;
+      disable_qbt_default_share_limits = true;
+    };
+
+    directory = {
+      root_dir = cfg.rootDir;
+    };
+
+    cat = cfg.categories;
+    tracker = trackerSection;
+    share_limits = cfg.shareLimits;
+  };
+in
+{
+  options.my.services.qbit-manage = {
+    enable = lib.mkEnableOption "qbit-manage, for per-tracker share limits";
+
+    qbittorrentPort = lib.mkOption {
+      type = lib.types.port;
+      default = 8080;
+      description = "Local qBittorrent web UI port. LocalHostAuth is off, so no credentials are needed.";
+    };
+
+    rootDir = lib.mkOption {
+      type = lib.types.str;
+      description = "Torrent data root. Only used by the orphaned and nohardlinks commands, which are off.";
+    };
+
+    dryRun = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Report what would change without applying it. Leave on until the output is boring.";
+    };
+
+    interval = lib.mkOption {
+      type = lib.types.str;
+      default = "daily";
+      description = "systemd OnCalendar expression for the run timer.";
+    };
+
+    trackerSecrets = lib.mkOption {
+      type = lib.types.attrsOf lib.types.str;
+      default = { };
+      example = {
+        t1 = "qbit_tracker_t1";
+      };
+      description = "Map of tag name to the SOPS secret holding that tracker's announce-URL keyword.";
+    };
+
+    categories = lib.mkOption {
+      type = lib.types.attrsOf lib.types.str;
+      default = { };
+      description = "Mandatory cat section: category name to save path. Unused while cat_update is off.";
+    };
+
+    shareLimits = lib.mkOption {
+      type = lib.types.attrs;
+      default = { };
+      description = ''
+        Share limit groups, keyed by group name. Lowest priority wins and each
+        torrent takes the first group it matches. Keep cleanup false: this holds
+        torrents whose .torrent files are the only copy of their passkeys.
+      '';
+    };
+  };
+
+  config = lib.mkIf cfg.enable {
+    environment.systemPackages = [ pkgs.qbit-manage ];
+
+    sops.templates."qbit-manage.yml" = {
+      content = configContent;
+      mode = "0400";
+    };
+
+    systemd.services.qbit-manage = {
+      description = "qbit-manage share limit run";
+      after = [
+        "qbittorrent.service"
+        "sops-install-secrets.service"
+      ];
+      requires = lib.optionals config.sops.useSystemdActivation [ "sops-install-secrets.service" ];
+
+      serviceConfig = {
+        Type = "oneshot";
+        User = "root";
+        Group = "root";
+        RuntimeDirectory = "qbit-manage";
+        RuntimeDirectoryMode = "0700";
+        ExecStartPre = "${pkgs.coreutils}/bin/install -m600 ${
+          config.sops.templates."qbit-manage.yml".path
+        } ${runtimeConfig}";
+        ExecStart = "${pkgs.qbit-manage}/bin/qbit-manage --config-file ${runtimeConfig} --run";
+      };
+    };
+
+    systemd.timers.qbit-manage = {
+      description = "Periodic qbit-manage share limit run";
+      wantedBy = [ "timers.target" ];
+      timerConfig = {
+        OnCalendar = cfg.interval;
+        Persistent = true;
+        RandomizedDelaySec = "15m";
+      };
+    };
+  };
+}

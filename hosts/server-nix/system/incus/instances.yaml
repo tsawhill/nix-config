@@ -59,6 +59,36 @@ deluge-nix:
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/deluge-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:43:7d:c4" }
 
+qbit-gen-nix:
+  type: "container"
+  profiles: ["nixos-lxc", "downloadHDD-mount", "downloadSSD-mount"]
+  config:
+    limits.memory: "4GiB"
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "8GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/qbit-gen-nix" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "02:5f:6e:64:81:16" }
+
+qbit-lts-nix:
+  type: "container"
+  profiles: ["nixos-lxc", "downloadHDD-mount", "downloadSSD-mount"]
+  config:
+    limits.memory: "6GiB"
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "8GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/qbit-lts-nix" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "02:5f:6e:64:81:17" }
+
+qui-nix:
+  type: "container"
+  profiles: ["nixos-lxc"]
+  config:
+    limits.memory: "2GiB"
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/qui-nix" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "02:5f:6e:64:81:18" }
+
 pyload-nix:
   type: "container"
   profiles: ["nixos-lxc", "downloadHDD-mount", "downloadSSD-mount"]

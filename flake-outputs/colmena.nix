@@ -184,6 +184,10 @@ in
         "${self}/hosts/server-nix/LXCs/pufferpanel.nix";
     "palworld-nix" = mkHost "monthly" "palworld-nix" "${self}/hosts/server-nix/LXCs/palworld.nix";
     "deluge-nix" = mkHost "monthly" "deluge-nix" "${self}/hosts/server-nix/LXCs/deluge.nix";
+    # Manual-only until the new containers and their SOPS keys are provisioned.
+    "qbit-gen-nix" = mkHost null "qbit-gen-nix" "${self}/hosts/server-nix/LXCs/qbit-gen.nix";
+    "qbit-lts-nix" = mkHost null "qbit-lts-nix" "${self}/hosts/server-nix/LXCs/qbit-lts.nix";
+    "qui-nix" = mkHost null "qui-nix" "${self}/hosts/server-nix/LXCs/qui.nix";
     "pyload-nix" = mkHost "monthly" "pyload-nix" "${self}/hosts/server-nix/LXCs/pyload.nix";
     "authentik-nix" = mkHost "monthly" "authentik-nix" "${self}/hosts/server-nix/LXCs/authentik.nix";
     "syncthing-nix" = mkHost "monthly" "syncthing-nix" "${self}/hosts/server-nix/LXCs/syncthing.nix";

@@ -25,6 +25,9 @@ let
     "palworld-nix"
     "pufferpanel-nix"
     "pyload-nix"
+    "qbit-gen-nix"
+    "qbit-lts-nix"
+    "qui-nix"
     "samba-nix"
     "searx-nix"
     "socks5-vpn-eu-nix"
@@ -177,6 +180,30 @@ let
       lan = {
         ip = "10.73.73.20";
         mac = "bc:24:11:43:7d:c4";
+      };
+      dns.enable = true;
+      monitoring.enable = true;
+    };
+    qbit-gen-nix = {
+      lan = {
+        ip = "10.73.73.22";
+        mac = "02:5f:6e:64:81:16";
+      };
+      dns.enable = true;
+      monitoring.enable = true;
+    };
+    qbit-lts-nix = {
+      lan = {
+        ip = "10.73.73.23";
+        mac = "02:5f:6e:64:81:17";
+      };
+      dns.enable = true;
+      monitoring.enable = true;
+    };
+    qui-nix = {
+      lan = {
+        ip = "10.73.73.24";
+        mac = "02:5f:6e:64:81:18";
       };
       dns.enable = true;
       monitoring.enable = true;
