@@ -760,12 +760,17 @@ in
       icon = "mdi:hvac";
     };
 
+    # initial, because Home Assistant creates an input_boolean in the off
+    # state rather than an unknown one, which would leave every room excluded
+    # until someone noticed. A restart therefore re-enables all three: a
+    # temporary exclusion should not outlive a restart silently.
     input_boolean = lib.listToAttrs (
       map (room: {
         name = "hvac_enable_${room}";
         value = {
           name = "${rooms.${room}} enabled";
           icon = "mdi:air-conditioner";
+          initial = true;
         };
       }) roomNames
     );
