@@ -67,11 +67,18 @@ existing blocked-device alias. These IPs fall within the repository's declared
 DHCP pool (`.100`–`.245`); ensure the active DHCP configuration will not lease
 them to other clients.
 
-The packaged integration is `make-all/tuya-local`, which supports local IR
-learning/sending and generic remotes with temperature/humidity sensors. Exact
-FK-UFO-R6 product/profile compatibility has not yet been established. Smart
-Life's virtual AC entries are cloud objects, so local control needs learned
-IR commands or a compatible protocol implementation instead of importing them.
+The packaged integration is `make-all/tuya-local`. Its `ir_remote_sensors`
+profile covers this device class: a `remote` entity on dps 201 (send) and 202
+(receive), plus temperature (dps 101) and humidity (dps 102) sensors. IR is
+learned and replayed locally with `remote.learn_command` and
+`remote.send_command`. Smart Life's virtual AC entries are separate cloud-only
+sub-devices that tuya-local cannot add, so every Daikin command has to be
+learned from the handheld remote instead of imported.
+
+That profile matches on product ID only. As of tuya-local 2026.5.2 it lists
+`whs3cty93fzrqkpt`, `jbe3snv4tki8oo9c` (S09), and `b1codgjxh0wf7qrf`; whether
+the FK-UFO-R6 reports one of these is still unverified. If it does not, report
+the product ID upstream rather than forcing an unrelated profile.
 
 Commission one unit first:
 
@@ -82,12 +89,14 @@ Commission one unit first:
    reset/re-pair after retrieving the key, as pairing can change it. Never put
    keys in Nix, git, or diagnostics shared with an agent.
 2. Add **Tuya Local** in Settings > Devices & services, starting with the office
-   at `10.73.73.201`. Match the device's data points to a supported profile.
-   The integration is installed through
+   at `10.73.73.201`, and confirm it offers the universal-remote-with-sensors
+   profile. The integration is installed through
    `pkgs.home-assistant-custom-components.tuya_local` (2026.5.2 in the current
-   flake lock), so no HACS installation is needed. Device matching is pending.
-3. Verify local sensor readings and learn/send Daikin full-state commands
-   using the handheld remote. Record entity IDs, units, and reporting cadence.
+   flake lock), so no HACS installation is needed.
+3. Verify local sensor readings, then learn Daikin commands with
+   `remote.learn_command`. Minisplit remotes send full state in one frame, so
+   learn one command per mode/setpoint/fan combination that the control logic
+   will actually use. Record entity IDs, command names, units, and cadence.
 4. Block WAN, power-cycle the blaster, and restart Home Assistant. Verify
    temperature updates and actual AC response still work without Smart Life
    running. Include an extended offline test for stock-firmware behavior.
