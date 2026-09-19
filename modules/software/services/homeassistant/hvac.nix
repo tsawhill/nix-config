@@ -446,10 +446,46 @@ let
             type = "grid";
             columns = 3;
             square = false;
+            # The built-in thermostat card puts the setpoint in the big numeral
+            # and the room temperature in small print. That is backwards here:
+            # the room reading is the one being controlled, and the setpoint is
+            # just the lever. A markdown card gives the emphasis we want, with a
+            # tile underneath for the controls it cannot provide.
             cards = map (room: {
-              type = "thermostat";
-              entity = climateEntity room;
-              name = rooms.${room};
+              type = "vertical-stack";
+              cards = [
+                {
+                  type = "markdown";
+                  content = ''
+                    {%- set t = states('${tempSensor room}') | float(0) -%}
+                    {%- set h = states('sensor.ac_controller_${room}_humidity') | float(0) -%}
+                    {%- set m = states('${climateEntity room}') -%}
+                    {%- set sp = state_attr('${climateEntity room}', 'temperature') -%}
+                    {%- set colour = "#2196f3" if m == "cool" else ("#ff9800" if m == "heat" else "#9e9e9e") -%}
+                    ### ${rooms.${room}}
+                    # {{ t | round(0) }}°
+                    <span style="color: {{ colour }}; font-weight: 600;">{% if m == "off" %}idle{% else %}{{ sp | round(0) }}° {{ m }}{% endif %}</span>
+                    &nbsp;·&nbsp; {{ h | round(0) }}% RH
+                    &nbsp;·&nbsp; above {{ states('${targetSensor room}') | round(0) }}°
+                  '';
+                }
+                {
+                  type = "tile";
+                  entity = climateEntity room;
+                  name = rooms.${room};
+                  features = [
+                    { type = "target-temperature"; }
+                    {
+                      type = "climate-hvac-modes";
+                      hvac_modes = [
+                        "off"
+                        "cool"
+                        "heat"
+                      ];
+                    }
+                  ];
+                }
+              ];
             }) roomNames;
           }
           {
