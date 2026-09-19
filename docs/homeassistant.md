@@ -147,7 +147,7 @@ Run it against SmartIR 1118 with a Python that has `tinytuya`:
 
 ```
 python3 generate-daikin-codes.py 1118.json --selftest   # 84 captures
-python3 generate-daikin-codes.py 1118.json 18 30 > daikin-arc452a21.json
+python3 generate-daikin-codes.py 1118.json 64 86 > daikin-arc452a21.json
 ```
 
 The selftest re-encodes every capture and compares bytes. Two upstream entries
@@ -156,8 +156,18 @@ decodes as `23 b4 4f`) and `heat/2/22` sets a stray `0x80` in byte 10. All
 generated codes therefore come from one clean template rather than per-mode
 captures, which normalises both defects away.
 
-The generated table spans 18-30 C (64-86 F), both modes and all six fan
-settings: 157 codes. SmartIR 1118's own 20-26 C range was one contributor's
+**The table is keyed in Fahrenheit, deliberately.** SmartIR 1.18.1 has no
+`temperatureUnit` field: it takes `hass.config.units.temperature_unit` and
+publishes `minTemperature`/`maxTemperature` verbatim. Under `us_customary` a
+Celsius-keyed table therefore shows up as "18-30 F". Setpoints are looked up
+with `'{0:g}'.format(target)`, so the keys are plain strings like `"72"`.
+
+Byte 6 is Celsius doubled, so the protocol carries half degrees natively.
+Rounding each Fahrenheit step to the nearest half degree keeps one distinct
+code per step instead of collapsing pairs onto the same setpoint.
+
+The generated table spans 64-86 F (18-30 C), both modes and all six fan
+settings: 277 codes. SmartIR 1118's own 20-26 C range was one contributor's
 capture range, not a hardware limit.
 
 Verified on hardware: `off`, `cool/auto/20`, `cool/auto/24`, `heat/auto/26`

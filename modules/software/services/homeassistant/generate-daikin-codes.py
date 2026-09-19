@@ -118,6 +118,18 @@ def checksum(frame_bytes):
     return sum(frame_bytes[:-1]) & 0xFF
 
 
+# Byte 6 is Celsius doubled, so the protocol carries half degrees natively.
+# Rounding to those rather than whole Celsius keeps one distinct code per
+# Fahrenheit step instead of collapsing pairs onto the same setpoint.
+CELSIUS_MIN, CELSIUS_MAX = 18.0, 30.0
+
+
+def celsius_for(fahrenheit):
+    celsius = (fahrenheit - 32) * 5.0 / 9.0
+    celsius = min(CELSIUS_MAX, max(CELSIUS_MIN, celsius))
+    return round(celsius * 2) / 2.0
+
+
 def build(template_code, mode, fan, temp_c):
     pulses = broadlink_to_pulses(template_code)
     spans = frame_spans(pulses)
@@ -165,9 +177,13 @@ def main():
     if "--selftest" in sys.argv:
         sys.exit(0 if selftest(table) else 1)
 
-    lo, hi = float(sys.argv[2]), float(sys.argv[3])
+    # SmartIR 1.18.1 has no temperatureUnit field: it adopts Home Assistant's
+    # system unit and publishes these numbers as-is. Under us_customary the
+    # table must therefore be keyed in Fahrenheit, even though the frame
+    # encodes Celsius.
+    lo, hi = int(sys.argv[2]), int(sys.argv[3])
     commands = {"off": IR.pulses_to_base64(broadlink_to_pulses(table["commands"]["off"]))}
-    temps = [lo + i for i in range(int(hi - lo) + 1)]
+    temps = list(range(lo, hi + 1))
 
     # One clean template drives every code. Two source captures are defective
     # (cool/4/20 is bit-shifted, heat/2/22 carries a stray flag in byte 10),
@@ -175,7 +191,7 @@ def main():
     template = table["commands"]["cool"]["auto"]["22"]
     for mode in ("cool", "heat"):
         commands[mode] = {
-            fan: {str(int(t)): build(template, mode, fan, t) for t in temps}
+            fan: {str(t): build(template, mode, fan, celsius_for(t)) for t in temps}
             for fan in FAN_BYTE
         }
 
