@@ -14,6 +14,7 @@ Frame layout (third frame, 19 bytes):
 """
 
 import base64
+import argparse
 import json
 import sys
 
@@ -151,6 +152,10 @@ def build(template_code, mode, fan, temp_c, airflow="off"):
     two are mutually exclusive: comfort holds the flap at a fixed angle and
     swing sweeps it.
     """
+    if mode not in MODE_BYTE or fan not in FAN_BYTE or airflow not in AIRFLOW:
+        raise ValueError("unsupported mode, fan, or airflow")
+    if not CELSIUS_MIN <= temp_c <= CELSIUS_MAX or temp_c * 2 != round(temp_c * 2):
+        raise ValueError("temperature must be 18–30 C in half-degree steps")
     pulses = broadlink_to_pulses(template_code)
     spans = frame_spans(pulses)
     if len(spans) != 3:
@@ -172,6 +177,64 @@ def build(template_code, mode, fan, temp_c, airflow="off"):
     pulses = write_frame(pulses, spans[0], bytes(first))
 
     return IR.pulses_to_base64(pulses)
+
+
+def validate_generated(table):
+    """Decode every emitted command independently of build(), including airflow.
+
+    This checks the committed Tuya pulse table, not the upstream Broadlink
+    captures consumed by --selftest. Return the number of verified commands.
+    """
+    lo, hi = table["minTemperature"], table["maxTemperature"]
+    if not isinstance(lo, int) or not isinstance(hi, int) or not 64 <= lo <= hi <= 86:
+        raise ValueError("generated range must be within 64–86 F")
+    expected_temps = {str(t) for t in range(lo, hi + 1)}
+
+    def decode(code, label):
+        pulses = IR.base64_to_pulses(code)
+        frames = [read_frame(pulses, span) for span in frame_spans(pulses)]
+        if [len(frame) for frame in frames] != [8, 8, 19]:
+            raise ValueError(f"{label}: invalid frame lengths")
+        for i, frame in enumerate(frames):
+            if frame[:3] != bytes([0x11, 0xDA, 0x27]):
+                raise ValueError(f"{label}: invalid frame {i} header")
+            if checksum(frame) != frame[-1]:
+                raise ValueError(f"{label}: invalid frame {i} checksum")
+        return frames
+
+    off = decode(table["commands"]["off"], "off")
+    if off[2][5] & 1:
+        raise ValueError("off: power bit is set")
+    if set(table["operationModes"]) != {"cool", "heat"}:
+        raise ValueError("incorrect operationModes")
+    if set(table["fanModes"]) != set(FAN_BYTE) or set(table["swingModes"]) != set(AIRFLOW):
+        raise ValueError("incorrect fan/airflow metadata")
+    checked = 1
+    for mode, mode_bits in MODE_BYTE.items():
+        fans = table["commands"][mode]
+        if set(fans) != set(FAN_BYTE):
+            raise ValueError(f"{mode}: incomplete fan modes")
+        for fan, fan_bits in FAN_BYTE.items():
+            if set(fans[fan]) != set(AIRFLOW):
+                raise ValueError(f"{mode}/{fan}: incomplete airflow modes")
+            for airflow in AIRFLOW:
+                temps = fans[fan][airflow]
+                if set(temps) != expected_temps:
+                    raise ValueError(f"{mode}/{fan}/{airflow}: incomplete temperatures")
+                for temp, code in temps.items():
+                    label = f"{mode}/{fan}/{airflow}/{temp}"
+                    first, _, last = decode(code, label)
+                    expected = (
+                        mode_bits | 0x09,
+                        round(celsius_for(int(temp)) * 2),
+                        fan_bits | (0x0F if airflow == "swing" else 0),
+                        0x10 if airflow == "comfort" else 0,
+                    )
+                    actual = (last[5], last[6], last[8], first[6] & 0x10)
+                    if actual != expected:
+                        raise ValueError(f"{label}: fields {actual} != {expected}")
+                    checked += 1
+    return checked
 
 
 def selftest(table):
@@ -200,17 +263,30 @@ def selftest(table):
 
 
 def main():
-    with open(sys.argv[1]) as handle:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("table")
+    parser.add_argument("lo", type=int, nargs="?")
+    parser.add_argument("hi", type=int, nargs="?")
+    checks = parser.add_mutually_exclusive_group()
+    checks.add_argument("--selftest", action="store_true", help="check source Broadlink captures")
+    checks.add_argument("--validate-generated", action="store_true", help="check generated Tuya codes")
+    args = parser.parse_args()
+    with open(args.table) as handle:
         table = json.load(handle)
 
-    if "--selftest" in sys.argv:
+    if args.validate_generated:
+        print(f"validated {validate_generated(table)} generated commands")
+        return
+    if args.selftest:
         sys.exit(0 if selftest(table) else 1)
 
     # SmartIR 1.18.1 has no temperatureUnit field: it adopts Home Assistant's
     # system unit and publishes these numbers as-is. Under us_customary the
     # table must therefore be keyed in Fahrenheit, even though the frame
     # encodes Celsius.
-    lo, hi = int(sys.argv[2]), int(sys.argv[3])
+    lo, hi = args.lo, args.hi
+    if lo is None or hi is None or not 64 <= lo <= hi <= 86:
+        parser.error("generation requires 64 <= lo <= hi <= 86")
     commands = {"off": IR.pulses_to_base64(broadlink_to_pulses(table["commands"]["off"]))}
     temps = list(range(lo, hi + 1))
 
@@ -247,6 +323,7 @@ def main():
         "swingModes": AIRFLOW,
         "commands": commands,
     }
+    validate_generated(out)
     json.dump(out, sys.stdout, indent=1, sort_keys=True)
 
 

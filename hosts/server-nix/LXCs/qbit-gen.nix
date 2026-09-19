@@ -37,9 +37,9 @@ in
       "${networkTopology.lib.lanIp "arrs-nix"}/32"
       "${networkTopology.lib.lanIp "qui-nix"}/32"
       "${networkTopology.lib.lanIp "taylor-desktop-nix"}/32"
-      "${networkTopology.lib.lanIp "taylor-laptop-nix"}/32"
+      "${networkTopology.lib.lanIp "taylor-cube-nix"}/32"
       (networkTopology.lib.wgAddress "taylor-desktop-nix")
-      (networkTopology.lib.wgAddress "taylor-laptop-nix")
+      (networkTopology.lib.wgAddress "taylor-cube-nix")
     ];
     serverDomains = [
       (networkTopology.lib.fqdn "qbit-gen-nix")
