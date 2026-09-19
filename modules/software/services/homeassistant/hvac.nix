@@ -85,7 +85,7 @@ let
 
   # Asleep: only the bedroom matters, the rest just must not bake.
   sleeping = {
-    bedroom = { coolAbove = 74; heatBelow = 66; priority = 10; fan = "quiet"; };
+    bedroom = { coolAbove = 71; heatBelow = 66; priority = 10; fan = "quiet"; };
     office = { coolAbove = 82; heatBelow = 60; priority = 1; fan = "auto"; };
     living_room = { coolAbove = 82; heatBelow = 60; priority = 1; fan = "auto"; };
   };
@@ -101,7 +101,7 @@ let
   # temperature on arrival rather than starting from 80. Nobody is in there
   # yet, so it pulls down on auto and only goes quiet once Asleep begins.
   preBed = {
-    bedroom = { coolAbove = 74; heatBelow = 66; priority = 10; fan = "auto"; };
+    bedroom = { coolAbove = 71; heatBelow = 66; priority = 10; fan = "auto"; };
     office = { coolAbove = 76; heatBelow = 68; priority = 5; fan = "auto"; };
     living_room = { coolAbove = 80; heatBelow = 60; priority = 1; fan = "auto"; };
   };
