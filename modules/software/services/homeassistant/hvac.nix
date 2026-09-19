@@ -79,26 +79,31 @@ let
   # not drop below 68 in practice, so these are placeholders to be revisited
   # before winter rather than numbers anyone has lived with.
 
+  # Fan is a preference, not a throttle. The setpoint already scales output and
+  # the unit's own auto varies the fan with information we do not have, so this
+  # only departs from auto where noise matters more than speed.
+
   # Asleep: only the bedroom matters, the rest just must not bake.
   sleeping = {
-    bedroom = { coolAbove = 74; heatBelow = 66; priority = 10; };
-    office = { coolAbove = 82; heatBelow = 60; priority = 1; };
-    living_room = { coolAbove = 82; heatBelow = 60; priority = 1; };
+    bedroom = { coolAbove = 74; heatBelow = 66; priority = 10; fan = "quiet"; };
+    office = { coolAbove = 82; heatBelow = 60; priority = 1; fan = "auto"; };
+    living_room = { coolAbove = 82; heatBelow = 60; priority = 1; fan = "auto"; };
   };
 
   # Working. Taylor is in the office every day, weekends included.
   working = {
-    office = { coolAbove = 76; heatBelow = 68; priority = 10; };
-    living_room = { coolAbove = 78; heatBelow = 66; priority = 5; };
-    bedroom = { coolAbove = 80; heatBelow = 60; priority = 1; };
+    office = { coolAbove = 76; heatBelow = 68; priority = 10; fan = "auto"; };
+    living_room = { coolAbove = 78; heatBelow = 66; priority = 5; fan = "auto"; };
+    bedroom = { coolAbove = 80; heatBelow = 60; priority = 1; fan = "auto"; };
   };
 
   # The bedroom pulls down while the office is still occupied, so it is at
-  # temperature on arrival rather than starting from 80.
+  # temperature on arrival rather than starting from 80. Nobody is in there
+  # yet, so it pulls down on auto and only goes quiet once Asleep begins.
   preBed = {
-    bedroom = { coolAbove = 74; heatBelow = 66; priority = 10; };
-    office = { coolAbove = 76; heatBelow = 68; priority = 5; };
-    living_room = { coolAbove = 80; heatBelow = 60; priority = 1; };
+    bedroom = { coolAbove = 74; heatBelow = 66; priority = 10; fan = "auto"; };
+    office = { coolAbove = 76; heatBelow = 68; priority = 5; fan = "auto"; };
+    living_room = { coolAbove = 80; heatBelow = 60; priority = 1; fan = "auto"; };
   };
 
   schedule = {
@@ -170,6 +175,23 @@ let
   swingToggle = room: "input_boolean.hvac_swing_${room}";
   comfortToggle = room: "input_boolean.hvac_comfort_${room}";
 
+  # "schedule" defers to the block; anything else pins that speed until
+  # changed back. Fan costs nothing in the code table, which already carries
+  # every speed.
+  fanSelect = room: "input_select.hvac_fan_${room}";
+  fanSensor = room: "sensor.hvac_fan_${room}";
+  fanFollowsSchedule = "schedule";
+  fanOptions = [
+    fanFollowsSchedule
+    "auto"
+    "quiet"
+    "1"
+    "2"
+    "3"
+    "4"
+    "5"
+  ];
+
   airflowTemplate = room: ''
     {%- if is_state('${comfortToggle room}', 'on') -%}comfort
     {%- elif is_state('${swingToggle room}', 'on') -%}swing
@@ -224,6 +246,14 @@ let
       {{ ns.current.rooms['${room}'].priority }}
     {%- endif -%}'';
 
+  fanTemplate = room: ''
+    ${currentBlock}
+    {%- if is_state('${fanSelect room}', '${fanFollowsSchedule}') -%}
+      {{ ns.current.rooms['${room}'].fan }}
+    {%- else -%}
+      {{ states('${fanSelect room}') }}
+    {%- endif -%}'';
+
   # Which block of today's pattern is in force, for the dashboard.
   scheduleBlockTemplate = ''
     ${currentBlock}
@@ -274,6 +304,8 @@ let
     setpoint = setpointTemplate room;
     airflow = airflowTemplate room;
     current_airflow = "{{ state_attr('${climateEntity room}', 'swing_mode') }}";
+    fan = "{{ states('${fanSensor room}') }}";
+    current_fan = "{{ state_attr('${climateEntity room}', 'fan_mode') }}";
     # What an idle room's dial shows: its own temperature. The card puts this
     # numeral front and centre, so while the head is off it may as well read
     # the room rather than a setpoint that is not in use. When cooling starts
@@ -301,6 +333,7 @@ let
       { trigger = "state"; entity_id = enableToggle room; }
       { trigger = "state"; entity_id = swingToggle room; }
       { trigger = "state"; entity_id = comfortToggle room; }
+      { trigger = "state"; entity_id = fanSensor room; }
       { trigger = "time_pattern"; minutes = "/1"; }
     ];
     actions = [
@@ -339,6 +372,24 @@ let
                   hvac_mode = "{{ desired }}";
                   temperature = "{{ setpoint }}";
                 };
+              }
+            ];
+          }
+          # Fan changed while running, whether from the schedule or a pin.
+          {
+            conditions = [
+              {
+                condition = "template";
+                value_template = ''
+                  {{ desired != 'off' and current_mode == desired
+                     and fan not in ['unknown', 'unavailable'] and fan != current_fan }}'';
+              }
+            ];
+            sequence = [
+              {
+                action = "climate.set_fan_mode";
+                target.entity_id = climateEntity room;
+                data.fan_mode = "{{ fan }}";
               }
             ];
           }
@@ -752,12 +803,18 @@ let
           }
           {
             type = "entities";
-            title = "Airflow";
+            title = "Fan and airflow";
             show_header_toggle = false;
-            # Standing preferences, not part of an override. Comfort aims the
-            # flap away from the room; swing sweeps it. Comfort wins if both
-            # are on, since the hardware cannot do each at once.
+            # Standing preferences, not part of an override. Fan defaults to
+            # following the schedule; pin it to hold a speed. Comfort aims the
+            # flap away from the room and swing sweeps it, so they are
+            # mutually exclusive and comfort wins if both are on.
             entities = lib.concatMap (room: [
+              {
+                entity = fanSelect room;
+                name = "${rooms.${room}} fan";
+                secondary_info = "last-changed";
+              }
               {
                 entity = swingToggle room;
                 name = "${rooms.${room}} swing";
@@ -766,6 +823,7 @@ let
                 entity = comfortToggle room;
                 name = "${rooms.${room}} comfort";
               }
+              { type = "divider"; }
             ]) roomNames;
           }
           {
@@ -912,30 +970,44 @@ in
     # run opposing ones. The per-room toggles are the temporary "not this room"
     # switch; they read as enabled unless explicitly off, so a room is never
     # left out just because its toggle has never been touched.
-    input_select.hvac_system_mode = {
-      name = "Normal mode";
-      options = [
-        "cool"
-        "heat"
-        "off"
-      ];
-      initial = "cool";
-      icon = "mdi:hvac";
-    };
-
-    # Chosen before Apply and cleared when the override expires, so a
-    # temporary change of mode cannot outlive the temperatures it came with.
-    input_select.hvac_override_mode = {
-      name = "Override mode";
-      options = [
-        followSystem
-        "cool"
-        "heat"
-        "off"
-      ];
-      initial = followSystem;
-      icon = "mdi:hvac";
-    };
+    # hvac_system_mode is the seasonal baseline. hvac_override_mode is chosen
+    # before Apply and cleared when the override expires, so a temporary
+    # change of mode cannot outlive the temperatures it came with. The fan
+    # selects default to following the schedule.
+    input_select = {
+      hvac_system_mode = {
+        name = "Normal mode";
+        options = [
+          "cool"
+          "heat"
+          "off"
+        ];
+        initial = "cool";
+        icon = "mdi:hvac";
+      };
+      hvac_override_mode = {
+        name = "Override mode";
+        options = [
+          followSystem
+          "cool"
+          "heat"
+          "off"
+        ];
+        initial = followSystem;
+        icon = "mdi:hvac";
+      };
+    }
+    // (lib.listToAttrs (
+      map (room: {
+        name = "hvac_fan_${room}";
+        value = {
+          name = "${rooms.${room}} fan";
+          options = fanOptions;
+          initial = fanFollowsSchedule;
+          icon = "mdi:fan";
+        };
+      }) roomNames
+    ));
 
     # No initial: it forces the value at every start, so a deploy silently
     # re-enabled rooms that had been deselected. Without it these restore
@@ -1003,7 +1075,13 @@ in
               icon = "mdi:hvac";
               state = effectiveModeTemplate;
             }
-          ];
+          ]
+          ++ (map (room: {
+            name = "hvac_fan_${room}";
+            unique_id = "hvac_fan_${room}";
+            icon = "mdi:fan";
+            state = fanTemplate room;
+          }) roomNames);
       }
     ];
 
