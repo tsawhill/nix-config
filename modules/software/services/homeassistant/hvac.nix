@@ -33,9 +33,18 @@ let
     # Degrees below the threshold before a room stops. Without this a room
     # chatters on and off around a single number.
     hysteresis = 2;
-    # How far under the threshold the head is told to aim. Its own sensor reads
-    # ceiling air and runs warm, so this keeps it from satisfying itself early.
-    setpointOffset = 4;
+    # The head is told to aim below the threshold, never at it: its own sensor
+    # reads ceiling air and runs warm, so a setpoint at the threshold would let
+    # it satisfy itself early and quit while the room is still warm.
+    #
+    # The gap scales with how far off the room is, because an inverter treats
+    # its own error as a throttle. Ten degrees over gets near-full output; two
+    # degrees over gets a nudge, so the room glides in instead of overshooting
+    # and the compressor spends its time modulating rather than cycling.
+    setpointBase = 1;
+    setpointGain = 1.0;
+    # Bottom of the generated code table.
+    setpointFloor = 64;
     # Compressor protection. An inverter would rather run long and gentle.
     minRunMinutes = 10;
     minOffMinutes = 10;
@@ -173,7 +182,7 @@ let
     current_mode = "{{ states('${climateEntity room}') }}";
     stale = "{{ states('${tempSensor room}') in ['unknown', 'unavailable'] or (as_timestamp(now()) - as_timestamp(states.sensor.ac_controller_${room}_temperature.last_updated, 0)) > ${toString (tuning.staleMinutes * 60)} }}";
     held = "{{ as_timestamp(now()) - as_timestamp(states.climate.${room}_ac.last_changed, as_timestamp(now())) }}";
-    setpoint = "{{ [[(states('${targetSensor room}') | float(999)) - ${toString tuning.setpointOffset}, 64] | max, 86] | min | round(0) }}";
+    setpoint = "{% set t = states('${targetSensor room}') | float(999) %}{% set r = states('${tempSensor room}') | float(t) %}{% set e = [r - t, 0] | max %}{{ [[t - (${toString tuning.setpointBase} + ${toString tuning.setpointGain} * e), ${toString tuning.setpointFloor}] | max, 86] | min | round(0) }}";
   };
 
   offAction = room: {
@@ -433,7 +442,7 @@ let
             ++ [
               { entity = "input_number.hvac_override_minutes"; name = "For how long"; }
               { entity = "script.hvac_apply_override"; name = "Apply"; }
-              { entity = "script.hvac_cancel_override"; name = "Cancel"; }
+              { entity = "script.hvac_back_to_schedule"; name = "Back to schedule"; }
             ]
             ++ (map (room: {
               entity = overrideTimer room;
@@ -589,9 +598,11 @@ in
         ];
       };
 
-      hvac_cancel_override = {
-        alias = "Cancel temperature override";
-        icon = "mdi:tune-variant";
+      # Drops every override at once. Nudging a thermostat card directly needs
+      # no undo: the controller reasserts its own setpoint within the minute.
+      hvac_back_to_schedule = {
+        alias = "Back to schedule";
+        icon = "mdi:calendar-clock";
         sequence = [
           {
             action = "timer.cancel";
