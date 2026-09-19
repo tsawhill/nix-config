@@ -477,8 +477,9 @@ let
     }) roomNames)
     ++ [
       {
-        # Once no override is running, the temporary mode has to go too,
-        # otherwise it silently becomes the new normal.
+        # An override is one operation: a mode, a temperature per room, and
+        # which rooms take part. All of it has to end together, or excluding a
+        # room for half an hour quietly excludes it forever.
         choose = [
           {
             conditions = [
@@ -492,6 +493,10 @@ let
                 action = "input_select.select_option";
                 target.entity_id = overrideMode;
                 data.option = followSystem;
+              }
+              {
+                action = "input_boolean.turn_on";
+                target.entity_id = map enableToggle roomNames;
               }
             ];
           }
@@ -637,10 +642,21 @@ let
             # threshold each room is holding to under it.
             type = "entities";
             title = "Current schedule";
+            # Normal mode lives here, not with the override: it is the seasonal
+            # setting you change twice a year, alongside what the schedule is
+            # doing right now.
             entities = [
               {
                 entity = "sensor.hvac_schedule_block";
                 name = "Now";
+              }
+              {
+                entity = systemMode;
+                name = "Normal mode";
+              }
+              {
+                entity = effectiveMode;
+                name = "Running as";
               }
               { type = "divider"; }
             ]
@@ -655,36 +671,28 @@ let
             # The header toggle would flip every switch on this card at once,
             # which is never what anyone means here.
             show_header_toggle = false;
-            # Mode first because it applies to everything: the heads share an
-            # outdoor unit and cannot run opposing modes. Then the per-room
-            # switches, then temperatures, a duration, and Apply. Expiry hands
-            # control back to the schedule on its own.
+            # Read top to bottom as one operation: which mode, then each room
+            # with its switch beside its temperature, then how long, then
+            # Apply. Everything here reverts together when the timer ends.
             entities = [
               {
-                entity = systemMode;
-                name = "Normal mode";
-              }
-              {
                 entity = overrideMode;
-                name = "Override mode";
-                secondary_info = "last-changed";
-              }
-              {
-                entity = effectiveMode;
-                name = "Running as";
+                name = "Mode";
               }
               { type = "divider"; }
             ]
-            ++ (map (room: {
-              entity = enableToggle room;
-              name = "${rooms.${room}} on";
-            }) roomNames)
-            ++ [ { type = "divider"; } ]
-            ++ (map (room: {
-              entity = overrideNumber room;
-              name = rooms.${room};
-            }) roomNames)
+            ++ (lib.concatMap (room: [
+              {
+                entity = enableToggle room;
+                name = "${rooms.${room}}";
+              }
+              {
+                entity = overrideNumber room;
+                name = " above";
+              }
+            ]) roomNames)
             ++ [
+              { type = "divider"; }
               { entity = "input_number.hvac_override_minutes"; name = "For how long"; }
               { entity = "script.hvac_apply_override"; name = "Apply"; }
               { entity = "script.hvac_back_to_schedule"; name = "Back to schedule"; }
