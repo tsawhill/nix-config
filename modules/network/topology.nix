@@ -12,6 +12,7 @@ let
     "deluge-nix"
     "ffsync-nix"
     "gotify-nix"
+    "homeassistant-nix"
     "homepage-nix"
     "immich-nix"
     "jellyfin-nix"
@@ -405,6 +406,14 @@ let
       lan = {
         ip = "10.73.73.31";
         mac = "02:36:bc:73:0d:3b";
+      };
+      dns.enable = true;
+      monitoring.enable = true;
+    };
+    homeassistant-nix = {
+      lan = {
+        ip = "10.73.73.34";
+        mac = "02:5f:6e:64:81:22";
       };
       dns.enable = true;
       monitoring.enable = true;

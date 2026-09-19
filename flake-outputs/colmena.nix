@@ -176,6 +176,11 @@ in
     "sunshine-nix" = mkHost "weekly" "sunshine-nix" "${self}/hosts/server-nix/LXCs/sunshine.nix";
     "ffsync-nix" = mkHost "weekly" "ffsync-nix" "${self}/hosts/server-nix/LXCs/ffsync.nix";
 
+    # Manual-only while onboarding devices and commissioning HVAC control.
+    "homeassistant-nix" =
+      mkHost null "homeassistant-nix"
+        "${self}/hosts/server-nix/LXCs/homeassistant.nix";
+
     # --- monthly ---
     "unifi-nix" = mkHost "monthly" "unifi-nix" "${self}/hosts/server-nix/LXCs/unifi.nix";
     "samba-nix" = mkHost "monthly" "samba-nix" "${self}/hosts/server-nix/LXCs/samba.nix";

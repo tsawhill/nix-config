@@ -117,6 +117,17 @@ monitoring-nix:
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/monitoring-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:4d:2c:9f" }
 
+homeassistant-nix:
+  type: "container"
+  profiles: ["nixos-lxc"]
+  config:
+    limits.cpu: "2"
+    limits.memory: "4GiB"
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "16GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/homeassistant-nix" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "02:5f:6e:64:81:22" }
+
 homepage-nix:
   type: "container"
   profiles: ["nixos-lxc"]
