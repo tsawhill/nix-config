@@ -564,22 +564,6 @@ let
             }) roomNames;
           }
           {
-            type = "entities";
-            title = "System";
-            # Mode is shared because the heads share an outdoor unit. The
-            # per-room switches are the temporary "leave this one alone".
-            entities = [
-              {
-                entity = systemMode;
-                name = "Mode";
-              }
-            ]
-            ++ (map (room: {
-              entity = enableToggle room;
-              name = rooms.${room};
-            }) roomNames);
-          }
-          {
             # The thermostat dials already show each room's temperature, so this
             # only has to answer "why is it doing that": the threshold in force
             # right now, whether from the schedule or an override.
@@ -594,9 +578,26 @@ let
           {
             type = "entities";
             title = "Override";
-            # Set the temperatures, pick a duration, then Apply. Expiry hands
+            # The header toggle would flip every switch on this card at once,
+            # which is never what anyone means here.
+            show_header_toggle = false;
+            # Mode first because it applies to everything: the heads share an
+            # outdoor unit and cannot run opposing modes. Then the per-room
+            # switches, then temperatures, a duration, and Apply. Expiry hands
             # control back to the schedule on its own.
-            entities = (map (room: {
+            entities = [
+              {
+                entity = systemMode;
+                name = "Mode (all rooms)";
+              }
+              { type = "divider"; }
+            ]
+            ++ (map (room: {
+              entity = enableToggle room;
+              name = "${rooms.${room}} on";
+            }) roomNames)
+            ++ [ { type = "divider"; } ]
+            ++ (map (room: {
               entity = overrideNumber room;
               name = rooms.${room};
             }) roomNames)
@@ -604,6 +605,7 @@ let
               { entity = "input_number.hvac_override_minutes"; name = "For how long"; }
               { entity = "script.hvac_apply_override"; name = "Apply"; }
               { entity = "script.hvac_back_to_schedule"; name = "Back to schedule"; }
+              { type = "divider"; }
             ]
             ++ (map (room: {
               entity = overrideTimer room;
@@ -621,14 +623,29 @@ let
             ];
           }
           {
-            type = "entities";
-            title = "Capacity shedding";
-            # A running timer here means that room was backed off so the
-            # priority room could actually get cold.
-            entities = map (room: {
-              entity = shedTimer room;
-              name = rooms.${room};
-            }) roomNames;
+            type = "vertical-stack";
+            cards = [
+              {
+                type = "entities";
+                title = "Paused to free up capacity";
+                entities = map (room: {
+                  entity = shedTimer room;
+                  name = "${rooms.${room}} paused";
+                }) roomNames;
+              }
+              {
+                # This card exists because "capacity shedding" means nothing
+                # until you have watched it happen on a hot afternoon.
+                type = "markdown";
+                content = ''
+                  On a hot day all three heads pull from one outdoor unit and
+                  none of them quite wins. When the room that matters most
+                  stops getting cooler, the least important room running is
+                  paused for a while so the capacity goes where you want it.
+                  **Idle** means this is not happening.
+                '';
+              }
+            ];
           }
         ];
       }
