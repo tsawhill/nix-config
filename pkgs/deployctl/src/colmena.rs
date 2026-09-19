@@ -14,6 +14,8 @@ use crate::hosts::{list_all, ssh_host};
 use crate::process::{phase, run_capture, run_logged, RunOutput};
 use crate::retry::sanitize_label;
 
+const LOCAL_NIXOS_VERSION: &str = "/run/current-system/sw/bin/nixos-version";
+
 pub struct BuildResult {
     pub output: RunOutput,
     pub system_path: Option<PathBuf>,
@@ -263,7 +265,8 @@ impl Colmena {
             return "unknown".to_owned();
         };
         let output = if host == self_hostname {
-            run_capture(&mut Command::new("nixos-version"))
+            // The deploy service's PATH has no /run/current-system/sw/bin.
+            run_capture(&mut Command::new(LOCAL_NIXOS_VERSION))
         } else {
             let target = ssh_host(&self.config, host);
             run_capture(
