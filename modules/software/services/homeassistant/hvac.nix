@@ -562,10 +562,46 @@ let
             type = "grid";
             columns = 3;
             square = false;
+            # A gauge leads with the room's own reading, which is the number
+            # being controlled; the built-in thermostat card puts the setpoint
+            # in the big numeral instead and cannot be inverted. The tile
+            # underneath carries the controls the gauge has no room for.
             cards = map (room: {
-              type = "thermostat";
-              entity = climateEntity room;
-              name = rooms.${room};
+              type = "vertical-stack";
+              cards = [
+                {
+                  type = "gauge";
+                  entity = tempSensor room;
+                  name = rooms.${room};
+                  min = 60;
+                  max = 95;
+                  severity = {
+                    green = 60;
+                    yellow = 78;
+                    red = 84;
+                  };
+                }
+                {
+                  type = "tile";
+                  entity = climateEntity room;
+                  name = rooms.${room};
+                  state_content = [
+                    "state"
+                    "temperature"
+                  ];
+                  features = [
+                    { type = "target-temperature"; }
+                    {
+                      type = "climate-hvac-modes";
+                      hvac_modes = [
+                        "off"
+                        "cool"
+                        "heat"
+                      ];
+                    }
+                  ];
+                }
+              ];
             }) roomNames;
           }
           {
