@@ -41,6 +41,7 @@ keys:
   - &pufferpanel-nix age1awqq8a7sq40uusne7e4uwp74s5vzmpggcvs2ll782ycy2jfuspsqx5x7cy
   - &pyload-nix age1qxptq9f9hnqv7ljuv2v2kskj8zqruj408zzdqzvdglhp2r0awy7ss93ymv
   - &qbit-gen-nix age18p2zpy45wt4jhzklf84ju7dfcl4ylv082r062eyqskr55zwv39jsf99tcf
+  - &qbit-lts-nix age1ckgf6srx3da6yp339kmdnrcmct38uqamq0nrxewtc3q2t6yjquxqcfftaj
   - &samba-nix age1v6nlyg65w0uulha8y5usg82yy06yepld7fltt3q4959pqc8fhqvsvwhtrd
   - &syncthing-nix age128sk3eu6utjjpjjqdags9utl0th263d80g7t750etz575t8nhgeqnsjwuh
   - &unifi-nix age1me4w63lfuzexf9a97m444fh05tfvtd2snej5ud8qja64c3s0qc3sw7y7vt
