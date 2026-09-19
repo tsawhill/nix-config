@@ -390,6 +390,8 @@ with open(sys.argv[2], 'w') as f:
     FIGLET="${pkgs.figlet}/bin/figlet"
     JQ="${pkgs.jq}/bin/jq"
     SSH="${pkgs.openssh}/bin/ssh"
+    SCP="${pkgs.openssh}/bin/scp"
+    NIX="${pkgs.nix}/bin/nix"
 
     # Incus and ZFS live on server-nix. The factory itself runs on build-nix,
     # whose root SSH key is authorized on server-nix.
@@ -403,6 +405,10 @@ with open(sys.argv[2], 'w') as f:
     # working /nix from the start (avoids a full download on first deploy).
     NIX_TEMPLATE_SNAPSHOT="rpool/VMDisks/nix-templates/nixos-base-nix@ready"
     NIX_TEMPLATE_SNAPSHOT_NAME="''${NIX_TEMPLATE_SNAPSHOT##*@}"
+    NIX_TEMPLATE_DATASET="''${NIX_TEMPLATE_SNAPSHOT%@*}"
+
+    # Flake attribute the base image and its nix store are both built from.
+    TEMPLATE_ATTR="nixosConfigurations.lxc-template.config.system.build"
 
     # Parent ZFS dataset under which per-container nix stores live.
     # e.g. downloadHDD/nix-stores/jellyfin-nix
@@ -572,7 +578,7 @@ with open(sys.argv[2], 'w') as f:
       --align center --width 50 "$($FIGLET -f small "NIXOS FACTORY")"
 
     # Top-level action picker
-    ACTION=$($GUM choose "create" "rename" "delete")
+    ACTION=$($GUM choose "create" "rename" "delete" "template")
 
     # ══════════════════════════════════════════════════════════════
     #  CREATE — provision a new NixOS container end-to-end
@@ -1209,11 +1215,297 @@ YAML
         "Deleted $TARGET"
     }
 
+    # ══════════════════════════════════════════════════════════════
+    #  TEMPLATE — rebuild the base image and the /nix template snapshot
+    #
+    #  Both artifacts come from one build of nixosConfigurations.lxc-template
+    #  so the rootfs image and the store it boots from can never drift apart.
+    #  Deploys onto a stale base fail in switch-to-configuration, so this is
+    #  the fix whenever the fleet's nixpkgs moves on.
+    #
+    #  Flow:
+    #    1. Build the rootfs tarball and Incus metadata on build-nix
+    #    2. Ship both to server-nix
+    #    3. Extract nix/store into a staging dataset and snapshot it @ready
+    #    4. Repack the rootfs without the store, import it as the base image
+    #    5. Swap the new dataset and image alias in, retiring the old ones
+    #    6. Optionally boot a throwaway container off the result
+    # ══════════════════════════════════════════════════════════════
+    do_template() {
+      require_server
+
+      STAMP=$(date +%Y%m%d-%H%M%S)
+      STAGING_DATASET="$NIX_TEMPLATE_DATASET-staging"
+      RETIRED_DATASET="$NIX_TEMPLATE_DATASET-retired-$STAMP"
+      REMOTE_WORK="/var/tmp/nixos-factory-template-$STAMP"
+
+      OLD_FINGERPRINT=$(server_cmd incus image info "$IMAGE_ALIAS" 2>/dev/null \
+        | grep -oE '[0-9a-f]{64}' | head -n1 || true)
+
+      $GUM style --border rounded --padding "1 2" --border-foreground 86 \
+        "Rebuild the factory base image
+
+    Flake:    $TEMPLATE_ATTR
+    Image:    $IMAGE_ALIAS
+    Store:    $NIX_TEMPLATE_SNAPSHOT
+    Retires:  $RETIRED_DATASET"
+
+      if ! $GUM confirm "Rebuild the base image and nix store template?"; then
+        echo "Aborted."
+        return 0
+      fi
+
+      # --- Step 1: Build both artifacts from the same evaluation ---
+      echo "==> Building $TEMPLATE_ATTR.tarball..."
+      if ! TARBALL_OUT=$("$NIX" build --no-link --print-out-paths \
+        "$NIX_CONFIG#$TEMPLATE_ATTR.tarball")
+      then
+        $GUM style --foreground 196 --bold "Building the rootfs tarball failed."
+        return 1
+      fi
+
+      echo "==> Building $TEMPLATE_ATTR.metadata..."
+      if ! METADATA_OUT=$("$NIX" build --no-link --print-out-paths \
+        "$NIX_CONFIG#$TEMPLATE_ATTR.metadata")
+      then
+        $GUM style --foreground 196 --bold "Building the Incus metadata failed."
+        return 1
+      fi
+
+      ROOTFS_TAR=$(echo "$TARBALL_OUT"/tarball/*.tar.xz)
+      METADATA_TAR=$(echo "$METADATA_OUT"/tarball/*.tar.xz)
+
+      if [ ! -f "$ROOTFS_TAR" ] || [ ! -f "$METADATA_TAR" ]; then
+        $GUM style --foreground 196 --bold "Build produced no tarball to import."
+        return 1
+      fi
+
+      # --- Step 2: Ship both tarballs to server-nix ---
+      echo "==> Copying tarballs to $SERVER_HOST:$REMOTE_WORK..."
+      server_cmd mkdir -p "$REMOTE_WORK"
+      "$SCP" -q -o BatchMode=yes "$ROOTFS_TAR" "$SERVER_HOST:$REMOTE_WORK/rootfs-full.tar.xz"
+      "$SCP" -q -o BatchMode=yes "$METADATA_TAR" "$SERVER_HOST:$REMOTE_WORK/metadata.tar.xz"
+
+      template_cleanup() {
+        server_cmd "umount $REMOTE_WORK/nix 2>/dev/null || true"
+        server_cmd rm -rf "$REMOTE_WORK"
+      }
+
+      # --- Step 3: Stage the new nix store on its own dataset ---
+      # A staging dataset means a failure here leaves the live template alone.
+      echo "==> Staging nix store in $STAGING_DATASET..."
+      server_cmd "zfs destroy -r $STAGING_DATASET 2>/dev/null || true"
+      if ! server_cmd zfs create "$STAGING_DATASET"; then
+        template_cleanup
+        $GUM style --foreground 196 --bold "Could not create $STAGING_DATASET."
+        return 1
+      fi
+
+      server_cmd mkdir -p "$REMOTE_WORK/nix"
+      # nix-templates inherits mountpoint=legacy, so mount it by hand.
+      if ! server_cmd mount -t zfs "$STAGING_DATASET" "$REMOTE_WORK/nix"; then
+        server_cmd "zfs destroy -r $STAGING_DATASET"
+        template_cleanup
+        $GUM style --foreground 196 --bold "Could not mount $STAGING_DATASET."
+        return 1
+      fi
+
+      # The dataset is mounted at /nix inside the guest, so nix/store from the
+      # tarball has to land as store/ at its root.
+      if ! server_cmd \
+        "tar -xJf $REMOTE_WORK/rootfs-full.tar.xz -C $REMOTE_WORK/nix --strip-components=1 nix"
+      then
+        server_cmd "umount $REMOTE_WORK/nix; zfs destroy -r $STAGING_DATASET"
+        template_cleanup
+        $GUM style --foreground 196 --bold "Extracting the nix store failed."
+        return 1
+      fi
+
+      if ! server_cmd zfs snapshot "$STAGING_DATASET@$NIX_TEMPLATE_SNAPSHOT_NAME"; then
+        server_cmd "umount $REMOTE_WORK/nix; zfs destroy -r $STAGING_DATASET"
+        template_cleanup
+        $GUM style --foreground 196 --bold "Snapshotting the staged store failed."
+        return 1
+      fi
+
+      if ! server_cmd umount "$REMOTE_WORK/nix"; then
+        server_cmd "zfs destroy -r $STAGING_DATASET"
+        template_cleanup
+        $GUM style --foreground 196 --bold "Could not unmount $STAGING_DATASET."
+        return 1
+      fi
+
+      # --- Step 4: Repack the rootfs without the store and import it ---
+      # The store arrives through the ZFS clone, so shipping it in the image
+      # too would just burn the container's 4GiB root quota.
+      echo "==> Repacking rootfs without /nix/store..."
+      if ! server_cmd \
+        "mkdir -p $REMOTE_WORK/rootfs && tar -xJf $REMOTE_WORK/rootfs-full.tar.xz -C $REMOTE_WORK/rootfs --exclude=nix/store --exclude='nix/store/*' && mkdir -p $REMOTE_WORK/rootfs/nix/store && tar -cJf $REMOTE_WORK/rootfs.tar.xz -C $REMOTE_WORK/rootfs ."
+      then
+        server_cmd "zfs destroy -r $STAGING_DATASET"
+        template_cleanup
+        $GUM style --foreground 196 --bold "Repacking the rootfs failed."
+        return 1
+      fi
+
+      echo "==> Importing the image into Incus..."
+      if ! IMPORT_OUT=$(server_cmd \
+        "incus image import $REMOTE_WORK/metadata.tar.xz $REMOTE_WORK/rootfs.tar.xz")
+      then
+        server_cmd "zfs destroy -r $STAGING_DATASET"
+        template_cleanup
+        $GUM style --foreground 196 --bold "Image import failed."
+        return 1
+      fi
+
+      NEW_FINGERPRINT=$(echo "$IMPORT_OUT" \
+        | grep -oE '[0-9a-f]{64}' | head -n1)
+      if [ -z "$NEW_FINGERPRINT" ]; then
+        server_cmd "zfs destroy -r $STAGING_DATASET"
+        template_cleanup
+        $GUM style --foreground 196 --bold "Could not read the new image fingerprint."
+        return 1
+      fi
+
+      # --- Step 5: Swap the alias and dataset into place ---
+      echo "==> Pointing $IMAGE_ALIAS at $NEW_FINGERPRINT..."
+      server_cmd "incus image alias delete $IMAGE_ALIAS 2>/dev/null || true"
+      if ! server_cmd incus image alias create "$IMAGE_ALIAS" "$NEW_FINGERPRINT"; then
+        if [ -n "$OLD_FINGERPRINT" ]; then
+          server_cmd incus image alias create "$IMAGE_ALIAS" "$OLD_FINGERPRINT" || true
+        fi
+        server_cmd "zfs destroy -r $STAGING_DATASET"
+        template_cleanup
+        $GUM style --foreground 196 --bold "Could not point $IMAGE_ALIAS at the new image."
+        return 1
+      fi
+
+      echo "==> Retiring $NIX_TEMPLATE_DATASET to $RETIRED_DATASET..."
+      if server_cmd zfs list "$NIX_TEMPLATE_DATASET" >/dev/null 2>&1; then
+        if ! server_cmd zfs rename "$NIX_TEMPLATE_DATASET" "$RETIRED_DATASET"; then
+          server_cmd "incus image alias delete $IMAGE_ALIAS 2>/dev/null || true"
+          if [ -n "$OLD_FINGERPRINT" ]; then
+            server_cmd incus image alias create "$IMAGE_ALIAS" "$OLD_FINGERPRINT" || true
+          fi
+          server_cmd "zfs destroy -r $STAGING_DATASET"
+          template_cleanup
+          $GUM style --foreground 196 --bold \
+            "Could not retire $NIX_TEMPLATE_DATASET. Nothing was swapped."
+          return 1
+        fi
+      fi
+
+      if ! server_cmd zfs rename "$STAGING_DATASET" "$NIX_TEMPLATE_DATASET"; then
+        server_cmd zfs rename "$RETIRED_DATASET" "$NIX_TEMPLATE_DATASET" || true
+        server_cmd "incus image alias delete $IMAGE_ALIAS 2>/dev/null || true"
+        if [ -n "$OLD_FINGERPRINT" ]; then
+          server_cmd incus image alias create "$IMAGE_ALIAS" "$OLD_FINGERPRINT" || true
+        fi
+        template_cleanup
+        $GUM style --foreground 196 --bold "Could not promote the staging dataset."
+        return 1
+      fi
+
+      template_cleanup
+
+      # --- Step 6: Optional smoke test ---
+      if $GUM confirm "Boot a throwaway container off the new template?"; then
+        if verify_template; then
+          $GUM style --foreground 82 "Smoke test passed."
+        else
+          $GUM style --foreground 214 --bold \
+            "Smoke test failed. To roll back:
+    incus image alias delete $IMAGE_ALIAS
+    incus image alias create $IMAGE_ALIAS ''${OLD_FINGERPRINT:-<previous fingerprint>}
+    zfs rename $NIX_TEMPLATE_DATASET $NIX_TEMPLATE_DATASET-failed-$STAMP
+    zfs rename $RETIRED_DATASET $NIX_TEMPLATE_DATASET"
+        fi
+      fi
+
+      $GUM style --foreground 82 --border rounded --padding "1 2" \
+        "Base image rebuilt
+
+    Image:    $IMAGE_ALIAS -> $NEW_FINGERPRINT
+    Store:    $NIX_TEMPLATE_SNAPSHOT
+    Retired:  $RETIRED_DATASET
+    Previous: ''${OLD_FINGERPRINT:-none}
+
+    Destroy the retired dataset and image once a create has succeeded."
+    }
+
+    # Provision a throwaway container exactly the way do_create does, confirm
+    # it boots and answers, then tear it down. Always cleans up after itself.
+    verify_template() {
+      CHECK_HOST="factory-template-check"
+      CHECK_RESULT=1
+
+      server_cmd "incus delete --force $CHECK_HOST 2>/dev/null || true"
+      server_cmd "zfs destroy -r $NIX_PARENT_DATASET/$CHECK_HOST 2>/dev/null || true"
+
+      echo "==> Creating $CHECK_HOST..."
+      if server_cmd incus init "$IMAGE_ALIAS" "$CHECK_HOST" -p "$PROFILE" -s rpool \
+        && server_cmd \
+          "zfs send $NIX_TEMPLATE_SNAPSHOT | zfs receive $NIX_PARENT_DATASET/$CHECK_HOST" \
+        && server_cmd zfs destroy \
+          "$NIX_PARENT_DATASET/$CHECK_HOST@$NIX_TEMPLATE_SNAPSHOT_NAME" \
+        && server_cmd chown -R "$UID_GID" "$NIX_HOST_MOUNT_BASE/$CHECK_HOST" \
+        && server_cmd incus config device add "$CHECK_HOST" nix-store disk \
+          source="$NIX_HOST_MOUNT_BASE/$CHECK_HOST" path=/nix \
+        && server_cmd incus start "$CHECK_HOST"
+      then
+        echo "==> Waiting for $CHECK_HOST to come up..."
+        for i in $(seq 1 60); do
+          if server_cmd incus exec "$CHECK_HOST" -- \
+            ping -c1 -W1 build-nix.lan >/dev/null 2>&1
+          then
+            CHECK_RESULT=0
+            break
+          fi
+          sleep 1
+        done
+
+        if [ "$CHECK_RESULT" -eq 0 ]; then
+          echo "==> Network is up. Waiting for sshd..."
+          CHECK_RESULT=1
+          for i in $(seq 1 30); do
+            if server_cmd incus exec "$CHECK_HOST" -- \
+              systemctl is-active sshd.service >/dev/null 2>&1
+            then
+              CHECK_RESULT=0
+              break
+            fi
+            sleep 1
+          done
+
+          # register-nix-paths loads the store DB and sets this profile, so a
+          # missing symlink means the image and the cloned store disagree.
+          if [ "$CHECK_RESULT" -eq 0 ]; then
+            echo "==> Checking the system profile..."
+            server_cmd incus exec "$CHECK_HOST" -- \
+              test -L /nix/var/nix/profiles/system || CHECK_RESULT=1
+          fi
+        fi
+
+        if [ "$CHECK_RESULT" -ne 0 ]; then
+          echo "==> Last 30 journal lines from $CHECK_HOST:"
+          server_cmd incus exec "$CHECK_HOST" -- \
+            journalctl -n 30 --no-pager 2>/dev/null || true
+        fi
+      fi
+
+      echo "==> Removing $CHECK_HOST..."
+      server_cmd "incus delete --force $CHECK_HOST 2>/dev/null || true"
+      server_cmd "zfs destroy -r $NIX_PARENT_DATASET/$CHECK_HOST 2>/dev/null || true"
+
+      return "$CHECK_RESULT"
+    }
+
     # ── Dispatch to selected action ───────────────────────────────
     case "$ACTION" in
       create) do_create ;;
       rename) do_rename ;;
       delete) do_delete ;;
+      template) do_template ;;
     esac
   '';
 in

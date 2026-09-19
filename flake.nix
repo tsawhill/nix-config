@@ -121,6 +121,20 @@
             modules = [ "${inputs.self}/hosts/taylor-deck-nix" ];
           };
 
+          # Base image for the NixOS factory. Built from nixpkgs-stable so the
+          # template matches the closure colmena later deploys onto these LXCs.
+          # `nixos-factory template` builds .config.system.build.tarball and
+          # .config.system.build.metadata from this.
+          lxc-template = inputs.nixpkgs-stable.lib.nixosSystem {
+            system = "x86_64-linux";
+            specialArgs = {
+              inherit inputs;
+              inherit networkTopology;
+              self = inputs.self;
+            };
+            modules = [ "${inputs.self}/hosts/server-nix/LXCs/base/template.nix" ];
+          };
+
           # Steam Machine ("cube"). Same unstable inputs colmena uses; day-to-day
           # updates go through colmena (`deploy taylor-cube-nix`).
           taylor-cube-nix = inputs.nixpkgs-unstable.lib.nixosSystem {
