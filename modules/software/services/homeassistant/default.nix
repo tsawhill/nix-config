@@ -64,9 +64,12 @@ in
       http.server_port = 8123;
       recorder.purge_keep_days = 14;
 
-      # Bedroom (.202) and living room (.203) join once their blasters are
-      # paired; the entity names follow from the Tuya Local device name.
-      climate = [ (mkRoomClimate "office" "Office AC") ];
+      # Slugs follow the Tuya Local device names, which set the entity ids.
+      climate = [
+        (mkRoomClimate "office" "Office AC")
+        (mkRoomClimate "bedroom" "Bedroom AC")
+        (mkRoomClimate "living_room" "Living Room AC")
+      ];
 
       # Declarative automations can be appended by other Nix modules. Keep
       # UI experiments separate so deployments never overwrite them.
