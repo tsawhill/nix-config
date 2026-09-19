@@ -75,10 +75,27 @@ learned and replayed locally with `remote.learn_command` and
 sub-devices that tuya-local cannot add, so every Daikin command has to be
 learned from the handheld remote instead of imported.
 
-That profile matches on product ID only. As of tuya-local 2026.5.2 it lists
-`whs3cty93fzrqkpt`, `jbe3snv4tki8oo9c` (S09), and `b1codgjxh0wf7qrf`; whether
-the FK-UFO-R6 reports one of these is still unverified. If it does not, report
-the product ID upstream rather than forcing an unrelated profile.
+That profile matches on product ID only, and the FK-UFO-R6 matches it. The
+office unit came up as `AC Controller Office` with exactly this entity set:
+
+| Entity | Purpose |
+| --- | --- |
+| `remote.ac_controller_office` | learn/send IR |
+| `infrared.ac_controller_office` | send-only IR |
+| `sensor.ac_controller_office_temperature` | room temperature |
+| `sensor.ac_controller_office_humidity` | room humidity |
+
+No other config in tuya-local pairs a remote with both sensors, so the match is
+unambiguous.
+
+**Local IR learning does not work on this firmware.** The device accepts
+`{"control":"study"}` on dps 201 and echoes it back, but never reports a
+captured code: across repeated attempts dps 202 appeared zero times in the
+debug log, and `remote.learn_command` times out every time. The Smart Life app
+*can* learn the same buttons, so the receiver hardware is fine and the firmware
+simply reports captures to the cloud only. Do not spend more time on it.
+
+Sending is unaffected, and that is all this design needs.
 
 Commission one unit first:
 
@@ -93,10 +110,8 @@ Commission one unit first:
    profile. The integration is installed through
    `pkgs.home-assistant-custom-components.tuya_local` (2026.5.2 in the current
    flake lock), so no HACS installation is needed.
-3. Verify local sensor readings, then learn Daikin commands with
-   `remote.learn_command`. Minisplit remotes send full state in one frame, so
-   learn one command per mode/setpoint/fan combination that the control logic
-   will actually use. Record entity IDs, command names, units, and cadence.
+3. Verify local sensor readings. IR commands come from the generated code
+   table described below, not from learning.
 4. Block WAN, power-cycle the blaster, and restart Home Assistant. Verify
    temperature updates and actual AC response still work without Smart Life
    running. Include an extended offline test for stock-firmware behavior.
@@ -104,6 +119,71 @@ Commission one unit first:
 If the stock firmware cannot meet this test, investigate replacement firmware
 against the actual board/module and sensor wiring. Do not assume the model
 name alone proves ESPHome/OpenBeken compatibility or flash a guessed pin map.
+
+## Daikin IR codes
+
+The handheld remote is an **ARC452A21**, driving FTXS\*\*LVJU heads. SmartIR
+entry 1118 covers exactly that pair, in Broadlink base64. `tinytuya`'s
+`IRRemoteControlDevice` converts between pulse timings and Tuya's base64, so
+those captures become Tuya codes without any learning.
+
+Decoding them yields the standard Daikin three-frame message. Only the third
+frame carries state:
+
+| Byte | Meaning |
+| --- | --- |
+| 0-2 | `11 da 27`, the Daikin signature |
+| 5 | mode and power: `0x39` cool on, `0x49` heat on, low nibble `0` = off |
+| 6 | target temperature in Celsius, doubled |
+| 8 | fan: `0x30`-`0x70` for speeds 1-5, `0xa0` auto |
+| 18 | checksum: sum of bytes 0-17, mod 256 |
+
+Frame 1's byte 5 is the remote's own clock, not control data, which is why it
+differs between captures taken minutes apart. Frame 0 is constant.
+
+`generate-daikin-codes.py` patches those bits inside a verified capture rather
+than synthesising pulse trains, so timing and framing stay exactly as recorded.
+Run it against SmartIR 1118 with a Python that has `tinytuya`:
+
+```
+python3 generate-daikin-codes.py 1118.json --selftest   # 84 captures
+python3 generate-daikin-codes.py 1118.json 18 30 > daikin-arc452a21.json
+```
+
+The selftest re-encodes every capture and compares bytes. Two upstream entries
+are defective and will not match: `cool/4/20` is shifted a bit (its header
+decodes as `23 b4 4f`) and `heat/2/22` sets a stray `0x80` in byte 10. All
+generated codes therefore come from one clean template rather than per-mode
+captures, which normalises both defects away.
+
+The generated table spans 18-30 C (64-86 F), both modes and all six fan
+settings: 157 codes. SmartIR 1118's own 20-26 C range was one contributor's
+capture range, not a hardware limit.
+
+Verified on hardware: `off`, `cool/auto/20`, `cool/auto/24`, `heat/auto/26`
+and `heat/5/26` all produce the correct mode, setpoint and fan on the office
+head. The generator reproduces the decoded bytes of all five exactly.
+
+## Climate entities
+
+SmartIR's `BroadlinkController` is not Broadlink-specific. With `Base64`
+encoding it calls `remote.send_command` with a `b64:` prefix against whatever
+entity `controller_data` names, and tuya-local's remote entity implements that
+same convention. So SmartIR drives the blasters directly, with our code table
+substituted for its own.
+
+`default.nix` bakes `daikin-arc452a21.json` into the SmartIR package as device
+code 9000. SmartIR resolves device files from inside its component directory,
+which is a read-only store path here, and downloads from GitHub when one is
+missing; baking it in avoids both. There is deliberately no top-level
+`smartir:` section, because its `async_setup` returns early without one and
+never registers the update check.
+
+Each room's climate entity takes `temperature_sensor` from its own blaster, so
+the thermostat reads room temperature rather than the head unit's return-air
+sensor. That sensor placement is why the unit's own setpoints feel inaccurate:
+it measures ceiling air, which is warmer than the occupied space, so it
+overshoots in cooling and undershoots in heating.
 
 ## Network isolation
 
