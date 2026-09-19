@@ -634,16 +634,8 @@ let
                 }) roomNames;
               }
               {
-                # This card exists because "capacity shedding" means nothing
-                # until you have watched it happen on a hot afternoon.
                 type = "markdown";
-                content = ''
-                  On a hot day all three heads pull from one outdoor unit and
-                  none of them quite wins. When the room that matters most
-                  stops getting cooler, the least important room running is
-                  paused for a while so the capacity goes where you want it.
-                  **Idle** means this is not happening.
-                '';
+                content = "*On hot days the least important room pauses so the priority room can catch up.*";
               }
             ];
           }
