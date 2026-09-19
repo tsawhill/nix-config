@@ -330,6 +330,58 @@ let
     ];
   };
 
+  # Park each override slider on the threshold actually in force, so opening
+  # the dashboard shows the current setting rather than whatever was left
+  # behind. The threshold is the useful starting point rather than the room
+  # temperature: it is the number being overridden.
+  #
+  # Only rooms without an active override are touched, so this never fights an
+  # override in progress. Writing a value that is already set changes nothing,
+  # so there is no feedback loop, and the target sensors only fire on a real
+  # change rather than on every re-render.
+  sliderSyncAutomation = {
+    alias = "HVAC sync override sliders";
+    description = "Keep each override slider on the threshold currently in force.";
+    mode = "queued";
+    triggers =
+      (lib.concatMap (room: [
+        {
+          trigger = "state";
+          entity_id = targetSensor room;
+        }
+        {
+          trigger = "state";
+          entity_id = overrideTimer room;
+          to = "idle";
+        }
+      ]) roomNames)
+      ++ [
+        {
+          trigger = "homeassistant";
+          event = "start";
+        }
+      ];
+    actions = map (room: {
+      choose = [
+        {
+          conditions = [
+            {
+              condition = "template";
+              value_template = "{{ not is_state('${overrideTimer room}', 'active') }}";
+            }
+          ];
+          sequence = [
+            {
+              action = "input_number.set_value";
+              target.entity_id = overrideNumber room;
+              data.value = "{{ states('${targetSensor room}') | float(75) | round(0) }}";
+            }
+          ];
+        }
+      ];
+    }) roomNames;
+  };
+
   # Commands are never acknowledged, so restate intent on a slow cycle.
   reconcileAutomation = {
     alias = "HVAC reconcile";
@@ -446,63 +498,23 @@ let
             type = "grid";
             columns = 3;
             square = false;
-            # The built-in thermostat card puts the setpoint in the big numeral
-            # and the room temperature in small print. That is backwards here:
-            # the room reading is the one being controlled, and the setpoint is
-            # just the lever. A markdown card gives the emphasis we want, with a
-            # tile underneath for the controls it cannot provide.
             cards = map (room: {
-              type = "vertical-stack";
-              cards = [
-                {
-                  type = "markdown";
-                  content = ''
-                    {%- set t = states('${tempSensor room}') | float(0) -%}
-                    {%- set h = states('sensor.ac_controller_${room}_humidity') | float(0) -%}
-                    {%- set m = states('${climateEntity room}') -%}
-                    {%- set sp = state_attr('${climateEntity room}', 'temperature') -%}
-                    {%- set colour = "#2196f3" if m == "cool" else ("#ff9800" if m == "heat" else "#9e9e9e") -%}
-                    ### ${rooms.${room}}
-                    # {{ t | round(0) }}°
-                    <span style="color: {{ colour }}; font-weight: 600;">{% if m == "off" %}idle{% else %}{{ sp | round(0) }}° {{ m }}{% endif %}</span> &nbsp;·&nbsp; {{ h | round(0) }}% RH &nbsp;·&nbsp; above {{ states('${targetSensor room}') | round(0) }}°
-                  '';
-                }
-                {
-                  type = "tile";
-                  entity = climateEntity room;
-                  name = rooms.${room};
-                  features = [
-                    { type = "target-temperature"; }
-                    {
-                      type = "climate-hvac-modes";
-                      hvac_modes = [
-                        "off"
-                        "cool"
-                        "heat"
-                      ];
-                    }
-                  ];
-                }
-              ];
+              type = "thermostat";
+              entity = climateEntity room;
+              name = rooms.${room};
             }) roomNames;
           }
           {
-            type = "entities";
-            title = "What the schedule wants";
-            entities = lib.concatMap (room: [
-              {
-                entity = tempSensor room;
-                name = "${rooms.${room}} now";
-              }
-              {
-                entity = targetSensor room;
-                name = "${rooms.${room}} cool above";
-              }
-              {
-                entity = prioritySensor room;
-                name = "${rooms.${room}} priority";
-              }
-            ]) roomNames;
+            # The thermostat dials already show each room's temperature, so this
+            # only has to answer "why is it doing that": the threshold in force
+            # right now, whether from the schedule or an override.
+            type = "glance";
+            title = "Cool above";
+            columns = 3;
+            entities = map (room: {
+              entity = targetSensor room;
+              name = rooms.${room};
+            }) roomNames;
           }
           {
             type = "entities";
@@ -747,6 +759,7 @@ in
 
     "automation manual" = (map mkRoomAutomation roomNames) ++ [
       transitionAutomation
+      sliderSyncAutomation
       reconcileAutomation
       shedAutomation
     ];
