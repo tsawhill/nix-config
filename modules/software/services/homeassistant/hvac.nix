@@ -1,4 +1,9 @@
-{ lib, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 # Schedule-driven cooling for the three Daikin heads.
 #
@@ -385,11 +390,108 @@ let
       }
     ];
   };
+  # A second dashboard in YAML mode, so the default one stays UI-editable.
+  dashboard = {
+    title = "Climate";
+    views = [
+      {
+        title = "Climate";
+        path = "climate";
+        icon = "mdi:air-conditioner";
+        cards = [
+          {
+            type = "grid";
+            columns = 3;
+            square = false;
+            cards = map (room: {
+              type = "thermostat";
+              entity = climateEntity room;
+              name = rooms.${room};
+            }) roomNames;
+          }
+          {
+            type = "entities";
+            title = "What the schedule wants";
+            entities = lib.concatMap (room: [
+              {
+                entity = tempSensor room;
+                name = "${rooms.${room}} now";
+              }
+              {
+                entity = targetSensor room;
+                name = "${rooms.${room}} cool above";
+              }
+              {
+                entity = prioritySensor room;
+                name = "${rooms.${room}} priority";
+              }
+            ]) roomNames;
+          }
+          {
+            type = "entities";
+            title = "Override";
+            # Set the temperatures, pick a duration, then Apply. Expiry hands
+            # control back to the schedule on its own.
+            entities = (map (room: {
+              entity = overrideNumber room;
+              name = rooms.${room};
+            }) roomNames)
+            ++ [
+              { entity = "input_number.hvac_override_minutes"; name = "For how long"; }
+              { entity = "script.hvac_apply_override"; name = "Apply"; }
+              { entity = "script.hvac_cancel_override"; name = "Cancel"; }
+            ]
+            ++ (map (room: {
+              entity = overrideTimer room;
+              name = "${rooms.${room}} remaining";
+            }) roomNames);
+          }
+          {
+            type = "entities";
+            title = "Nap";
+            entities = [
+              { entity = "input_number.hvac_nap_minutes"; name = "Nap length"; }
+              { entity = "script.hvac_start_nap"; name = "Start nap"; }
+              { entity = "script.hvac_end_nap"; name = "End nap"; }
+              { entity = overrideTimer "bedroom"; name = "Bedroom remaining"; }
+            ];
+          }
+          {
+            type = "entities";
+            title = "Capacity shedding";
+            # A running timer here means that room was backed off so the
+            # priority room could actually get cold.
+            entities = map (room: {
+              entity = shedTimer room;
+              name = rooms.${room};
+            }) roomNames;
+          }
+        ];
+      }
+    ];
+  };
+
+  dashboardFile = (pkgs.formats.yaml { }).generate "hvac-dashboard.yaml" dashboard;
+  configDir = config.services.home-assistant.configDir;
 in
 {
+  # Lovelace resolves a YAML dashboard's filename inside the config directory,
+  # which is writable state, so link the generated file into place.
+  systemd.services.home-assistant.preStart = lib.mkBefore ''
+    ln -sfn ${dashboardFile} ${lib.escapeShellArg configDir}/hvac-dashboard.yaml
+  '';
+
   # input_number and timer arrive with default_config, and template has no
   # dependencies of its own, so none of this needs extraComponents.
   services.home-assistant.config = {
+    lovelace.dashboards.hvac-yaml = {
+      mode = "yaml";
+      title = "Climate";
+      icon = "mdi:air-conditioner";
+      filename = "hvac-dashboard.yaml";
+      show_in_sidebar = true;
+    };
+
     input_number =
       (lib.listToAttrs (
         lib.concatMap (room: [
@@ -505,10 +607,22 @@ in
       };
 
       # A nap is the override mechanism pointed at one room: sleeping
-      # temperature, top priority, for as long as the slider says.
+      # temperature, top priority, for as long as asked. The duration is a
+      # field rather than only the slider so an Android widget can carry its
+      # own value without opening the app.
       hvac_start_nap = {
         alias = "Start nap";
         icon = "mdi:power-sleep";
+        fields.minutes = {
+          name = "Minutes";
+          description = "Nap length; defaults to the dashboard slider.";
+          example = 45;
+          selector.number = {
+            min = 20;
+            max = 240;
+            step = 10;
+          };
+        };
         sequence = [
           {
             action = "input_number.set_value";
@@ -518,7 +632,8 @@ in
           {
             action = "timer.start";
             target.entity_id = overrideTimer "bedroom";
-            data.duration = "{{ states('input_number.hvac_nap_minutes') | int(60) * 60 }}";
+            data.duration = ''
+              {{ (minutes | default(states('input_number.hvac_nap_minutes'), true) | int(60)) * 60 }}'';
           }
         ];
       };
