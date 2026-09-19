@@ -81,14 +81,14 @@ let
 
   # Asleep: only the bedroom matters, the rest just must not bake.
   sleeping = {
-    bedroom = { coolAbove = 72; heatBelow = 66; priority = 10; };
+    bedroom = { coolAbove = 74; heatBelow = 66; priority = 10; };
     office = { coolAbove = 82; heatBelow = 60; priority = 1; };
     living_room = { coolAbove = 82; heatBelow = 60; priority = 1; };
   };
 
   # Working. Taylor is in the office every day, weekends included.
   working = {
-    office = { coolAbove = 75; heatBelow = 68; priority = 10; };
+    office = { coolAbove = 76; heatBelow = 68; priority = 10; };
     living_room = { coolAbove = 78; heatBelow = 66; priority = 5; };
     bedroom = { coolAbove = 80; heatBelow = 60; priority = 1; };
   };
@@ -96,8 +96,8 @@ let
   # The bedroom pulls down while the office is still occupied, so it is at
   # temperature on arrival rather than starting from 80.
   preBed = {
-    bedroom = { coolAbove = 72; heatBelow = 66; priority = 10; };
-    office = { coolAbove = 75; heatBelow = 68; priority = 5; };
+    bedroom = { coolAbove = 74; heatBelow = 66; priority = 10; };
+    office = { coolAbove = 76; heatBelow = 68; priority = 5; };
     living_room = { coolAbove = 80; heatBelow = 60; priority = 1; };
   };
 
@@ -152,9 +152,26 @@ let
   prioritySensor = room: "sensor.hvac_priority_${room}";
 
   # One outdoor unit means the heads cannot run opposing modes, so this is a
-  # single system-wide choice rather than a per-room one.
+  # single system-wide choice rather than a per-room one. systemMode is the
+  # seasonal baseline; overrideMode is the temporary one, and it expires with
+  # the override timers so an hour of heat cannot quietly become a whole
+  # morning of it.
   systemMode = "input_select.hvac_system_mode";
+  overrideMode = "input_select.hvac_override_mode";
+  followSystem = "follow system";
+  effectiveMode = "sensor.hvac_effective_mode";
   enableToggle = room: "input_boolean.hvac_enable_${room}";
+
+  anyOverrideActive = lib.concatStringsSep " or " (
+    map (room: "is_state('${overrideTimer room}', 'active')") roomNames
+  );
+
+  effectiveModeTemplate = ''
+    {%- if (${anyOverrideActive}) and not is_state('${overrideMode}', '${followSystem}') -%}
+      {{ states('${overrideMode}') }}
+    {%- else -%}
+      {{ states('${systemMode}') }}
+    {%- endif -%}'';
 
   # Resolve today's pattern and the block covering the current minute. Every
   # tag trims its own whitespace: Home Assistant types rendered results
@@ -203,7 +220,7 @@ let
   # the current mode inside the hysteresis band is what stops a room chattering
   # on and off around a single number.
   desiredTemplate = room: ''
-    {%- set sys = states('${systemMode}') -%}
+    {%- set sys = states('${effectiveMode}') -%}
     {%- set enabled = not is_state('${enableToggle room}', 'off') -%}
     {%- set r = states('${tempSensor room}') | float(-999) -%}
     {%- set ct = states('${targetSensor room}') | float(999) -%}
@@ -223,7 +240,7 @@ let
   # The gap below (cooling) or above (heating) the threshold scales with how
   # far off the room is, because the head treats its own error as a throttle.
   setpointTemplate = room: ''
-    {%- set sys = states('${systemMode}') -%}
+    {%- set sys = states('${effectiveMode}') -%}
     {%- set r = states('${tempSensor room}') | float(0) -%}
     {%- if sys == 'heat' -%}
       {%- set ht = states('${heatTargetSensor room}') | float(68) -%}
@@ -264,7 +281,7 @@ let
       { trigger = "state"; entity_id = targetSensor room; }
       { trigger = "state"; entity_id = heatTargetSensor room; }
       { trigger = "state"; entity_id = shedTimer room; }
-      { trigger = "state"; entity_id = systemMode; }
+      { trigger = "state"; entity_id = effectiveMode; }
       { trigger = "state"; entity_id = enableToggle room; }
       { trigger = "time_pattern"; minutes = "/1"; }
     ];
@@ -428,11 +445,15 @@ let
       ]) roomNames)
       ++ [
         {
+          trigger = "state";
+          entity_id = effectiveMode;
+        }
+        {
           trigger = "homeassistant";
           event = "start";
         }
       ];
-    actions = map (room: {
+    actions = (map (room: {
       choose = [
         {
           conditions = [
@@ -445,12 +466,38 @@ let
             {
               action = "input_number.set_value";
               target.entity_id = overrideNumber room;
-              data.value = "{{ states('${targetSensor room}') | float(75) | round(0) }}";
+              # The threshold for whichever mode is running. Parking a cool
+              # threshold while in heat would offer 82 as a heat target.
+              data.value = ''
+                {% if is_state('${effectiveMode}', 'heat') %}{{ states('${heatTargetSensor room}') | float(68) | round(0) }}{% else %}{{ states('${targetSensor room}') | float(75) | round(0) }}{% endif %}'';
             }
           ];
         }
       ];
-    }) roomNames;
+    }) roomNames)
+    ++ [
+      {
+        # Once no override is running, the temporary mode has to go too,
+        # otherwise it silently becomes the new normal.
+        choose = [
+          {
+            conditions = [
+              {
+                condition = "template";
+                value_template = "{{ not (${anyOverrideActive}) }}";
+              }
+            ];
+            sequence = [
+              {
+                action = "input_select.select_option";
+                target.entity_id = overrideMode;
+                data.option = followSystem;
+              }
+            ];
+          }
+        ];
+      }
+    ];
   };
 
   # Commands are never acknowledged, so restate intent on a slow cycle.
@@ -610,7 +657,16 @@ let
             entities = [
               {
                 entity = systemMode;
-                name = "Mode (all rooms)";
+                name = "Normal mode";
+              }
+              {
+                entity = overrideMode;
+                name = "Override mode";
+                secondary_info = "last-changed";
+              }
+              {
+                entity = effectiveMode;
+                name = "Running as";
               }
               { type = "divider"; }
             ]
@@ -789,13 +845,27 @@ in
     # switch; they read as enabled unless explicitly off, so a room is never
     # left out just because its toggle has never been touched.
     input_select.hvac_system_mode = {
-      name = "System mode";
+      name = "Normal mode";
       options = [
         "cool"
         "heat"
         "off"
       ];
       initial = "cool";
+      icon = "mdi:hvac";
+    };
+
+    # Chosen before Apply and cleared when the override expires, so a
+    # temporary change of mode cannot outlive the temperatures it came with.
+    input_select.hvac_override_mode = {
+      name = "Override mode";
+      options = [
+        followSystem
+        "cool"
+        "heat"
+        "off"
+      ];
+      initial = followSystem;
       icon = "mdi:hvac";
     };
 
@@ -843,6 +913,12 @@ in
               unique_id = "hvac_schedule_block";
               icon = "mdi:calendar-clock";
               state = scheduleBlockTemplate;
+            }
+            {
+              name = "hvac_effective_mode";
+              unique_id = "hvac_effective_mode";
+              icon = "mdi:hvac";
+              state = effectiveModeTemplate;
             }
           ];
       }
