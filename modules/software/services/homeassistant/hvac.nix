@@ -69,8 +69,8 @@ let
     # toIntBase10, because toInt rejects "00" as octal-ambiguous.
     (lib.toIntBase10 (builtins.elemAt parts 0)) * 60 + (lib.toIntBase10 (builtins.elemAt parts 1));
 
-  block = from: blockRooms: {
-    inherit from;
+  block = from: label: blockRooms: {
+    inherit from label;
     fromMinutes = minutesOf from;
     rooms = blockRooms;
   };
@@ -113,26 +113,26 @@ let
     };
     patterns = {
       workday = [
-        (block "00:00" sleeping)
-        (block "06:00" working)
-        (block "22:00" preBed)
+        (block "00:00" "Asleep" sleeping)
+        (block "06:00" "Working" working)
+        (block "22:00" "Wind-down" preBed)
       ];
       # No work the next morning, so bed is later.
       fridayNight = [
-        (block "00:00" sleeping)
-        (block "06:00" working)
-        (block "23:30" preBed)
+        (block "00:00" "Asleep" sleeping)
+        (block "06:00" "Working" working)
+        (block "23:30" "Wind-down" preBed)
       ];
       weekendLate = [
-        (block "00:00" sleeping)
-        (block "09:30" working)
-        (block "23:30" preBed)
+        (block "00:00" "Asleep" sleeping)
+        (block "09:30" "Working" working)
+        (block "23:30" "Wind-down" preBed)
       ];
       # Sunday night returns to the work-week bedtime.
       weekend = [
-        (block "00:00" sleeping)
-        (block "09:30" working)
-        (block "22:00" preBed)
+        (block "00:00" "Asleep" sleeping)
+        (block "09:30" "Working" working)
+        (block "22:00" "Wind-down" preBed)
       ];
     };
   };
@@ -192,6 +192,11 @@ let
     {%- else -%}
       {{ ns.current.rooms['${room}'].priority }}
     {%- endif -%}'';
+
+  # Which block of today's pattern is in force, for the dashboard.
+  scheduleBlockTemplate = ''
+    ${currentBlock}
+    {{- ns.current.label }} since {{ ns.current.from -}}'';
 
   # Resolve what the room should be doing into one value, so the automation
   # below is "apply this" rather than a tree of cool and heat branches. Holding
@@ -575,16 +580,22 @@ let
             }) roomNames;
           }
           {
-            # The thermostat dials already show each room's temperature, so this
-            # only has to answer "why is it doing that": the threshold in force
-            # right now, whether from the schedule or an override.
-            type = "glance";
-            title = "Cool above";
-            columns = 3;
-            entities = map (room: {
+            # The dials already show each room's temperature, so this answers
+            # "why is it doing that": which block is in force, and the
+            # threshold each room is holding to under it.
+            type = "entities";
+            title = "Current schedule";
+            entities = [
+              {
+                entity = "sensor.hvac_schedule_block";
+                name = "Now";
+              }
+              { type = "divider"; }
+            ]
+            ++ (map (room: {
               entity = targetSensor room;
-              name = rooms.${room};
-            }) roomNames;
+              name = "${rooms.${room}} cool above";
+            }) roomNames);
           }
           {
             type = "entities";
@@ -637,13 +648,16 @@ let
             # Shedding is rare, so the card only appears while it is happening
             # rather than sitting there reading Idle three times.
             type = "conditional";
+            # Card conditions take state, numeric_state, screen, user, and, or
+            # but not template, so this is an explicit or over the three.
             conditions = [
               {
-                condition = "template";
-                value_template = ''
-                  {{ expand(${
-                    lib.concatStringsSep ", " (map (room: "'${shedTimer room}'") roomNames)
-                  }) | selectattr('state', 'eq', 'active') | list | count > 0 }}'';
+                condition = "or";
+                conditions = map (room: {
+                  condition = "state";
+                  entity = shedTimer room;
+                  state = "active";
+                }) roomNames;
               }
             ];
             card = {
@@ -822,7 +836,15 @@ in
             unique_id = "hvac_priority_${room}";
             icon = "mdi:sort-numeric-variant";
             state = priorityTemplate room;
-          }) roomNames);
+          }) roomNames)
+          ++ [
+            {
+              name = "hvac_schedule_block";
+              unique_id = "hvac_schedule_block";
+              icon = "mdi:calendar-clock";
+              state = scheduleBlockTemplate;
+            }
+          ];
       }
     ];
 
