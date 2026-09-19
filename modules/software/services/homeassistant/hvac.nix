@@ -236,6 +236,10 @@ let
     min_run_active = "{{ is_state('${minRunTimer room}', 'active') }}";
     min_off_active = "{{ is_state('${minOffTimer room}', 'active') }}";
     setpoint = setpointTemplate room;
+    # What an idle room's dial shows. The threshold reads as "it will cool
+    # above this"; the computed setpoint would just be an arbitrary number a
+    # degree below it.
+    park = "{% set sys = states('${systemMode}') %}{% set v = (states('${heatTargetSensor room}') if sys == 'heat' else states('${targetSensor room}')) | float(75) %}{{ [[v, ${toString tuning.setpointFloor}] | max, 86] | min | round(0) }}";
   };
 
   offAction = room: {
@@ -296,24 +300,25 @@ let
               }
             ];
           }
-          # Idle and staying idle: keep the dial showing the setpoint this room
-          # would use. With the head off, SmartIR stores the value without
-          # transmitting, so this costs no IR and stops a never-commanded room
-          # displaying its minimum temperature.
+          # Idle and staying idle: park the dial on the threshold, so it reads
+          # as "cools above this" rather than showing an arbitrary number. With
+          # the head off, SmartIR stores the value without transmitting, so
+          # this costs no IR and stops a never-commanded room displaying its
+          # minimum temperature.
           {
             conditions = [
               {
                 condition = "template";
                 value_template = ''
                   {{ desired == 'off' and current_mode == 'off'
-                     and (state_attr('${climateEntity room}', 'temperature') | float(0)) != setpoint }}'';
+                     and (state_attr('${climateEntity room}', 'temperature') | float(0)) != park }}'';
               }
             ];
             sequence = [
               {
                 action = "climate.set_temperature";
                 target.entity_id = climateEntity room;
-                data.temperature = "{{ setpoint }}";
+                data.temperature = "{{ park }}";
               }
             ];
           }
