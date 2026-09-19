@@ -141,6 +141,8 @@ let
   shedTimer = room: "timer.hvac_shed_${room}";
   overrideNumber = room: "input_number.hvac_override_${room}";
   startTempNumber = room: "input_number.hvac_start_temp_${room}";
+  minRunTimer = room: "timer.hvac_min_run_${room}";
+  minOffTimer = room: "timer.hvac_min_off_${room}";
   targetSensor = room: "sensor.hvac_target_${room}";
   prioritySensor = room: "sensor.hvac_priority_${room}";
 
@@ -180,8 +182,12 @@ let
     target = "{{ states('${targetSensor room}') | float(999) }}";
     shed = "{{ is_state('${shedTimer room}', 'active') }}";
     current_mode = "{{ states('${climateEntity room}') }}";
-    stale = "{{ states('${tempSensor room}') in ['unknown', 'unavailable'] or (as_timestamp(now()) - as_timestamp(states.sensor.ac_controller_${room}_temperature.last_updated, 0)) > ${toString (tuning.staleMinutes * 60)} }}";
-    held = "{{ as_timestamp(now()) - as_timestamp(states.climate.${room}_ac.last_changed, as_timestamp(now())) }}";
+    # last_reported, not last_updated: Home Assistant does not rewrite a state
+    # object whose value and attributes are unchanged, so a genuinely steady
+    # temperature would otherwise look like a dead sensor after 15 minutes.
+    stale = "{{ states('${tempSensor room}') in ['unknown', 'unavailable'] or (as_timestamp(now()) - as_timestamp(states.sensor.ac_controller_${room}_temperature.last_reported, 0)) > ${toString (tuning.staleMinutes * 60)} }}";
+    min_run_active = "{{ is_state('${minRunTimer room}', 'active') }}";
+    min_off_active = "{{ is_state('${minOffTimer room}', 'active') }}";
     setpoint = "{% set t = states('${targetSensor room}') | float(999) %}{% set r = states('${tempSensor room}') | float(t) %}{% set e = [r - t, 0] | max %}{{ [[t - (${toString tuning.setpointBase} + ${toString tuning.setpointGain} * e), ${toString tuning.setpointFloor}] | max, 86] | min | round(0) }}";
   };
 
@@ -224,7 +230,7 @@ let
                 value_template = ''
                   {{ (shed or room_temp <= target - ${toString tuning.hysteresis})
                      and current_mode != 'off'
-                     and held > ${toString (tuning.minRunMinutes * 60)} }}'';
+                     and not min_run_active }}'';
               }
             ];
             sequence = [ (offAction room) ];
@@ -238,7 +244,7 @@ let
                   {{ not shed and not stale and room_temp > target
                      and (current_mode != 'cool'
                           or (state_attr('${climateEntity room}', 'temperature') | float(0)) != setpoint)
-                     and (current_mode == 'cool' or held > ${toString (tuning.minOffMinutes * 60)}) }}'';
+                     and (current_mode == 'cool' or not min_off_active) }}'';
               }
             ];
             sequence = [
@@ -259,33 +265,67 @@ let
 
   # Record the temperature a room started at, so progress can be measured
   # without depending on a statistics or derivative integration.
-  startTempAutomation = {
-    alias = "HVAC record start temperature";
-    description = "Snapshot room temperature whenever a head begins cooling.";
+  # Compressor protection rides on timers rather than the climate entity's
+  # last_changed, which resets every time Home Assistant restarts and would
+  # otherwise freeze every room for the minimum off time after each deploy.
+  # Timers restore across restarts, so they measure the real interval.
+  transitionAutomation = {
+    alias = "HVAC record transitions";
+    description = "Snapshot the starting temperature and run the minimum run/off timers.";
     mode = "queued";
-    triggers = map (room: {
-      trigger = "state";
-      entity_id = climateEntity room;
-      to = "cool";
-      id = room;
-    }) roomNames;
+    triggers = lib.concatMap (room: [
+      {
+        trigger = "state";
+        entity_id = climateEntity room;
+        to = "cool";
+        id = "${room}_cool";
+      }
+      {
+        trigger = "state";
+        entity_id = climateEntity room;
+        to = "off";
+        id = "${room}_off";
+      }
+    ]) roomNames;
     actions = [
       {
-        choose = map (room: {
-          conditions = [
-            {
-              condition = "trigger";
-              id = room;
-            }
-          ];
-          sequence = [
-            {
-              action = "input_number.set_value";
-              target.entity_id = startTempNumber room;
-              data.value = "{{ states('${tempSensor room}') | float(0) | round(1) }}";
-            }
-          ];
-        }) roomNames;
+        choose = lib.concatMap (room: [
+          {
+            conditions = [
+              {
+                condition = "trigger";
+                id = "${room}_cool";
+              }
+            ];
+            sequence = [
+              {
+                action = "input_number.set_value";
+                target.entity_id = startTempNumber room;
+                data.value = "{{ states('${tempSensor room}') | float(0) | round(1) }}";
+              }
+              {
+                action = "timer.start";
+                target.entity_id = minRunTimer room;
+                data.duration = tuning.minRunMinutes * 60;
+              }
+            ];
+          }
+          {
+            conditions = [
+              {
+                condition = "trigger";
+                id = "${room}_off";
+              }
+            ];
+            sequence = [
+              {
+                action = "timer.start";
+                target.entity_id = minOffTimer room;
+                data.duration = tuning.minOffMinutes * 60;
+              }
+            ];
+          }
+        ]) roomNames;
       }
     ];
   };
@@ -565,6 +605,22 @@ in
             restore = true;
           };
         }
+        {
+          name = "hvac_min_run_${room}";
+          value = {
+            name = "${rooms.${room}} minimum run";
+            duration = "00:${toString tuning.minRunMinutes}:00";
+            restore = true;
+          };
+        }
+        {
+          name = "hvac_min_off_${room}";
+          value = {
+            name = "${rooms.${room}} minimum off";
+            duration = "00:${toString tuning.minOffMinutes}:00";
+            restore = true;
+          };
+        }
       ]) roomNames
     );
 
@@ -656,7 +712,7 @@ in
     };
 
     "automation manual" = (map mkRoomAutomation roomNames) ++ [
-      startTempAutomation
+      transitionAutomation
       reconcileAutomation
       shedAutomation
     ];
