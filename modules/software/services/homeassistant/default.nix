@@ -37,6 +37,8 @@ let
   };
 in
 {
+  imports = [ ./hvac.nix ];
+
   services.home-assistant = {
     enable = true;
     openFirewall = true;
@@ -71,9 +73,8 @@ in
         (mkRoomClimate "living_room" "Living Room AC")
       ];
 
-      # Declarative automations can be appended by other Nix modules. Keep
-      # UI experiments separate so deployments never overwrite them.
-      "automation manual" = [ ];
+      # Declarative automations live in hvac.nix under "automation manual".
+      # Keep UI experiments separate so deployments never overwrite them.
       "automation ui" = "!include automations.yaml";
       "script ui" = "!include scripts.yaml";
       "scene ui" = "!include scenes.yaml";
