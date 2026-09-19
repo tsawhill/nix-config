@@ -85,25 +85,25 @@ let
 
   # Asleep: only the bedroom matters, the rest just must not bake.
   sleeping = {
-    bedroom = { coolAbove = 71; heatBelow = 66; priority = 10; fan = "quiet"; };
-    office = { coolAbove = 82; heatBelow = 60; priority = 1; fan = "auto"; };
-    living_room = { coolAbove = 82; heatBelow = 60; priority = 1; fan = "auto"; };
+    bedroom = { coolAbove = 71; heatBelow = 66; priority = 10; fan = "quiet"; airflow = "comfort"; };
+    office = { coolAbove = 82; heatBelow = 60; priority = 1; fan = "auto"; airflow = "comfort"; };
+    living_room = { coolAbove = 82; heatBelow = 60; priority = 1; fan = "auto"; airflow = "comfort"; };
   };
 
   # Working. Taylor is in the office every day, weekends included.
   working = {
-    office = { coolAbove = 76; heatBelow = 68; priority = 10; fan = "auto"; };
-    living_room = { coolAbove = 78; heatBelow = 66; priority = 5; fan = "auto"; };
-    bedroom = { coolAbove = 80; heatBelow = 60; priority = 1; fan = "auto"; };
+    office = { coolAbove = 76; heatBelow = 68; priority = 10; fan = "auto"; airflow = "comfort"; };
+    living_room = { coolAbove = 78; heatBelow = 66; priority = 5; fan = "auto"; airflow = "comfort"; };
+    bedroom = { coolAbove = 80; heatBelow = 60; priority = 1; fan = "auto"; airflow = "comfort"; };
   };
 
   # The bedroom pulls down while the office is still occupied, so it is at
   # temperature on arrival rather than starting from 80. Nobody is in there
   # yet, so it pulls down on auto and only goes quiet once Asleep begins.
   preBed = {
-    bedroom = { coolAbove = 71; heatBelow = 66; priority = 10; fan = "auto"; };
-    office = { coolAbove = 76; heatBelow = 68; priority = 5; fan = "auto"; };
-    living_room = { coolAbove = 80; heatBelow = 60; priority = 1; fan = "auto"; };
+    bedroom = { coolAbove = 71; heatBelow = 66; priority = 10; fan = "auto"; airflow = "comfort"; };
+    office = { coolAbove = 76; heatBelow = 68; priority = 5; fan = "auto"; airflow = "comfort"; };
+    living_room = { coolAbove = 80; heatBelow = 60; priority = 1; fan = "auto"; airflow = "comfort"; };
   };
 
   schedule = {
@@ -167,13 +167,20 @@ let
   effectiveMode = "sensor.hvac_effective_mode";
   enableToggle = room: "input_boolean.hvac_enable_${room}";
 
-  # Airflow is a standing preference per room, not part of an override. The
-  # protocol sends full state, so it has to ride in SmartIR's swing dimension:
-  # a toggle that sent its own IR would be wiped by the next setpoint change.
-  # Comfort holds the flap away from the room, swing sweeps it, so they are
-  # mutually exclusive in the hardware and comfort wins if both are set.
-  swingToggle = room: "input_boolean.hvac_swing_${room}";
-  comfortToggle = room: "input_boolean.hvac_comfort_${room}";
+  # Airflow comes from the schedule, same as fan, with a per-room pin. It has
+  # to ride in SmartIR's swing dimension because the protocol sends full
+  # state: anything sending its own IR would be wiped by the next setpoint
+  # change. One select rather than two switches, since comfort holds the flap
+  # at a fixed angle and swing sweeps it, so they were never combinable.
+  airflowSelect = room: "input_select.hvac_airflow_${room}";
+  airflowSensor = room: "sensor.hvac_airflow_${room}";
+  airflowFollowsSchedule = "schedule";
+  airflowOptions = [
+    airflowFollowsSchedule
+    "off"
+    "swing"
+    "comfort"
+  ];
 
   # "schedule" defers to the block; anything else pins that speed until
   # changed back. Fan costs nothing in the code table, which already carries
@@ -193,9 +200,11 @@ let
   ];
 
   airflowTemplate = room: ''
-    {%- if is_state('${comfortToggle room}', 'on') -%}comfort
-    {%- elif is_state('${swingToggle room}', 'on') -%}swing
-    {%- else -%}off
+    ${currentBlock}
+    {%- if is_state('${airflowSelect room}', '${airflowFollowsSchedule}') -%}
+      {{ ns.current.rooms['${room}'].airflow }}
+    {%- else -%}
+      {{ states('${airflowSelect room}') }}
     {%- endif -%}'';
 
   anyOverrideActive = lib.concatStringsSep " or " (
@@ -302,7 +311,7 @@ let
     min_run_active = "{{ is_state('${minRunTimer room}', 'active') }}";
     min_off_active = "{{ is_state('${minOffTimer room}', 'active') }}";
     setpoint = setpointTemplate room;
-    airflow = airflowTemplate room;
+    airflow = "{{ states('${airflowSensor room}') }}";
     current_airflow = "{{ state_attr('${climateEntity room}', 'swing_mode') }}";
     fan = "{{ states('${fanSensor room}') }}";
     current_fan = "{{ state_attr('${climateEntity room}', 'fan_mode') }}";
@@ -331,8 +340,8 @@ let
       { trigger = "state"; entity_id = shedTimer room; }
       { trigger = "state"; entity_id = effectiveMode; }
       { trigger = "state"; entity_id = enableToggle room; }
-      { trigger = "state"; entity_id = swingToggle room; }
-      { trigger = "state"; entity_id = comfortToggle room; }
+      { trigger = "state"; entity_id = airflowSensor room; }
+
       { trigger = "state"; entity_id = fanSensor room; }
       { trigger = "time_pattern"; minutes = "/1"; }
     ];
@@ -813,15 +822,10 @@ let
               {
                 entity = fanSelect room;
                 name = "${rooms.${room}} fan";
-                secondary_info = "last-changed";
               }
               {
-                entity = swingToggle room;
-                name = "${rooms.${room}} swing";
-              }
-              {
-                entity = comfortToggle room;
-                name = "${rooms.${room}} comfort";
+                entity = airflowSelect room;
+                name = "${rooms.${room}} airflow";
               }
               { type = "divider"; }
             ]) roomNames;
@@ -998,15 +1002,26 @@ in
       };
     }
     // (lib.listToAttrs (
-      map (room: {
-        name = "hvac_fan_${room}";
-        value = {
-          name = "${rooms.${room}} fan";
-          options = fanOptions;
-          initial = fanFollowsSchedule;
-          icon = "mdi:fan";
-        };
-      }) roomNames
+      lib.concatMap (room: [
+        {
+          name = "hvac_fan_${room}";
+          value = {
+            name = "${rooms.${room}} fan";
+            options = fanOptions;
+            initial = fanFollowsSchedule;
+            icon = "mdi:fan";
+          };
+        }
+        {
+          name = "hvac_airflow_${room}";
+          value = {
+            name = "${rooms.${room}} airflow";
+            options = airflowOptions;
+            initial = airflowFollowsSchedule;
+            icon = "mdi:weather-windy";
+          };
+        }
+      ]) roomNames
     ));
 
     # No initial: it forces the value at every start, so a deploy silently
@@ -1014,29 +1029,13 @@ in
     # their last state, which is what deselecting a room has to mean. They
     # are all on today, so nothing is stranded off by the change.
     input_boolean = lib.listToAttrs (
-      lib.concatMap (room: [
-        {
-          name = "hvac_enable_${room}";
-          value = {
-            name = "${rooms.${room}} enabled";
-            icon = "mdi:air-conditioner";
-          };
-        }
-        {
-          name = "hvac_swing_${room}";
-          value = {
-            name = "${rooms.${room}} swing";
-            icon = "mdi:arrow-oscillating";
-          };
-        }
-        {
-          name = "hvac_comfort_${room}";
-          value = {
-            name = "${rooms.${room}} comfort airflow";
-            icon = "mdi:weather-windy";
-          };
-        }
-      ]) roomNames
+      map (room: {
+        name = "hvac_enable_${room}";
+        value = {
+          name = "${rooms.${room}} enabled";
+          icon = "mdi:air-conditioner";
+        };
+      }) roomNames
     );
 
     template = [
@@ -1081,6 +1080,12 @@ in
             unique_id = "hvac_fan_${room}";
             icon = "mdi:fan";
             state = fanTemplate room;
+          }) roomNames)
+          ++ (map (room: {
+            name = "hvac_airflow_${room}";
+            unique_id = "hvac_airflow_${room}";
+            icon = "mdi:weather-windy";
+            state = airflowTemplate room;
           }) roomNames);
       }
     ];
