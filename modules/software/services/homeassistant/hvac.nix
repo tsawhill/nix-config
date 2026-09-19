@@ -236,10 +236,12 @@ let
     min_run_active = "{{ is_state('${minRunTimer room}', 'active') }}";
     min_off_active = "{{ is_state('${minOffTimer room}', 'active') }}";
     setpoint = setpointTemplate room;
-    # What an idle room's dial shows. The threshold reads as "it will cool
-    # above this"; the computed setpoint would just be an arbitrary number a
-    # degree below it.
-    park = "{% set sys = states('${systemMode}') %}{% set v = (states('${heatTargetSensor room}') if sys == 'heat' else states('${targetSensor room}')) | float(75) %}{{ [[v, ${toString tuning.setpointFloor}] | max, 86] | min | round(0) }}";
+    # What an idle room's dial shows: its own temperature. The card puts this
+    # numeral front and centre, so while the head is off it may as well read
+    # the room rather than a setpoint that is not in use. When cooling starts
+    # the dial turns blue and switches to the real setpoint, which makes the
+    # transition obvious.
+    park = "{{ [[states('${tempSensor room}') | float(75), ${toString tuning.setpointFloor}] | max, 86] | min | round(0) }}";
   };
 
   offAction = room: {
@@ -632,21 +634,26 @@ let
             ];
           }
           {
-            type = "vertical-stack";
-            cards = [
+            # Shedding is rare, so the card only appears while it is happening
+            # rather than sitting there reading Idle three times.
+            type = "conditional";
+            conditions = [
               {
-                type = "entities";
-                title = "Paused to free up capacity";
-                entities = map (room: {
-                  entity = shedTimer room;
-                  name = "${rooms.${room}} paused";
-                }) roomNames;
-              }
-              {
-                type = "markdown";
-                content = "*On hot days the least important room pauses so the priority room can catch up.*";
+                condition = "template";
+                value_template = ''
+                  {{ expand(${
+                    lib.concatStringsSep ", " (map (room: "'${shedTimer room}'") roomNames)
+                  }) | selectattr('state', 'eq', 'active') | list | count > 0 }}'';
               }
             ];
+            card = {
+              type = "entities";
+              title = "Paused to free up capacity";
+              entities = map (room: {
+                entity = shedTimer room;
+                name = "${rooms.${room}} paused";
+              }) roomNames;
+            };
           }
         ];
       }
