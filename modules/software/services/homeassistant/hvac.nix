@@ -162,6 +162,20 @@ let
   effectiveMode = "sensor.hvac_effective_mode";
   enableToggle = room: "input_boolean.hvac_enable_${room}";
 
+  # Airflow is a standing preference per room, not part of an override. The
+  # protocol sends full state, so it has to ride in SmartIR's swing dimension:
+  # a toggle that sent its own IR would be wiped by the next setpoint change.
+  # Comfort holds the flap away from the room, swing sweeps it, so they are
+  # mutually exclusive in the hardware and comfort wins if both are set.
+  swingToggle = room: "input_boolean.hvac_swing_${room}";
+  comfortToggle = room: "input_boolean.hvac_comfort_${room}";
+
+  airflowTemplate = room: ''
+    {%- if is_state('${comfortToggle room}', 'on') -%}comfort
+    {%- elif is_state('${swingToggle room}', 'on') -%}swing
+    {%- else -%}off
+    {%- endif -%}'';
+
   anyOverrideActive = lib.concatStringsSep " or " (
     map (room: "is_state('${overrideTimer room}', 'active')") roomNames
   );
@@ -258,6 +272,8 @@ let
     min_run_active = "{{ is_state('${minRunTimer room}', 'active') }}";
     min_off_active = "{{ is_state('${minOffTimer room}', 'active') }}";
     setpoint = setpointTemplate room;
+    airflow = airflowTemplate room;
+    current_airflow = "{{ state_attr('${climateEntity room}', 'swing_mode') }}";
     # What an idle room's dial shows: its own temperature. The card puts this
     # numeral front and centre, so while the head is off it may as well read
     # the room rather than a setpoint that is not in use. When cooling starts
@@ -283,6 +299,8 @@ let
       { trigger = "state"; entity_id = shedTimer room; }
       { trigger = "state"; entity_id = effectiveMode; }
       { trigger = "state"; entity_id = enableToggle room; }
+      { trigger = "state"; entity_id = swingToggle room; }
+      { trigger = "state"; entity_id = comfortToggle room; }
       { trigger = "time_pattern"; minutes = "/1"; }
     ];
     actions = [
@@ -321,6 +339,25 @@ let
                   hvac_mode = "{{ desired }}";
                   temperature = "{{ setpoint }}";
                 };
+              }
+            ];
+          }
+          # Airflow changed while running. Only worth sending to a head that
+          # is on: with it off SmartIR would just retransmit the off code.
+          {
+            conditions = [
+              {
+                condition = "template";
+                value_template = ''
+                  {{ desired != 'off' and current_mode == desired
+                     and airflow != current_airflow }}'';
+              }
+            ];
+            sequence = [
+              {
+                action = "climate.set_swing_mode";
+                target.entity_id = climateEntity room;
+                data.swing_mode = "{{ airflow }}";
               }
             ];
           }
@@ -714,6 +751,24 @@ let
             ];
           }
           {
+            type = "entities";
+            title = "Airflow";
+            show_header_toggle = false;
+            # Standing preferences, not part of an override. Comfort aims the
+            # flap away from the room; swing sweeps it. Comfort wins if both
+            # are on, since the hardware cannot do each at once.
+            entities = lib.concatMap (room: [
+              {
+                entity = swingToggle room;
+                name = "${rooms.${room}} swing";
+              }
+              {
+                entity = comfortToggle room;
+                name = "${rooms.${room}} comfort";
+              }
+            ]) roomNames;
+          }
+          {
             # Shedding is rare, so the card only appears while it is happening
             # rather than sitting there reading Idle three times.
             type = "conditional";
@@ -887,13 +942,29 @@ in
     # their last state, which is what deselecting a room has to mean. They
     # are all on today, so nothing is stranded off by the change.
     input_boolean = lib.listToAttrs (
-      map (room: {
-        name = "hvac_enable_${room}";
-        value = {
-          name = "${rooms.${room}} enabled";
-          icon = "mdi:air-conditioner";
-        };
-      }) roomNames
+      lib.concatMap (room: [
+        {
+          name = "hvac_enable_${room}";
+          value = {
+            name = "${rooms.${room}} enabled";
+            icon = "mdi:air-conditioner";
+          };
+        }
+        {
+          name = "hvac_swing_${room}";
+          value = {
+            name = "${rooms.${room}} swing";
+            icon = "mdi:arrow-oscillating";
+          };
+        }
+        {
+          name = "hvac_comfort_${room}";
+          value = {
+            name = "${rooms.${room}} comfort airflow";
+            icon = "mdi:weather-windy";
+          };
+        }
+      ]) roomNames
     );
 
     template = [

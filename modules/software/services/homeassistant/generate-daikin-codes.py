@@ -24,7 +24,19 @@ FRAME_GAP_US = 15000
 ONE_SPACE_US = 800
 
 MODE_BYTE = {"cool": 0x30, "heat": 0x40}
-FAN_BYTE = {"1": 0x30, "2": 0x40, "3": 0x50, "4": 0x60, "5": 0x70, "auto": 0xA0}
+# Quiet is a fan speed in this protocol rather than a separate flag.
+FAN_BYTE = {
+    "1": 0x30,
+    "2": 0x40,
+    "3": 0x50,
+    "4": 0x60,
+    "5": 0x70,
+    "auto": 0xA0,
+    "quiet": 0xB0,
+}
+SWING_ON = 0x0F
+COMFORT_BIT = 0x10
+AIRFLOW = ["off", "swing", "comfort"]
 
 
 def broadlink_to_pulses(code_b64):
@@ -130,7 +142,15 @@ def celsius_for(fahrenheit):
     return round(celsius * 2) / 2.0
 
 
-def build(template_code, mode, fan, temp_c):
+def build(template_code, mode, fan, temp_c, airflow="off"):
+    """Airflow is one of off, swing or comfort.
+
+    Vertical swing is the low nibble of byte 8 in the third frame. Comfort
+    Airflow is a single bit in the *first* frame, which every other setting
+    leaves alone, so it needs that frame rewritten and its own checksum. The
+    two are mutually exclusive: comfort holds the flap at a fixed angle and
+    swing sweeps it.
+    """
     pulses = broadlink_to_pulses(template_code)
     spans = frame_spans(pulses)
     if len(spans) != 3:
@@ -139,10 +159,19 @@ def build(template_code, mode, fan, temp_c):
     frame = bytearray(read_frame(pulses, spans[2]))
     frame[5] = MODE_BYTE[mode] | 0x09
     frame[6] = int(round(temp_c * 2))
-    frame[8] = FAN_BYTE[fan]
+    frame[8] = FAN_BYTE[fan] | (SWING_ON if airflow == "swing" else 0x00)
     frame[18] = checksum(frame)
+    pulses = write_frame(pulses, spans[2], bytes(frame))
 
-    return IR.pulses_to_base64(write_frame(pulses, spans[2], bytes(frame)))
+    first = bytearray(read_frame(pulses, spans[0]))
+    if airflow == "comfort":
+        first[6] |= COMFORT_BIT
+    else:
+        first[6] &= ~COMFORT_BIT & 0xFF
+    first[7] = checksum(first)
+    pulses = write_frame(pulses, spans[0], bytes(first))
+
+    return IR.pulses_to_base64(pulses)
 
 
 def selftest(table):
@@ -188,10 +217,20 @@ def main():
     # One clean template drives every code. Two source captures are defective
     # (cool/4/20 is bit-shifted, heat/2/22 carries a stray flag in byte 10),
     # so seeding per mode/fan would propagate those into generated codes.
+    # SmartIR indexes commands as mode / fan / swing / temperature when the
+    # device declares swingModes, and the names are arbitrary. That spare
+    # dimension is the only place a full-state protocol can carry airflow, so
+    # swing and comfort ride in it.
     template = table["commands"]["cool"]["auto"]["22"]
     for mode in ("cool", "heat"):
         commands[mode] = {
-            fan: {str(t): build(template, mode, fan, celsius_for(t)) for t in temps}
+            fan: {
+                airflow: {
+                    str(t): build(template, mode, fan, celsius_for(t), airflow)
+                    for t in temps
+                }
+                for airflow in AIRFLOW
+            }
             for fan in FAN_BYTE
         }
 
@@ -204,7 +243,8 @@ def main():
         "maxTemperature": hi,
         "precision": 1.0,
         "operationModes": ["cool", "heat"],
-        "fanModes": ["auto", "1", "2", "3", "4", "5"],
+        "fanModes": ["auto", "quiet", "1", "2", "3", "4", "5"],
+        "swingModes": AIRFLOW,
         "commands": commands,
     }
     json.dump(out, sys.stdout, indent=1, sort_keys=True)
