@@ -134,52 +134,45 @@ let
   targetSensor = room: "sensor.hvac_target_${room}";
   prioritySensor = room: "sensor.hvac_priority_${room}";
 
-  # Resolve today's pattern and the block covering the current minute.
+  # Resolve today's pattern and the block covering the current minute. Every
+  # tag trims its own whitespace: Home Assistant types rendered results
+  # natively, and a stray newline turns a number or a boolean into a string.
   currentBlock = ''
-    {% set schedule = ${scheduleJson} %}
-    {% set blocks = schedule.patterns[schedule.days[now().strftime('%A') | lower]] %}
-    {% set mins = now().hour * 60 + now().minute %}
-    {% set ns = namespace(current = blocks[0]) %}
-    {% for b in blocks %}
-      {% if mins >= b.fromMinutes %}{% set ns.current = b %}{% endif %}
-    {% endfor %}
-  '';
+    {%- set schedule = ${scheduleJson} -%}
+    {%- set blocks = schedule.patterns[schedule.days[now().strftime('%A') | lower]] -%}
+    {%- set mins = now().hour * 60 + now().minute -%}
+    {%- set ns = namespace(current = blocks[0]) -%}
+    {%- for b in blocks -%}
+      {%- if mins >= b.fromMinutes -%}{%- set ns.current = b -%}{%- endif -%}
+    {%- endfor -%}'';
 
   # An active override replaces the scheduled value for as long as it runs.
   targetTemplate = room: ''
     ${currentBlock}
-    {% if is_state('${overrideTimer room}', 'active') %}
+    {%- if is_state('${overrideTimer room}', 'active') -%}
       {{ states('${overrideNumber room}') | round(0) }}
-    {% else %}
+    {%- else -%}
       {{ ns.current.rooms['${room}'].coolAbove }}
-    {% endif %}
-  '';
+    {%- endif -%}'';
 
   priorityTemplate = room: ''
     ${currentBlock}
-    {% if is_state('${overrideTimer room}', 'active') %}
+    {%- if is_state('${overrideTimer room}', 'active') -%}
       ${toString tuning.overridePriority}
-    {% else %}
+    {%- else -%}
       {{ ns.current.rooms['${room}'].priority }}
-    {% endif %}
-  '';
+    {%- endif -%}'';
 
+  # Single-line on purpose, for the same native-typing reason. as_timestamp
+  # takes a default, which covers an entity that does not exist yet.
   roomVariables = room: {
     room_temp = "{{ states('${tempSensor room}') | float(-999) }}";
     target = "{{ states('${targetSensor room}') | float(999) }}";
     shed = "{{ is_state('${shedTimer room}', 'active') }}";
     current_mode = "{{ states('${climateEntity room}') }}";
-    stale = ''
-      {% set s = states.sensor.ac_controller_${room}_temperature %}
-      {{ s is none
-         or s.state in ['unknown', 'unavailable']
-         or (now() - s.last_updated).total_seconds() > ${toString (tuning.staleMinutes * 60)} }}'';
-    held = ''
-      {% set c = states.climate.${room}_ac %}
-      {{ 0 if c is none else (now() - c.last_changed).total_seconds() }}'';
-    setpoint = ''
-      {% set t = states('${targetSensor room}') | float(999) %}
-      {{ [[t - ${toString tuning.setpointOffset}, 64] | max, 86] | min | round(0) }}'';
+    stale = "{{ states('${tempSensor room}') in ['unknown', 'unavailable'] or (as_timestamp(now()) - as_timestamp(states.sensor.ac_controller_${room}_temperature.last_updated, 0)) > ${toString (tuning.staleMinutes * 60)} }}";
+    held = "{{ as_timestamp(now()) - as_timestamp(states.climate.${room}_ac.last_changed, as_timestamp(now())) }}";
+    setpoint = "{{ [[(states('${targetSensor room}') | float(999)) - ${toString tuning.setpointOffset}, 64] | max, 86] | min | round(0) }}";
   };
 
   offAction = room: {
@@ -347,7 +340,7 @@ let
       {
         variables = {
           stalled = ''
-            {% set ns = namespace(pick = '', best = -1) %}
+            {% set ns = namespace(pick = "", best = -1) %}
             ${lib.concatMapStrings (room: ''
               {% if ${stalledExpr room} and (states('${prioritySensor room}') | int(0)) > ns.best %}
                 {% set ns.pick = '${room}' %}
@@ -356,7 +349,7 @@ let
             '') roomNames}
             {{ ns.pick }}'';
           victim = ''
-            {% set ns = namespace(pick = '', worst = 999) %}
+            {% set ns = namespace(pick = "", worst = 999) %}
             ${lib.concatMapStrings (room: ''
               {% if is_state('${climateEntity room}', 'cool')
                     and not is_state('${shedTimer room}', 'active')
