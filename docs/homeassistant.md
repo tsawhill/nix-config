@@ -112,13 +112,17 @@ Commission one unit first:
    flake lock), so no HACS installation is needed.
 3. Verify local sensor readings. IR commands come from the generated code
    table described below, not from learning.
-4. Block WAN, power-cycle the blaster, and restart Home Assistant. Verify
-   temperature updates and actual AC response still work without Smart Life
-   running. Include an extended offline test for stock-firmware behavior.
+4. Block WAN and power-cycle the blasters.
 
-If the stock firmware cannot meet this test, investigate replacement firmware
-against the actual board/module and sensor wiring. Do not assume the model
-name alone proves ESPHome/OpenBeken compatibility or flash a guessed pin map.
+**All three passed on 2026-09-19.** With WAN blocked in OPNsense, sensors kept
+reporting and control kept working; after a power cycle the units rejoined and
+re-established their local sessions fast enough that tuya-local never marked
+the entities unavailable. The stock firmware does not need the cloud to boot,
+so replacing it buys nothing here and the FrankEver units can stay as they are.
+
+Worth knowing for the next fault: tuya-local holds one local TCP session per
+device for both reads and writes, so live sensor readings are evidence that
+the control path works, not just the sensor path.
 
 ## Daikin IR codes
 
@@ -197,9 +201,13 @@ overshoots in cooling and undershoots in heating.
 
 ## Network isolation
 
-The current deployment uses the existing LAN and an OPNsense blocking alias;
-no isolated IoT network is currently planned. This blocks traffic traversing
-the router, but does not isolate devices from peers on the same subnet.
+The blasters are in an OPNsense blocking alias with WAN denied, on the existing
+LAN rather than an isolated IoT network. That blocks traffic traversing the
+router but does not isolate them from peers on the same subnet.
+
+The block must deny WAN only. Home Assistant on `10.73.73.34` still has to
+reach `.201`-`.203` locally, and a rule broad enough to catch that looks
+exactly like a firmware failure.
 
 For full isolation, place the blasters on an isolated IoT VLAN/SSID. Deny WAN and new connections
 to trusted LAN hosts, and isolate clients from each other. Allow Home Assistant
