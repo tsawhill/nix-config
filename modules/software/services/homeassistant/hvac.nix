@@ -57,7 +57,8 @@ let
     let
       parts = lib.splitString ":" stamp;
     in
-    (lib.toInt (builtins.elemAt parts 0)) * 60 + (lib.toInt (builtins.elemAt parts 1));
+    # toIntBase10, because toInt rejects "00" as octal-ambiguous.
+    (lib.toIntBase10 (builtins.elemAt parts 0)) * 60 + (lib.toIntBase10 (builtins.elemAt parts 1));
 
   block = from: blockRooms: {
     inherit from;
