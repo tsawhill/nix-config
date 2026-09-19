@@ -562,46 +562,14 @@ let
             type = "grid";
             columns = 3;
             square = false;
-            # A gauge leads with the room's own reading, which is the number
-            # being controlled; the built-in thermostat card puts the setpoint
-            # in the big numeral instead and cannot be inverted. The tile
-            # underneath carries the controls the gauge has no room for.
+            # The thermostat card puts the setpoint in the big numeral and the
+            # room temperature in small print, which is the wrong emphasis for
+            # this system. It still looks better than the alternatives built
+            # from gauges or markdown, both of which were tried and were worse.
             cards = map (room: {
-              type = "vertical-stack";
-              cards = [
-                {
-                  type = "gauge";
-                  entity = tempSensor room;
-                  name = rooms.${room};
-                  min = 60;
-                  max = 95;
-                  severity = {
-                    green = 60;
-                    yellow = 78;
-                    red = 84;
-                  };
-                }
-                {
-                  type = "tile";
-                  entity = climateEntity room;
-                  name = rooms.${room};
-                  state_content = [
-                    "state"
-                    "temperature"
-                  ];
-                  features = [
-                    { type = "target-temperature"; }
-                    {
-                      type = "climate-hvac-modes";
-                      hvac_modes = [
-                        "off"
-                        "cool"
-                        "heat"
-                      ];
-                    }
-                  ];
-                }
-              ];
+              type = "thermostat";
+              entity = climateEntity room;
+              name = rooms.${room};
             }) roomNames;
           }
           {
