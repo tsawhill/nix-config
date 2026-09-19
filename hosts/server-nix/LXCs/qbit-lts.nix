@@ -28,7 +28,6 @@ in
   networking.hostName = "qbit-lts-nix";
 
   my.secrets.qbit-lts-vpn.enable = vpnClientEnabled;
-  my.secrets.qbittorrent_webui.enable = secretsProvisioned;
   my.secrets.qbit-trackers.enable = secretsProvisioned;
 
   # Seeding instance: torrents arrive already complete, at a path chosen when
@@ -37,11 +36,14 @@ in
     enable = true;
     profile = "lts";
     portSecret = lib.mkIf vpnClientEnabled "qbit_lts_vpn_port";
-    webuiPasswordSecret = lib.mkIf secretsProvisioned "qbittorrent_webui_password";
 
     authSubnetWhitelist = [
       "${networkTopology.lib.lanIp "arrs-nix"}/32"
       "${networkTopology.lib.lanIp "qui-nix"}/32"
+      "${networkTopology.lib.lanIp "taylor-desktop-nix"}/32"
+      "${networkTopology.lib.lanIp "taylor-laptop-nix"}/32"
+      (networkTopology.lib.wgAddress "taylor-desktop-nix")
+      (networkTopology.lib.wgAddress "taylor-laptop-nix")
     ];
     serverDomains = [
       (networkTopology.lib.fqdn "qbit-lts-nix")
@@ -75,12 +77,16 @@ in
   my.services.qbit-manage = {
     enable = secretsProvisioned;
     rootDir = "/mnt/downloadSSD/Seeding";
+    # Hourly, not daily: unlisted trackers are meant to stop promptly, and the
+    # timer is the real bound on how long they seed.
+    interval = "hourly";
     # Stays on until a --dry-run has been read and found boring.
     dryRun = true;
 
     trackerSecrets = {
       t1 = "qbit_tracker_t1";
       t2 = "qbit_tracker_t2";
+      t3 = "qbit_tracker_t3";
     };
 
     categories = {
@@ -88,28 +94,43 @@ in
     };
 
     # Lowest priority wins; each torrent takes the first group it matches.
-    # cleanup stays false everywhere: these .torrent files are the only copy of
-    # their passkeys.
+    # Promotion to this host is universal, so these only govern how long a
+    # torrent seeds once it arrives.
     shareLimits = {
-      tier1 = {
+      # Seed forever.
+      t1 = {
         priority = 1;
         include_any_tags = [ "t1" ];
-        min_seeding_time = "30d";
-        max_ratio = -1;
-        cleanup = false;
-      };
-      tier2 = {
-        priority = 2;
-        include_any_tags = [ "t2" ];
-        min_seeding_time = "14d";
-        max_ratio = -1;
-        cleanup = false;
-      };
-      default = {
-        priority = 99;
         max_ratio = -1;
         max_seeding_time = -1;
         cleanup = false;
+      };
+      # 30 days, then remove the torrent and free the download copy.
+      t2 = {
+        priority = 2;
+        include_any_tags = [ "t2" ];
+        max_ratio = -1;
+        max_seeding_time = "30d";
+        cleanup = true;
+      };
+      # 2 days, then remove.
+      t3 = {
+        priority = 3;
+        include_any_tags = [ "t3" ];
+        max_ratio = -1;
+        max_seeding_time = "2d";
+        cleanup = true;
+      };
+      # Unlisted trackers stop and are cleaned up: everything promoted here came
+      # through an *arr import, so the download copy is a seeding artifact and
+      # the library already has the media. Removal goes via the recycle bin.
+      default = {
+        priority = 99;
+        max_ratio = -1;
+        max_seeding_time = 0;
+        share_limit_action = "Stop";
+        resume_torrent_after_change = false;
+        cleanup = true;
       };
     };
   };

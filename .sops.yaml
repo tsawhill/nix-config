@@ -413,3 +413,31 @@ creation_rules:
         - *build-nix
         - *deluge-nix
         - *networking-vpn-out-eu1-nix
+  - path_regex: modules/secrets/server/LXCs/qbit-gen-vpn\.yaml$
+    key_groups:
+      - age:
+        - *build-nix
+        - *qbit-gen-nix
+        - *networking-vpn-out-eu1-nix
+  - path_regex: modules/secrets/server/LXCs/qbit-lts-vpn\.yaml$
+    key_groups:
+      - age:
+        - *build-nix
+        - *qbit-lts-nix
+        - *networking-vpn-out-eu1-nix
+  - path_regex: modules/secrets/server/LXCs/qbittorrent_webui\.yaml$
+    key_groups:
+      - age:
+        - *build-nix
+        - *qbit-gen-nix
+        - *qbit-lts-nix
+  - path_regex: modules/secrets/server/LXCs/qbit-trackers\.yaml$
+    key_groups:
+      - age:
+        - *build-nix
+        - *qbit-lts-nix
+  - path_regex: modules/secrets/server/LXCs/qui_session_secret\.yaml$
+    key_groups:
+      - age:
+        - *build-nix
+        - *qui-nix

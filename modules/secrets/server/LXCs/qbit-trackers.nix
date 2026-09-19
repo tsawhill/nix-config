@@ -21,6 +21,7 @@ in
       default = [
         "qbit_tracker_t1"
         "qbit_tracker_t2"
+        "qbit_tracker_t3"
       ];
       description = "Secret keys to declare, one per tracker tier. Extend as tiers are added.";
     };

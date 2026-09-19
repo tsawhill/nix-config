@@ -52,12 +52,6 @@ port = local port). Do not reuse `deluge_vpn_port`: the gateway asserts
 `lib.unique portForwardKeys`, so a duplicate `portSecret` fails evaluation while
 Deluge is still up.
 
-Generate the web UI password hash — either with
-<https://codeberg.org/feathecutie/qbittorrent_password>, or by starting one
-container without a password, setting one in the web UI, and copying the
-`Password_PBKDF2` line out of
-`/var/lib/qBittorrent/qBittorrent/config/qBittorrent.conf`.
-
 Add the `.sops.yaml` creation rules now that the factory has written each host's
 age anchor, then fill in the values:
 
@@ -76,13 +70,6 @@ forwarded_port: "PORT_FROM_AIRVPN"
 ```
 
 ```
-sops modules/secrets/server/LXCs/qbittorrent_webui.yaml
-```
-```yaml
-password_pbkdf2: "@ByteArray(SALT:HASH)"
-```
-
-```
 openssl rand -hex 32
 sops modules/secrets/server/LXCs/qui_session_secret.yaml
 ```
@@ -94,9 +81,13 @@ session_secret: "HEX_FROM_ABOVE"
 sops modules/secrets/server/LXCs/qbit-trackers.yaml
 ```
 ```yaml
-# Announce-URL keywords qbit-manage matches on; pipe-delimit aliases.
-qbit_tracker_t1: "KEYWORD_FOR_TIER1"
-qbit_tracker_t2: "KEYWORD_FOR_TIER2"
+# One key per seeding tier, not per tracker. The value is one or more
+# announce-URL substrings, pipe-delimited with no spaces, e.g.
+# "flacsfor.me|gazellegames.net". Anything not listed falls through to the
+# catch-all tier, which stops seeding and removes the torrent.
+qbit_tracker_t1: "KEYWORDS"   # seed forever
+qbit_tracker_t2: "KEYWORDS"   # seed 30 days, then remove
+qbit_tracker_t3: "KEYWORDS"   # seed 2 days, then remove
 ```
 
 The qui session secret encrypts the stored qBittorrent credentials in qui's
@@ -104,9 +95,43 @@ database. Rotating it deregisters every instance — treat it as permanent.
 
 Encryption targets: each `qbit-*-vpn.yaml` goes to build-nix, its own host, and
 `networking-vpn-out-eu1-nix` (which renders the DNAT rule from the placeholder).
-`qbittorrent_webui.yaml` goes to build-nix and both qBittorrent hosts,
-`qui_session_secret.yaml` to build-nix and `qui-nix`, `qbit-trackers.yaml` to
+`qui_session_secret.yaml` goes to build-nix and `qui-nix`, `qbit-trackers.yaml` to
 build-nix and `qbit-lts-nix`.
+
+### Web UI access
+
+There is no web UI password. `authSubnetWhitelist` covers `arrs-nix`, `qui-nix`
+and Taylor's desktop and laptop on both LAN and WireGuard, so those reach the UI
+without authenticating and everything else hits a login it cannot pass. The
+qBittorrent UIs have no public vhost; qui behind Authentik is the front door.
+
+To add a password later, the machinery is still in place — the secret module
+`modules/secrets/server/LXCs/qbittorrent_webui.nix` and its `.sops.yaml` rule are
+unused but intact. qBittorrent has no `QBT_WEBUI_PASSWORD`, so the hash has to be
+generated out of band:
+
+```
+# 1. qBittorrent logs a temporary password at startup when none is set
+ssh root@qbit-gen-nix.lan 'journalctl -u qbittorrent | grep -i "temporary password"'
+
+# 2. Log into http://qbit-gen-nix.lan:8080 as admin with it, then set a real
+#    password under Tools -> Options -> Web UI
+
+# 3. Read the generated hash back out, immediately - the config is reinstalled
+#    from the store on restart, so it only lives there until qBittorrent restarts
+ssh root@qbit-gen-nix.lan 'grep Password_PBKDF2 /var/lib/qBittorrent/qBittorrent/config/qBittorrent.conf'
+```
+
+Put that whole `@ByteArray(salt:hash)` value in the secret, then set
+`my.secrets.qbittorrent_webui.enable = true` and
+`webuiPasswordSecret = "qbittorrent_webui_password"` on both hosts:
+
+```
+sops modules/secrets/server/LXCs/qbittorrent_webui.yaml
+```
+```yaml
+password_pbkdf2: "@ByteArray(SALT:HASH)"
+```
 
 ### 5. Gateway and enable
 
@@ -116,23 +141,33 @@ overlap, and enable `my.secrets.qbit-gen-vpn` / `qbit-lts-vpn` there. Deploy the
 gateway, then flip `vpnClientEnabled = true` in both qBittorrent host files and
 deploy them, then `qui-nix`, then `local-nginx-nix`.
 
-### 6. Verify the config keys before loading torrents
+### 6. Config keys — verified 2026-09-19
 
-Several `Session\*` key names were taken from the 5.2.2 source but not confirmed
-against a running binary. On `qbit-gen-nix`, set each in the web UI and read
-`/var/lib/qBittorrent/qBittorrent/config/qBittorrent.conf` back:
+Checked against the rendered config on both containers. All tuning keys applied.
+Resolved:
 
-- `SendBufferLowWatermark`, `SendBufferWatermarkFactor`
-- `MemoryWorkingSetLimit` (name and unit)
-- `GlobalMaxInactiveSeedingMinutes`
-- `MaxRatioAction` vs `ShareLimitAction`
-- `Network\PortForwardingEnabled` — **confirm this one first.** If it is not the
-  UPnP/NAT-PMP toggle, UPnP stays on behind the VPN.
-- `Preferences\WebUI\ServerDomains`
-- `Meta\MigrationVersion` — qBittorrent 5 may re-run config migrations on every
-  boot since the config is reinstalled. Pin it if it appears.
-- `categories.json` schema — newer builds may write `download_path` and
-  `use_download_path` per entry.
+- `Network\PortForwardingEnabled` — **confirmed**, lives in `[Network]` and
+  persists as `false`. UPnP/NAT-PMP are off.
+- `Preferences\WebUI\ServerDomains` — confirmed; `HostHeaderValidation` stays
+  `true`.
+- `Session\ShareLimitAction` is the real key, **not** `MaxRatioAction`. String
+  values, default `Stop`.
+- `Session\AddTorrentStopped`, **not** `AddTorrentPaused`.
+- `Meta\MigrationVersion=8` does appear, and is now pinned in `serverConfig`.
+  Without it, migrations re-run every boot against an already-current file.
+- `SendBufferWatermark`, `SocketBacklogSize`, `ConnectionSpeed`, `FilePoolSize`,
+  `AsyncIOThreadsCount`, `HashingThreadsCount` all applied verbatim.
+
+Still unverified, because nothing sets them yet:
+
+- `SendBufferLowWatermark`, `SendBufferWatermarkFactor`, `MemoryWorkingSetLimit`,
+  `GlobalMaxInactiveSeedingMinutes` — not currently in either profile.
+- `categories.json` schema — check whether newer builds add `download_path` and
+  `use_download_path` once categories are in use.
+- **`Session\Port`** — qBittorrent writes a random port back when nothing sets
+  one (seen as `13386` on qbit-gen). This is the mechanism `QBT_TORRENTING_PORT`
+  has to override at stage 5. Confirm with `ss -ltnp` that the listening port is
+  the AirVPN-reserved one, not a fresh random.
 
 ### 7. Monitoring and qui instances
 
@@ -213,23 +248,73 @@ set last, then stop `deluged` but leave the container for another week.
 
 ## qbit-manage
 
-Per-tracker ratio and seed time come from qbit-manage on `qbit-lts-nix`, since
-qBittorrent has only global and per-torrent share limits. It runs against
+Per-tracker seeding policy comes from qbit-manage on `qbit-lts-nix`, since
+qBittorrent itself has only global and per-torrent share limits. It runs against
 `localhost:8080` with no credentials (`LocalHostAuth` is off).
 
-Tracker keywords are SOPS secrets; the share limit groups that consume them live
-in `hosts/server-nix/LXCs/qbit-lts.nix` where they can be reviewed. `tag_update`
-applies the tracker tags and `share_limits` then filters on them — both must stay
-enabled or the groups match nothing.
+Promotion to `qbit-lts-nix` is universal — the On Import script runs regardless
+of tracker — so the tiers only govern how long a torrent seeds once it arrives:
+
+| Tier | Seeds for | At expiry |
+|---|---|---|
+| `t1` | forever | nothing |
+| `t2` | 30 days | torrent removed, download copy freed |
+| `t3` | 2 days | torrent removed, download copy freed |
+| unmatched | until the next run | stopped **and removed** |
+
+Unlisted trackers stop and are cleaned up: `max_seeding_time = 0` is an
+immediately-met limit, with `share_limit_action = "Stop"` and
+`resume_torrent_after_change = false` (the default `true` would undo the stop on
+the following run). Cleanup is justified because everything the promotion script
+puts here arrived via an *arr import, so the library already holds the media and
+the download copy is a seeding artifact.
+
+**"Immediately" is bounded by the timer**, which is why it runs hourly rather
+than daily. An unmatched torrent can still seed for up to an hour before being
+stopped. Tightening that further means a more frequent timer, not a config
+change.
+
+### Two ways a torrent reaches qbit-lts without an import
+
+The cleanup justification above holds for the promotion path. It does **not**
+hold for:
+
+1. **The Deluge migration.** The ~950 albums in `/mnt/downloadSSD/Seeding` are
+   added to `qbit-lts` directly, not through an *arr. Some may never have been
+   imported by Lidarr at all, in which case that copy is the only copy.
+2. **Anything you promote by hand** in qui from `qbit-gen`.
+
+For both, a tracker keyword that fails to match means the torrent is stopped and
+removed on the next hourly run. The recycle bin gives 30 days and keeps the
+`.torrent`, so it is recoverable — but it is the only thing standing between a
+typo and real deletion.
+
+**Hard ordering rule: do not set `dryRun = false` until the migration is complete
+and a dry-run shows every migrated torrent in the tier you expect.** Anything
+falling through to `other` is a keyword that did not match. On a private tracker
+that is also how you collect a hit-and-run, so this pass is not optional.
+
+Removal goes through qbit-manage's recycle bin at `/mnt/downloadHDD/.RecycleBin`
+with `save_torrents` on, so both the data and the `.torrent` survive for 30 days
+before real deletion. That matters because those `.torrent` files are the only
+copy of their passkeys.
+
+Tracker keywords are SOPS secrets; the tiers that consume them live in
+`hosts/server-nix/LXCs/qbit-lts.nix` where they can be reviewed. A tier's secret
+value is one or more announce-URL substrings, pipe-delimited with no spaces:
+
+```yaml
+qbit_tracker_t1: "flacsfor.me|gazellegames.net"
+```
+
+`tag_update` applies the tracker tags and `share_limits` then filters on them —
+both must stay enabled or the groups match nothing.
 
 `my.services.qbit-manage.dryRun` starts **true**. Run it once and read the whole
-output: confirm each torrent lands in the group you expect, that the keywords
-actually matched rather than everything falling through to `other`, and that
-nothing is reported as removable. Only then set `dryRun = false`.
-
-`cleanup` stays `false` in every group and `share_limit_action` stays at its
-default. This instance holds torrents whose `.torrent` files are the only copy of
-their passkeys.
+output: confirm each torrent lands in the tier you expect, that the keywords
+matched rather than everything falling through to `other`, and that the only
+things marked for removal are ones you actually want gone. Only then set
+`dryRun = false`.
 
 ## Decommissioning deluge-nix
 

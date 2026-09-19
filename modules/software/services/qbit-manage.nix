@@ -57,6 +57,18 @@ let
 
     directory = {
       root_dir = cfg.rootDir;
+      recycle_bin = cfg.recycleBin.path;
+      torrents_dir = cfg.torrentsDir;
+    };
+
+    # cleanup moves torrents here rather than erasing them, giving a recovery
+    # window. save_torrents keeps the .torrent alongside the data, which matters
+    # because those files are the only copy of their passkeys.
+    recyclebin = {
+      enabled = cfg.recycleBin.enable;
+      empty_after_x_days = cfg.recycleBin.emptyAfterDays;
+      save_torrents = true;
+      split_by_category = false;
     };
 
     cat = cfg.categories;
@@ -83,6 +95,32 @@ in
       type = lib.types.bool;
       default = true;
       description = "Report what would change without applying it. Leave on until the output is boring.";
+    };
+
+    torrentsDir = lib.mkOption {
+      type = lib.types.str;
+      default = "/var/lib/qBittorrent/qBittorrent/data/BT_backup";
+      description = "qBittorrent's BT_backup directory. Required for the recycle bin to save .torrent files.";
+    };
+
+    recycleBin = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Move cleaned-up torrents here instead of deleting outright.";
+      };
+
+      path = lib.mkOption {
+        type = lib.types.str;
+        default = "/mnt/downloadHDD/.RecycleBin";
+        description = "Recycle bin location. Same filesystem as the data avoids a copy on move.";
+      };
+
+      emptyAfterDays = lib.mkOption {
+        type = lib.types.int;
+        default = 30;
+        description = "How long recovered-from-cleanup data survives before real deletion.";
+      };
     };
 
     interval = lib.mkOption {

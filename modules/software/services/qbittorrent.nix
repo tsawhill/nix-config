@@ -78,6 +78,11 @@ let
   baseServerConfig = {
     LegalNotice.Accepted = true;
 
+    # qBittorrent 5 stamps this after running its config migrations. The config
+    # is reinstalled from the store on every start, so pin it or migrations
+    # re-run each boot against an already-current file.
+    Meta.MigrationVersion = 8;
+
     Preferences = {
       General.Locale = "en";
       WebUI = {
