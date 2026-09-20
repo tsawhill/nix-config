@@ -61,6 +61,7 @@ in
     presharedKeySecret = "vpn_egress_wireguard_preshared_key";
 
     clientAddresses = [
+      (lanIp "arrs-nix")
       (lanIp "deluge-nix")
       (lanIp "qbit-gen-nix")
       (lanIp "qbit-lts-nix")
