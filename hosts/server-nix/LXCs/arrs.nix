@@ -9,7 +9,7 @@
     "${self}/modules/software/services/lidarr.nix"
     "${self}/modules/software/services/yt-dlp.nix"
     "${self}/modules/software/services/qbit-promote.nix"
-    "${self}/modules/software/services/flaresolverr.nix"
+    "${self}/modules/software/services/byparr.nix"
 
   ];
   my.secrets = {
@@ -39,7 +39,7 @@
   };
 
   # Reached by Prowlarr over loopback as http://127.0.0.1:8191.
-  my.services.flaresolverr.enable = true;
+  my.services.byparr.enable = true;
 
   # Indexer queries leave through the Swiss gateway rather than OPNsense's own
   # tunnel, so the *arrs and the torrent clients share one exit.
