@@ -59,7 +59,6 @@
   proxy.qui = {
     enable = true;
     domain = "qbit.tsawhill.org";
-    enableAuthentik = true;
   };
   proxy.seerr = {
     enable = true;
