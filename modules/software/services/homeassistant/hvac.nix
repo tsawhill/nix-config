@@ -1018,16 +1018,17 @@ in
     ln -sfn ${dashboardFile} ${lib.escapeShellArg configDir}/hvac-dashboard.yaml
   '';
 
+  # The module builds the resource URL from pname and version, so both have to
+  # exist on the derivation; the content hash doubles as the cache buster.
   services.home-assistant.customLovelaceModules = [
     (
       let
-        entrypoint = "hvac-controls-${
-          builtins.substring 0 12 (builtins.hashFile "sha256" ./hvac-controls.js)
-        }.js";
+        pname = "hvac-controls";
+        version = builtins.substring 0 12 (builtins.hashFile "sha256" ./hvac-controls.js);
       in
-      pkgs.runCommand "hvac-controls" { passthru = { inherit entrypoint; }; } ''
+      pkgs.runCommand "${pname}-${version}" { passthru = { inherit pname version; }; } ''
         mkdir -p $out
-        cp ${./hvac-controls.js} $out/${entrypoint}
+        cp ${./hvac-controls.js} $out/${pname}.js
       ''
     )
   ];
