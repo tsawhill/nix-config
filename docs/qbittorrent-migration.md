@@ -148,8 +148,13 @@ Resolved:
 
 - `Network\PortForwardingEnabled` — **confirmed**, lives in `[Network]` and
   persists as `false`. UPnP/NAT-PMP are off.
-- `Preferences\WebUI\ServerDomains` — confirmed; `HostHeaderValidation` stays
-  `true`.
+- `Preferences\WebUI\ServerDomains` — key name is right, but the value is split
+  on **`;`**, not commas (`AuthSubnetWhitelist` is a Qt QStringList and *is*
+  comma-separated — the two differ). A comma-joined list silently matches
+  nothing, and every request by hostname then gets a bare 401 before auth is
+  considered. `validateHostHeader` matches the Host against the local address
+  before consulting the domain list, which is why reaching the UI by IP worked
+  while the hostname did not. `HostHeaderValidation` stays `true`.
 - `Session\ShareLimitAction` is the real key, **not** `MaxRatioAction`. String
   values, default `Stop`.
 - `Session\AddTorrentStopped`, **not** `AddTorrentPaused`.

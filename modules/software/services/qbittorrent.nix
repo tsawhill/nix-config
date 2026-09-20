@@ -102,7 +102,8 @@ let
         AuthSubnetWhitelist = lib.concatStringsSep ", " cfg.authSubnetWhitelist;
       }
       // lib.optionalAttrs (cfg.serverDomains != [ ]) {
-        ServerDomains = lib.concatStringsSep ", " cfg.serverDomains;
+        # Split on ";" by qBittorrent, unlike AuthSubnetWhitelist which is a QStringList.
+        ServerDomains = lib.concatStringsSep ";" cfg.serverDomains;
       }
       // lib.optionalAttrs hasPassword {
         # Replaced from SOPS at pre-start; never the real hash in the store.
