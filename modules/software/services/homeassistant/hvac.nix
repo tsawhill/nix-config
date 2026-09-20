@@ -300,7 +300,7 @@ let
   targetTemplate = room: ''
     ${currentBlock}
     {%- if is_state('${overrideTimer room}', 'active') -%}
-      {{ states('${overrideNumber room}') | round(0) }}
+      {{ states('${overrideNumber room}') | float(75) | round(0) }}
     {%- else -%}
       {{ ns.current.rooms['${room}'].coolAbove }}
     {%- endif -%}'';
@@ -308,7 +308,7 @@ let
   heatTargetTemplate = room: ''
     ${currentBlock}
     {%- if is_state('${overrideTimer room}', 'active') -%}
-      {{ states('${overrideNumber room}') | round(0) }}
+      {{ states('${overrideNumber room}') | float(68) | round(0) }}
     {%- else -%}
       {{ ns.current.rooms['${room}'].heatBelow }}
     {%- endif -%}'';
@@ -424,6 +424,10 @@ let
       {
         trigger = "state";
         entity_id = shedTimer room;
+      }
+      {
+        trigger = "state";
+        entity_id = overrideTimer room;
       }
       {
         trigger = "state";
@@ -894,11 +898,11 @@ let
                       minutes:
                       actionButton (
                         if minutes == 30 then
-                          "30 min"
+                          "Apply 30m"
                         else if minutes == 60 then
-                          "1 hour"
+                          "Apply 1h"
                         else
-                          "2 hours"
+                          "Apply 2h"
                       ) "mdi:check" "script.hvac_apply_override" { inherit room minutes; }
                     )
                     [
@@ -1238,9 +1242,8 @@ in
     # run opposing ones. The per-room toggles are the temporary "not this room"
     # switch; they read as enabled unless explicitly off, so a room is never
     # left out just because its toggle has never been touched.
-    # hvac_system_mode is the seasonal baseline. hvac_override_mode is chosen
-    # before Apply and cleared when the override expires, so a temporary
-    # change of mode cannot outlive the temperatures it came with. The fan
+    # hvac_system_mode is the seasonal baseline. hvac_override_mode holds the
+    # applied mode and is ignored when no override timer is active. The fan
     # selects default to following the schedule.
     input_select = {
       hvac_draft_mode = {
@@ -1414,12 +1417,11 @@ in
           }
           {
             condition = "template";
-            value_template = "{{ selected_room in ['all', 'office', 'bedroom', 'living_room'] and op in ['apply', 'resume', 'nap'] }}";
+            value_template = "{{ selected_room in ['all', 'office', 'bedroom', 'living_room'] and op in ['apply', 'resume', 'nap'] and (op != 'nap' or selected_room == 'bedroom') }}";
           }
           {
-            condition = "state";
-            entity_id = "input_boolean.hvac_drafts_initialized";
-            state = "on";
+            condition = "template";
+            value_template = "{{ op == 'resume' or is_state('input_boolean.hvac_drafts_initialized', 'on') }}";
           }
           {
             choose = [

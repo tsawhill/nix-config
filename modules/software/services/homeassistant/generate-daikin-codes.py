@@ -207,7 +207,9 @@ def validate_generated(table):
         raise ValueError("off: power bit is set")
     if set(table["operationModes"]) != {"cool", "heat"}:
         raise ValueError("incorrect operationModes")
-    if set(table["fanModes"]) != set(FAN_BYTE) or set(table["swingModes"]) != set(AIRFLOW):
+    if set(table["fanModes"]) != set(FAN_BYTE) or set(table["swingModes"]) != set(
+        AIRFLOW
+    ):
         raise ValueError("incorrect fan/airflow metadata")
     checked = 1
     for mode, mode_bits in MODE_BYTE.items():
@@ -268,8 +270,12 @@ def main():
     parser.add_argument("lo", type=int, nargs="?")
     parser.add_argument("hi", type=int, nargs="?")
     checks = parser.add_mutually_exclusive_group()
-    checks.add_argument("--selftest", action="store_true", help="check source Broadlink captures")
-    checks.add_argument("--validate-generated", action="store_true", help="check generated Tuya codes")
+    checks.add_argument(
+        "--selftest", action="store_true", help="check source Broadlink captures"
+    )
+    checks.add_argument(
+        "--validate-generated", action="store_true", help="check generated Tuya codes"
+    )
     args = parser.parse_args()
     with open(args.table) as handle:
         table = json.load(handle)
@@ -287,7 +293,9 @@ def main():
     lo, hi = args.lo, args.hi
     if lo is None or hi is None or not 64 <= lo <= hi <= 86:
         parser.error("generation requires 64 <= lo <= hi <= 86")
-    commands = {"off": IR.pulses_to_base64(broadlink_to_pulses(table["commands"]["off"]))}
+    commands = {
+        "off": IR.pulses_to_base64(broadlink_to_pulses(table["commands"]["off"]))
+    }
     temps = list(range(lo, hi + 1))
 
     # One clean template drives every code. Two source captures are defective

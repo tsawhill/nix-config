@@ -34,7 +34,7 @@ which is why DNS must be applied beforehand. Subsequent service changes use
 
 ## Declarative configuration and persistent state
 
-Edit `modules/software/services/homeassistant.nix` for packaged integrations,
+Edit `modules/software/services/homeassistant/default.nix` for packaged integrations,
 base configuration, helpers, templates, scripts, and automations. Add declarative
 automations to `services.home-assistant.config."automation manual"`. UI-created
 automations, scripts, and scenes have separate writable includes, initialized
@@ -224,8 +224,8 @@ device addresses, and router rules are not configured by this change.
 
 ## Control logic
 
-Once temperature readings and a working command path are available, implement
-room control declaratively with:
+`modules/software/services/homeassistant/hvac.nix` implements the room controller
+and the YAML dashboard. The controller uses:
 
 - Explicit heat/cool modes and setpoints, using measured room temperature.
 - A deadband and command interval to prevent oscillation and IR flooding.
@@ -234,7 +234,56 @@ room control declaratively with:
   confirm the indoor unit received it.
 - Coordination between heads sharing one outdoor unit before changing modes.
 
-No live HVAC automation is enabled until the entities and behavior are verified.
+## Dashboard and overrides
+
+The Rooms view uses responsive sections: three room panels on desktop and one
+per row on a phone. Temperature and humidity are always measured room values;
+the controller no longer rewrites the idle AC setpoint to make a dial look like
+a room sensor. Each panel shows the active heating/cooling threshold, controller
+status, and active timers. IR state is labelled as requested, not confirmed.
+
+Each room's pending threshold is separate from the applied override. Choose
+**Apply 30m**, **Apply 1h**, or **Apply 2h** to enable that room with the pending
+threshold, using the current system mode. Other rooms keep their timers.
+**Resume schedule** cancels only that room's override. Settings contains the
+whole-house override: pending mode, room thresholds, and run/pause choices are
+copied into applied helpers together when **Apply all rooms** is pressed.
+Room pause choices apply only during an active override. System mode is shared
+because all heads use the same outdoor unit.
+
+On the first startup after migration, drafts are seeded from the active room
+thresholds and existing override choices. After that they restore the last
+selection across restarts. No background synchronization overwrites pending
+edits. **Use current thresholds** explicitly reloads the current targets.
+Existing applied helper IDs and timer IDs are retained so an active override
+can survive deployment. System mode and fan/airflow preferences also restore.
+
+The Settings view holds the immediate seasonal mode control. Each room's
+settings subview holds immediate fan/airflow preferences and controller details.
+Bedroom nap presets use the sleeping cooling threshold in cool mode and the
+sleeping heating threshold in heat mode, without changing other rooms or the
+pending drafts. Starting a nap while the system is off is ignored. A nap
+replaces any existing bedroom override, using its same timer.
+
+### Offline validation
+
+With Python, Jinja2, and TinyTuya available:
+
+```sh
+python3 modules/software/services/homeassistant/test-hvac.py
+python3 modules/software/services/homeassistant/generate-daikin-codes.py \
+  modules/software/services/homeassistant/daikin-arc452a21.json --validate-generated
+```
+
+The regression suite exercises template behavior and generated IR fields. It
+does not contact Home Assistant or transmit IR. The generated-table validator
+checks all 967 commands, including quiet fan, swing/comfort exclusivity, mode,
+temperature, frame headers, and all frame checksums. Generation also validates
+its output before writing JSON. `--selftest` remains for upstream Broadlink
+source captures; `--validate-generated` is for the committed Tuya table.
+
+These checks do not replace the deployment build, a browser check at desktop
+and phone widths, or confirmation that the actual indoor units received IR.
 
 References: [FrankEver FK-UFO-R6](https://frankever.com/fk-ufo-r6-smart-remote-control-with-humidity-and-temperature-sensor/),
 [Tuya Local](https://github.com/make-all/tuya-local),
