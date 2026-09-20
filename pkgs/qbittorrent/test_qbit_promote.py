@@ -50,6 +50,17 @@ class ReadEventTests(unittest.TestCase):
             env = {f"{prefix}_eventtype": "Download", f"{prefix}_download_id": "ABCDEF"}
             self.assertEqual(read_event(env), ("Download", "abcdef"))
 
+    def test_reads_the_capitalised_names_the_arrs_actually_set(self):
+        # Sonarr sets Sonarr_EventType / Sonarr_Download_Id, and environment
+        # variables are case-sensitive, so a lowercase-only lookup sees nothing.
+        for prefix in ("Sonarr", "Radarr", "Lidarr"):
+            env = {f"{prefix}_EventType": "Download", f"{prefix}_Download_Id": "ABCDEF"}
+            self.assertEqual(read_event(env), ("Download", "abcdef"))
+
+    def test_event_type_matching_is_case_insensitive(self):
+        env = {"Sonarr_EventType": "download", "Sonarr_Download_Id": "AbC"}
+        self.assertEqual(read_event(env), ("download", "abc"))
+
     def test_test_event_is_a_no_op(self):
         eventtype, torrent_hash = read_event({"sonarr_eventtype": "Test"})
         self.assertEqual(eventtype, "Test")

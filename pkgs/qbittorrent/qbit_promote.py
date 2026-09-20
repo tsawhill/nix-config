@@ -18,11 +18,13 @@ import urllib.parse
 import urllib.request
 import uuid
 
+# The *arrs set these capitalised (Sonarr_EventType, Sonarr_Download_Id) and
+# environment variables are case-sensitive, so every lookup is normalised.
 EVENT_VARS = ("sonarr_eventtype", "radarr_eventtype", "lidarr_eventtype")
 HASH_VARS = ("sonarr_download_id", "radarr_download_id", "lidarr_download_id")
 
-IMPORT_EVENTS = {"Download", "AlbumDownload", "TrackFileImported"}
-TEST_EVENTS = {"Test"}
+IMPORT_EVENTS = {"download", "albumdownload", "trackfileimported"}
+TEST_EVENTS = {"test"}
 
 # Anything below 1.0 means the seeding instance cannot serve the data yet.
 COMPLETE_PROGRESS = 1.0
@@ -33,19 +35,25 @@ class PromotionError(Exception):
     """Raised when the torrent must be left on the intake instance."""
 
 
+def lookup(env, names):
+    """Case-insensitive environment lookup, first non-empty match wins."""
+    folded = {key.lower(): value for key, value in env.items()}
+    return next((folded[name] for name in names if folded.get(name)), None)
+
+
 def read_event(env):
     """Return (eventtype, infohash) from whichever *arr invoked us."""
-    eventtype = next((env[name] for name in EVENT_VARS if env.get(name)), None)
+    eventtype = lookup(env, EVENT_VARS)
     if eventtype is None:
         raise PromotionError("no *arr event type in the environment")
 
-    if eventtype in TEST_EVENTS:
+    if eventtype.lower() in TEST_EVENTS:
         return eventtype, None
 
-    if eventtype not in IMPORT_EVENTS:
+    if eventtype.lower() not in IMPORT_EVENTS:
         return eventtype, None
 
-    torrent_hash = next((env[name] for name in HASH_VARS if env.get(name)), None)
+    torrent_hash = lookup(env, HASH_VARS)
     if not torrent_hash:
         raise PromotionError(f"{eventtype} event carried no download id")
 
