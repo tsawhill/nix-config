@@ -64,7 +64,7 @@ in
     # Cosmetic here: labels are preserved on promotion, but with AutoTMM off no
     # path is ever enforced from them.
     categories = {
-      sonarr.savePath = "/mnt/downloadHDD/downloads/sonarr";
+      tv-sonarr.savePath = "/mnt/downloadHDD/downloads/sonarr";
       radarr.savePath = "/mnt/downloadHDD/downloads/radarr";
       lidarr.savePath = "/mnt/downloadSSD/Seeding";
       music-seed.savePath = "/mnt/downloadSSD/Seeding";
