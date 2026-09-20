@@ -18,10 +18,12 @@ in
 
     image = lib.mkOption {
       type = lib.types.str;
-      default = "ghcr.io/thephaseless/byparr:v3.0.4";
+      default = "ghcr.io/thephaseless/byparr@sha256:874f719518f617d03a60e03411fc5d090647e1a877041e81f8dc965927c7deb6";
       description = ''
-        Pinned upstream image. Byparr is not in nixpkgs, so this is the one part
-        of the stack not built from a pinned source tree — bump it deliberately.
+        Pinned by digest: upstream publishes only latest/main/nightly, so there
+        is no version tag to pin to. Byparr is not in nixpkgs, making this the
+        one part of the stack not built from a pinned source tree — bump it
+        deliberately by resolving a new digest, never by moving to a tag.
       '';
     };
   };
