@@ -1,7 +1,7 @@
 { self, ... }:
 let
-  # qui cannot start without its session secret, so both wait for SOPS.
-  secretsProvisioned = false;
+  # qui cannot start without its session secret, so both follow it.
+  secretsProvisioned = true;
 in
 {
   imports = [
