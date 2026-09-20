@@ -49,12 +49,10 @@ in
     ];
     serverDomains = [
       (networkTopology.lib.fqdn "qbit-lts-nix")
-      (networkTopology.lib.lanIp "qbit-lts-nix")
-      "localhost"
     ];
 
     # Only a fallback. Promoted torrents always arrive with an explicit path.
-    defaultSavePath = "/mnt/downloadSSD/Seeding";
+    defaultSavePath = "/mnt/downloadHDD/downloads/complete";
     tempPath = null;
     autoTMM = false;
 

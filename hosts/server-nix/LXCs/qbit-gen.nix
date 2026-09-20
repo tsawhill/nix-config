@@ -45,8 +45,6 @@ in
     ];
     serverDomains = [
       (networkTopology.lib.fqdn "qbit-gen-nix")
-      (networkTopology.lib.lanIp "qbit-gen-nix")
-      "localhost"
     ];
 
     defaultSavePath = "/mnt/downloadHDD/downloads/complete";

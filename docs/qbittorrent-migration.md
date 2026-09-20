@@ -138,17 +138,24 @@ deploy them, then `qui-nix`, then `local-nginx-nix`.
 ### 6. Config keys — verified 2026-09-19
 
 Checked against the rendered config on both containers. All tuning keys applied.
+
 Resolved:
 
 - `Network\PortForwardingEnabled` — **confirmed**, lives in `[Network]` and
   persists as `false`. UPnP/NAT-PMP are off.
-- `Preferences\WebUI\ServerDomains` — key name is right, but the value is split
-  on **`;`**, not commas (`AuthSubnetWhitelist` is a Qt QStringList and *is*
-  comma-separated — the two differ). A comma-joined list silently matches
-  nothing, and every request by hostname then gets a bare 401 before auth is
-  considered. `validateHostHeader` matches the Host against the local address
-  before consulting the domain list, which is why reaching the UI by IP worked
-  while the hostname did not. `HostHeaderValidation` stays `true`.
+- `Session\Port` — **confirmed working**. `QBT_TORRENTING_PORT` is honoured: the
+  listening TCP/UDP port matches the firewall rule, which reads the secret by a
+  separate path. Note `ss` shows the process as `.qbittorrent-no` (systemd
+  truncates it), so grepping for `qbittorrent-nox` finds nothing and looks like a
+  failure when it is not.
+- `Preferences\WebUI\ServerDomains` — key name is right, but the value is a plain
+  INI string where **`;` begins a comment**, so only the first entry survives. It
+  is also split on `;`, not commas (`AuthSubnetWhitelist` is a Qt QStringList and
+  *is* comma-separated — the two differ). Keep it to a single hostname.
+  `validateHostHeader` matches the Host against the local address before
+  consulting the list, so requests by IP need no entry — but `localhost` is a
+  name, not an address, and **is** rejected. That is why qbit-manage connects to
+  `127.0.0.1:8080` rather than `localhost:8080`.
 - `Session\ShareLimitAction` is the real key, **not** `MaxRatioAction`. String
   values, default `Stop`.
 - `Session\AddTorrentStopped`, **not** `AddTorrentPaused`.
@@ -156,6 +163,9 @@ Resolved:
   Without it, migrations re-run every boot against an already-current file.
 - `SendBufferWatermark`, `SocketBacklogSize`, `ConnectionSpeed`, `FilePoolSize`,
   `AsyncIOThreadsCount`, `HashingThreadsCount` all applied verbatim.
+- `WebUI\Password_PBKDF2` is rendered with the section prefix, so the injection
+  must match `^WebUI.Password_PBKDF2=`. Matching `^Password_PBKDF2=` silently
+  does nothing and leaves the placeholder as the password.
 
 Still unverified, because nothing sets them yet:
 
@@ -163,10 +173,6 @@ Still unverified, because nothing sets them yet:
   `GlobalMaxInactiveSeedingMinutes` — not currently in either profile.
 - `categories.json` schema — check whether newer builds add `download_path` and
   `use_download_path` once categories are in use.
-- **`Session\Port`** — qBittorrent writes a random port back when nothing sets
-  one (seen as `13386` on qbit-gen). This is the mechanism `QBT_TORRENTING_PORT`
-  has to override at stage 5. Confirm with `ss -ltnp` that the listening port is
-  the AirVPN-reserved one, not a fresh random.
 
 ### 7. Monitoring and qui instances
 

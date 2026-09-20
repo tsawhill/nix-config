@@ -210,7 +210,14 @@ in
     serverDomains = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [ ];
-      description = "Host headers accepted by the web UI. Empty disables host header validation.";
+      description = ''
+        Host headers accepted by the web UI. Empty disables host header validation.
+
+        Rendered as a plain INI string, where ";" begins a comment, so entries
+        past the first are silently dropped. Keep this to one name. Requests by
+        IP are matched against the local address before this list is consulted,
+        so they need no entry.
+      '';
     };
 
     defaultSavePath = lib.mkOption {

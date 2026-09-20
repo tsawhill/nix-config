@@ -40,7 +40,10 @@ let
     };
 
     qbt = {
-      host = "localhost:${toString cfg.qbittorrentPort}";
+      # 127.0.0.1, not localhost: validateHostHeader matches the Host against the
+      # local address before consulting ServerDomains, so the literal IP passes
+      # where the name would be rejected.
+      host = "127.0.0.1:${toString cfg.qbittorrentPort}";
       user = "";
       pass = "";
     };
@@ -83,7 +86,7 @@ in
     qbittorrentPort = lib.mkOption {
       type = lib.types.port;
       default = 8080;
-      description = "Local qBittorrent web UI port. LocalHostAuth is off, so no credentials are needed.";
+      description = "Local qBittorrent web UI port. Reached over loopback, where LocalHostAuth is off.";
     };
 
     rootDir = lib.mkOption {
