@@ -183,7 +183,10 @@ in
         ExecStartPre = "${pkgs.coreutils}/bin/install -m600 ${
           config.sops.templates."qbit-manage.yml".path
         } ${runtimeConfig}";
-        ExecStart = "${pkgs.qbit-manage}/bin/qbit-manage --config-file ${runtimeConfig} --run";
+        # --web-server=False is required: the server defaults to ON for non-Docker
+        # runs and keeps the process alive, so a Type=oneshot unit would sit in
+        # "activating" forever and block its own timer. --run then exits cleanly.
+        ExecStart = "${pkgs.qbit-manage}/bin/qbit-manage --config-file ${runtimeConfig} --run --web-server=False";
       };
     };
 
