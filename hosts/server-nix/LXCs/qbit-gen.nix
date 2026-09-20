@@ -5,9 +5,8 @@
   ...
 }:
 let
-  # Leave false until the container exists and its forwarded port secret is set;
-  # see docs/qbittorrent-migration.md.
-  vpnClientEnabled = false;
+  # Routed through the Swiss gateway; forwarded port comes from SOPS.
+  vpnClientEnabled = true;
 in
 {
   imports = [
@@ -25,6 +24,7 @@ in
   networking.hostName = "qbit-gen-nix";
 
   my.secrets.qbit-gen-vpn.enable = vpnClientEnabled;
+  my.secrets.qbittorrent_webui.enable = true;
 
   # Intake instance: every grab lands here, and anything that fails to import
   # stays here rather than reaching the seeding box.
@@ -32,6 +32,8 @@ in
     enable = true;
     profile = "gen";
     portSecret = lib.mkIf vpnClientEnabled "qbit_gen_vpn_port";
+    webuiUsername = "taylor";
+    webuiPasswordSecret = "qbittorrent_webui_password_gen";
 
     authSubnetWhitelist = [
       "${networkTopology.lib.lanIp "arrs-nix"}/32"

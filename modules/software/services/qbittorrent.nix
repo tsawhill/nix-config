@@ -150,12 +150,17 @@ let
   '';
 
   # The PBKDF2 hash is credential-equivalent, so it is substituted into the
-  # installed config at runtime rather than rendered into the store.
+  # installed config at runtime rather than rendered into the store. The key is
+  # nested under Preferences.WebUI, so the rendered line is prefixed "WebUI\".
   injectPassword = pkgs.writeShellScript "qbittorrent-inject-password" ''
     set -eu
     hash=$(${pkgs.coreutils}/bin/cat ${lib.escapeShellArg passwordFile})
+    if ! ${pkgs.gnugrep}/bin/grep -q '^WebUI.Password_PBKDF2=' ${configFile}; then
+      echo "qBittorrent config has no Password_PBKDF2 line to replace" >&2
+      exit 1
+    fi
     ${pkgs.gnused}/bin/sed -i \
-      "s|^Password_PBKDF2=.*|Password_PBKDF2=$hash|" \
+      "s|^WebUI.Password_PBKDF2=.*|WebUI\\\\Password_PBKDF2=$hash|" \
       ${configFile}
   '';
 in

@@ -100,37 +100,31 @@ build-nix and `qbit-lts-nix`.
 
 ### Web UI access
 
-There is no web UI password. `authSubnetWhitelist` covers `arrs-nix`, `qui-nix`
-and Taylor's desktop and laptop on both LAN and WireGuard, so those reach the UI
-without authenticating and everything else hits a login it cannot pass. The
-qBittorrent UIs have no public vhost; qui behind Authentik is the front door.
+Username and password are both declarative, so anything set through the web UI
+is wiped on the next service start — the config is reinstalled from the store
+every time. `webuiUsername = "taylor"` lives in each host file; the password hash
+comes from SOPS and is substituted into the installed config by an `ExecStartPre`
+(qBittorrent has no `QBT_WEBUI_PASSWORD`, so it cannot come from the environment).
 
-To add a password later, the machinery is still in place — the secret module
-`modules/secrets/server/LXCs/qbittorrent_webui.nix` and its `.sops.yaml` rule are
-unused but intact. qBittorrent has no `QBT_WEBUI_PASSWORD`, so the hash has to be
-generated out of band:
+`authSubnetWhitelist` additionally covers `arrs-nix`, `qui-nix` and Taylor's
+machines on LAN and WireGuard, which reach the UI without authenticating. The
+password is for everything else. The qBittorrent UIs have no public vhost; qui
+behind Authentik is the front door.
+
+Each host has its own password. Read each hash back out **before the service
+restarts**, since that is the only place it exists:
 
 ```
-# 1. qBittorrent logs a temporary password at startup when none is set
-ssh root@qbit-gen-nix.lan 'journalctl -u qbittorrent | grep -i "temporary password"'
-
-# 2. Log into http://qbit-gen-nix.lan:8080 as admin with it, then set a real
-#    password under Tools -> Options -> Web UI
-
-# 3. Read the generated hash back out, immediately - the config is reinstalled
-#    from the store on restart, so it only lives there until qBittorrent restarts
 ssh root@qbit-gen-nix.lan 'grep Password_PBKDF2 /var/lib/qBittorrent/qBittorrent/config/qBittorrent.conf'
+ssh root@qbit-lts-nix.lan 'grep Password_PBKDF2 /var/lib/qBittorrent/qBittorrent/config/qBittorrent.conf'
 ```
-
-Put that whole `@ByteArray(salt:hash)` value in the secret, then set
-`my.secrets.qbittorrent_webui.enable = true` and
-`webuiPasswordSecret = "qbittorrent_webui_password"` on both hosts:
 
 ```
 sops modules/secrets/server/LXCs/qbittorrent_webui.yaml
 ```
 ```yaml
-password_pbkdf2: "@ByteArray(SALT:HASH)"
+password_gen: "@ByteArray(SALT:HASH)"   # from qbit-gen-nix
+password_lts: "@ByteArray(SALT:HASH)"   # from qbit-lts-nix
 ```
 
 ### 5. Gateway and enable

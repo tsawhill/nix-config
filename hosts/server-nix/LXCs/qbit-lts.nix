@@ -5,11 +5,10 @@
   ...
 }:
 let
-  # Leave false until the container exists and its forwarded port secret is set;
-  # see docs/qbittorrent-migration.md.
-  vpnClientEnabled = false;
-  # Secret-backed features stay off until the SOPS values exist.
-  secretsProvisioned = false;
+  # Routed through the Swiss gateway; forwarded port comes from SOPS.
+  vpnClientEnabled = true;
+  # Tracker keywords and qbit-manage; dryRun stays on until the migration lands.
+  secretsProvisioned = true;
 in
 {
   imports = [
@@ -28,6 +27,7 @@ in
   networking.hostName = "qbit-lts-nix";
 
   my.secrets.qbit-lts-vpn.enable = vpnClientEnabled;
+  my.secrets.qbittorrent_webui.enable = true;
   my.secrets.qbit-trackers.enable = secretsProvisioned;
 
   # Seeding instance: torrents arrive already complete, at a path chosen when
@@ -36,6 +36,8 @@ in
     enable = true;
     profile = "lts";
     portSecret = lib.mkIf vpnClientEnabled "qbit_lts_vpn_port";
+    webuiUsername = "taylor";
+    webuiPasswordSecret = "qbittorrent_webui_password_lts";
 
     authSubnetWhitelist = [
       "${networkTopology.lib.lanIp "arrs-nix"}/32"
