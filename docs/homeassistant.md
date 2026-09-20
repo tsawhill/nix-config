@@ -242,34 +242,34 @@ the controller no longer rewrites the idle AC setpoint to make a dial look like
 a room sensor. Each panel shows the active heating/cooling threshold, controller
 status, and active timers. IR state is labelled as requested, not confirmed.
 
-Each room's pending threshold is separate from the applied override. Choose
-**Apply 30m**, **Apply 1h**, or **Apply 2h** to enable that room with the pending
-threshold, using the current system mode. Other rooms keep their timers.
-**Resume schedule** cancels only that room's override. Settings contains the
-whole-house override: pending mode, room thresholds, and run/pause choices are
-copied into applied helpers together when **Apply all rooms** is pressed.
-Room pause choices apply only during an active override. System mode is shared
-because all heads use the same outdoor unit.
+The Override panel has browser-local room tabs and pending temperature, on/off,
+fan, and airflow controls. **Apply** copies that room's choices together and
+starts its timer for the selected duration. **Resume schedule** cancels only
+that room's override. Expiry restores normal temperature, power, fan, and airflow
+behavior. “Normal setting” follows the standing fan/airflow preference.
+System mode remains shared because all heads use the same outdoor unit.
 
-On the first startup after migration, drafts are seeded from the active room
-thresholds and existing override choices. After that they restore the last
-selection across restarts. No background synchronization overwrites pending
-edits. **Use current thresholds** explicitly reloads the current targets.
-Existing applied helper IDs and timer IDs are retained so an active override
-can survive deployment. System mode and fan/airflow preferences also restore.
+Draft temperatures and power choices are seeded once from the active settings,
+then restore the last selection across restarts. Background updates do not
+overwrite pending edits. Fan and airflow drafts initially use “Normal setting”.
+The Settings view holds seasonal mode and standing room fan/airflow preferences.
 
-The Settings view holds the immediate seasonal mode control. Each room's
-settings subview holds immediate fan/airflow preferences and controller details.
-Bedroom nap presets use the sleeping cooling threshold in cool mode and the
-sleeping heating threshold in heat mode, without changing other rooms or the
-pending drafts. Starting a nap while the system is off is ignored. A nap
-replaces any existing bedroom override, using its same timer.
+Bedroom nap has a duration selector and Start button. It uses the bedroom's
+sleeping threshold for the current heating/cooling mode, quiet fan, and comfort
+airflow, without changing other rooms or pending drafts. It replaces any bedroom
+override and restores normal behavior when its timer ends. Starting a nap while
+the system is off is disabled. **End bedroom override** ends the bedroom timer,
+whether it was started by Nap or the Override panel.
+
+The two compact controls are local custom Lovelace cards in `hvac-controls.js`,
+bundled through Nix with a content-hashed filename. They load no external assets.
 
 ### Offline validation
 
 With Python, Jinja2, and TinyTuya available:
 
 ```sh
+node modules/software/services/homeassistant/test-hvac-controls.cjs
 python3 modules/software/services/homeassistant/test-hvac.py
 python3 modules/software/services/homeassistant/generate-daikin-codes.py \
   modules/software/services/homeassistant/daikin-arc452a21.json --validate-generated

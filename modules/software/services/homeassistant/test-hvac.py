@@ -83,6 +83,8 @@ class Templates(unittest.TestCase):
             "overrideMode": "input_select.hvac_override_mode",
             "draftMode": "input_select.hvac_draft_mode",
             "followSystem": "follow system",
+            "fanFollowsSchedule": "schedule",
+            "airflowFollowsSchedule": "schedule",
             "toString tuning.staleMinutes * 60": "900",
             "toString (tuning.staleMinutes * 60)": "900",
             "toString tuning.hysteresis": "2",
@@ -109,6 +111,10 @@ class Templates(unittest.TestCase):
             "targetSensor": "sensor.hvac_target_office",
             "heatTargetSensor": "sensor.hvac_heat_target_office",
             "minOffTimer": "timer.hvac_min_off_office",
+            "appliedFan": "input_select.hvac_override_fan_office",
+            "appliedAirflow": "input_select.hvac_override_airflow_office",
+            "fanSelect": "input_select.hvac_fan_office",
+            "airflowSelect": "input_select.hvac_airflow_office",
         }
         refs.update({k + " room": v for k, v in helpers.items()})
 
@@ -128,7 +134,13 @@ class Templates(unittest.TestCase):
                 "fromMinutes": hour * 60 + minute,
                 "label": label,
                 "rooms": {
-                    "office": {"coolAbove": threshold, "heatBelow": 60, "priority": 1}
+                    "office": {
+                        "coolAbove": threshold,
+                        "heatBelow": 60,
+                        "priority": 1,
+                        "fan": "auto",
+                        "airflow": "comfort",
+                    }
                 },
             }
 
@@ -194,6 +206,43 @@ class Templates(unittest.TestCase):
             str([f"timer.hvac_override_{r}" for r in ROOMS]),
         )
 
+    def test_timed_fan_and_airflow_restore_normal_preferences(self):
+        for name, normal, override, scheduled in [
+            ("fan", "2", "quiet", "auto"),
+            ("airflow", "off", "swing", "comfort"),
+        ]:
+            with self.subTest(control=name):
+                self.values[f"input_select.hvac_{name}_office"] = normal
+                self.values[f"input_select.hvac_override_{name}_office"] = override
+                self.values["timer.hvac_override_office"] = "idle"
+                self.assertEqual(self.render(name + "Template"), normal)
+                self.values["timer.hvac_override_office"] = "active"
+                self.assertEqual(self.render(name + "Template"), override)
+                self.values[f"input_select.hvac_draft_{name}_office"] = scheduled
+                self.assertEqual(self.render(name + "Template"), override)
+                self.values[f"input_select.hvac_override_{name}_office"] = "schedule"
+                self.assertEqual(self.render(name + "Template"), normal)
+                self.values[f"input_select.hvac_{name}_office"] = "schedule"
+                self.assertEqual(self.render(name + "Template"), scheduled)
+                self.values[f"input_select.hvac_override_{name}_office"] = override
+                self.values["timer.hvac_override_office"] = "idle"
+                self.assertEqual(self.render(name + "Template"), scheduled)
+
+    def test_room_power_off_and_nap_power_on(self):
+        expr = re.search(
+            r'action = "(\{\{ \'input_boolean.turn_on\'.*?)";', SOURCE
+        ).group(1)
+        template = self.env.from_string(self.expand(expr))
+        self.assertEqual(
+            template.render(op="apply", enabled_office=False), "input_boolean.turn_off"
+        )
+        self.assertEqual(
+            template.render(op="apply", enabled_office=True), "input_boolean.turn_on"
+        )
+        self.assertEqual(
+            template.render(op="nap", enabled_office=False), "input_boolean.turn_on"
+        )
+
     def test_next_schedule_rolls_over_midnight(self):
         self.assertEqual(self.render("nextBlockTemplate"), "Asleep at 00:00")
         self.now = self.now.replace(hour=12)
@@ -230,13 +279,19 @@ class Templates(unittest.TestCase):
         ).group(1)
         sleeping = SOURCE.split("  sleeping =", 1)[1].split("  working =", 1)[0]
         bedroom = sleeping.split("bedroom =", 1)[1].split("};", 1)[0]
+        targets = {}
         for key in ("heatBelow", "coolAbove"):
             value = re.search(rf"{key}\s*=\s*(\d+)", bedroom).group(1)
+            targets[key] = value
             expr = expr.replace("${toString sleeping.bedroom." + key + "}", value)
         expr = expr.replace("${room}", "office")
         t = self.env.from_string(expr)
-        self.assertEqual(t.render(op="nap", nap_heat=True, value_office=80), "66")
-        self.assertEqual(t.render(op="nap", nap_heat=False, value_office=80), "71")
+        self.assertEqual(
+            t.render(op="nap", nap_heat=True, value_office=80), targets["heatBelow"]
+        )
+        self.assertEqual(
+            t.render(op="nap", nap_heat=False, value_office=80), targets["coolAbove"]
+        )
         self.assertEqual(t.render(op="apply", nap_heat=True, value_office=80), "80")
 
 

@@ -90,7 +90,7 @@ let
   # Asleep: only the bedroom matters, the rest just must not bake.
   sleeping = {
     bedroom = {
-      coolAbove = 71;
+      coolAbove = 73;
       heatBelow = 66;
       priority = 10;
       fan = "quiet";
@@ -142,7 +142,7 @@ let
   # yet, so it pulls down on auto and only goes quiet once Asleep begins.
   preBed = {
     bedroom = {
-      coolAbove = 71;
+      coolAbove = 73;
       heatBelow = 66;
       priority = 10;
       fan = "auto";
@@ -209,6 +209,10 @@ let
   overrideNumber = room: "input_number.hvac_override_${room}";
   draftNumber = room: "input_number.hvac_draft_${room}";
   draftEnable = room: "input_boolean.hvac_draft_enable_${room}";
+  draftFan = room: "input_select.hvac_draft_fan_${room}";
+  draftAirflow = room: "input_select.hvac_draft_airflow_${room}";
+  appliedFan = room: "input_select.hvac_override_fan_${room}";
+  appliedAirflow = room: "input_select.hvac_override_airflow_${room}";
   draftMode = "input_select.hvac_draft_mode";
   commitIdle = {
     condition = "state";
@@ -267,7 +271,9 @@ let
 
   airflowTemplate = room: ''
     ${currentBlock}
-    {%- if is_state('${airflowSelect room}', '${airflowFollowsSchedule}') -%}
+    {%- if is_state('${overrideTimer room}', 'active') and states('${appliedAirflow room}') in ['off', 'swing', 'comfort'] -%}
+      {{ states('${appliedAirflow room}') }}
+    {%- elif is_state('${airflowSelect room}', '${airflowFollowsSchedule}') -%}
       {{ ns.current.rooms['${room}'].airflow }}
     {%- else -%}
       {{ states('${airflowSelect room}') }}
@@ -323,7 +329,9 @@ let
 
   fanTemplate = room: ''
     ${currentBlock}
-    {%- if is_state('${fanSelect room}', '${fanFollowsSchedule}') -%}
+    {%- if is_state('${overrideTimer room}', 'active') and states('${appliedFan room}') in ['auto', 'quiet', '1', '2', '3', '4', '5'] -%}
+      {{ states('${appliedFan room}') }}
+    {%- elif is_state('${fanSelect room}', '${fanFollowsSchedule}') -%}
       {{ ns.current.rooms['${room}'].fan }}
     {%- else -%}
       {{ states('${fanSelect room}') }}
@@ -769,16 +777,6 @@ let
       }
     ];
   };
-  actionButton = name: icon: action: data: {
-    type = "button";
-    inherit name icon;
-    show_state = false;
-    tap_action = {
-      action = "perform-action";
-      perform_action = action;
-      inherit data;
-    };
-  };
   activeTimerCard = entity: name: {
     type = "conditional";
     conditions = [
@@ -869,106 +867,31 @@ let
                 type = "markdown";
                 grid_options.columns = 12;
                 content = ''
-                  **{{ states('sensor.hvac_status_${room}') }}**
-
-                  {% set m = states('${effectiveMode}') %}
-                  {% if m == 'heat' %}Heat below **{{ states('${heatTargetSensor room}') }}°F**{% elif m == 'cool' %}Cool above **{{ states('${targetSensor room}') }}°F**{% else %}Temperature control off{% endif %} · {{ {'cool': 'Cooling requested', 'heat': 'Heating requested', 'off': 'Idle'}.get(states('${climateEntity room}'), 'AC unavailable') }}
+                  {{ states('sensor.hvac_status_${room}') }} · {% set m = states('${effectiveMode}') %}{% if m == 'heat' %}Heat below **{{ states('${heatTargetSensor room}') }}°F**{% elif m == 'cool' %}Cool above **{{ states('${targetSensor room}') }}°F**{% else %}Off{% endif %}
                 '';
               }
-              {
-                type = "tile";
-                entity = draftNumber room;
-                name = "Pending threshold";
-                features = [
-                  {
-                    type = "numeric-input";
-                    style = "buttons";
-                  }
-                ];
-                grid_options.columns = 12;
-              }
-              {
-                type = "grid";
-                columns = 3;
-                square = false;
-                grid_options.columns = 12;
-                cards =
-                  map
-                    (
-                      minutes:
-                      actionButton (
-                        if minutes == 30 then
-                          "Apply 30m"
-                        else if minutes == 60 then
-                          "Apply 1h"
-                        else
-                          "Apply 2h"
-                      ) "mdi:check" "script.hvac_apply_override" { inherit room minutes; }
-                    )
-                    [
-                      30
-                      60
-                      120
-                    ];
-              }
-              (activeTimerCard (overrideTimer room) "Override remaining")
               (activeTimerCard (shedTimer room) "Capacity pause")
-              {
-                type = "grid";
-                columns = 2;
-                square = false;
-                grid_options.columns = 12;
-                cards = [
-                  (actionButton "Resume schedule" "mdi:calendar-check" "script.hvac_apply_override" {
-                    inherit room;
-                    operation = "resume";
-                  })
-                  {
-                    type = "button";
-                    name = "Room settings";
-                    icon = "mdi:tune";
-                    tap_action = {
-                      action = "navigate";
-                      navigation_path = "/hvac-yaml/${room}";
-                    };
-                  }
-                ];
-              }
+
             ];
           }) roomNames)
           ++ [
             {
               type = "grid";
+              column_span = 2;
               cards = [
                 {
-                  type = "heading";
-                  heading = "Bedroom nap";
-                  icon = "mdi:power-sleep";
+                  type = "custom:hvac-override-card";
+                  grid_options.columns = "full";
                 }
+              ];
+            }
+            {
+              type = "grid";
+              cards = [
                 {
-                  type = "markdown";
-                  content = "Sleep threshold for the current heating/cooling mode. Other rooms keep their settings. Unavailable while the system is off.";
-                }
-                {
-                  type = "grid";
-                  columns = 3;
-                  square = false;
+                  type = "custom:hvac-nap-card";
                   grid_options.columns = 12;
-                  cards =
-                    map
-                      (
-                        minutes:
-                        actionButton "${toString minutes} min" "mdi:power-sleep" "script.hvac_start_nap" {
-                          inherit minutes;
-                        }
-                      )
-                      [
-                        30
-                        60
-                        90
-                      ];
                 }
-                (actionButton "End bedroom override" "mdi:calendar-check" "script.hvac_end_nap" { })
               ];
             }
           ];
@@ -992,7 +915,7 @@ let
                 entities = [
                   {
                     entity = systemMode;
-                    name = "Normal mode (applies immediately)";
+                    name = "Normal mode (whole system)";
                   }
                   {
                     entity = effectiveMode;
@@ -1002,61 +925,30 @@ let
               }
               {
                 type = "markdown";
-                content = "All heads share one outdoor unit, so heating/cooling mode is system-wide. Room presets use the active mode. Fan and airflow preferences are in each room’s settings.";
+                content = "Heating/cooling mode is shared by all rooms. Fan and airflow preferences below are the defaults used when no timed override is active.";
               }
             ];
           }
-          {
-            type = "grid";
-            cards = [
-              {
-                type = "heading";
-                heading = "Whole-house override";
-              }
-              {
-                type = "markdown";
-                content = "Edits stay pending until Apply. Turning a room off here pauses it for the override duration; it does not exclude it from this operation.";
-              }
-              {
-                type = "entities";
-                show_header_toggle = false;
-                entities = [
-                  {
-                    entity = draftMode;
-                    name = "Pending system mode";
-                  }
-                ]
-                ++ lib.concatMap (room: [
-                  {
-                    entity = draftEnable room;
-                    name = "Run ${rooms.${room}}";
-                  }
-                  {
-                    entity = draftNumber room;
-                    name = "${rooms.${room}} threshold";
-                  }
-                ]) roomNames
-                ++ [
-                  {
-                    entity = "input_number.hvac_override_minutes";
-                    name = "Duration";
-                  }
-                ];
-              }
-              {
-                type = "grid";
-                columns = 2;
-                square = false;
-                grid_options.columns = 12;
-                cards = [
-                  (actionButton "Apply all rooms" "mdi:check" "script.hvac_apply_override" { })
-                  (actionButton "Resume all" "mdi:calendar-check" "script.hvac_back_to_schedule" { })
-                  (actionButton "Use current thresholds" "mdi:restore" "script.hvac_use_current_targets" { })
-                ];
-              }
-            ];
-          }
-        ];
+        ]
+        ++ map (room: {
+          type = "grid";
+          cards = [
+            {
+              type = "entities";
+              title = rooms.${room};
+              entities = [
+                {
+                  entity = fanSelect room;
+                  name = "Normal fan";
+                }
+                {
+                  entity = airflowSelect room;
+                  name = "Normal airflow";
+                }
+              ];
+            }
+          ];
+        }) roomNames;
       }
     ]
     ++ map (room: {
@@ -1125,6 +1017,20 @@ in
   systemd.services.home-assistant.preStart = lib.mkBefore ''
     ln -sfn ${dashboardFile} ${lib.escapeShellArg configDir}/hvac-dashboard.yaml
   '';
+
+  services.home-assistant.customLovelaceModules = [
+    (
+      let
+        entrypoint = "hvac-controls-${
+          builtins.substring 0 12 (builtins.hashFile "sha256" ./hvac-controls.js)
+        }.js";
+      in
+      pkgs.runCommand "hvac-controls" { passthru = { inherit entrypoint; }; } ''
+        mkdir -p $out
+        cp ${./hvac-controls.js} $out/${entrypoint}
+      ''
+    )
+  ];
 
   # input_number and timer arrive with default_config, and template has no
   # dependencies of its own, so none of this needs extraComponents.
@@ -1280,6 +1186,35 @@ in
     // (lib.listToAttrs (
       lib.concatMap (room: [
         {
+          name = "hvac_draft_fan_${room}";
+          value = {
+            name = "${rooms.${room}} pending fan";
+            options = fanOptions;
+          };
+        }
+        {
+          name = "hvac_draft_airflow_${room}";
+          value = {
+            name = "${rooms.${room}} pending airflow";
+            options = airflowOptions;
+          };
+        }
+        {
+          name = "hvac_override_fan_${room}";
+          value = {
+            name = "${rooms.${room}} override fan";
+            options = fanOptions;
+          };
+        }
+        {
+          name = "hvac_override_airflow_${room}";
+          value = {
+            name = "${rooms.${room}} override airflow";
+            options = airflowOptions;
+          };
+        }
+
+        {
           name = "hvac_fan_${room}";
           value = {
             name = "${rooms.${room}} fan";
@@ -1350,6 +1285,12 @@ in
             state = roomStatus room;
           }) roomNames)
           ++ [
+            {
+              name = "hvac_nap_target";
+              unique_id = "hvac_nap_target";
+              unit_of_measurement = "°F";
+              state = "{{ ${toString sleeping.bedroom.heatBelow} if is_state('${effectiveMode}', 'heat') else ${toString sleeping.bedroom.coolAbove} }}";
+            }
             {
               name = "hvac_next_block";
               unique_id = "hvac_next_block";
@@ -1453,6 +1394,14 @@ in
                       value = "{{ states('${draftNumber room}') | float(75) }}";
                     }
                     {
+                      name = "fan_${room}";
+                      value = "{{ states('${draftFan room}') }}";
+                    }
+                    {
+                      name = "airflow_${room}";
+                      value = "{{ states('${draftAirflow room}') }}";
+                    }
+                    {
                       name = "enabled_${room}";
                       value = "{{ is_state('${draftEnable room}', 'on') }}";
                     }
@@ -1476,8 +1425,18 @@ in
                       data.value = "{{ (${toString sleeping.bedroom.heatBelow} if nap_heat else ${toString sleeping.bedroom.coolAbove}) if op == 'nap' else value_${room} }}";
                     }
                     {
-                      action = "{{ 'input_boolean.turn_on' if op == 'nap' or selected_room != 'all' or enabled_${room} else 'input_boolean.turn_off' }}";
+                      action = "{{ 'input_boolean.turn_on' if op == 'nap' or enabled_${room} else 'input_boolean.turn_off' }}";
                       target.entity_id = enableToggle room;
+                    }
+                    {
+                      action = "input_select.select_option";
+                      target.entity_id = appliedFan room;
+                      data.option = "{{ '${sleeping.bedroom.fan}' if op == 'nap' else fan_${room} }}";
+                    }
+                    {
+                      action = "input_select.select_option";
+                      target.entity_id = appliedAirflow room;
+                      data.option = "{{ '${sleeping.bedroom.airflow}' if op == 'nap' else airflow_${room} }}";
                     }
                     {
                       action = "timer.start";
