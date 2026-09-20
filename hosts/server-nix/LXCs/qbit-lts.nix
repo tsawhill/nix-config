@@ -113,12 +113,13 @@ in
         max_seeding_time = "30d";
         cleanup = true;
       };
-      # 2 days, then remove.
+      # 1 week or a 1.0 ratio, whichever lands first, then remove. qbit-manage
+      # checks ratio then seeding time with early returns, so setting both is OR.
       t3 = {
         priority = 3;
         include_any_tags = [ "t3" ];
-        max_ratio = -1;
-        max_seeding_time = "2d";
+        max_ratio = "1.0";
+        max_seeding_time = "1w";
         cleanup = true;
       };
       # Unlisted trackers stop and are cleaned up: everything promoted here came
