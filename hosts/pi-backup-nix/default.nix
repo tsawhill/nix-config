@@ -241,6 +241,11 @@ in
     domain = "pro.tsawhill.org";
     mTLSCert = "mTLS-CA";
   };
+  proxy.qui = {
+    enable = true;
+    domain = "qbit.tsawhill.org";
+    mTLSCert = "mTLS-CA";
+  };
   proxy.seerr = {
     enable = true;
     domain = "request.tsawhill.org";
