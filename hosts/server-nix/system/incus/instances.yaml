@@ -25,7 +25,7 @@ arrs-nix:
   type: "container"
   profiles: ["nixos-lxc", "media-mount", "downloadHDD-mount", "downloadSSD-mount"]
   config:
-    limits.memory: "4GiB"
+    limits.memory: "8GiB"
   devices:
     root: { type: "disk", path: "/", pool: "rpool", size: "8GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/arrs-nix" }

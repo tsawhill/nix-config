@@ -48,7 +48,13 @@ in
         # Loopback only. Prowlarr runs on this host and nothing else should reach it.
         ports = [ "127.0.0.1:${toString cfg.port}:8191" ];
         # The browser needs more than Docker's default 64M of shared memory.
-        extraOptions = [ "--shm-size=512m" ];
+        extraOptions = [
+          "--shm-size=512m"
+          # Capped so a runaway browser is killed instead of the *arrs sharing
+          # this host. Byparr restarting is a far better failure than Sonarr
+          # being OOM-killed.
+          "--memory=3g"
+        ];
       };
     };
   };
