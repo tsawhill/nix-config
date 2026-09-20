@@ -1,4 +1,9 @@
-{ inputs, config, ... }:
+{
+  inputs,
+  config,
+  pkgs,
+  ...
+}:
 {
   imports = [ inputs.authentik-nix.nixosModules.default ];
   networking.firewall.allowedTCPPorts = [
@@ -39,7 +44,19 @@
 
   # Define the LDAP Outpost Container
   virtualisation.oci-containers.containers.authentik-ldap-outpost = {
-    image = "ghcr.io/goauthentik/ldap:latest"; # Or pin a version like :2024.2.1
+    # Pulled into the Nix store rather than fetched at service start, so the
+    # image is part of the closure. Pinned to 2026.5.6 to match the authentik
+    # server: outposts track the server version, so bump both together.
+    imageFile = pkgs.dockerTools.pullImage {
+      imageName = "ghcr.io/goauthentik/ldap";
+      imageDigest = "sha256:68a595f5a7b75fb3615f1609725adaf1d45f743aafece715d943b9706074c307";
+      hash = "sha256-VVXWo+piQZb47YqeSBoI2zWxHNJE4C6VDKOGDc4bpz4=";
+      finalImageName = "ghcr.io/goauthentik/ldap";
+      finalImageTag = "2026.5.6";
+      arch = "amd64";
+      os = "linux";
+    };
+    image = "ghcr.io/goauthentik/ldap:2026.5.6";
 
     # Map the standard LDAP ports
     # Host Port : Container Port
