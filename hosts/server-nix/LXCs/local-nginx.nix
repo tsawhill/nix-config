@@ -56,6 +56,11 @@
     enable = true;
     domain = "pro.tsawhill.org";
   };
+  proxy.qui = {
+    enable = true;
+    domain = "qbit.tsawhill.org";
+    enableAuthentik = true;
+  };
   proxy.seerr = {
     enable = true;
     domain = "request.tsawhill.org";

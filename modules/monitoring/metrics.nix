@@ -134,6 +134,10 @@ let
       url = "https://pro.tsawhill.org";
     }
     {
+      name = "qui";
+      url = "https://qbit.tsawhill.org";
+    }
+    {
       name = "Jellyseerr";
       url = "https://request.tsawhill.org";
     }

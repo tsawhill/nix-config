@@ -82,6 +82,17 @@ let
       ];
     }
     {
+      name = "qui";
+      url = "https://qbit.tsawhill.org";
+      icon = "sh:qbittorrent";
+      group = "Arrs";
+      altStatus = [
+        302
+        401
+        403
+      ];
+    }
+    {
       name = "Nextcloud";
       url = "https://nc.tsawhill.org";
       icon = "si:nextcloud";
@@ -151,6 +162,18 @@ let
       url = "http://adguard-nix.${lanDomain}:3000";
       icon = "sh:adguard-home";
       group = "Monitoring";
+    }
+    {
+      name = "qBittorrent intake";
+      url = "http://qbit-gen-nix.${lanDomain}:8080";
+      icon = "sh:qbittorrent";
+      group = "Infra";
+    }
+    {
+      name = "qBittorrent seeding";
+      url = "http://qbit-lts-nix.${lanDomain}:8080";
+      icon = "sh:qbittorrent";
+      group = "Infra";
     }
     {
       name = "YouTube";
