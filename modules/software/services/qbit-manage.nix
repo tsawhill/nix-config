@@ -37,6 +37,10 @@ let
       rem_orphaned = false;
       tag_nohardlinks = false;
       skip_cleanup = true;
+      # qbit-manage 4.7.1 caps at qBittorrent 5.2.0 and nixpkgs ships 5.2.2.
+      # The gap is a patch release against Web API 2.15.1, so the check is
+      # skipped rather than pinning qBittorrent back. Revisit on a major bump.
+      skip_qb_version_check = true;
     };
 
     qbt = {
