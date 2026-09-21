@@ -127,7 +127,6 @@ in
           server = {
             http_listen_address = "0.0.0.0";
             http_listen_port = 3100;
-            grpc_listen_address = "127.0.0.1";
           };
           common = {
             path_prefix = lokiDir;
