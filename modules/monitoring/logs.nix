@@ -79,7 +79,10 @@ in
             type = "remap";
             inputs = [ "journal" ];
             source = ''
-              .unit = string(._SYSTEMD_UNIT) ?? string(.SYSLOG_IDENTIFIER) ?? "unknown"
+              unit = string(._SYSTEMD_UNIT) ?? string(.SYSLOG_IDENTIFIER) ?? "unknown"
+              # Collapse instance names so sshd@<conn>.service and session-N.scope share one stream.
+              unit = replace(unit, r'@.*\.', "@.")
+              .unit = replace(unit, r'^session-[^.]+\.scope$', "session.scope")
               priority = to_int(.PRIORITY) ?? 6
               .level = to_syslog_level(priority) ?? "info"
             '';
@@ -154,6 +157,11 @@ in
           ];
           limits_config = {
             retention_period = stack.retention;
+            # Grafana's Logs Drilldown groups by service_name; use the unit or file.
+            discover_service_name = [
+              "unit"
+              "filename"
+            ];
             reject_old_samples = true;
             reject_old_samples_max_age = "168h";
           };
