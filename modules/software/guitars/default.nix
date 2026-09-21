@@ -224,13 +224,5 @@ in
       );
     };
 
-    # mk-game-launcher removes this filter so launched games see the guitars.
-    programs.steam.package = lib.mkIf (cfg.steamIgnoredGuitarDevices != [ ]) (
-      pkgs.steam.override {
-        extraEnv.SDL_GAMECONTROLLER_IGNORE_DEVICES = lib.concatStringsSep "," (
-          lib.unique cfg.steamIgnoredGuitarDevices
-        );
-      }
-    );
   };
 }

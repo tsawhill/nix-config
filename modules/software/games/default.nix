@@ -273,6 +273,12 @@ let
           ++ lib.optional (
             entryCfg.lowLatency.enable && entryCfg.lowLatency.pipewireLatency != null
           ) "PIPEWIRE_LATENCY=${entryCfg.lowLatency.pipewireLatency}"
+          # A stream marker survives Proton's container even when host client.conf
+          # is unavailable. WirePlumber routes playback only, never microphone input.
+          ++ lib.optionals (entryCfg.runner.umu != null) [
+            "PIPEWIRE_PROPS=nix.game-audio=true"
+            "PULSE_PROP=nix.game-audio=true"
+          ]
           ++ entryCfg.env
           ++ guitarShimEnv;
         setupScript =

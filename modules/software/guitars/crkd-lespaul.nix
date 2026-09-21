@@ -20,11 +20,11 @@
           x = 2;
           leftshoulder = 4;
           back = 6;
-          start = 10;
+          start = 7;
           rightshoulder = 5;
           guide = 8;
           leftstick = 9;
-          rightstick = 7;
+          rightstick = 10;
           misc1 = 6;
         };
         povs = {

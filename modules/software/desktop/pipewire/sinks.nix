@@ -63,13 +63,22 @@ in
       ++ lib.optionals cfg.discord.enable [ (mkSink "discord_audio" "Discord Audio") ]
       ++ lib.optionals cfg.desktop.enable [ (mkSink "desktop_audio" "Desktop Audio") ];
 
-    # Native application streams share the Pulse routing policy. Server-side
-    # loopbacks do not load client.conf and still follow the hardware default.
-    extraConfig.client."94-app-routing"."stream.rules" =
-      config.services.pipewire.extraConfig.pipewire-pulse."94-app-routing"."stream.rules";
+    # Run routing in the host session manager, including containerized native
+    # clients that cannot load the host's PipeWire client.conf fragments.
+    wireplumber.extraScripts."app-routing.lua" = builtins.readFile ./app-routing.lua;
+    wireplumber.extraConfig."94-app-routing" = {
+      "wireplumber.components" = [
+        {
+          name = "app-routing.lua";
+          type = "script/lua";
+          provides = "custom.app-routing";
+        }
+      ];
+      "wireplumber.profiles".main."custom.app-routing" = "required";
+    };
 
     # Rules are evaluated top-to-bottom; more specific matches override the catch-all.
-    extraConfig.pipewire-pulse."94-app-routing"."stream.rules" =
+    wireplumber.extraConfig."94-app-routing"."app-routing.rules" =
       # Catch-all: send everything to Desktop Audio (must be first)
       lib.optionals cfg.desktop.enable [
         (mkRoute [ { "media.class" = "Stream/Output/Audio"; } ] "desktop_audio")
@@ -82,6 +91,7 @@ in
       ++ lib.optionals cfg.music.enable [
         (mkRoute [
           { "application.process.binary" = "mpv"; }
+          { "application.name" = "mpv"; }
           { "application.name" = "~[Ff]eishin.*"; }
         ] "music")
       ]
@@ -90,6 +100,7 @@ in
         (mkRoute [
           { "application.name" = "deadlock.exe"; }
           { "application.process.binary" = "wine64-preloader"; }
+          { "nix.game-audio" = "true"; }
         ] "game_audio")
         (mkRoute [
           { "application.name" = "ALSA plug-in [cs2]"; }
