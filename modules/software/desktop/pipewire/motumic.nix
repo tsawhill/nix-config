@@ -24,6 +24,14 @@
   config = lib.mkIf config.my.desktop.audio.motuMic.enable {
 
     services.pipewire = {
+      # Keep only the MOTU awake to avoid USB resume delays.
+      wireplumber.extraConfig."13-motu-awake"."monitor.alsa.rules" = [
+        {
+          matches = [ { "node.name" = "~alsa_(input|output)[.]usb-MOTU_M2_.*"; } ];
+          actions.update-props."session.suspend-timeout-seconds" = 0;
+        }
+      ];
+
       extraLadspaPackages = with pkgs; [
         lsp-plugins
         rnnoise-plugin
@@ -38,8 +46,8 @@
           args = {
             "node.description" = "MOTU M2 Mic (Processed)";
             "media.name" = "MOTU M2 Mic Processed";
-            # 480 samples required by rnnoise's fixed frame size.
-            "node.latency" = "480/48000";
+            # RNNoise buffers its own 480-sample frames; it does not require
+            # a 480-sample graph quantum. Both streams explicitly use 48 kHz.
 
             "filter.graph" = {
               "nodes" = [
@@ -179,7 +187,12 @@
 
             "capture.props" = {
               "node.name" = "motu_mic_capture";
-              "audio.position" = [ "FL" ];
+              # Pro Audio profile: microphone on physical input 1.
+              "target.object" = "alsa_input.usb-MOTU_M2_M2MA072BWT-00.pro-input-0";
+              "audio.position" = [ "AUX0" ];
+              "audio.rate" = 48000;
+              "stream.dont-remix" = true;
+              "node.dont-fallback" = true;
               "node.passive" = true;
             };
 
@@ -188,6 +201,7 @@
               "node.description" = "Mic Input";
               "media.class" = "Audio/Source";
               "audio.position" = [ "MONO" ];
+              "audio.rate" = 48000;
               "priority.session" = 2200;
             };
 

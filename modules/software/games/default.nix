@@ -8,6 +8,31 @@
 let
   cfg = config.software.games;
 
+  lowLatencyOptions = {
+    enable = lib.mkEnableOption "low-latency audio requests for this game launcher";
+
+    pulseLatencyMs = lib.mkOption {
+      type = lib.types.nullOr lib.types.ints.positive;
+      default = 4;
+      example = 8;
+      description = ''
+        Requested libpulse buffering in milliseconds for launched games.
+        Increase this if a game crackles. Null leaves the environment untouched.
+        This does not control game-engine or emulator internal audio queues.
+      '';
+    };
+    pipewireLatency = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = "128/48000";
+      example = "256/48000";
+      description = ''
+        Native PipeWire latency request as samples/rate. Null leaves the
+        environment untouched. This is a request, not a forced graph quantum
+        or an end-to-end latency guarantee.
+      '';
+    };
+  };
+
   # Auto-import every game entry file (recursively, so games can live in
   # per-platform subdirs like proton/ and ps3/). default.nix itself is excluded.
   collectNix =
@@ -240,7 +265,16 @@ let
           gamescopeArgs
           ;
         inherit (runner) runnerCommand;
-        env = entryCfg.env ++ guitarShimEnv;
+        # Explicit per-game env assignments come last and take precedence.
+        env =
+          lib.optional (
+            entryCfg.lowLatency.enable && entryCfg.lowLatency.pulseLatencyMs != null
+          ) "PULSE_LATENCY_MSEC=${toString entryCfg.lowLatency.pulseLatencyMs}"
+          ++ lib.optional (
+            entryCfg.lowLatency.enable && entryCfg.lowLatency.pipewireLatency != null
+          ) "PIPEWIRE_LATENCY=${entryCfg.lowLatency.pipewireLatency}"
+          ++ entryCfg.env
+          ++ guitarShimEnv;
         setupScript =
           (runner.setupScript or "") + lib.optionalString entryCfg.guitarShim.enable guitarShimSetup;
         launchPrefix = runner.launchPrefix or "";
@@ -520,6 +554,8 @@ in
             default = [ ];
             description = "Environment variable assignments to set for this game launcher.";
           };
+
+          lowLatency = lowLatencyOptions;
 
           gamescopeArgs = lib.mkOption {
             type = lib.types.nullOr lib.types.str;

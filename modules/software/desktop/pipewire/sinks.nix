@@ -26,8 +26,8 @@ let
   };
 
   mkRoute = matches: target: {
-    inherit matches;
-    actions.update-props."node.target" = target;
+    matches = map (match: match // { "media.class" = "Stream/Output/Audio"; }) matches;
+    actions.update-props."target.object" = target;
   };
 in
 {
@@ -63,20 +63,27 @@ in
       ++ lib.optionals cfg.discord.enable [ (mkSink "discord_audio" "Discord Audio") ]
       ++ lib.optionals cfg.desktop.enable [ (mkSink "desktop_audio" "Desktop Audio") ];
 
-    # Routing rules via pipewire-pulse (PulseAudio compat layer).
+    # Native application streams share the Pulse routing policy. Server-side
+    # loopbacks do not load client.conf and still follow the hardware default.
+    extraConfig.client."94-app-routing"."stream.rules" =
+      config.services.pipewire.extraConfig.pipewire-pulse."94-app-routing"."stream.rules";
+
     # Rules are evaluated top-to-bottom; more specific matches override the catch-all.
     extraConfig.pipewire-pulse."94-app-routing"."stream.rules" =
       # Catch-all: send everything to Desktop Audio (must be first)
       lib.optionals cfg.desktop.enable [
         (mkRoute [ { "media.class" = "Stream/Output/Audio"; } ] "desktop_audio")
       ]
-      # Discord (Electron)
+      # Feishin also runs as electron, so match the application name instead.
       ++ lib.optionals cfg.discord.enable [
-        (mkRoute [ { "application.process.binary" = "electron"; } ] "discord_audio")
+        (mkRoute [ { "application.name" = "~([Vv]esktop|[Dd]iscord).*"; } ] "discord_audio")
       ]
       # mpv → Music
       ++ lib.optionals cfg.music.enable [
-        (mkRoute [ { "application.process.binary" = "mpv"; } ] "music")
+        (mkRoute [
+          { "application.process.binary" = "mpv"; }
+          { "application.name" = "~[Ff]eishin.*"; }
+        ] "music")
       ]
       # Games
       ++ lib.optionals cfg.game.enable [

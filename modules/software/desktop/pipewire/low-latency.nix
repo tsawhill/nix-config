@@ -21,14 +21,12 @@ let
       matches = [
         {
           "application.process.binary" = binary;
-          "media.class" = "Stream/Input/Audio";
         }
       ];
       actions.update-props = {
         "pulse.min.frag" = captureLatency;
         "pulse.default.frag" = captureLatency;
         "pulse.min.quantum" = captureLatency;
-        "node.latency" = captureLatency;
       };
     };
 in
@@ -103,32 +101,22 @@ in
           "pulse.default.frag" = latency;
           "pulse.min.quantum" = latency;
         };
-        "pulse.rules" =
-          lib.mapAttrsToList mkPulseCaptureRule cfg.pulseCaptureQuantumByProcess
-          ++ lib.optionals cfg.forceStreams [
-            {
-              matches = [ { "node.name" = "~.*"; } ];
-              actions.update-props = forceQuantumProps // {
-                "node.latency" = latency;
-              };
-            }
-          ];
+        # Pulse rules match client properties, not stream media classes.
+        "pulse.rules" = lib.mapAttrsToList mkPulseCaptureRule cfg.pulseCaptureQuantumByProcess;
+        "stream.rules" = lib.optionals cfg.forceStreams [ forceQuantumRule ];
       };
 
       extraConfig.client."92-low-latency" = lib.mkIf cfg.forceStreams {
         "stream.rules" = [ forceQuantumRule ];
       };
 
-      # Keep ALSA devices ready and give their drivers enough buffering for the
-      # smaller graph quantum.
+      # Let ALSA choose the period count; unrelated devices may suspend normally.
       wireplumber.extraConfig."13-low-latency"."monitor.alsa.rules" = [
         {
           matches = [ { "node.name" = "~alsa_.*"; } ];
           actions.update-props = {
             "api.alsa.period-size" = cfg.quantum;
             "api.alsa.headroom" = alsaHeadroom;
-            "api.alsa.period-num" = 4;
-            "session.suspend-timeout-seconds" = 0;
           };
         }
       ];

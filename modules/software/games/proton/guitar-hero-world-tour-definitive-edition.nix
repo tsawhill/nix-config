@@ -5,6 +5,11 @@
       desktopName = "Guitar Hero World Tour: Definitive Edition";
       category = "Guitar Hero";
       guitarShim.enable = true;
+      lowLatency = {
+        enable = true;
+        pulseLatencyMs = 8;
+        pipewireLatency = "256/48000";
+      };
       env = [
         "vblank_mode=0"
       ];
