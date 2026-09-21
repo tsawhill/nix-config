@@ -7,7 +7,7 @@
 let
   # Routed through the Swiss gateway; forwarded port comes from SOPS.
   vpnClientEnabled = true;
-  # Tracker keywords and qbit-manage; dryRun stays on until the migration lands.
+  # Tracker keywords and qbit-manage.
   secretsProvisioned = true;
 in
 {
@@ -80,8 +80,9 @@ in
     # Hourly, not daily: unlisted trackers are meant to stop promptly, and the
     # timer is the real bound on how long they seed.
     interval = "hourly";
-    # Stays on until a --dry-run has been read and found boring.
-    dryRun = true;
+    # Migration verified 2026-09-21: every torrent in a real tier, none in the
+    # catch-all, zero cleanup candidates. Enforcing for real from here.
+    dryRun = false;
 
     trackerSecrets = {
       t1 = "qbit_tracker_t1";
