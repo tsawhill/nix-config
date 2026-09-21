@@ -11,6 +11,10 @@
     # This tells NixOS not to use the 'nologin' shell
     shell = pkgs.zsh;
   };
+  my.monitoring.logs.agent = {
+    files = [ "/var/log/nginx/*.log" ];
+    fileGroups = [ "nginx" ];
+  };
   proxy.authentik = {
     enable = true;
     domain = "auth.tsawhill.org";

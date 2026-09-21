@@ -127,6 +127,8 @@ in
         ];
       };
     };
+
+    logs.agent.enable = true;
   };
   my.users.taylor = {
     enable = true;

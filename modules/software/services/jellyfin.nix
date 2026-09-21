@@ -16,8 +16,12 @@
       After = "network-online.target";
     };
 
+    # Keep logs (incl. FFmpeg transcode logs) outside /root so the log agent can read them.
+    environment.JELLYFIN_LOG_DIR = "/var/log/jellyfin";
+
     serviceConfig = {
       type = "simple";
+      LogsDirectory = "jellyfin";
       ExecStart = "/usr/bin/env jellyfin";
       Restart = "always";
       TimeoutStopSec = "20";

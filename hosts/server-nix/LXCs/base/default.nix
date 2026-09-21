@@ -59,6 +59,7 @@ in
   };
   software.server.enable = true;
   my.monitoring.metrics.exporters.enable = true;
+  my.monitoring.logs.agent.enable = true;
   # /proc/diskstats is host-global inside these containers, so node_exporter
   # would publish identical and misleading disk I/O for every guest. Incus's
   # host-side metrics endpoint provides the attributable counters instead.

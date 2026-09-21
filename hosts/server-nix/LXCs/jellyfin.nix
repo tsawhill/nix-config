@@ -12,5 +12,6 @@
       gid = 1000;
     };
   };
+  my.monitoring.logs.agent.files = [ "/var/log/jellyfin/*.log" ];
   networking.hostName = "jellyfin-nix";
 }

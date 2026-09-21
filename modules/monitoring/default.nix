@@ -6,6 +6,7 @@
   # below decide which services to enable.
   imports = [
     ./homepage.nix
+    ./logs.nix
     ./metrics.nix
     ./notifications.nix
     ./smart-alerts.nix
