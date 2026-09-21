@@ -7,9 +7,27 @@ logic that was difficult to follow and test as one large shell script.
 
 ## Mental model
 
-A scheduled host deployment has four explicit stages:
+A deployment resolves the raw hive's names and tags once, from the exact Git
+commit captured before deploying. Every build uses that same Git-backed flake
+reference, so ignored files and edits made during the run cannot change its
+inputs. Removed-host GC roots are pruned once using that inventory.
 
-1. Build one host and discover its exact `nixos-system` store path.
+Systems are built in batches of four using one pure `nix build` invocation for
+the selected `colmenaHive.toplevel` outputs. This shares evaluation work and
+uses the flake evaluation cache without Colmena 0.4's impure temporary-flake
+evaluator. The hive generator and the installed Colmena CLI come from the same
+pinned input. Host discovery still reads the raw `colmena` output to avoid
+evaluating every NixOS configuration just to select names and tags.
+
+A failed batch falls back to individual builds, so a broken host cannot block
+its healthy siblings. Batch builds have a 24-hour timeout; single-host builds
+and fallback attempts retain the six-hour timeout. `build_batch_size` and
+`batch_build_timeout` are configured in the rebuild Nix module. Setting the
+batch size to one is useful for timing individual systems.
+
+Each scheduled host then has four explicit stages:
+
+1. Obtain its exact system path from its indexed Nix build result link.
 2. Pin that closure locally and replace any older queued retry for the host.
 3. Write a durable JSON retry record *before* attempting activation.
 4. Copy and activate that exact path, deleting the record only on success or a
@@ -19,6 +37,12 @@ This ordering is intentional. If a host is offline, the retry timer activates
 the already-built closure later instead of evaluating a newer flake. A newer
 Daily, Weekly, or Monthly build for the same host supersedes retry state from
 every older cadence.
+
+Temporary result links protect the entire batch against garbage collection
+until its hosts have been processed. Results are associated by Nix's documented
+installable index, never by parsing mixed build logs. The temporary links are
+removed afterward; durable build and retry pins keep their existing retention
+policies. Build logs show the selected hosts, elapsed time, and exit status.
 
 Scheduled deployments for topology hosts marked as intermittent Incus guests
 preserve the guest's power state. A stopped guest is started through its Incus
@@ -89,6 +113,11 @@ activating a host.
 
 The package is built reproducibly through `pkgs/deployctl/default.nix` and its
 committed `Cargo.lock`. Unit tests deliberately cover pure policy such as host
-ordering, path discovery, and safe state labels. Keep subprocess and filesystem
+ordering, batch fallback, result mapping and root lifetime, and safe state labels. Keep subprocess and filesystem
 effects behind their focused modules so more policy can become pure tests over
 time.
+
+After changing this controller, rebuild `build-nix` first to install it. That
+bootstrap deployment still runs through the previously installed controller;
+subsequent `deploy` commands use the new implementation. The raw `colmena`
+output remains available for that bootstrap.

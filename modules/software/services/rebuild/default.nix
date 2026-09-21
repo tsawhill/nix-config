@@ -1,5 +1,6 @@
 {
   config,
+  inputs,
   lib,
   networkTopology,
   pkgs,
@@ -8,7 +9,7 @@
 
 let
   repoPath = "/mnt/zpool/code/nix-config";
-  flakePath = "path://${repoPath}";
+  flakePath = "git+file://${repoPath}";
   deployLockPath = "/run/lock/colmena-deploy.lock";
   retryStateDir = "/var/lib/colmena-deploy-retries";
   notifications = config.my.monitoring.notifications;
@@ -29,6 +30,10 @@ let
     system_profile = "/nix/var/nix/profiles/system";
     lan_domain = networkTopology.domains.lan;
     per_host_build_timeout = "6h";
+    # One evaluator shares work across each small batch. Activation remains
+    # sequential, with the builder and Incus host last.
+    build_batch_size = 4;
+    batch_build_timeout = "24h";
     apply_timeout = "90m";
     incus_boot_timeout_secs = 180;
     # Physical and remote hosts retain two closures for offline comparisons.
@@ -69,7 +74,7 @@ let
 
   deployctlRaw = pkgs.callPackage ../../../../pkgs/deployctl { };
   runtimePath = lib.makeBinPath [
-    pkgs.colmena
+    inputs.colmena.packages.${pkgs.stdenv.hostPlatform.system}.colmena
     pkgs.coreutils
     pkgs.curl
     pkgs.git

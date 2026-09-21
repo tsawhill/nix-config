@@ -2,6 +2,13 @@
   description = "NixOS Configuration";
 
   inputs = {
+    # Keep the direct-evaluation hive and CLI on the same revision. Nixpkgs
+    # still packages 0.4, which uses the legacy impure flake evaluator.
+    colmena = {
+      url = "github:nix-community/colmena/3c396f116d1b5572a7f6bdf59d216109815f4810";
+      inputs.nixpkgs.follows = "nixpkgs-stable";
+      inputs.stable.follows = "nixpkgs-stable";
+    };
     authentik-nix.url = "github:nix-community/authentik-nix";
     grimoire.url = "github:Slush97/grimoire";
     nixos-raspberrypi.url = "github:nvmd/nixos-raspberrypi/main";
@@ -97,6 +104,8 @@
     in
     colmenaOutputs
     // {
+      colmenaHive = inputs.colmena.lib.makeHive colmenaOutputs.colmena;
+
       nixosConfigurations =
         (serverOutputs.nixosConfigurations or { })
         // (piOutputs.nixosConfigurations or { })

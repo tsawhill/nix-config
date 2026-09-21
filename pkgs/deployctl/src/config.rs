@@ -16,6 +16,10 @@ pub struct Config {
     pub system_profile: PathBuf,
     pub lan_domain: String,
     pub per_host_build_timeout: String,
+    #[serde(default = "default_build_batch_size")]
+    pub build_batch_size: usize,
+    #[serde(default = "default_batch_build_timeout")]
+    pub batch_build_timeout: String,
     pub apply_timeout: String,
     pub incus_boot_timeout_secs: u64,
     pub keep_roots: usize,
@@ -26,6 +30,14 @@ pub struct Config {
     pub wol_macs: BTreeMap<String, String>,
     #[serde(default)]
     pub incus_guests: BTreeMap<String, IncusGuestConfig>,
+}
+
+fn default_build_batch_size() -> usize {
+    4
+}
+
+fn default_batch_build_timeout() -> String {
+    "24h".to_owned()
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -67,7 +79,12 @@ impl Config {
         let path = path.unwrap_or_else(|| Path::new("/etc/deployctl.json"));
         let bytes = fs::read(path)
             .with_context(|| format!("failed to read deployctl config at {}", path.display()))?;
-        serde_json::from_slice(&bytes)
-            .with_context(|| format!("invalid deployctl config at {}", path.display()))
+        let config: Self = serde_json::from_slice(&bytes)
+            .with_context(|| format!("invalid deployctl config at {}", path.display()))?;
+        anyhow::ensure!(
+            config.build_batch_size > 0,
+            "build_batch_size must be positive"
+        );
+        Ok(config)
     }
 }

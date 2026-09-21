@@ -11,7 +11,7 @@ use crate::changes::{closure_packages, DeployChanges, HostChange};
 use crate::cli::DeployGoal;
 use crate::colmena::{is_retryable, BuildResult, Colmena};
 use crate::config::Config;
-use crate::hosts::{controller_last, expand_selector, list_all, ssh_host};
+use crate::hosts::{controller_last, ssh_host, HostInventory};
 use crate::incus::{with_lifecycle, LifecycleOutcome, SshIncus};
 use crate::locking::{DeployLock, LockMode};
 use crate::notifications::{deploy_log_email_body, has_warnings, Notifier};
@@ -42,14 +42,15 @@ impl Controller {
     }
 
     pub fn plan(&self, selector: &str, ordered: bool) -> Result<()> {
-        let mut hosts = expand_selector(&self.config, selector)?;
+        let inventory = HostInventory::load(&self.config, &self.config.flake_uri)?;
+        let mut hosts = inventory.select(selector);
         if ordered {
             hosts = controller_last(hosts);
         }
         if hosts.is_empty() {
             bail!(
                 "no hosts matched selector {selector:?}; known hosts: {}",
-                list_all(&self.config)?.join(" ")
+                display_set(&inventory.names())
             );
         }
         for (index, host) in hosts.iter().enumerate() {
@@ -63,7 +64,8 @@ impl Controller {
             &self.config.deploy_lock_path,
             "manual deploy",
             LockMode::Prompt,
-        )? else {
+        )?
+        else {
             bail!("manual deploy did not wait for the deploy lock");
         };
 
@@ -71,12 +73,14 @@ impl Controller {
         // sees the working-tree edits it is about to deploy.
         let base = self.summary_base();
         let staged = self.pre_deploy_commit(&format!("manual deploy {selector}"))?;
+        let source = self.deployment_source()?;
         phase(format!("Manual deploy {selector}: resolving hosts"));
-        let hosts = controller_last(expand_selector(&self.config, selector)?);
+        let inventory = HostInventory::load(&self.config, &source)?;
+        let hosts = controller_last(inventory.select(selector));
         if hosts.is_empty() {
             bail!(
                 "no hosts matched selector {selector:?}; known hosts: {}",
-                list_all(&self.config)?.join(" ")
+                display_set(&inventory.names())
             );
         }
         phase(format!(
@@ -89,40 +93,47 @@ impl Controller {
         let mut deployed = Vec::new();
         let mut had_warnings = false;
 
-        for host in hosts {
-            phase(format!(
-                "{host}: manual build phase ({})",
-                goal.as_str()
-            ));
-            let build = self.colmena.build(&host)?;
-            let Some(system_path) = self.accept_build(&host, &build, "Manual deploy") else {
-                failed.insert(host);
-                continue;
-            };
-            let previous = self.colmena.previous_system(&host);
-            if let Err(error) = self.colmena.pin_built_system(&host, &system_path) {
-                eprintln!("warning: failed to pin {host}: {error:#}");
-            }
+        self.prune_removed_hosts(&inventory);
+        for batch in hosts.chunks(self.config.build_batch_size) {
+            let mut builds = self.colmena.build_batch(&source, batch)?;
+            for host in batch.iter().cloned() {
+                phase(format!(
+                    "{host}: processing manual build result ({})",
+                    goal.as_str()
+                ));
+                let build = builds.remove(&host).context("missing host build result")?;
+                let Some(system_path) = self.accept_build(&host, &build, "Manual deploy") else {
+                    failed.insert(host);
+                    continue;
+                };
+                let previous = self.colmena.previous_system(&host);
+                if let Err(error) = self.colmena.pin_built_system(&host, &system_path) {
+                    eprintln!("warning: failed to pin {host}: {error:#}");
+                }
 
-            phase(format!(
-                "{host}: manual exact-path apply started ({}, timeout {})",
-                goal.as_str(),
-                self.config.apply_timeout
-            ));
-            let output = self.colmena.apply(&host, &system_path, goal)?;
-            had_warnings |= has_warnings(&output);
-            if output.success() {
-                phase(format!("{host}: manual exact-path apply completed"));
-                succeeded.insert(host.clone());
-                deployed.push(self.host_change(&host, previous.as_deref(), &system_path));
-                self.retries.clear_host(&host)?;
-            } else {
-                failed.insert(host.clone());
-                self.notify_host_failure(
-                    &format!("❌ Manual deploy {host} FAILED"),
-                    &output,
-                    &format!("Build log excerpt for manual deploy {host} (goal={}).", goal.as_str()),
-                );
+                phase(format!(
+                    "{host}: manual exact-path apply started ({}, timeout {})",
+                    goal.as_str(),
+                    self.config.apply_timeout
+                ));
+                let output = self.colmena.apply(&host, &system_path, goal)?;
+                had_warnings |= has_warnings(&output);
+                if output.success() {
+                    phase(format!("{host}: manual exact-path apply completed"));
+                    succeeded.insert(host.clone());
+                    deployed.push(self.host_change(&host, previous.as_deref(), &system_path));
+                    self.retries.clear_host(&host)?;
+                } else {
+                    failed.insert(host.clone());
+                    self.notify_host_failure(
+                        &format!("❌ Manual deploy {host} FAILED"),
+                        &output,
+                        &format!(
+                            "Build log excerpt for manual deploy {host} (goal={}).",
+                            goal.as_str()
+                        ),
+                    );
+                }
             }
         }
 
@@ -180,16 +191,15 @@ impl Controller {
 
         let base = self.summary_base();
         let staged = self.pre_deploy_commit(&format!("{schedule} pre-deploy"))?;
+        let source = self.deployment_source()?;
         phase(format!("Deploying {schedule} ({selector})"));
-        let hosts = controller_last(expand_selector(&self.config, selector)?);
+        let inventory = HostInventory::load(&self.config, &source)?;
+        let hosts = controller_last(inventory.select(selector));
         if hosts.is_empty() {
             phase(format!("No hosts found for selector {selector:?}"));
             return Ok(());
         }
-        phase(format!(
-            "{schedule}: hosts to deploy: {}",
-            hosts.join(" ")
-        ));
+        phase(format!("{schedule}: hosts to deploy: {}", hosts.join(" ")));
         self.retries.clear_schedule(schedule)?;
         let build_id = Utc::now().format("%Y%m%d%H%M%S").to_string();
 
@@ -199,137 +209,140 @@ impl Controller {
         let mut deployed = Vec::new();
         let mut had_warnings = false;
 
-        for host in hosts {
-            phase(format!("{host}: scheduled build phase"));
-            let build = self.colmena.build(&host)?;
-            let Some(system_path) = self.accept_build(&host, &build, schedule) else {
-                hard_failed.insert(host);
-                continue;
-            };
-            let previous = self.colmena.previous_system(&host);
-            if let Err(error) = self.colmena.pin_built_system(&host, &system_path) {
-                eprintln!("warning: failed to pin {host}: {error:#}");
-            }
+        self.prune_removed_hosts(&inventory);
+        for batch in hosts.chunks(self.config.build_batch_size) {
+            let mut builds = self.colmena.build_batch(&source, batch)?;
+            for host in batch.iter().cloned() {
+                phase(format!("{host}: processing scheduled build result"));
+                let build = builds.remove(&host).context("missing host build result")?;
+                let Some(system_path) = self.accept_build(&host, &build, schedule) else {
+                    hard_failed.insert(host);
+                    continue;
+                };
+                let previous = self.colmena.previous_system(&host);
+                if let Err(error) = self.colmena.pin_built_system(&host, &system_path) {
+                    eprintln!("warning: failed to pin {host}: {error:#}");
+                }
 
-            self.retries.clear_host(&host)?;
-            phase(format!("{host}: queueing retry record for {}", system_path.display()));
-            let record = self.retries.new_record(
-                schedule,
-                selector,
-                &host,
-                system_path.clone(),
-                DeployGoal::Switch,
-                &build_id,
-            );
-            self.retries.write(&record)?;
-
-            phase(format!(
-                "{host}: first exact-path apply started (timeout {})",
-                self.config.apply_timeout
-            ));
-            let managed = self
-                .config
-                .incus_guests
-                .get(&host)
-                .filter(|guest| guest.intermittent)
-                .cloned();
-            let lifecycle = if let Some(guest) = &managed {
+                self.retries.clear_host(&host)?;
                 phase(format!(
-                    "{host}: checking intermittent Incus instance {} through {}",
-                    guest.instance, guest.manager
+                    "{host}: queueing retry record for {}",
+                    system_path.display()
                 ));
-                let mut backend = SshIncus::new(
-                    guest,
-                    ssh_host(&self.config, &host),
-                    Duration::from_secs(self.config.incus_boot_timeout_secs),
+                let record = self.retries.new_record(
+                    schedule,
+                    selector,
+                    &host,
+                    system_path.clone(),
+                    DeployGoal::Switch,
+                    &build_id,
                 );
-                match with_lifecycle(&mut backend, || {
-                    self.colmena
-                        .apply(&host, &system_path, DeployGoal::Switch)
-                }) {
-                    Ok(outcome) => outcome,
-                    Err(error) => {
+                self.retries.write(&record)?;
+
+                phase(format!(
+                    "{host}: first exact-path apply started (timeout {})",
+                    self.config.apply_timeout
+                ));
+                let managed = self
+                    .config
+                    .incus_guests
+                    .get(&host)
+                    .filter(|guest| guest.intermittent)
+                    .cloned();
+                let lifecycle = if let Some(guest) = &managed {
+                    phase(format!(
+                        "{host}: checking intermittent Incus instance {} through {}",
+                        guest.instance, guest.manager
+                    ));
+                    let mut backend = SshIncus::new(
+                        guest,
+                        ssh_host(&self.config, &host),
+                        Duration::from_secs(self.config.incus_boot_timeout_secs),
+                    );
+                    match with_lifecycle(&mut backend, || {
+                        self.colmena.apply(&host, &system_path, DeployGoal::Switch)
+                    }) {
+                        Ok(outcome) => outcome,
+                        Err(error) => {
+                            hard_failed.insert(host.clone());
+                            self.retries.delete(schedule, &host)?;
+                            self.notify_lifecycle_failure(
+                                schedule,
+                                &host,
+                                &format!("Incus lifecycle setup failed: {error:#}"),
+                                None,
+                            );
+                            continue;
+                        }
+                    }
+                } else {
+                    LifecycleOutcome {
+                        operation: self.colmena.apply(&host, &system_path, DeployGoal::Switch),
+                        restoration_error: None,
+                        started: false,
+                    }
+                };
+
+                let LifecycleOutcome {
+                    operation,
+                    restoration_error,
+                    started,
+                } = lifecycle;
+                let output = match operation {
+                    Ok(output) => output,
+                    Err(error) if managed.is_some() => {
                         hard_failed.insert(host.clone());
                         self.retries.delete(schedule, &host)?;
+                        let restoration = restoration_error
+                            .map(|error| format!("\nState restoration also failed: {error:#}"))
+                            .unwrap_or_default();
                         self.notify_lifecycle_failure(
                             schedule,
                             &host,
-                            &format!("Incus lifecycle setup failed: {error:#}"),
+                            &format!("Scheduled apply could not run: {error:#}{restoration}"),
                             None,
                         );
                         continue;
                     }
+                    Err(error) => return Err(error),
+                };
+                if started && restoration_error.is_none() {
+                    phase(format!(
+                        "{host}: restored intermittent Incus instance to stopped"
+                    ));
                 }
-            } else {
-                LifecycleOutcome {
-                    operation: self
-                        .colmena
-                        .apply(&host, &system_path, DeployGoal::Switch),
-                    restoration_error: None,
-                    started: false,
-                }
-            };
-
-            let LifecycleOutcome {
-                operation,
-                restoration_error,
-                started,
-            } = lifecycle;
-            let output = match operation {
-                Ok(output) => output,
-                Err(error) if managed.is_some() => {
+                if let Some(error) = restoration_error {
+                    if output.success() {
+                        deployed.push(self.host_change(&host, previous.as_deref(), &system_path));
+                    }
                     hard_failed.insert(host.clone());
                     self.retries.delete(schedule, &host)?;
-                    let restoration = restoration_error
-                        .map(|error| format!("\nState restoration also failed: {error:#}"))
-                        .unwrap_or_default();
                     self.notify_lifecycle_failure(
                         schedule,
                         &host,
-                        &format!("Scheduled apply could not run: {error:#}{restoration}"),
-                        None,
-                    );
-                    continue;
-                }
-                Err(error) => return Err(error),
-            };
-            if started && restoration_error.is_none() {
-                phase(format!(
-                    "{host}: restored intermittent Incus instance to stopped"
-                ));
-            }
-            if let Some(error) = restoration_error {
-                if output.success() {
-                    deployed.push(self.host_change(&host, previous.as_deref(), &system_path));
-                }
-                hard_failed.insert(host.clone());
-                self.retries.delete(schedule, &host)?;
-                self.notify_lifecycle_failure(
-                    schedule,
-                    &host,
-                    &format!(
+                        &format!(
                         "Activation {} but the guest could not be restored to stopped: {error:#}",
                         if output.success() { "succeeded" } else { "failed" }
                     ),
-                    Some(&output),
-                );
-                continue;
-            }
-            had_warnings |= has_warnings(&output);
-            match scheduled_disposition(
-                managed.is_some(),
-                output.success(),
-                is_retryable(&output),
-            ) {
-                ScheduledDisposition::Succeeded => {
-                    phase(format!("{host}: first exact-path apply completed"));
-                    succeeded.insert(host.clone());
-                    deployed.push(self.host_change(&host, previous.as_deref(), &system_path));
-                    self.retries.delete(schedule, &host)?;
+                        Some(&output),
+                    );
+                    continue;
                 }
-                ScheduledDisposition::Deferred => {
-                    deferred.insert(host.clone());
-                    self.notifier.notify(
+                had_warnings |= has_warnings(&output);
+                match scheduled_disposition(
+                    managed.is_some(),
+                    output.success(),
+                    is_retryable(&output),
+                ) {
+                    ScheduledDisposition::Succeeded => {
+                        phase(format!("{host}: first exact-path apply completed"));
+                        succeeded.insert(host.clone());
+                        deployed.push(self.host_change(&host, previous.as_deref(), &system_path));
+                        self.retries.delete(schedule, &host)?;
+                    }
+                    ScheduledDisposition::Deferred => {
+                        deferred.insert(host.clone());
+                        self.notifier.notify(
                         &format!("⚠️ {schedule}: {host} deferred"),
                         5,
                         &format!(
@@ -338,15 +351,16 @@ impl Controller {
                             output.tail(20)
                         ),
                     );
-                }
-                ScheduledDisposition::HardFailed => {
-                    hard_failed.insert(host.clone());
-                    self.retries.delete(schedule, &host)?;
-                    self.notify_host_failure(
-                        &format!("❌ {schedule}: {host} FAILED"),
-                        &output,
-                        &format!("Build log excerpt for {host} ({schedule})."),
-                    );
+                    }
+                    ScheduledDisposition::HardFailed => {
+                        hard_failed.insert(host.clone());
+                        self.retries.delete(schedule, &host)?;
+                        self.notify_host_failure(
+                            &format!("❌ {schedule}: {host} FAILED"),
+                            &output,
+                            &format!("Build log excerpt for {host} ({schedule})."),
+                        );
+                    }
                 }
             }
         }
@@ -417,7 +431,8 @@ impl Controller {
             &self.config.deploy_lock_path,
             "deploy retry",
             LockMode::Skip,
-        )? else {
+        )?
+        else {
             return Ok(());
         };
 
@@ -506,11 +521,12 @@ impl Controller {
     /// Read-only: it takes no lock, commits nothing, and moves no ref, so the
     /// model and the prompt can be exercised against real closures at any time.
     pub fn summarize_last(&self, selector: &str, show_prompt: bool) -> Result<()> {
-        let hosts = expand_selector(&self.config, selector)?;
+        let inventory = HostInventory::load(&self.config, &self.config.flake_uri)?;
+        let hosts = inventory.select(selector);
         if hosts.is_empty() {
             bail!(
                 "no hosts matched selector {selector:?}; known hosts: {}",
-                list_all(&self.config)?.join(" ")
+                display_set(&inventory.names())
             );
         }
 
@@ -538,7 +554,10 @@ impl Controller {
             println!("--- prompt ---\n{}\n--- reply ---", changes.prompt());
         }
         let summary = self.summarizer.summarize(&changes);
-        println!("{}", summary.commit_message(selector, &versions, base.as_deref()));
+        println!(
+            "{}",
+            summary.commit_message(selector, &versions, base.as_deref())
+        );
         Ok(())
     }
 
@@ -546,11 +565,9 @@ impl Controller {
         if offset >= 0 {
             bail!("offset must be negative, for example -2");
         }
-        let Some(_lock) = DeployLock::acquire(
-            &self.config.deploy_lock_path,
-            "rollback",
-            LockMode::Skip,
-        )? else {
+        let Some(_lock) =
+            DeployLock::acquire(&self.config.deploy_lock_path, "rollback", LockMode::Skip)?
+        else {
             bail!("rollback skipped because another deploy owns the lock");
         };
         let target = ssh_host(&self.config, host);
@@ -579,7 +596,10 @@ impl Controller {
                 .arg("nix-env -p /nix/var/nix/profiles/system --list-generations"),
         )?;
         if !generations.success() {
-            bail!("unable to list generations on {host}:\n{}", generations.text);
+            bail!(
+                "unable to list generations on {host}:\n{}",
+                generations.text
+            );
         }
         let generation_numbers: Vec<_> = generations
             .text
@@ -588,7 +608,12 @@ impl Controller {
             .collect();
         let distance = offset.unsigned_abs() as usize;
         let generation = generation_numbers
-            .get(generation_numbers.len().checked_sub(distance).context("offset exceeds available generations")?)
+            .get(
+                generation_numbers
+                    .len()
+                    .checked_sub(distance)
+                    .context("offset exceeds available generations")?,
+            )
             .context("offset exceeds available generations")?;
         println!("Switching {host} to generation {generation}");
         let command = format!(
@@ -619,7 +644,12 @@ impl Controller {
         }
     }
 
-    fn accept_build(&self, host: &str, build: &BuildResult, schedule: &str) -> Option<std::path::PathBuf> {
+    fn accept_build(
+        &self,
+        host: &str,
+        build: &BuildResult,
+        schedule: &str,
+    ) -> Option<std::path::PathBuf> {
         if build.output.success() {
             if let Some(path) = &build.system_path {
                 return Some(path.clone());
@@ -639,15 +669,26 @@ impl Controller {
         None
     }
 
+    fn deployment_source(&self) -> Result<String> {
+        let revision = self
+            .rev_parse("HEAD")
+            .context("cannot resolve pre-deploy commit")?;
+        let source = pinned_flake_uri(&self.config.flake_uri, &revision)?;
+        phase(format!("Deployment source: {source}"));
+        Ok(source)
+    }
+
+    fn prune_removed_hosts(&self, inventory: &HostInventory) {
+        if let Err(error) = self.colmena.prune_removed_hosts(&inventory.names()) {
+            eprintln!("warning: failed to prune removed-host roots: {error:#}");
+        }
+    }
+
     fn notify_host_failure(&self, title: &str, output: &RunOutput, heading: &str) {
         let tail = output.tail(20);
         let email = deploy_log_email_body(output, heading);
-        self.notifier.notify_email(
-            title,
-            10,
-            &format!("Last 20 lines:\n{tail}"),
-            &email,
-        );
+        self.notifier
+            .notify_email(title, 10, &format!("Last 20 lines:\n{tail}"), &email);
     }
 
     fn notify_lifecycle_failure(
@@ -675,9 +716,8 @@ impl Controller {
     /// Commit the working tree before building, and report whether it made a
     /// commit.
     ///
-    /// Colmena builds from the working tree, so a dirty deploy would otherwise
-    /// activate a configuration that matches no commit at all. Capturing it
-    /// first is what lets a deployed generation be traced back to a revision.
+    /// Builds use this exact commit, so all edits intended for the deployment
+    /// must be captured before resolving selectors or building any systems.
     /// On success the summary replaces this placeholder message, so the
     /// deployment ends up as one commit holding both the changes and their
     /// description.
@@ -689,10 +729,7 @@ impl Controller {
             &[
                 "commit",
                 "-m",
-                &format!(
-                    "auto: {label} {}",
-                    Local::now().format("%Y-%m-%d %H:%M")
-                ),
+                &format!("auto: {label} {}", Local::now().format("%Y-%m-%d %H:%M")),
             ],
             true,
         )?;
@@ -801,11 +838,17 @@ impl Controller {
     fn commit_summary(&self, message: &str, amend: bool) -> Result<()> {
         self.git(&["add", "flake.lock"], true)?;
         if amend && self.tip_is_unpushed() {
-            self.git(&["commit", "--amend", "--allow-empty", "-m", message], false)?;
+            self.git(
+                &["commit", "--amend", "--allow-empty", "-m", message],
+                false,
+            )?;
         } else {
             self.git(&["commit", "--allow-empty", "-m", message], false)?;
         }
-        self.git(&["update-ref", &self.config.summary.marker_ref, "HEAD"], true)
+        self.git(
+            &["update-ref", &self.config.summary.marker_ref, "HEAD"],
+            true,
+        )
     }
 
     /// Never rewrite a commit that a remote already has.
@@ -826,12 +869,28 @@ impl Controller {
     }
 
     fn git(&self, args: &[&str], allow_failure: bool) -> Result<()> {
-        let output = run_logged(Command::new("git").args(args).current_dir(&self.config.repo_path))?;
+        let output = run_logged(
+            Command::new("git")
+                .args(args)
+                .current_dir(&self.config.repo_path),
+        )?;
         if !output.success() && !allow_failure {
             bail!("git {} failed", args.join(" "));
         }
         Ok(())
     }
+}
+
+fn pinned_flake_uri(base: &str, revision: &str) -> Result<String> {
+    anyhow::ensure!(
+        base.starts_with("git+file:///") && !base.contains(['?', '#']),
+        "deployment flake_uri must be an absolute git+file URI without query or fragment"
+    );
+    anyhow::ensure!(
+        matches!(revision.len(), 40 | 64) && revision.bytes().all(|c| c.is_ascii_hexdigit()),
+        "invalid pre-deploy Git revision"
+    );
+    Ok(format!("{base}?rev={revision}"))
 }
 
 fn with_report(body: &str, report: Option<&str>) -> String {
@@ -872,7 +931,25 @@ fn scheduled_disposition(
 
 #[cfg(test)]
 mod tests {
-    use super::{scheduled_disposition, ScheduledDisposition};
+    use super::{pinned_flake_uri, scheduled_disposition, ScheduledDisposition};
+
+    #[test]
+    fn deployment_source_uses_an_exact_commit_and_git_filtering() {
+        let revision = "0123456789abcdef0123456789abcdef01234567";
+        assert_eq!(
+            pinned_flake_uri("git+file:///repo", revision).unwrap(),
+            format!("git+file:///repo?rev={revision}")
+        );
+        for source in [
+            "path:/repo",
+            "/repo",
+            "git+file:///repo?ref=main",
+            "git+file:///repo#colmena",
+        ] {
+            assert!(pinned_flake_uri(source, revision).is_err());
+        }
+        assert!(pinned_flake_uri("git+file:///repo", "HEAD").is_err());
+    }
 
     #[test]
     fn ordinary_retryable_failure_is_deferred() {
