@@ -2,8 +2,8 @@
   description = "NixOS Configuration";
 
   inputs = {
-    # Keep the direct-evaluation hive and CLI on the same revision. Nixpkgs
-    # still packages 0.4, which uses the legacy impure flake evaluator.
+    # Provides lib.makeHive for the pure colmenaHive output deployctl builds.
+    # Nixpkgs still packages 0.4, whose CLI rejects this hive schema.
     colmena = {
       url = "github:nix-community/colmena/3c396f116d1b5572a7f6bdf59d216109815f4810";
       inputs.nixpkgs.follows = "nixpkgs-stable";

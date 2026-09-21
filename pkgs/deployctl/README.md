@@ -15,9 +15,10 @@ inputs. Removed-host GC roots are pruned once using that inventory.
 Systems are built in batches of four using one pure `nix build` invocation for
 the selected `colmenaHive.toplevel` outputs. This shares evaluation work and
 uses the flake evaluation cache without Colmena 0.4's impure temporary-flake
-evaluator. The hive generator and the installed Colmena CLI come from the same
-pinned input. Host discovery still reads the raw `colmena` output to avoid
-evaluating every NixOS configuration just to select names and tags.
+evaluator. The hive generator comes from the pinned `colmena` flake input; the
+controller never runs the Colmena CLI itself. Host discovery still reads the raw
+`colmena` output to avoid evaluating every NixOS configuration just to select
+names and tags.
 
 A failed batch falls back to individual builds, so a broken host cannot block
 its healthy siblings. Batch builds have a 24-hour timeout; single-host builds
@@ -117,7 +118,15 @@ ordering, batch fallback, result mapping and root lifetime, and safe state label
 effects behind their focused modules so more policy can become pure tests over
 time.
 
-After changing this controller, rebuild `build-nix` first to install it. That
-bootstrap deployment still runs through the previously installed controller;
-subsequent `deploy` commands use the new implementation. The raw `colmena`
-output remains available for that bootstrap.
+After changing this controller, rebuild `build-nix` first to install it. Normally
+`deploy build-nix` does that through the previously installed controller. If the
+installed controller cannot evaluate the flake (for example, an older Colmena CLI
+rejecting a newer `colmenaHive` schema), bootstrap by hand with the same steps
+the controller takes, run from the repo on build-nix:
+
+    nix build -o /tmp/bootstrap .#colmenaHive.toplevel.build-nix
+    nix-env -p /nix/var/nix/profiles/system --set "$(readlink /tmp/bootstrap)"
+    "$(readlink /tmp/bootstrap)"/bin/switch-to-configuration switch
+    rm /tmp/bootstrap
+
+Subsequent `deploy` commands use the new implementation.

@@ -3,6 +3,7 @@
   lib,
   config,
   self,
+  inputs,
   ...
 }:
 {
@@ -50,8 +51,8 @@
       # Multimedia CLI
       ffmpeg
 
-      # Deployment tools
-      colmena
+      # Deployment tools; the CLI must match the flake's colmenaHive schema
+      inputs.colmena.packages.${pkgs.stdenv.hostPlatform.system}.colmena
       gotify-cli
     ];
   };

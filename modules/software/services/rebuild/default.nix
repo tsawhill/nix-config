@@ -1,6 +1,5 @@
 {
   config,
-  inputs,
   lib,
   networkTopology,
   pkgs,
@@ -74,7 +73,6 @@ let
 
   deployctlRaw = pkgs.callPackage ../../../../pkgs/deployctl { };
   runtimePath = lib.makeBinPath [
-    inputs.colmena.packages.${pkgs.stdenv.hostPlatform.system}.colmena
     pkgs.coreutils
     pkgs.curl
     pkgs.git
