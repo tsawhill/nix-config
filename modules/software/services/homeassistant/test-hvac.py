@@ -215,18 +215,48 @@ class Templates(unittest.TestCase):
                 self.values[f"input_select.hvac_{name}_office"] = normal
                 self.values[f"input_select.hvac_override_{name}_office"] = override
                 self.values["timer.hvac_override_office"] = "idle"
-                self.assertEqual(self.render(name + "Template"), normal)
+                self.assertEqual(
+                    self.render(
+                        "normalFanTemplate" if name == "fan" else "airflowTemplate"
+                    ),
+                    normal,
+                )
                 self.values["timer.hvac_override_office"] = "active"
-                self.assertEqual(self.render(name + "Template"), override)
+                self.assertEqual(
+                    self.render(
+                        "normalFanTemplate" if name == "fan" else "airflowTemplate"
+                    ),
+                    override,
+                )
                 self.values[f"input_select.hvac_draft_{name}_office"] = scheduled
-                self.assertEqual(self.render(name + "Template"), override)
+                self.assertEqual(
+                    self.render(
+                        "normalFanTemplate" if name == "fan" else "airflowTemplate"
+                    ),
+                    override,
+                )
                 self.values[f"input_select.hvac_override_{name}_office"] = "schedule"
-                self.assertEqual(self.render(name + "Template"), normal)
+                self.assertEqual(
+                    self.render(
+                        "normalFanTemplate" if name == "fan" else "airflowTemplate"
+                    ),
+                    normal,
+                )
                 self.values[f"input_select.hvac_{name}_office"] = "schedule"
-                self.assertEqual(self.render(name + "Template"), scheduled)
+                self.assertEqual(
+                    self.render(
+                        "normalFanTemplate" if name == "fan" else "airflowTemplate"
+                    ),
+                    scheduled,
+                )
                 self.values[f"input_select.hvac_override_{name}_office"] = override
                 self.values["timer.hvac_override_office"] = "idle"
-                self.assertEqual(self.render(name + "Template"), scheduled)
+                self.assertEqual(
+                    self.render(
+                        "normalFanTemplate" if name == "fan" else "airflowTemplate"
+                    ),
+                    scheduled,
+                )
 
     def test_room_power_off_and_nap_power_on(self):
         expr = re.search(
@@ -267,7 +297,7 @@ class Templates(unittest.TestCase):
         )[0]
         self.assertNotRegex(selects, r"\binitial\s*=")
         sync = SOURCE.split("  sliderSyncAutomation =", 1)[1].split(
-            "  reconcileAutomation =", 1
+            "  patienceTemplate =", 1
         )[0]
         self.assertIn("input_boolean.hvac_drafts_initialized", sync)
         self.assertNotIn("target.entity_id = overrideNumber", sync)
@@ -293,6 +323,96 @@ class Templates(unittest.TestCase):
             t.render(op="nap", nap_heat=False, value_office=80), targets["coolAbove"]
         )
         self.assertEqual(t.render(op="apply", nap_heat=True, value_office=80), "80")
+
+    def watch(self, **overrides):
+        text = raw_template("watchDecision")
+        for key, value in {
+            "progressDegrees": 0.3,
+            "boostMinutes": 10,
+            "stallMinutes": 20,
+        }.items():
+            text = text.replace("${toString tuning." + key + "}", str(value))
+        args = dict(
+            phase="watching",
+            mode="cool",
+            desired="cool",
+            fresh=True,
+            checkpoint=100,
+            elapsed=300,
+            progress=0,
+            patience=1,
+        )
+        args.update(overrides)
+        return self.env.from_string(text).render(**args).strip()
+
+    def test_watch_retry_is_bounded_and_progress_silent(self):
+        self.assertEqual(self.watch(elapsed=299), "wait")
+        self.assertEqual(self.watch(), "retry")
+        self.assertEqual(self.watch(progress=0.31), "progress")
+        for phase in ["retried", "boosted", "stalled", "exhausted", "settled"]:
+            self.assertNotEqual(self.watch(phase=phase, elapsed=10000), "retry")
+        self.assertEqual(self.watch(phase="idle"), "initialize")
+        self.assertEqual(self.watch(phase="exhausted", progress=0.5), "progress")
+
+    def test_outdoor_gap_only_delays_escalation(self):
+        self.assertEqual(self.watch(patience=2), "retry")
+        self.assertEqual(self.watch(phase="retried", elapsed=600), "boost")
+        self.assertEqual(self.watch(phase="retried", elapsed=600, patience=2), "wait")
+        self.assertEqual(self.watch(phase="retried", elapsed=1200, patience=2), "boost")
+        self.assertEqual(self.watch(phase="boosted", elapsed=1200), "stall")
+        self.assertEqual(self.watch(phase="boosted", elapsed=1200, patience=2), "wait")
+        self.assertEqual(self.watch(phase="boosted", elapsed=2400, patience=2), "stall")
+
+    def test_patience_uses_per_room_delta_and_weather_units(self):
+        text = raw_template("patienceTemplate").replace(
+            "${toString tuning.deltaForDoubleWait}", "35"
+        )
+        template = self.env.from_string(text)
+
+        def factor(**changes):
+            args = dict(
+                mode="cool",
+                outdoor_fresh=True,
+                outdoor_value=110,
+                outdoor_unit="°F",
+                sample=75,
+            )
+            args.update(changes)
+            return float(template.render(**args))
+
+        self.assertEqual(factor(), 2)
+        self.assertEqual(factor(sample=92.5), 1.5)
+        self.assertEqual(factor(outdoor_value=75), 1)
+        self.assertEqual(factor(outdoor_value=60), 1)
+        self.assertEqual(factor(outdoor_value=140), 2)
+        self.assertAlmostEqual(
+            factor(outdoor_value=43.333333, outdoor_unit="°C"), 2, places=6
+        )
+        self.assertEqual(factor(outdoor_fresh=False), 1)
+        self.assertEqual(factor(outdoor_value=None), 1)
+        self.assertEqual(factor(outdoor_unit="K"), 1)
+        self.assertEqual(factor(mode="heat"), 1)
+
+    def test_watch_rejects_stale_sensors_and_changed_demand(self):
+        self.assertEqual(self.watch(fresh=False), "wait")
+        self.assertEqual(self.watch(desired="off"), "wait")
+        self.assertEqual(self.watch(mode="unavailable"), "wait")
+        self.assertEqual(self.watch(mode="heat", desired="heat"), "retry")
+        self.assertEqual(
+            self.watch(phase="off_pending", mode="off", elapsed=120), "off_retry"
+        )
+        self.assertEqual(self.watch(phase="idle", mode="off", elapsed=10000), "wait")
+
+    def test_boost_respects_quiet_and_fixed_fans(self):
+        self.values["climate.office_ac"] = "cool"
+        self.values["input_select.hvac_watch_office"] = "boosted"
+        for normal in ["quiet", "1", "2", "3", "4", "5"]:
+            self.values["sensor.hvac_normal_fan_office"] = normal
+            self.assertEqual(self.render("fanTemplate"), normal)
+        self.values["sensor.hvac_normal_fan_office"] = "auto"
+        self.assertEqual(self.render("fanTemplate"), "5")
+        self.values["climate.office_ac"] = "off"
+        self.assertEqual(self.render("fanTemplate"), "auto")
 
 
 class StateAccessor:

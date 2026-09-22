@@ -228,11 +228,47 @@ device addresses, and router rules are not configured by this change.
 and the YAML dashboard. The controller uses:
 
 - Explicit heat/cool modes and setpoints, using measured room temperature.
-- A deadband and command interval to prevent oscillation and IR flooding.
-- Stale/unavailable sensor handling, startup reconciliation, and manual override.
+- A deadband and minimum run/off times to prevent oscillation.
+- Stale/unavailable sensor handling, bounded retries, and manual override.
 - Full-state IR commands where supported, acknowledging that sent IR does not
   confirm the indoor unit received it.
 - Coordination between heads sharing one outdoor unit before changing modes.
+
+There is no periodic IR resend. Each run starts immediately when allowed by the
+compressor timers. Its requested setpoint stays steady until a threshold or mode
+changes. Five-minute temperature means are compared with a saved baseline;
+at least 0.3°F of progress refreshes the observation window silently.
+
+After five minutes without progress, the controller retries once. After another
+10 minutes without progress it boosts Auto fan to speed 5, leaving Quiet and
+fixed speeds alone. After another 20 minutes it reports **Not reaching target**
+and can pause one strictly lower-priority cooling room for 30 minutes. A room
+still in its minimum run time cannot be selected. There is no repeat shedding
+for that stalled run. Heating gets the same retry/boost monitoring but no
+capacity shedding. A boost ends when the run ends; standing preferences are
+never rewritten. Recovery clears the warning without replenishing retry budgets.
+
+An off transition gets one delayed off retry after two minutes, then silence.
+IR has no acknowledgement, so neither a temperature trend nor HA's climate state
+proves that a command was received. The watchdog saves its phase and observation
+checkpoint across restarts. Missing or stale room readings prevent escalation.
+
+`weather.forecast_home` supplies advisory outdoor temperature via its current
+`temperature` and `temperature_unit` attributes. During cooling, each room's
+five-minute mean is subtracted from the outdoor temperature. The escalation
+wait multiplier is `1 + clamp((outdoor°F − room°F) / 35, 0, 1)`:
+
+| Outdoor minus room | Post-retry fan wait | Subsequent capacity wait |
+| --- | --- | --- |
+| 0°F or less | 10 min | 20 min |
+| 17.5°F | 15 min | 30 min |
+| 35°F or more | 20 min | 40 min |
+
+Initial commands and the first five-minute check are unchanged. °C weather data
+is converted to °F. Missing data, unsupported units, or weather updates over an
+hour old use the normal waits. Weather availability never blocks local control.
+The multiplier is recalculated from current weather and each room's smoothed
+temperature; it is a bounded allowance, not an estimate of required AC capacity.
 
 ## Dashboard and overrides
 

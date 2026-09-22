@@ -18,8 +18,8 @@
 #     frees capacity so the important one actually gets cold.
 #
 # IR is open loop. Nothing here can read the units back, so the controller
-# re-sends its intent periodically and treats a stale sensor as a reason to
-# stop rather than to keep guessing.
+# checks temperature progress before a bounded retry and treats stale sensors
+# as a reason to stop rather than to keep guessing.
 
 let
   rooms = {
@@ -52,15 +52,16 @@ let
     # Compressor protection. An inverter would rather run long and gentle.
     minRunMinutes = 10;
     minOffMinutes = 10;
-    # Restate intent this often, since commands are unacknowledged and someone
-    # may have picked up the handheld remote.
-    reconcileMinutes = 15;
+    # Weather is advisory; local control works when it is unavailable.
+    outdoorEntity = "weather.forecast_home";
+    progressDegrees = 0.3;
+    boostMinutes = 10;
+    stallMinutes = 20;
+    # Scale escalation waits from 1x to 2x across a 0–35°F outdoor/room gap.
+    deltaForDoubleWait = 35;
     # A sensor quieter than this is not worth acting on.
     staleMinutes = 15;
-    # Capacity shedding: a room cooling this long that has not fallen by at
-    # least this much has run into the limits of the outdoor unit.
-    stallMinutes = 20;
-    stallProgress = 1.0;
+    # A capacity pause is bounded and limited to one victim per stalled cycle.
     shedMinutes = 30;
     overridePriority = 10;
   };
@@ -327,7 +328,7 @@ let
       {{ ns.current.rooms['${room}'].priority }}
     {%- endif -%}'';
 
-  fanTemplate = room: ''
+  normalFanTemplate = room: ''
     ${currentBlock}
     {%- if is_state('${overrideTimer room}', 'active') and states('${appliedFan room}') in ['auto', 'quiet', '1', '2', '3', '4', '5'] -%}
       {{ states('${appliedFan room}') }}
@@ -336,6 +337,10 @@ let
     {%- else -%}
       {{ states('${fanSelect room}') }}
     {%- endif -%}'';
+
+  fanTemplate = room: ''
+    {%- set normal = states('sensor.hvac_normal_fan_${room}') -%}
+    {{ '5' if normal == 'auto' and states('input_select.hvac_watch_${room}') in ['boosted', 'stalled', 'exhausted', 'settled'] and states('${climateEntity room}') in ['cool', 'heat'] else normal }}'';
 
   # Which block of today's pattern is in force, for the dashboard.
   scheduleBlockTemplate = ''
@@ -424,10 +429,12 @@ let
       {
         trigger = "state";
         entity_id = targetSensor room;
+        id = "target";
       }
       {
         trigger = "state";
         entity_id = heatTargetSensor room;
+        id = "target";
       }
       {
         trigger = "state";
@@ -445,6 +452,7 @@ let
         trigger = "state";
         entity_id = "script.hvac_apply_override";
         to = "off";
+        id = "target";
       }
       {
         trigger = "state";
@@ -488,7 +496,7 @@ let
                 value_template = ''
                   {{ desired != 'off'
                      and (current_mode != desired
-                          or (state_attr('${climateEntity room}', 'temperature') | float(0)) != setpoint)
+                          or (trigger.id | default("") == 'target' and (state_attr('${climateEntity room}', 'temperature') | float(0)) != setpoint))
                      and (current_mode != 'off' or not min_off_active) }}'';
               }
             ];
@@ -561,6 +569,12 @@ let
         trigger = "state";
         entity_id = climateEntity room;
         to = "cool";
+        id = "${room}_cool";
+      }
+      {
+        trigger = "state";
+        entity_id = climateEntity room;
+        to = "heat";
         id = "${room}_cool";
       }
       {
@@ -666,55 +680,160 @@ let
       ];
   };
 
-  # Commands are never acknowledged, so restate intent on a slow cycle.
-  reconcileAutomation = {
-    alias = "HVAC reconcile";
-    description = "Re-send the intended state, since IR gives no feedback.";
-    mode = "single";
-    conditions = [ commitIdle ];
-    triggers = [
-      {
-        trigger = "time_pattern";
-        minutes = "/${toString tuning.reconcileMinutes}";
-      }
-    ];
-    # Off is restated too, and that matters more than restating on. A missed
-    # off leaves the head running while Home Assistant shows it stopped, with
-    # nothing to notice or correct it; that is how a deselected room can heat
-    # all night.
-    actions = map (room: {
-      choose = [
+  patienceTemplate = ''
+    {%- if mode != 'cool' or not outdoor_fresh or not is_number(outdoor_value) or outdoor_unit not in ['°F', '°C'] -%}1
+    {%- else -%}
+      {%- set outside = (outdoor_value | float) * 1.8 + 32 if outdoor_unit == '°C' else outdoor_value | float -%}
+      {{ 1 + [[(outside - sample) / ${toString tuning.deltaForDoubleWait}, 0] | max, 1] | min }}
+    {%- endif -%}'';
+
+  # Pure decision template, exercised by the offline regression suite. Progress
+  # refreshes the observation window, never the per-cycle retry budget.
+  watchDecision = ''
+    {%- if phase == 'off_pending' -%}
+      {{ 'off_retry' if mode == 'off' and elapsed >= 120 else 'wait' }}
+    {%- elif mode not in ['cool', 'heat'] or desired != mode or not fresh -%}wait
+    {%- elif phase == 'idle' or checkpoint <= 0 -%}initialize
+    {%- elif elapsed < 300 -%}wait
+    {%- elif progress >= ${toString tuning.progressDegrees} -%}progress
+    {%- elif phase == 'watching' -%}retry
+    {%- elif phase == 'retried' and elapsed >= ${toString tuning.boostMinutes} * patience * 60 -%}boost
+    {%- elif phase == 'boosted' and elapsed >= ${toString tuning.stallMinutes} * patience * 60 -%}stall
+    {%- else -%}wait
+    {%- endif -%}'';
+
+  # Compare five-minute means, not single noisy readings. All budgets and
+  # checkpoints restore across HA restarts; no startup command storm.
+  mkWatchAutomation =
+    room:
+    let
+      phaseEntity = "input_select.hvac_watch_${room}";
+      checkpointEntity = "input_number.hvac_checkpoint_${room}";
+      baselineEntity = "input_number.hvac_baseline_${room}";
+      setPhase = option: {
+        action = "input_select.select_option";
+        target.entity_id = phaseEntity;
+        data = { inherit option; };
+      };
+      checkpoint = [
         {
-          conditions = [
-            {
-              condition = "template";
-              value_template = "{{ is_state('${climateEntity room}', 'off') }}";
-            }
-          ];
-          sequence = [ (offAction room) ];
+          action = "input_number.set_value";
+          target.entity_id = baselineEntity;
+          data.value = "{{ sample }}";
+        }
+        {
+          action = "input_number.set_value";
+          target.entity_id = checkpointEntity;
+          data.value = "{{ as_timestamp(now()) }}";
         }
       ];
-      default = [
+    in
+    {
+      alias = "HVAC ${rooms.${room}} progress watch";
+      mode = "queued";
+      max = 5;
+      triggers = [
         {
-          action = "climate.set_temperature";
-          target.entity_id = climateEntity room;
-          data = {
-            hvac_mode = "{{ states('${climateEntity room}') }}";
-            temperature = "{{ state_attr('${climateEntity room}', 'temperature') | round(0) }}";
+          trigger = "time_pattern";
+          minutes = "/1";
+          id = "tick";
+        }
+        {
+          trigger = "state";
+          entity_id = climateEntity room;
+          to = null;
+          id = "transition";
+        }
+      ];
+      conditions = [ commitIdle ];
+      actions = [
+        {
+          variables = {
+            mode = "{{ states('${climateEntity room}') }}";
+            desired = desiredTemplate room;
+            phase = "{{ states('${phaseEntity}') }}";
+            checkpoint = "{{ states('${checkpointEntity}') | float(0) }}";
+            sample = "{{ states('sensor.hvac_mean_${room}') | float(states('${tempSensor room}') | float(0)) }}";
+            fresh = "{{ is_number(states('${tempSensor room}')) and is_number(states('sensor.hvac_mean_${room}')) and (as_timestamp(now()) - as_timestamp(states.sensor.ac_controller_${room}_temperature.last_reported, 0)) < 300 }}";
+            outdoor_value = "{{ state_attr('${tuning.outdoorEntity}', 'temperature') }}";
+            outdoor_unit = "{{ state_attr('${tuning.outdoorEntity}', 'temperature_unit') }}";
+            outdoor_fresh = "{{ states('${tuning.outdoorEntity}') not in ['unknown', 'unavailable'] and (as_timestamp(now()) - as_timestamp(states['${tuning.outdoorEntity}'].last_updated, 0)) < 3600 }}";
           };
         }
+        {
+          variables = {
+            elapsed = "{{ as_timestamp(now()) - checkpoint }}";
+            progress = "{{ ((states('${baselineEntity}') | float(sample)) - sample) * (1 if mode == 'cool' else -1) }}";
+            patience = patienceTemplate;
+          };
+        }
+        {
+          choose = [
+            {
+              conditions = "{{ trigger.id == 'transition' and trigger.from_state is not none and trigger.to_state is not none and trigger.from_state.state in ['cool', 'heat', 'off'] and trigger.to_state.state in ['cool', 'heat', 'off'] and trigger.from_state.state != trigger.to_state.state }}";
+              sequence = [ (setPhase "{{ 'off_pending' if mode == 'off' else 'watching' }}") ] ++ checkpoint;
+            }
+          ];
+          default = [
+            { variables.decision = watchDecision; }
+            {
+              choose = [
+                {
+                  conditions = "{{ decision == 'off_retry' and desired == 'off' }}";
+                  sequence = [
+                    (setPhase "idle")
+                    (offAction room)
+                  ];
+                }
+                {
+                  conditions = "{{ decision == 'initialize' }}";
+                  sequence = [ (setPhase "watching") ] ++ checkpoint;
+                }
+                {
+                  conditions = "{{ decision == 'progress' }}";
+                  sequence = [
+                    (setPhase "{{ 'settled' if phase in ['stalled', 'exhausted'] else phase }}")
+                  ]
+                  ++ checkpoint;
+                }
+                {
+                  conditions = "{{ decision == 'retry' }}";
+                  # Consume the retry before calling IR, even if transmission fails.
+                  sequence = [
+                    (setPhase "retried")
+                  ]
+                  ++ checkpoint
+                  ++ [
+                    {
+                      action = "climate.set_temperature";
+                      target.entity_id = climateEntity room;
+                      data = {
+                        hvac_mode = "{{ mode }}";
+                        temperature = "{{ state_attr('${climateEntity room}', 'temperature') }}";
+                      };
+                    }
+                  ];
+                }
+                {
+                  conditions = "{{ decision == 'boost' }}";
+                  sequence = [ (setPhase "boosted") ] ++ checkpoint;
+                }
+                {
+                  conditions = "{{ decision == 'stall' }}";
+                  sequence = [ (setPhase "stalled") ];
+                }
+              ];
+            }
+          ];
+        }
       ];
-    }) roomNames;
-  };
+    };
 
-  # True when a room has been cooling a while without making real headway.
   stalledExpr = room: ''
     (is_state('${climateEntity room}', 'cool')
+     and is_state('input_select.hvac_watch_${room}', 'stalled')
      and (states('${tempSensor room}') | float(0)) > (states('${targetSensor room}') | float(999))
-     and (now() - states.climate.${room}_ac.last_changed).total_seconds() > ${
-       toString (tuning.stallMinutes * 60)
-     }
-     and ((states('${startTempNumber room}') | float(0)) - (states('${tempSensor room}') | float(0))) < ${toString tuning.stallProgress})
+     and (as_timestamp(now()) - as_timestamp(states.sensor.ac_controller_${room}_temperature.last_reported, 0)) < 300)
   '';
 
   # Capacity guard. When the most important calling room stops making progress
@@ -748,6 +867,8 @@ let
             ${lib.concatMapStrings (room: ''
               {% if is_state('${climateEntity room}', 'cool')
                     and not is_state('${shedTimer room}', 'active')
+                    and not is_state('${minRunTimer room}', 'active')
+                    and (states('${prioritySensor room}') | int(0)) < (states('sensor.hvac_priority_' ~ (stalled | trim)) | int(0))
                     and (states('${prioritySensor room}') | int(0)) < ns.worst %}
                 {% set ns.pick = '${room}' %}
                 {% set ns.worst = states('${prioritySensor room}') | int(0) %}
@@ -770,6 +891,11 @@ let
                 action = "timer.start";
                 target.entity_id = "{{ 'timer.hvac_shed_' ~ (victim | trim) }}";
                 data.duration = tuning.shedMinutes * 60;
+              }
+              {
+                action = "input_select.select_option";
+                target.entity_id = "{{ 'input_select.hvac_watch_' ~ (stalled | trim) }}";
+                data.option = "exhausted";
               }
             ];
           }
@@ -804,6 +930,7 @@ let
     {%- elif is_state('${shedTimer room}', 'active') -%}Paused for capacity
     {%- elif m == 'off' -%}System off
     {%- elif is_state('${climateEntity room}', 'off') and is_state('${minOffTimer room}', 'active') -%}Waiting to restart
+    {%- elif states('input_select.hvac_watch_${room}') in ['stalled', 'exhausted'] and states('${climateEntity room}') in ['cool', 'heat'] -%}Not reaching target
     {%- else -%}{{ 'Override' if active else 'Following schedule' }}
     {%- endif -%}'';
 
@@ -1020,6 +1147,8 @@ in
 
   # The module builds the resource URL from pname and version, so both have to
   # exist on the derivation; the content hash doubles as the cache buster.
+  services.home-assistant.extraComponents = [ "statistics" ];
+
   services.home-assistant.customLovelaceModules = [
     (
       let
@@ -1043,6 +1172,17 @@ in
       filename = "hvac-dashboard.yaml";
       show_in_sidebar = true;
     };
+
+    sensor = map (room: {
+      platform = "statistics";
+      name = "hvac_mean_${room}";
+      unique_id = "hvac_mean_${room}";
+      entity_id = tempSensor room;
+      state_characteristic = "mean";
+      max_age.minutes = 5;
+      sampling_size = 300;
+      precision = 2;
+    }) roomNames;
 
     input_number =
       (lib.listToAttrs (
@@ -1069,6 +1209,26 @@ in
               unit_of_measurement = "°F";
               mode = "slider";
               icon = "mdi:thermometer";
+            };
+          }
+          {
+            name = "hvac_checkpoint_${room}";
+            value = {
+              name = "${rooms.${room}} progress checkpoint";
+              min = 0;
+              max = 4102444800;
+              step = 1;
+              mode = "box";
+            };
+          }
+          {
+            name = "hvac_baseline_${room}";
+            value = {
+              name = "${rooms.${room}} progress baseline";
+              min = -40;
+              max = 150;
+              step = 0.01;
+              mode = "box";
             };
           }
           {
@@ -1186,6 +1346,22 @@ in
     }
     // (lib.listToAttrs (
       lib.concatMap (room: [
+        {
+          name = "hvac_watch_${room}";
+          value = {
+            name = "${rooms.${room}} progress watch";
+            options = [
+              "idle"
+              "watching"
+              "retried"
+              "boosted"
+              "stalled"
+              "exhausted"
+              "settled"
+              "off_pending"
+            ];
+          };
+        }
         {
           name = "hvac_draft_fan_${room}";
           value = {
@@ -1312,6 +1488,11 @@ in
               state = effectiveModeTemplate;
             }
           ]
+          ++ (map (room: {
+            name = "hvac_normal_fan_${room}";
+            unique_id = "hvac_normal_fan_${room}";
+            state = normalFanTemplate room;
+          }) roomNames)
           ++ (map (room: {
             name = "hvac_fan_${room}";
             unique_id = "hvac_fan_${room}";
@@ -1508,11 +1689,13 @@ in
       };
     };
 
-    "automation manual" = (map mkRoomAutomation roomNames) ++ [
-      transitionAutomation
-      sliderSyncAutomation
-      reconcileAutomation
-      shedAutomation
-    ];
+    "automation manual" =
+      (map mkRoomAutomation roomNames)
+      ++ (map mkWatchAutomation roomNames)
+      ++ [
+        transitionAutomation
+        sliderSyncAutomation
+        shedAutomation
+      ];
   };
 }
