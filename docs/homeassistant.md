@@ -248,10 +248,23 @@ for that stalled run. Heating gets the same retry/boost monitoring but no
 capacity shedding. A boost ends when the run ends; standing preferences are
 never rewritten. Recovery clears the warning without replenishing retry budgets.
 
-An off transition gets one delayed off retry after two minutes, then silence.
+An off transition gets a delayed off retry after two minutes. Monitoring then
+continues silently: if a fresh five-minute mean moves at least 0.5°F farther in
+the previous run's direction over ten minutes, and is more than 1°F beyond the
+stop boundary, one additional off command is sent. Continued drift after another
+ten minutes raises a persistent warning and a dashboard shutdown warning. These
+checks do not run against a head that has since started a new run.
 IR has no acknowledgement, so neither a temperature trend nor HA's climate state
 proves that a command was received. The watchdog saves its phase and observation
 checkpoint across restarts. Missing or stale room readings prevent escalation.
+
+On a system mode change or HA startup, a bounded handoff sends off to all heads
+twice, including heads HA already believes are off. Room control is blocked
+during that handoff, then the ten-minute minimum off interval applies before
+starting the selected mode. This handles a missed cooling-off command that could
+otherwise prevent the shared outdoor unit from heating. The deadband retains
+only the selected mode, never an opposing mode. A room explicitly paused by an
+override stays paused; enable it and Apply, or Resume schedule, to allow heating.
 
 `weather.forecast_home` supplies advisory outdoor temperature via its current
 `temperature` and `temperature_unit` attributes. During cooling, each room's

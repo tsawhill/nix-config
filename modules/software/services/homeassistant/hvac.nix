@@ -377,9 +377,9 @@ let
         } -%}
     {%- if blocked -%}off
     {%- elif sys == 'cool' -%}
-      {{ 'cool' if r > ct else ('off' if r <= ct - ${toString tuning.hysteresis} else cur) }}
+      {{ 'cool' if r > ct else ('off' if r <= ct - ${toString tuning.hysteresis} else (cur if cur == 'cool' else 'off')) }}
     {%- elif sys == 'heat' -%}
-      {{ 'heat' if r < ht else ('off' if r >= ht + ${toString tuning.hysteresis} else cur) }}
+      {{ 'heat' if r < ht else ('off' if r >= ht + ${toString tuning.hysteresis} else (cur if cur == 'heat' else 'off')) }}
     {%- else -%}off
     {%- endif -%}'';
 
@@ -472,7 +472,14 @@ let
         minutes = "/1";
       }
     ];
-    conditions = [ commitIdle ];
+    conditions = [
+      commitIdle
+      {
+        condition = "state";
+        entity_id = "script.hvac_mode_handoff";
+        state = "off";
+      }
+    ];
     actions = [
       { variables = roomVariables room; }
       {
@@ -497,7 +504,9 @@ let
                   {{ desired != 'off'
                      and (current_mode != desired
                           or (trigger.id | default("") == 'target' and (state_attr('${climateEntity room}', 'temperature') | float(0)) != setpoint))
-                     and (current_mode != 'off' or not min_off_active) }}'';
+                     and (current_mode != 'off' or not min_off_active)
+                     and is_state('script.hvac_mode_handoff', 'off')
+                     and (as_timestamp(now()) - as_timestamp(states.sensor.hvac_effective_mode.last_changed, 0)) >= 10 }}'';
               }
             ];
             sequence = [
@@ -552,6 +561,29 @@ let
         ];
       }
     ];
+  };
+
+  modeHandoffAutomation = {
+    alias = "HVAC mode handoff";
+    mode = "restart";
+    triggers = [
+      {
+        trigger = "homeassistant";
+        event = "start";
+      }
+      {
+        trigger = "state";
+        entity_id = effectiveMode;
+        to = null;
+      }
+    ];
+    conditions = [
+      {
+        condition = "template";
+        value_template = "{{ states('${effectiveMode}') in ['cool', 'heat', 'off'] }}";
+      }
+    ];
+    actions = [ { action = "script.hvac_mode_handoff"; } ];
   };
 
   # Record the temperature a room started at, so progress can be measured
@@ -692,6 +724,8 @@ let
   watchDecision = ''
     {%- if phase == 'off_pending' -%}
       {{ 'off_retry' if mode == 'off' and elapsed >= 120 else 'wait' }}
+    {%- elif mode == 'off' and phase in ['off_check', 'off_final'] and fresh and elapsed >= 600 and off_drift >= 0.5 and off_overshoot -%}
+      {{ 'off_correct' if phase == 'off_check' else 'off_failed' }}
     {%- elif mode not in ['cool', 'heat'] or desired != mode or not fresh -%}wait
     {%- elif phase == 'idle' or checkpoint <= 0 -%}initialize
     {%- elif elapsed < 300 -%}wait
@@ -745,13 +779,21 @@ let
           id = "transition";
         }
       ];
-      conditions = [ commitIdle ];
+      # Record transitions even while an override is committing. Only the
+      # periodic command path waits for the commit to finish.
+      conditions = [
+        {
+          condition = "template";
+          value_template = "{{ trigger.id == 'transition' or is_state('script.hvac_apply_override', 'off') }}";
+        }
+      ];
       actions = [
         {
           variables = {
             mode = "{{ states('${climateEntity room}') }}";
             desired = desiredTemplate room;
             phase = "{{ states('${phaseEntity}') }}";
+            last_run = "{{ states('input_select.hvac_last_run_${room}') }}";
             checkpoint = "{{ states('${checkpointEntity}') | float(0) }}";
             sample = "{{ states('sensor.hvac_mean_${room}') | float(states('${tempSensor room}') | float(0)) }}";
             fresh = "{{ is_number(states('${tempSensor room}')) and is_number(states('sensor.hvac_mean_${room}')) and (as_timestamp(now()) - as_timestamp(states.sensor.ac_controller_${room}_temperature.last_reported, 0)) < 300 }}";
@@ -765,13 +807,23 @@ let
             elapsed = "{{ as_timestamp(now()) - checkpoint }}";
             progress = "{{ ((states('${baselineEntity}') | float(sample)) - sample) * (1 if mode == 'cool' else -1) }}";
             patience = patienceTemplate;
+            off_drift = "{{ ((states('${baselineEntity}') | float(sample)) - sample) * (1 if last_run == 'cool' else -1) }}";
+            off_overshoot = "{{ (last_run == 'cool' and sample < (states('${targetSensor room}') | float(-999)) - ${toString tuning.hysteresis} - 1) or (last_run == 'heat' and sample > (states('${heatTargetSensor room}') | float(999)) + ${toString tuning.hysteresis} + 1) }}";
           };
         }
         {
           choose = [
             {
               conditions = "{{ trigger.id == 'transition' and trigger.from_state is not none and trigger.to_state is not none and trigger.from_state.state in ['cool', 'heat', 'off'] and trigger.to_state.state in ['cool', 'heat', 'off'] and trigger.from_state.state != trigger.to_state.state }}";
-              sequence = [ (setPhase "{{ 'off_pending' if mode == 'off' else 'watching' }}") ] ++ checkpoint;
+              sequence = [
+                (setPhase "{{ 'off_pending' if mode == 'off' else 'watching' }}")
+                {
+                  action = "input_select.select_option";
+                  target.entity_id = "input_select.hvac_last_run_${room}";
+                  data.option = "{{ mode if mode in ['cool', 'heat'] else trigger.from_state.state }}";
+                }
+              ]
+              ++ checkpoint;
             }
           ];
           default = [
@@ -779,15 +831,41 @@ let
             {
               choose = [
                 {
-                  conditions = "{{ decision == 'off_retry' and desired == 'off' }}";
+                  conditions = "{{ decision == 'off_retry' }}";
                   sequence = [
-                    (setPhase "idle")
+                    (setPhase "off_check")
                     (offAction room)
                   ];
                 }
                 {
+                  conditions = "{{ decision == 'off_correct' }}";
+                  sequence = [ (setPhase "off_final") ] ++ checkpoint ++ [ (offAction room) ];
+                }
+                {
+                  conditions = "{{ decision == 'off_failed' }}";
+                  sequence = [
+                    (setPhase "off_failed")
+                    {
+                      action = "persistent_notification.create";
+                      data = {
+                        notification_id = "hvac_off_${room}";
+                        title = "${rooms.${room}} AC may still be running";
+                        message = "Temperature is still moving past the stop threshold after off retries. Check the physical unit and IR blaster. Home Assistant cannot confirm IR reception.";
+                      };
+                    }
+                  ];
+                }
+                {
                   conditions = "{{ decision == 'initialize' }}";
-                  sequence = [ (setPhase "watching") ] ++ checkpoint;
+                  sequence = [
+                    (setPhase "watching")
+                    {
+                      action = "input_select.select_option";
+                      target.entity_id = "input_select.hvac_last_run_${room}";
+                      data.option = "{{ mode }}";
+                    }
+                  ]
+                  ++ checkpoint;
                 }
                 {
                   conditions = "{{ decision == 'progress' }}";
@@ -926,6 +1004,7 @@ let
     {%- elif (as_timestamp(now()) - as_timestamp(states.sensor.ac_controller_${room}_temperature.last_reported, 0)) > ${
       toString (tuning.staleMinutes * 60)
     } -%}Sensor stale
+    {%- elif is_state('input_select.hvac_watch_${room}', 'off_failed') -%}Check unit: shutdown unconfirmed
     {%- elif active and is_state('${enableToggle room}', 'off') -%}Paused by override
     {%- elif is_state('${shedTimer room}', 'active') -%}Paused for capacity
     {%- elif m == 'off' -%}System off
@@ -1347,6 +1426,17 @@ in
     // (lib.listToAttrs (
       lib.concatMap (room: [
         {
+          name = "hvac_last_run_${room}";
+          value = {
+            name = "${rooms.${room}} last run mode";
+            options = [
+              "unknown"
+              "cool"
+              "heat"
+            ];
+          };
+        }
+        {
           name = "hvac_watch_${room}";
           value = {
             name = "${rooms.${room}} progress watch";
@@ -1359,6 +1449,9 @@ in
               "exhausted"
               "settled"
               "off_pending"
+              "off_check"
+              "off_final"
+              "off_failed"
             ];
           };
         }
@@ -1509,6 +1602,26 @@ in
     ];
 
     script = {
+      hvac_mode_handoff = {
+        alias = "Stop all heads before changing system mode";
+        mode = "restart";
+        sequence = [
+          {
+            repeat = {
+              count = 2;
+              sequence = (map (room: (offAction room) // { continue_on_error = true; }) roomNames) ++ [
+                { delay.seconds = 2; }
+              ];
+            };
+          }
+        ]
+        ++ (map (room: {
+          action = "timer.start";
+          target.entity_id = minOffTimer room;
+          data.duration = tuning.minOffMinutes * 60;
+        }) roomNames);
+      };
+
       # All commits are serialized. The room controller waits until this script
       # finishes, so it never acts on a partly copied set of pending values.
       hvac_apply_override = {
@@ -1694,6 +1807,7 @@ in
       ++ (map mkWatchAutomation roomNames)
       ++ [
         transitionAutomation
+        modeHandoffAutomation
         sliderSyncAutomation
         shedAutomation
       ];

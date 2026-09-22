@@ -341,6 +341,8 @@ class Templates(unittest.TestCase):
             elapsed=300,
             progress=0,
             patience=1,
+            off_drift=0,
+            off_overshoot=False,
         )
         args.update(overrides)
         return self.env.from_string(text).render(**args).strip()
@@ -353,6 +355,58 @@ class Templates(unittest.TestCase):
             self.assertNotEqual(self.watch(phase=phase, elapsed=10000), "retry")
         self.assertEqual(self.watch(phase="idle"), "initialize")
         self.assertEqual(self.watch(phase="exhausted", progress=0.5), "progress")
+
+    def test_shutdown_keeps_monitoring_after_first_retry(self):
+        # Replay the incident: HA said off at 71.58F, bedroom kept cooling.
+        args = dict(
+            mode="off",
+            desired="off",
+            elapsed=600,
+            off_drift=71.58 - 68,
+            off_overshoot=True,
+        )
+        self.assertEqual(self.watch(phase="off_check", **args), "off_correct")
+        self.assertEqual(self.watch(phase="off_final", **args), "off_failed")
+        self.assertEqual(self.watch(phase="off_failed", **args), "wait")
+        self.assertEqual(
+            self.watch(phase="off_check", **(args | {"fresh": False})), "wait"
+        )
+        self.assertEqual(
+            self.watch(phase="off_check", **(args | {"off_drift": 0.2})), "wait"
+        )
+        self.assertEqual(
+            self.watch(phase="off_check", **(args | {"off_overshoot": False})), "wait"
+        )
+        # A heat demand waiting for compressor cooldown must not suppress off retry.
+        self.assertEqual(
+            self.watch(phase="off_pending", mode="off", desired="heat", elapsed=120),
+            "off_retry",
+        )
+        # A new run must never be stopped by an old off checkpoint.
+        self.assertNotIn(
+            self.watch(
+                phase="off_check",
+                mode="heat",
+                desired="heat",
+                elapsed=600,
+                off_drift=3,
+                off_overshoot=True,
+            ),
+            ["off_correct", "off_failed"],
+        )
+
+    def test_mode_change_never_retains_opposite_mode_in_deadband(self):
+        self.values["sensor.hvac_effective_mode"] = "heat"
+        self.values["sensor.ac_controller_office_temperature"] = "69"
+        self.values["climate.office_ac"] = "cool"
+        self.assertEqual(self.render("desiredTemplate"), "off")
+        self.values["climate.office_ac"] = "heat"
+        self.assertEqual(self.render("desiredTemplate"), "heat")
+        self.values["sensor.hvac_effective_mode"] = "cool"
+        self.values["sensor.ac_controller_office_temperature"] = "75"
+        self.assertEqual(self.render("desiredTemplate"), "off")
+        self.values["climate.office_ac"] = "cool"
+        self.assertEqual(self.render("desiredTemplate"), "cool")
 
     def test_outdoor_gap_only_delays_escalation(self):
         self.assertEqual(self.watch(patience=2), "retry")
