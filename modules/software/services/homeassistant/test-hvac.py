@@ -343,6 +343,7 @@ class Templates(unittest.TestCase):
             patience=1,
             off_drift=0,
             off_overshoot=False,
+            stop_boundary=71,
         )
         args.update(overrides)
         return self.env.from_string(text).render(**args).strip()
@@ -368,16 +369,22 @@ class Templates(unittest.TestCase):
         self.assertEqual(self.watch(phase="off_check", **args), "off_correct")
         self.assertEqual(self.watch(phase="off_final", **args), "off_failed")
         self.assertEqual(self.watch(phase="off_failed", **args), "off_recover")
-        self.assertEqual(self.watch(phase="off_failed", **(args | {"off_drift": 0})), "off_recover")
-        self.assertEqual(self.watch(phase="off_failed", **(args | {"off_overshoot": False})), "wait")
+        self.assertEqual(
+            self.watch(phase="off_failed", **(args | {"off_drift": 0})), "off_observe"
+        )
+        self.assertEqual(
+            self.watch(phase="off_failed", **(args | {"off_overshoot": False})),
+            "off_observe",
+        )
         self.assertEqual(
             self.watch(phase="off_check", **(args | {"fresh": False})), "wait"
         )
         self.assertEqual(
-            self.watch(phase="off_check", **(args | {"off_drift": 0.2})), "wait"
+            self.watch(phase="off_check", **(args | {"off_drift": 0.2})), "off_observe"
         )
         self.assertEqual(
-            self.watch(phase="off_check", **(args | {"off_overshoot": False})), "wait"
+            self.watch(phase="off_check", **(args | {"off_overshoot": False})),
+            "off_observe",
         )
         # A heat demand waiting for compressor cooldown must not suppress off retry.
         self.assertEqual(
@@ -395,6 +402,36 @@ class Templates(unittest.TestCase):
                 off_overshoot=True,
             ),
             ["off_correct", "off_failed"],
+        )
+
+    def test_off_warning_recovers_without_claiming_physical_confirmation(self):
+        args = dict(
+            mode="off",
+            desired="off",
+            phase="off_failed",
+            elapsed=600,
+            off_overshoot=True,
+        )
+        self.assertEqual(self.watch(**args, off_drift=0), "off_observe")
+        self.assertEqual(self.watch(**args, off_drift=-1), "off_observe")
+        self.assertEqual(self.watch(**args, off_drift=0.7), "off_recover")
+        self.assertEqual(self.watch(**args, fresh=False), "wait")
+        self.assertEqual(self.watch(**(args | {"elapsed": 599})), "wait")
+        self.assertEqual(self.watch(**args, stop_boundary=-40), "off_rebase")
+
+    def test_off_overshoot_uses_saved_boundary_not_new_schedule(self):
+        expr = re.search(r'off_overshoot = "(.*?)";', SOURCE).group(1)
+        template = self.env.from_string(expr)
+        # A morning heating schedule dropping from 66 to 60 must not turn
+        # a stable 67F room into a failed shutdown (old logic did).
+        self.assertEqual(
+            template.render(last_run="heat", sample=67, stop_boundary=68), "False"
+        )
+        self.assertEqual(
+            template.render(last_run="heat", sample=70, stop_boundary=68), "True"
+        )
+        self.assertEqual(
+            template.render(last_run="cool", sample=68, stop_boundary=71), "True"
         )
 
     def test_mode_change_never_retains_opposite_mode_in_deadband(self):

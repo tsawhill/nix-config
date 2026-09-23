@@ -253,11 +253,15 @@ continues silently: if a fresh five-minute mean moves at least 0.5°F farther in
 the previous run's direction over ten minutes, and is more than 1°F beyond the
 stop boundary, one additional off command is sent. Continued drift after another
 ten minutes raises a persistent warning and a dashboard shutdown warning. While
-shutdown remains failed and fresh readings are still beyond the stop boundary,
-an off recovery attempt continues at most once per ten minutes—even if the room
-has plateaued at an excessively cold/hot temperature. Normal idle rooms do not
-receive these recovery commands. These
-checks do not run against a head that has since started a new run.
+shutdown remains failed, further recovery attempts require fresh evidence of
+continued drift past the saved stop boundary, at most once per ten minutes.
+Every completed observation window refreshes its temperature baseline. A window
+without suspicious drift clears the warning and persistent notification, while
+leaving the room in “Off requested · monitoring”—not “confirmed off.”
+The stop boundary is saved at shutdown so later schedule/override changes cannot
+retroactively turn that shutdown into a failure. Existing installations without
+a saved boundary first establish a new observation window. These checks do not
+run against a head that has since started a new run.
 IR has no acknowledgement, so neither a temperature trend nor HA's climate state
 proves that a command was received. The watchdog saves its phase and observation
 checkpoint across restarts. Missing or stale room readings prevent escalation.

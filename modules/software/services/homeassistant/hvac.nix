@@ -724,9 +724,13 @@ let
   watchDecision = ''
     {%- if phase == 'off_pending' -%}
       {{ 'off_retry' if mode == 'off' and elapsed >= 120 else 'wait' }}
-    {%- elif mode == 'off' and phase == 'off_failed' and fresh and elapsed >= 600 and off_overshoot -%}off_recover
-    {%- elif mode == 'off' and phase in ['off_check', 'off_final'] and fresh and elapsed >= 600 and off_drift >= 0.5 and off_overshoot -%}
-      {{ 'off_correct' if phase == 'off_check' else 'off_failed' }}
+    {%- elif mode == 'off' and phase in ['off_check', 'off_final', 'off_failed'] and fresh -%}
+      {%- if stop_boundary <= -40 -%}off_rebase
+      {%- elif elapsed < 600 -%}wait
+      {%- elif off_drift >= 0.5 and off_overshoot -%}
+        {{ 'off_correct' if phase == 'off_check' else ('off_recover' if phase == 'off_failed' else 'off_failed') }}
+      {%- else -%}off_observe
+      {%- endif -%}
     {%- elif mode not in ['cool', 'heat'] or desired != mode or not fresh -%}wait
     {%- elif phase == 'idle' or checkpoint <= 0 -%}initialize
     {%- elif elapsed < 300 -%}wait
@@ -745,6 +749,15 @@ let
       phaseEntity = "input_select.hvac_watch_${room}";
       checkpointEntity = "input_number.hvac_checkpoint_${room}";
       baselineEntity = "input_number.hvac_baseline_${room}";
+      captureBoundary = {
+        action = "input_number.set_value";
+        target.entity_id = "input_number.hvac_stop_boundary_${room}";
+        data.value = "{{ (states('${targetSensor room}') | float(75)) - ${toString tuning.hysteresis} if mode == 'cool' or (mode == 'off' and last_run == 'cool') else (states('${heatTargetSensor room}') | float(68)) + ${toString tuning.hysteresis} }}";
+      };
+      dismissWarning = {
+        action = "persistent_notification.dismiss";
+        data.notification_id = "hvac_off_${room}";
+      };
       setPhase = option: {
         action = "input_select.select_option";
         target.entity_id = phaseEntity;
@@ -795,6 +808,7 @@ let
             desired = desiredTemplate room;
             phase = "{{ states('${phaseEntity}') }}";
             last_run = "{{ states('input_select.hvac_last_run_${room}') }}";
+            stop_boundary = "{{ states('input_number.hvac_stop_boundary_${room}') | float(-40) }}";
             checkpoint = "{{ states('${checkpointEntity}') | float(0) }}";
             sample = "{{ states('sensor.hvac_mean_${room}') | float(states('${tempSensor room}') | float(0)) }}";
             fresh = "{{ is_number(states('${tempSensor room}')) and is_number(states('sensor.hvac_mean_${room}')) and (as_timestamp(now()) - as_timestamp(states.sensor.ac_controller_${room}_temperature.last_reported, 0)) < 300 }}";
@@ -809,7 +823,7 @@ let
             progress = "{{ ((states('${baselineEntity}') | float(sample)) - sample) * (1 if mode == 'cool' else -1) }}";
             patience = patienceTemplate;
             off_drift = "{{ ((states('${baselineEntity}') | float(sample)) - sample) * (1 if last_run == 'cool' else -1) }}";
-            off_overshoot = "{{ (last_run == 'cool' and sample < (states('${targetSensor room}') | float(-999)) - ${toString tuning.hysteresis} - 1) or (last_run == 'heat' and sample > (states('${heatTargetSensor room}') | float(999)) + ${toString tuning.hysteresis} + 1) }}";
+            off_overshoot = "{{ (last_run == 'cool' and sample < stop_boundary - 1) or (last_run == 'heat' and sample > stop_boundary + 1) }}";
           };
         }
         {
@@ -818,6 +832,15 @@ let
               conditions = "{{ trigger.id == 'transition' and trigger.from_state is not none and trigger.to_state is not none and trigger.from_state.state in ['cool', 'heat', 'off'] and trigger.to_state.state in ['cool', 'heat', 'off'] and trigger.from_state.state != trigger.to_state.state }}";
               sequence = [
                 (setPhase "{{ 'off_pending' if mode == 'off' else 'watching' }}")
+                captureBoundary
+                {
+                  choose = [
+                    {
+                      conditions = "{{ mode in ['cool', 'heat'] }}";
+                      sequence = [ dismissWarning ];
+                    }
+                  ];
+                }
                 {
                   action = "input_select.select_option";
                   target.entity_id = "input_select.hvac_last_run_${room}";
@@ -837,6 +860,22 @@ let
                     (setPhase "off_check")
                     (offAction room)
                   ];
+                }
+                {
+                  conditions = "{{ decision in ['off_observe', 'off_rebase'] }}";
+                  sequence = [
+                    {
+                      choose = [
+                        {
+                          conditions = "{{ decision == 'off_rebase' }}";
+                          sequence = [ captureBoundary ];
+                        }
+                      ];
+                    }
+                    (setPhase "off_check")
+                    dismissWarning
+                  ]
+                  ++ checkpoint;
                 }
                 {
                   conditions = "{{ decision == 'off_correct' }}";
@@ -863,6 +902,8 @@ let
                 {
                   conditions = "{{ decision == 'initialize' }}";
                   sequence = [
+                    captureBoundary
+                    dismissWarning
                     (setPhase "watching")
                     {
                       action = "input_select.select_option";
@@ -1303,6 +1344,16 @@ in
               min = 0;
               max = 4102444800;
               step = 1;
+              mode = "box";
+            };
+          }
+          {
+            name = "hvac_stop_boundary_${room}";
+            value = {
+              name = "${rooms.${room}} stop boundary for monitored run";
+              min = -40;
+              max = 150;
+              step = 0.1;
               mode = "box";
             };
           }
