@@ -252,7 +252,11 @@ An off transition gets a delayed off retry after two minutes. Monitoring then
 continues silently: if a fresh five-minute mean moves at least 0.5°F farther in
 the previous run's direction over ten minutes, and is more than 1°F beyond the
 stop boundary, one additional off command is sent. Continued drift after another
-ten minutes raises a persistent warning and a dashboard shutdown warning. These
+ten minutes raises a persistent warning and a dashboard shutdown warning. While
+shutdown remains failed and fresh readings are still beyond the stop boundary,
+an off recovery attempt continues at most once per ten minutes—even if the room
+has plateaued at an excessively cold/hot temperature. Normal idle rooms do not
+receive these recovery commands. These
 checks do not run against a head that has since started a new run.
 IR has no acknowledgement, so neither a temperature trend nor HA's climate state
 proves that a command was received. The watchdog saves its phase and observation
@@ -339,3 +343,16 @@ References: [FrankEver FK-UFO-R6](https://frankever.com/fk-ufo-r6-smart-remote-c
 [local IR AC control](https://github.com/make-all/tuya-local/discussions/5449),
 [Daikin integration](https://www.home-assistant.io/integrations/daikin/),
 [splitting configuration](https://www.home-assistant.io/docs/configuration/splitting_configuration/).
+
+### Command delivery errors
+
+Local patches make SmartIR wait for `remote.send_command`, propagate errors,
+and restore the previous requested state if a send fails. Tuya Local raises
+exhausted write errors to the caller rather than only logging them; polling
+behavior is unchanged. This confirms completion of the software send path,
+**not reception by the AC**. “Off requested · monitoring” and shutdown warnings
+remain necessary because IR has no receiver acknowledgement.
+
+`test-delivery.py /path/to/custom_components` exercises the patched integration
+source offline: service completion, error propagation, and requested-state
+restoration. It requires only Python's standard library and sends no commands.

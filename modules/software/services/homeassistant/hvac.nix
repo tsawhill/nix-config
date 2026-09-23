@@ -724,6 +724,7 @@ let
   watchDecision = ''
     {%- if phase == 'off_pending' -%}
       {{ 'off_retry' if mode == 'off' and elapsed >= 120 else 'wait' }}
+    {%- elif mode == 'off' and phase == 'off_failed' and fresh and elapsed >= 600 and off_overshoot -%}off_recover
     {%- elif mode == 'off' and phase in ['off_check', 'off_final'] and fresh and elapsed >= 600 and off_drift >= 0.5 and off_overshoot -%}
       {{ 'off_correct' if phase == 'off_check' else 'off_failed' }}
     {%- elif mode not in ['cool', 'heat'] or desired != mode or not fresh -%}wait
@@ -842,9 +843,13 @@ let
                   sequence = [ (setPhase "off_final") ] ++ checkpoint ++ [ (offAction room) ];
                 }
                 {
-                  conditions = "{{ decision == 'off_failed' }}";
+                  conditions = "{{ decision in ['off_failed', 'off_recover'] }}";
                   sequence = [
                     (setPhase "off_failed")
+                  ]
+                  ++ checkpoint
+                  ++ [
+                    ((offAction room) // { continue_on_error = true; })
                     {
                       action = "persistent_notification.create";
                       data = {
@@ -1007,6 +1012,7 @@ let
     {%- elif is_state('input_select.hvac_watch_${room}', 'off_failed') -%}Check unit: shutdown unconfirmed
     {%- elif active and is_state('${enableToggle room}', 'off') -%}Paused by override
     {%- elif is_state('${shedTimer room}', 'active') -%}Paused for capacity
+    {%- elif is_state('${climateEntity room}', 'off') and states('input_select.hvac_watch_${room}') in ['off_pending', 'off_check', 'off_final'] -%}Off requested · monitoring
     {%- elif m == 'off' -%}System off
     {%- elif is_state('${climateEntity room}', 'off') and is_state('${minOffTimer room}', 'active') -%}Waiting to restart
     {%- elif states('input_select.hvac_watch_${room}') in ['stalled', 'exhausted'] and states('${climateEntity room}') in ['cool', 'heat'] -%}Not reaching target

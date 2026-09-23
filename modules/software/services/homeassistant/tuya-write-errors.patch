@@ -1,0 +1,38 @@
+--- a/custom_components/tuya_local/device.py
++++ b/custom_components/tuya_local/device.py
+@@ -619,12 +619,15 @@
+         await self._retry_on_failed_connection(
+             lambda: self._set_values(pending_properties),
+             "Failed to update device state.",
++            raise_on_failure=True,
+         )
+ 
+     def _set_values(self, properties):
+         try:
+             self._lock.acquire()
+-            self._api.set_multiple_values(properties, nowait=True)
++            result = self._api.set_multiple_values(properties, nowait=True)
++            if isinstance(result, dict) and "Error" in result:
++                raise ConnectionError("IR transport rejected the write")
+             self._cached_state["updated_at"] = 0
+             now = time()
+             self._last_connection = now
+@@ -635,7 +638,7 @@
+         finally:
+             self._lock.release()
+ 
+-    async def _retry_on_failed_connection(self, func, error_message):
++    async def _retry_on_failed_connection(self, func, error_message, raise_on_failure=False):
+         if self._api_protocol_version_index is None:
+             await self._rotate_api_protocol_version()
+         auto = (self._protocol_configured == "auto") and (
+@@ -699,6 +702,9 @@
+                 if not self._api_protocol_working:
+                     await self._rotate_api_protocol_version()
+ 
++        if raise_on_failure:
++            raise ConnectionError(error_message)
++
+     def _get_cached_state(self):
+         cached_state = self._cached_state.copy()
+         return {**cached_state, **self._get_pending_properties()}

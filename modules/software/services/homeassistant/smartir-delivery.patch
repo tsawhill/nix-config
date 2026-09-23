@@ -1,0 +1,85 @@
+--- a/custom_components/smartir/controller.py
++++ b/custom_components/smartir/controller.py
+@@ -109,7 +109,7 @@
+         }
+ 
+         await self.hass.services.async_call(
+-            'remote', 'send_command', service_data)
++            'remote', 'send_command', service_data, blocking=True)
+ 
+ 
+ class XiaomiController(AbstractController):
+@@ -129,7 +129,7 @@
+         }
+ 
+         await self.hass.services.async_call(
+-            'remote', 'send_command', service_data)
++            'remote', 'send_command', service_data, blocking=True)
+ 
+ 
+ class MQTTController(AbstractController):
+--- a/custom_components/smartir/climate.py
++++ b/custom_components/smartir/climate.py
+@@ -95,6 +95,22 @@
+     async_add_entities([SmartIRClimate(
+         hass, config, device_data
+     )])
++
++def restore_on_send_failure(method):
++    """Do not publish an unsent requested state as successful."""
++    async def wrapped(self, *args, **kwargs):
++        names = ("_hvac_mode", "_target_temperature", "_last_on_operation",
++                 "_current_fan_mode", "_current_swing_mode")
++        before = {name: getattr(self, name) for name in names}
++        try:
++            return await method(self, *args, **kwargs)
++        except Exception:
++            for name, value in before.items():
++                setattr(self, name, value)
++            self.async_write_ha_state()
++            raise
++    return wrapped
++
+ 
+ class SmartIRClimate(ClimateEntity, RestoreEntity):
+     def __init__(self, hass, config, device_data):
+@@ -296,6 +312,7 @@
+             'commands_encoding': self._commands_encoding
+         }
+ 
++    @restore_on_send_failure
+     async def async_set_temperature(self, **kwargs):
+         """Set new target temperatures."""
+         hvac_mode = kwargs.get(ATTR_HVAC_MODE)  
+@@ -322,6 +339,7 @@
+ 
+         self.async_write_ha_state()
+ 
++    @restore_on_send_failure
+     async def async_set_hvac_mode(self, hvac_mode):
+         """Set operation mode."""
+         self._hvac_mode = hvac_mode
+@@ -332,6 +350,7 @@
+         await self.send_command()
+         self.async_write_ha_state()
+ 
++    @restore_on_send_failure
+     async def async_set_fan_mode(self, fan_mode):
+         """Set fan mode."""
+         self._current_fan_mode = fan_mode
+@@ -340,6 +359,7 @@
+             await self.send_command()      
+         self.async_write_ha_state()
+ 
++    @restore_on_send_failure
+     async def async_set_swing_mode(self, swing_mode):
+         """Set swing mode."""
+         self._current_swing_mode = swing_mode
+@@ -385,6 +405,7 @@
+ 
+             except Exception as e:
+                 _LOGGER.exception(e)
++                raise
+                 
+     @callback
+     async def _async_temp_sensor_changed(self, event: Event[EventStateChangedData]) -> None:

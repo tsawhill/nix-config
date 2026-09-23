@@ -367,7 +367,9 @@ class Templates(unittest.TestCase):
         )
         self.assertEqual(self.watch(phase="off_check", **args), "off_correct")
         self.assertEqual(self.watch(phase="off_final", **args), "off_failed")
-        self.assertEqual(self.watch(phase="off_failed", **args), "wait")
+        self.assertEqual(self.watch(phase="off_failed", **args), "off_recover")
+        self.assertEqual(self.watch(phase="off_failed", **(args | {"off_drift": 0})), "off_recover")
+        self.assertEqual(self.watch(phase="off_failed", **(args | {"off_overshoot": False})), "wait")
         self.assertEqual(
             self.watch(phase="off_check", **(args | {"fresh": False})), "wait"
         )

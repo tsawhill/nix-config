@@ -15,6 +15,7 @@ let
   # ours in avoids both. Omitting a top-level `smartir:` section also leaves
   # its update check unregistered, so it never reaches the network.
   smartir = pkgs.home-assistant-custom-components.smartir.overrideAttrs (old: {
+    patches = (old.patches or [ ]) ++ [ ./smartir-delivery.patch ];
     postInstall = (old.postInstall or "") + ''
       install -Dm444 ${./daikin-arc452a21.json} \
         $out/custom_components/smartir/codes/climate/${toString daikinDeviceCode}.json
@@ -52,7 +53,9 @@ in
       "met"
     ];
     customComponents = [
-      pkgs.home-assistant-custom-components.tuya_local
+      (pkgs.home-assistant-custom-components.tuya_local.overrideAttrs (old: {
+        patches = (old.patches or [ ]) ++ [ ./tuya-write-errors.patch ];
+      }))
       smartir
     ];
 
