@@ -280,6 +280,43 @@ class Templates(unittest.TestCase):
         self.now = self.now.replace(day=20)
         self.assertEqual(self.render("nextBlockTemplate"), "Wind-down at 22:00")
 
+    def test_room_activity_distinguishes_idle_off_and_running(self):
+        self.assertEqual(self.render("roomActivity"), "Idle")
+        self.values["input_select.hvac_watch_office"] = "off_check"
+        self.assertEqual(self.render("roomActivity"), "Idle")
+        self.assertEqual(self.render("roomStatus"), "Following schedule")
+        self.values["climate.office_ac"] = "cool"
+        self.assertEqual(self.render("roomActivity"), "Cooling")
+        self.values["climate.office_ac"] = "heat"
+        self.assertEqual(self.render("roomActivity"), "Heating")
+        self.values["climate.office_ac"] = "off"
+        self.values["timer.hvac_override_office"] = "active"
+        self.values["input_boolean.hvac_enable_office"] = "off"
+        self.assertEqual(self.render("roomActivity"), "Off")
+        self.values["input_select.hvac_watch_office"] = "off_failed"
+        self.assertEqual(self.render("roomStatus"), "Check unit: shutdown unconfirmed")
+        self.values["timer.hvac_override_office"] = "idle"
+        self.values["sensor.hvac_effective_mode"] = "off"
+        self.assertEqual(self.render("roomActivity"), "Off")
+
+    def test_room_summary_keeps_source_activity_and_warning_separate(self):
+        self.values["sensor.hvac_activity_office"] = "Cooling"
+        self.values["sensor.hvac_status_office"] = "Following schedule"
+        self.assertEqual(
+            self.render("roomSummary"),
+            "Following schedule · Cool above **76°F** · Cooling",
+        )
+        self.values["timer.hvac_override_office"] = "active"
+        self.values["sensor.hvac_activity_office"] = "Idle"
+        self.assertEqual(
+            self.render("roomSummary"), "Override · Cool above **76°F** · Idle"
+        )
+        self.values["sensor.hvac_status_office"] = "Check unit: shutdown unconfirmed"
+        self.assertIn("Check unit: shutdown unconfirmed", self.render("roomSummary"))
+        self.values["input_boolean.hvac_enable_office"] = "off"
+        self.values["sensor.hvac_activity_office"] = "Off"
+        self.assertTrue(self.render("roomSummary").startswith("Override · Off"))
+
     def test_room_status_reports_missing_stale_and_waiting(self):
         self.assertEqual(self.render("roomStatus"), "Following schedule")
         self.values["sensor.ac_controller_office_temperature"] = "unavailable"

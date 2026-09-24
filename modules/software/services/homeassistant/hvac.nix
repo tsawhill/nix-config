@@ -1053,12 +1053,33 @@ let
     {%- elif is_state('input_select.hvac_watch_${room}', 'off_failed') -%}Check unit: shutdown unconfirmed
     {%- elif active and is_state('${enableToggle room}', 'off') -%}Paused by override
     {%- elif is_state('${shedTimer room}', 'active') -%}Paused for capacity
-    {%- elif is_state('${climateEntity room}', 'off') and states('input_select.hvac_watch_${room}') in ['off_pending', 'off_check', 'off_final'] -%}Off requested · monitoring
     {%- elif m == 'off' -%}System off
     {%- elif is_state('${climateEntity room}', 'off') and is_state('${minOffTimer room}', 'active') -%}Waiting to restart
     {%- elif states('input_select.hvac_watch_${room}') in ['stalled', 'exhausted'] and states('${climateEntity room}') in ['cool', 'heat'] -%}Not reaching target
     {%- else -%}{{ 'Override' if active else 'Following schedule' }}
     {%- endif -%}'';
+
+  # Display the last commanded operating state, separately from its source and
+  # diagnostic warnings. IR provides no physical running-state acknowledgement.
+  roomActivity = room: ''
+    {%- set current = states('${climateEntity room}') -%}
+    {%- set enabled = not is_state('${overrideTimer room}', 'active') or not is_state('${enableToggle room}', 'off') -%}
+    {%- if current == 'cool' -%}Cooling
+    {%- elif current == 'heat' -%}Heating
+    {%- elif current != 'off' -%}Unavailable
+    {%- elif states('${effectiveMode}') in ['cool', 'heat'] and enabled -%}Idle
+    {%- else -%}Off
+    {%- endif -%}'';
+
+  roomSummary = room: ''
+    {%- set active = is_state('${overrideTimer room}', 'active') -%}
+    {%- set mode = states('${effectiveMode}') -%}
+    {%- set enabled = not active or not is_state('${enableToggle room}', 'off') -%}
+    {{ 'Override' if active else 'Following schedule' }}{% if enabled and mode == 'cool' %} · Cool above **{{ states('${targetSensor room}') }}°F**{% elif enabled and mode == 'heat' %} · Heat below **{{ states('${heatTargetSensor room}') }}°F**{% endif %} · {{ states('sensor.hvac_activity_${room}') }}
+    {% set status = states('sensor.hvac_status_${room}') %}{% if status not in ['Override', 'Following schedule', 'System off', 'Paused by override', 'unknown', 'unavailable'] %}
+
+    {{ status }}
+    {% endif %}'';
 
   # Native sections reflow whole room panels, rather than squeezing three
   # thermostat dials onto a phone. The large numbers are always measurements.
@@ -1119,9 +1140,7 @@ let
               {
                 type = "markdown";
                 grid_options.columns = 12;
-                content = ''
-                  {{ states('sensor.hvac_status_${room}') }} · {% set m = states('${effectiveMode}') %}{% if m == 'heat' %}Heat below **{{ states('${heatTargetSensor room}') }}°F**{% elif m == 'cool' %}Cool above **{{ states('${targetSensor room}') }}°F**{% else %}Off{% endif %}
-                '';
+                content = roomSummary room;
               }
               (activeTimerCard (shedTimer room) "Capacity pause")
 
@@ -1605,6 +1624,11 @@ in
             unique_id = "hvac_priority_${room}";
             icon = "mdi:sort-numeric-variant";
             state = priorityTemplate room;
+          }) roomNames)
+          ++ (map (room: {
+            name = "hvac_activity_${room}";
+            unique_id = "hvac_activity_${room}";
+            state = roomActivity room;
           }) roomNames)
           ++ (map (room: {
             name = "hvac_status_${room}";

@@ -257,7 +257,7 @@ shutdown remains failed, further recovery attempts require fresh evidence of
 continued drift past the saved stop boundary, at most once per ten minutes.
 Every completed observation window refreshes its temperature baseline. A window
 without suspicious drift clears the warning and persistent notification, while
-leaving the room in “Off requested · monitoring”—not “confirmed off.”
+continuing silent monitoring without claiming physical confirmation.
 The stop boundary is saved at shutdown so later schedule/override changes cannot
 retroactively turn that shutdown into a failure. Existing installations without
 a saved boundary first establish a new observation window. These checks do not
@@ -354,8 +354,11 @@ Local patches make SmartIR wait for `remote.send_command`, propagate errors,
 and restore the previous requested state if a send fails. Tuya Local raises
 exhausted write errors to the caller rather than only logging them; polling
 behavior is unchanged. This confirms completion of the software send path,
-**not reception by the AC**. “Off requested · monitoring” and shutdown warnings
-remain necessary because IR has no receiver acknowledgement.
+**not reception by the AC**. Dashboard activity describes the last commanded
+state: Cooling, Heating, Idle (enabled but stopped), or Off (disabled/system off).
+It appears beside the schedule/override source and threshold. Diagnostic warnings
+appear on a separate line; routine shutdown monitoring stays in the background.
+IR still has no receiver acknowledgement.
 
 `test-delivery.py /path/to/custom_components` exercises the patched integration
 source offline: service completion, error propagation, and requested-state
