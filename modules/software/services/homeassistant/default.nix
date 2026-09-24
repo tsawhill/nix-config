@@ -54,7 +54,10 @@ in
     ];
     customComponents = [
       (pkgs.home-assistant-custom-components.tuya_local.overrideAttrs (old: {
-        patches = (old.patches or [ ]) ++ [ ./tuya-write-errors.patch ];
+        patches = (old.patches or [ ]) ++ [
+          ./tuya-write-errors.patch
+          ./tuya-session-persistence.patch
+        ];
       }))
       smartir
     ];

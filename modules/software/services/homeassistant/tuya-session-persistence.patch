@@ -1,0 +1,38 @@
+--- a/custom_components/tuya_local/device.py
++++ b/custom_components/tuya_local/device.py
+@@ -360,11 +360,17 @@
+                     self._last_full_poll = now
+                     last_heartbeat = now  # reset heartbeat timer on full poll
+                 elif persist:
++                    owner = self._api.parent or self._api
++                    if not owner.socketPersistent:
++                        owner.set_socketPersistent(True)
+                     if now - last_heartbeat > self._HEARTBEAT_INTERVAL:
+-                        await self._hass.async_add_executor_job(
+-                            self._api.heartbeat,
+-                            True,
+-                        )
++                        # receive() owns reconnecting; heartbeat must not create
++                        # a competing protocol-3.4 session on a closed socket.
++                        if owner.socket is not None:
++                            await self._hass.async_add_executor_job(
++                                self._api.heartbeat,
++                                True,
++                            )
+                         last_heartbeat = now
+                     poll = await self._hass.async_add_executor_job(
+                         self._api.receive,
+@@ -677,10 +683,10 @@
+                     i,
+                     connections,
+                 )
+-                # Ensure we have a fresh connection for the next attempt
+-                self._api.set_socketPersistent(False)
++                # Reconnect without losing the receive loop's persistence policy.
++                self._api.close()
+                 if self._api.parent:
+-                    self._api.parent.set_socketPersistent(False)
++                    self._api.parent.close()
+ 
+                 if i + 1 == connections:
+                     self._reset_cached_state()

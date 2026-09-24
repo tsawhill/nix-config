@@ -96,13 +96,62 @@ class Delivery(unittest.IsolatedAsyncioTestCase):
         obj = SimpleNamespace(_api_protocol_version_index=0, _protocol_configured='3.3',
             _api_protocol_working=True, _SINGLE_PROTO_CONNECTION_ATTEMPTS=2,
             _hass=SimpleNamespace(is_stopping=False, async_add_executor_job=execute),
-            _api=SimpleNamespace(set_socketPersistent=lambda value: None, parent=None),
+            _api=SimpleNamespace(close=lambda: None, parent=None),
             _reset_cached_state=lambda: None, _api_working_protocol_failures=0,
             _AUTO_FAILURE_RESET_COUNT=10)
         with self.assertLogs('test', level='ERROR'):
             with self.assertRaises(ConnectionError):
                 await ns['_retry_on_failed_connection'](obj, fail, 'failed write', raise_on_failure=True)
         self.assertIsNone(await ns['_retry_on_failed_connection'](obj, fail, 'failed poll'))
+
+    async def test_retry_preserves_persistence_and_closes_parent(self):
+        tree = ast.parse((ROOT / 'tuya_local/device.py').read_text())
+        method = next(n for n in ast.walk(tree) if isinstance(n, ast.AsyncFunctionDef) and n.name == '_retry_on_failed_connection')
+        ns = {'_LOGGER': logging.getLogger('test')}
+        compile_node(method, ns)
+        for persistent in [True, False]:
+            closes = []
+            parent = SimpleNamespace(socketPersistent=persistent, close=lambda: closes.append('parent'))
+            api = SimpleNamespace(socketPersistent=persistent, parent=parent, close=lambda: closes.append('device'))
+            calls = 0
+            async def execute(func):
+                return func()
+            def operation():
+                nonlocal calls
+                calls += 1
+                if calls == 1:
+                    raise ConnectionError('transient')
+                return {'ok': True}
+            obj = SimpleNamespace(_api_protocol_version_index=0, _protocol_configured='3.4',
+                _api_protocol_working=True, _SINGLE_PROTO_CONNECTION_ATTEMPTS=2,
+                _hass=SimpleNamespace(is_stopping=False, async_add_executor_job=execute),
+                _api=api, _api_working_protocol_failures=0)
+            self.assertEqual(await ns['_retry_on_failed_connection'](obj, operation, 'failed'), {'ok': True})
+            self.assertEqual(closes, ['device', 'parent'])
+            self.assertEqual(api.socketPersistent, persistent)
+            self.assertEqual(parent.socketPersistent, persistent)
+
+    async def test_heartbeat_does_not_open_a_second_session(self):
+        tree = ast.parse((ROOT / 'tuya_local/device.py').read_text())
+        method = next(n for n in ast.walk(tree) if isinstance(n, ast.AsyncFunctionDef) and n.name == 'async_receive')
+        branch = next(n for n in ast.walk(method) if isinstance(n, ast.If) and isinstance(n.test, ast.Name) and n.test.id == 'persist')
+        wrapper = ast.parse('async def run(self):\n    now = 100\n    last_heartbeat = 0\n').body[0]
+        wrapper.body.extend(branch.body)
+        ns = {}
+        compile_node(ast.fix_missing_locations(wrapper), ns)
+        for connected in [False, True]:
+            calls = []
+            api = SimpleNamespace(parent=None, socket=object() if connected else None, socketPersistent=False)
+            api.set_socketPersistent = lambda value: setattr(api, 'socketPersistent', value)
+            api.heartbeat = lambda nowait: calls.append('heartbeat')
+            api.receive = lambda: calls.append('receive')
+            async def execute(func, *args):
+                return func(*args)
+            obj = SimpleNamespace(_api=api, _HEARTBEAT_INTERVAL=5,
+                                  _hass=SimpleNamespace(async_add_executor_job=execute))
+            await ns['run'](obj)
+            self.assertTrue(api.socketPersistent)
+            self.assertEqual(calls, ['heartbeat', 'receive'] if connected else ['receive'])
 
 
 if __name__ == '__main__':
