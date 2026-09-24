@@ -721,6 +721,8 @@ let
 
   # Pure decision template, exercised by the offline regression suite. Progress
   # refreshes the observation window, never the per-cycle retry budget.
+  # A dark sensor cannot confirm a stop, and it rides the same blaster that
+  # drops, so the off ladder walks blind rather than stalling on stale data.
   watchDecision = ''
     {%- if phase == 'off_pending' -%}
       {{ 'off_retry' if mode == 'off' and elapsed >= 120 else 'wait' }}
@@ -731,6 +733,8 @@ let
         {{ 'off_correct' if phase == 'off_check' else ('off_recover' if phase == 'off_failed' else 'off_failed') }}
       {%- else -%}off_observe
       {%- endif -%}
+    {%- elif mode == 'off' and phase in ['off_check', 'off_final'] -%}
+      {{ 'wait' if elapsed < 300 else ('off_correct' if phase == 'off_check' else 'off_failed') }}
     {%- elif mode not in ['cool', 'heat'] or desired != mode or not fresh -%}wait
     {%- elif phase == 'idle' or checkpoint <= 0 -%}initialize
     {%- elif elapsed < 300 -%}wait
@@ -903,7 +907,7 @@ let
                       data = {
                         notification_id = "hvac_off_${room}";
                         title = "${rooms.${room}} AC may still be running";
-                        message = "Temperature is still moving past the stop threshold after off retries. Check the physical unit and IR blaster. Home Assistant cannot confirm IR reception.";
+                        message = "{{ 'Temperature is still moving past the stop threshold after off retries.' if fresh else 'The room sensor went offline after the off command, so the stop could not be confirmed and blind retries are exhausted.' }} Check the physical unit and IR blaster. Home Assistant cannot confirm IR reception.";
                       };
                     }
                   ];

@@ -416,7 +416,7 @@ class Templates(unittest.TestCase):
             "off_observe",
         )
         self.assertEqual(
-            self.watch(phase="off_check", **(args | {"fresh": False})), "wait"
+            self.watch(phase="off_check", **(args | {"fresh": False})), "off_correct"
         )
         self.assertEqual(
             self.watch(phase="off_check", **(args | {"off_drift": 0.2})), "off_observe"
@@ -509,7 +509,31 @@ class Templates(unittest.TestCase):
         )
         self.assertEqual(self.watch(**args, elapsed=299), "wait")
         self.assertEqual(self.watch(**args, elapsed=300), "off_correct")
-        self.assertEqual(self.watch(**args, elapsed=300, fresh=False), "wait")
+        self.assertEqual(self.watch(**args, elapsed=299, fresh=False), "wait")
+        self.assertEqual(self.watch(**args, elapsed=300, fresh=False), "off_correct")
+
+    def test_dark_sensor_retries_off_blind_then_stops(self):
+        # The blaster carries both the sensor and the IR, so a shutdown that
+        # loses the sensor must still retry, but must not beep forever.
+        args = dict(mode="off", desired="off", fresh=False, elapsed=300)
+        self.assertEqual(self.watch(phase="off_pending", **(args | {"elapsed": 120})), "off_retry")
+        self.assertEqual(self.watch(phase="off_check", **args), "off_correct")
+        self.assertEqual(self.watch(phase="off_final", **args), "off_failed")
+        # Ladder exhausted: the warning stands, no further commands.
+        self.assertEqual(self.watch(phase="off_failed", **args), "wait")
+        self.assertEqual(self.watch(phase="off_failed", **(args | {"elapsed": 86400})), "wait")
+        # Blind retries never fire for a unit that was never commanded off.
+        for phase in ["watching", "retried", "idle"]:
+            self.assertEqual(self.watch(phase=phase, **args), "wait")
+
+    def test_dark_sensor_ladder_resumes_when_sensor_returns(self):
+        # Once readings come back, drift evidence takes over from blind retries.
+        args = dict(mode="off", desired="off", elapsed=300, off_drift=3.5, off_overshoot=True)
+        self.assertEqual(self.watch(phase="off_failed", **args), "off_recover")
+        self.assertEqual(
+            self.watch(phase="off_failed", **(args | {"off_drift": 0, "off_overshoot": False})),
+            "off_observe",
+        )
 
     def test_mode_change_never_retains_opposite_mode_in_deadband(self):
         self.values["sensor.hvac_effective_mode"] = "heat"
