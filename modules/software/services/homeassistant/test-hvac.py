@@ -381,6 +381,8 @@ class Templates(unittest.TestCase):
             off_drift=0,
             off_overshoot=False,
             stop_boundary=71,
+            recovery_elapsed=0,
+            unmet=True,
         )
         args.update(overrides)
         return self.env.from_string(text).render(**args).strip()
@@ -453,7 +455,7 @@ class Templates(unittest.TestCase):
         self.assertEqual(self.watch(**args, off_drift=-1), "off_observe")
         self.assertEqual(self.watch(**args, off_drift=0.7), "off_recover")
         self.assertEqual(self.watch(**args, fresh=False), "wait")
-        self.assertEqual(self.watch(**(args | {"elapsed": 599})), "wait")
+        self.assertEqual(self.watch(**(args | {"elapsed": 299})), "wait")
         self.assertEqual(self.watch(**args, stop_boundary=-40), "off_rebase")
 
     def test_off_overshoot_uses_saved_boundary_not_new_schedule(self):
@@ -470,6 +472,44 @@ class Templates(unittest.TestCase):
         self.assertEqual(
             template.render(last_run="cool", sample=68, stop_boundary=71), "True"
         )
+
+    def test_run_recovery_continues_without_replenishing_escalations(self):
+        for phase in ["retried", "boosted", "stalled", "exhausted", "settled"]:
+            for mode in ["cool", "heat"]:
+                args = dict(
+                    phase=phase,
+                    mode=mode,
+                    desired=mode,
+                    elapsed=300,
+                    recovery_elapsed=300,
+                )
+                self.assertEqual(self.watch(**args), "recover")
+                self.assertEqual(
+                    self.watch(**(args | {"recovery_elapsed": 299})), "wait"
+                )
+                self.assertEqual(self.watch(**args, progress=0.4), "progress")
+                self.assertEqual(self.watch(**args, unmet=False), "progress")
+                self.assertEqual(self.watch(**args, fresh=False), "wait")
+                self.assertEqual(self.watch(**(args | {"desired": "off"})), "wait")
+        # Recovery cadence never postpones a due fan/capacity decision.
+        self.assertEqual(
+            self.watch(phase="retried", elapsed=600, recovery_elapsed=300), "boost"
+        )
+        self.assertEqual(
+            self.watch(phase="boosted", elapsed=1200, recovery_elapsed=300), "stall"
+        )
+
+    def test_shutdown_recovery_checks_after_five_minutes(self):
+        args = dict(
+            mode="off",
+            desired="off",
+            phase="off_check",
+            off_drift=0.6,
+            off_overshoot=True,
+        )
+        self.assertEqual(self.watch(**args, elapsed=299), "wait")
+        self.assertEqual(self.watch(**args, elapsed=300), "off_correct")
+        self.assertEqual(self.watch(**args, elapsed=300, fresh=False), "wait")
 
     def test_mode_change_never_retains_opposite_mode_in_deadband(self):
         self.values["sensor.hvac_effective_mode"] = "heat"

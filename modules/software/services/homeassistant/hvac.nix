@@ -726,7 +726,7 @@ let
       {{ 'off_retry' if mode == 'off' and elapsed >= 120 else 'wait' }}
     {%- elif mode == 'off' and phase in ['off_check', 'off_final', 'off_failed'] and fresh -%}
       {%- if stop_boundary <= -40 -%}off_rebase
-      {%- elif elapsed < 600 -%}wait
+      {%- elif elapsed < 300 -%}wait
       {%- elif off_drift >= 0.5 and off_overshoot -%}
         {{ 'off_correct' if phase == 'off_check' else ('off_recover' if phase == 'off_failed' else 'off_failed') }}
       {%- else -%}off_observe
@@ -735,9 +735,11 @@ let
     {%- elif phase == 'idle' or checkpoint <= 0 -%}initialize
     {%- elif elapsed < 300 -%}wait
     {%- elif progress >= ${toString tuning.progressDegrees} -%}progress
+    {%- elif not unmet -%}progress
     {%- elif phase == 'watching' -%}retry
     {%- elif phase == 'retried' and elapsed >= ${toString tuning.boostMinutes} * patience * 60 -%}boost
     {%- elif phase == 'boosted' and elapsed >= ${toString tuning.stallMinutes} * patience * 60 -%}stall
+    {%- elif phase in ['retried', 'boosted', 'stalled', 'exhausted', 'settled'] and recovery_elapsed >= 300 -%}recover
     {%- else -%}wait
     {%- endif -%}'';
 
@@ -748,6 +750,11 @@ let
     let
       phaseEntity = "input_select.hvac_watch_${room}";
       checkpointEntity = "input_number.hvac_checkpoint_${room}";
+      recordRecovery = {
+        action = "input_number.set_value";
+        target.entity_id = "input_number.hvac_last_recovery_${room}";
+        data.value = "{{ as_timestamp(now()) }}";
+      };
       baselineEntity = "input_number.hvac_baseline_${room}";
       captureBoundary = {
         action = "input_number.set_value";
@@ -822,6 +829,8 @@ let
             elapsed = "{{ as_timestamp(now()) - checkpoint }}";
             progress = "{{ ((states('${baselineEntity}') | float(sample)) - sample) * (1 if mode == 'cool' else -1) }}";
             patience = patienceTemplate;
+            recovery_elapsed = "{{ as_timestamp(now()) - (states('input_number.hvac_last_recovery_${room}') | float(0)) }}";
+            unmet = "{{ (mode == 'cool' and sample > (states('${targetSensor room}') | float(999))) or (mode == 'heat' and sample < (states('${heatTargetSensor room}') | float(-999))) }}";
             off_drift = "{{ ((states('${baselineEntity}') | float(sample)) - sample) * (1 if last_run == 'cool' else -1) }}";
             off_overshoot = "{{ (last_run == 'cool' and sample < stop_boundary - 1) or (last_run == 'heat' and sample > stop_boundary + 1) }}";
           };
@@ -921,12 +930,20 @@ let
                   ++ checkpoint;
                 }
                 {
-                  conditions = "{{ decision == 'retry' }}";
-                  # Consume the retry before calling IR, even if transmission fails.
+                  conditions = "{{ decision in ['retry', 'recover'] }}";
+                  # Rate-limit delivery attempts without resetting observation
+                  # windows or replenishing the fan/shedding escalation budget.
                   sequence = [
-                    (setPhase "retried")
+                    recordRecovery
+                    {
+                      choose = [
+                        {
+                          conditions = "{{ decision == 'retry' }}";
+                          sequence = [ (setPhase "retried") ] ++ checkpoint;
+                        }
+                      ];
+                    }
                   ]
-                  ++ checkpoint
                   ++ [
                     {
                       action = "climate.set_temperature";
@@ -1354,6 +1371,16 @@ in
               unit_of_measurement = "°F";
               mode = "slider";
               icon = "mdi:thermometer";
+            };
+          }
+          {
+            name = "hvac_last_recovery_${room}";
+            value = {
+              name = "${rooms.${room}} last run recovery attempt";
+              min = 0;
+              max = 4102444800;
+              step = 1;
+              mode = "box";
             };
           }
           {

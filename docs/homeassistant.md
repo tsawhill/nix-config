@@ -239,7 +239,12 @@ compressor timers. Its requested setpoint stays steady until a threshold or mode
 changes. Five-minute temperature means are compared with a saved baseline;
 at least 0.3°F of progress refreshes the observation window silently.
 
-After five minutes without progress, the controller retries once. After another
+After five minutes without progress, the controller retries. While the room is
+still beyond its heating/cooling threshold and not making progress, it continues
+retrying at most once per five minutes, including after a stalled-run warning.
+Successful progress or satisfied demand suppresses these recovery commands.
+A separate persisted recovery timestamp rate-limits attempts without resetting
+observation windows or replenishing fan/shedding budgets. After another
 10 minutes without progress it boosts Auto fan to speed 5, leaving Quiet and
 fixed speeds alone. After another 20 minutes it reports **Not reaching target**
 and can pause one strictly lower-priority cooling room for 30 minutes. A room
@@ -250,11 +255,11 @@ never rewritten. Recovery clears the warning without replenishing retry budgets.
 
 An off transition gets a delayed off retry after two minutes. Monitoring then
 continues silently: if a fresh five-minute mean moves at least 0.5°F farther in
-the previous run's direction over ten minutes, and is more than 1°F beyond the
+the previous run's direction over five minutes, and is more than 1°F beyond the
 stop boundary, one additional off command is sent. Continued drift after another
-ten minutes raises a persistent warning and a dashboard shutdown warning. While
+five minutes raises a persistent warning and a dashboard shutdown warning. While
 shutdown remains failed, further recovery attempts require fresh evidence of
-continued drift past the saved stop boundary, at most once per ten minutes.
+continued drift past the saved stop boundary, at most once per five minutes.
 Every completed observation window refreshes its temperature baseline. A window
 without suspicious drift clears the warning and persistent notification, while
 continuing silent monitoring without claiming physical confirmation.
