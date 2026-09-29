@@ -419,7 +419,7 @@ class Templates(unittest.TestCase):
             self.watch(phase="off_check", **(args | {"fresh": False})), "off_correct"
         )
         self.assertEqual(
-            self.watch(phase="off_check", **(args | {"off_drift": 0.2})), "off_observe"
+            self.watch(phase="off_check", **(args | {"off_drift": 0.2})), "off_accumulate"
         )
         self.assertEqual(
             self.watch(phase="off_check", **(args | {"off_overshoot": False})),
@@ -442,6 +442,36 @@ class Templates(unittest.TestCase):
             ),
             ["off_correct", "off_failed"],
         )
+
+    def test_slow_shutdown_drift_accumulates_and_retries_both_directions(self):
+        # Recorded living-room five-minute means, minutes since 21:15.
+        # No short step is 0.5F, but the cumulative cooling must trigger off.
+        history = [(0, 72.86), (30, 72.78), (36, 72.73), (42, 72.68),
+                   (60, 72.64), (65, 72.55), (71, 72.50), (83, 72.45),
+                   (89, 72.32), (101, 72.24), (107, 72.14)]
+        for direction in (1, -1):
+            baseline = history[0][1] * direction
+            checkpoint = 0
+            sends = []
+            for minute, temp in history[1:]:
+                sample = temp * direction
+                decision = self.watch(mode="off", desired="off", phase="off_check",
+                                      elapsed=(minute - checkpoint) * 60,
+                                      off_drift=(baseline - sample) * direction,
+                                      off_overshoot=True)
+                if decision == 'off_correct':
+                    sends.append(minute)
+                if decision in ('off_observe', 'off_correct'):
+                    baseline, checkpoint = sample, minute
+            self.assertEqual(sends, [89])
+    def test_slow_shutdown_drift_window_is_bounded_and_requires_overshoot(self):
+        args = dict(mode="off", desired="off", phase="off_check", off_overshoot=True)
+        self.assertEqual(self.watch(**args, elapsed=7199, off_drift=.3), 'off_accumulate')
+        self.assertEqual(self.watch(**args, elapsed=7200, off_drift=.3), 'off_observe')
+        for drift in (0, -.2):
+            self.assertEqual(self.watch(**args, elapsed=900, off_drift=drift), 'off_observe')
+        self.assertEqual(self.watch(**(args | dict(off_overshoot=False)),
+                                   elapsed=900, off_drift=.3), 'off_observe')
 
     def test_off_warning_recovers_without_claiming_physical_confirmation(self):
         args = dict(

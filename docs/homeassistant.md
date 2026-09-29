@@ -365,6 +365,16 @@ It appears beside the schedule/override source and threshold. Diagnostic warning
 appear on a separate line; routine shutdown monitoring stays in the background.
 IR still has no receiver acknowledgement.
 
+While a unit is commanded off, the watchdog retains small movements farther
+past its saved stop boundary for up to two hours. A cumulative 0.5°F movement
+in the previous running direction, more than 1°F beyond that boundary, triggers
+another off command. The existing five-minute minimum still applies. Each retry
+starts a new observation window; returning to the baseline, leaving the
+overshoot region, or reaching the window limit without enough movement rebases
+the observation. This catches gradual continued cooling/heating without periodic
+unconditional resends. It remains temperature-based evidence, not confirmation
+of the AC's physical state.
+
 `test-delivery.py /path/to/custom_components` exercises the patched integration
 source offline: service completion, error propagation, and requested-state
 restoration. It requires only Python's standard library and sends no commands.

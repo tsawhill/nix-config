@@ -731,6 +731,7 @@ let
       {%- elif elapsed < 300 -%}wait
       {%- elif off_drift >= 0.5 and off_overshoot -%}
         {{ 'off_correct' if phase == 'off_check' else ('off_recover' if phase == 'off_failed' else 'off_failed') }}
+      {%- elif off_overshoot and off_drift > 0 and elapsed < 7200 -%}off_accumulate
       {%- else -%}off_observe
       {%- endif -%}
     {%- elif mode == 'off' and phase in ['off_check', 'off_final'] -%}
@@ -747,7 +748,13 @@ let
     {%- else -%}wait
     {%- endif -%}'';
 
-  # Compare five-minute means, not single noisy readings. All budgets and
+  # Compare five-minute means, not single noisy readings. While off, retain
+  # a baseline for up to two hours when drifting farther past the stop boundary.
+  # off_accumulate deliberately changes neither the baseline nor checkpoint:
+  # small drops/rises must add up rather than disappear every five minutes.
+  # A corrective send starts a new observation window; flat/reversing trends
+  # rebase normally, so an old temperature difference cannot cause timed beeps.
+  # All budgets and
   # checkpoints restore across HA restarts; no startup command storm.
   mkWatchAutomation =
     room:
