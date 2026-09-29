@@ -3,10 +3,27 @@
   config,
   inputs,
   lib,
+  pkgs,
   ...
 }:
 let
   cubeSSHUsers = [ "root" ];
+
+  # TEMP: nixos-26.05 ships claude-code 2.1.223 and the VSCodium remote server's
+  # bundled extension CLI is 2.1.278; neither knows claude-opus-5-5. Take the CLI
+  # from unstable and point the extension at it. Drop unstablePkgs, claudeWrapper,
+  # the claude-code overlay, and the Machine settings file once the extension
+  # ships a CLI that has the model.
+  unstablePkgs = import inputs.nixpkgs-unstable {
+    localSystem = config.nixpkgs.hostPlatform.system;
+    config.allowUnfree = true;
+  };
+
+  # The extension execs the wrapper as `wrapper <its own claude> <args>`.
+  claudeWrapper = pkgs.writeShellScript "claude-code-wrapper" ''
+    if [ "$#" -gt 0 ]; then shift; fi
+    exec ${pkgs.claude-code}/bin/claude "$@"
+  '';
 in
 {
   imports = [
@@ -79,5 +96,12 @@ in
   # Allow VS Code Remote SSH server to run
   programs.nix-ld.enable = true;
   software.dev.enable = true;
+
+  nixpkgs.overlays = [ (_final: _prev: { claude-code = unstablePkgs.claude-code; }) ];
+
+  home-manager.users.root.home.file.".vscodium-server/data/Machine/settings.json".text =
+    builtins.toJSON
+      { "claudeCode.claudeProcessWrapper" = "${claudeWrapper}"; };
+
   networking.hostName = "build-nix";
 }
