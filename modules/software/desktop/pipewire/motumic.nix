@@ -192,7 +192,10 @@
               "audio.position" = [ "AUX0" ];
               "audio.rate" = 48000;
               "stream.dont-remix" = true;
-              "node.dont-fallback" = true;
+              # No node.dont-fallback: this chain loads with the daemon, before
+              # WirePlumber creates the ALSA nodes, and a target that is missing
+              # at that moment errors the capture stream — which makes
+              # module-filter-chain destroy mic_input for the rest of the session.
               "node.passive" = true;
             };
 
