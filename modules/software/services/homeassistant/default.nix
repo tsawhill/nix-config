@@ -57,6 +57,7 @@ in
         patches = (old.patches or [ ]) ++ [
           ./tuya-write-errors.patch
           ./tuya-session-persistence.patch
+          ./tuya-serialize-io.patch
         ];
       }))
       smartir

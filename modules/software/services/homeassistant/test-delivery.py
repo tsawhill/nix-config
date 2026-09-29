@@ -23,6 +23,112 @@ def compile_node(node, namespace):
 
 
 class Delivery(unittest.IsolatedAsyncioTestCase):
+    def tuya_io_methods(self):
+        cls = extract('tuya_local/device.py', 'TuyaLocalDevice')
+        ns = dict(_LOGGER=logging.getLogger('test'), log_json=lambda value: value,
+                  CancelledError=asyncio.CancelledError)
+        for name in ('_send_pending_updates', 'async_refresh', 'async_receive'):
+            compile_node(next(n for n in cls.body if getattr(n, 'name', '') == name), ns)
+        return ns
+
+    async def test_write_waits_for_receive_and_snapshots_after_acquiring_lock(self):
+        ns = self.tuya_io_methods()
+        lock = asyncio.Lock()
+        calls = []
+        pending = {'1': 'old'}
+        async def retry(func, message, **kwargs):
+            self.assertTrue(lock.locked())
+            self.assertTrue(kwargs['raise_on_failure'])
+            func()
+        def snapshot():
+            calls.append('snapshot')
+            return dict(pending)
+        obj = SimpleNamespace(_api_lock=lock, _get_unsent_properties=snapshot,
+                              _set_values=lambda values: calls.append(values),
+                              _retry_on_failed_connection=retry, name='test')
+        # A receive/status operation owns the same lock until it completes.
+        async with lock:
+            task = asyncio.create_task(ns['_send_pending_updates'](obj))
+            await asyncio.sleep(0)
+            self.assertFalse(task.done())
+            self.assertEqual(calls, [])
+            pending['1'] = 'new'
+        await asyncio.wait_for(task, 1)
+        self.assertEqual(calls, ['snapshot', {'1': 'new'}])
+        self.assertFalse(lock.locked())
+
+    async def test_failed_write_holds_lock_through_retry_then_releases_it(self):
+        ns = self.tuya_io_methods()
+        lock = asyncio.Lock()
+        entered, release = asyncio.Event(), asyncio.Event()
+        async def retry(*args, **kwargs):
+            entered.set()
+            await release.wait()
+            self.assertTrue(lock.locked())
+            raise ConnectionError('retries exhausted')
+        obj = SimpleNamespace(_api_lock=lock, name='test',
+                              _get_unsent_properties=lambda: {'1': 'command'},
+                              _retry_on_failed_connection=retry)
+        task = asyncio.create_task(ns['_send_pending_updates'](obj))
+        await asyncio.wait_for(entered.wait(), 1)
+        receiver = asyncio.create_task(lock.acquire())
+        await asyncio.sleep(0)
+        receiver_was_blocked = not receiver.done()
+        release.set()
+        with self.assertRaises(ConnectionError):
+            await task
+        await asyncio.wait_for(receiver, 1)
+        lock.release()
+        self.assertTrue(receiver_was_blocked)
+
+    async def test_cancelled_receive_waiter_cannot_close_or_unlock_writer(self):
+        ns = self.tuya_io_methods()
+        persistence = []
+        obj = SimpleNamespace(should_poll=False, _running=True,
+                              _api_working_protocol_failures=0,
+                              _api_lock=asyncio.Lock(), _cached_state={},
+                              _api=SimpleNamespace(parent=None,
+                                  set_socketPersistent=persistence.append))
+        generator = ns['async_receive'](obj)
+        async with obj._api_lock:
+            task = asyncio.create_task(anext(generator))
+            await asyncio.sleep(0)
+            self.assertFalse(task.done())
+            task.cancel()
+            with self.assertRaises(asyncio.CancelledError):
+                await task
+            self.assertTrue(obj._api_lock.locked())
+            self.assertNotIn(False, persistence)
+        await generator.aclose()
+
+    async def test_already_drained_write_batch_does_not_resend(self):
+        ns = self.tuya_io_methods()
+        async def retry(*args, **kwargs):
+            self.fail('empty batch must not touch transport')
+        obj = SimpleNamespace(_api_lock=asyncio.Lock(), name='test',
+                              _get_unsent_properties=lambda: {},
+                              _retry_on_failed_connection=retry)
+        await ns['_send_pending_updates'](obj)
+
+    async def test_startup_refresh_waits_for_io_and_rechecks_monitor(self):
+        ns = self.tuya_io_methods()
+        calls = []
+        async def retry(func, message):
+            self.assertTrue(obj._api_lock.locked())
+            calls.append('refresh')
+        obj = SimpleNamespace(_api_lock=asyncio.Lock(), name='test',
+                              _running=False, _retry_on_failed_connection=retry)
+        async with obj._api_lock:
+            task = asyncio.create_task(ns['async_refresh'](obj))
+            await asyncio.sleep(0)
+            self.assertFalse(task.done())
+            obj._running = True
+        await asyncio.wait_for(task, 1)
+        self.assertEqual(calls, [])
+        obj._running = False
+        await ns['async_refresh'](obj)
+        self.assertEqual(calls, ['refresh'])
+
     def controller(self, service):
         ns = dict(AbstractController=object, ENC_BASE64='Base64', ENC_HEX='Hex',
                   ENC_PRONTO='Pronto', ATTR_ENTITY_ID='entity_id')

@@ -1,0 +1,68 @@
+--- a/custom_components/tuya_local/device.py
++++ b/custom_components/tuya_local/device.py
+@@ -317,8 +317,8 @@
+         while self._running:
+             error_count = self._api_working_protocol_failures
+             force_backoff = False
++            await self._api_lock.acquire()
+             try:
+-                await self._api_lock.acquire()
+                 last_cache = self._cached_state.get("updated_at", 0)
+                 now = time()
+                 full_poll = False
+@@ -501,11 +501,12 @@
+ 
+     async def async_refresh(self):
+         _LOGGER.debug("Refreshing device state for %s", self.name)
+-        if not self._running:
+-            await self._retry_on_failed_connection(
+-                lambda: self._refresh_cached_state(),
+-                f"Failed to refresh device state for {self.name}.",
+-            )
++        async with self._api_lock:
++            if not self._running:
++                await self._retry_on_failed_connection(
++                    lambda: self._refresh_cached_state(),
++                    f"Failed to refresh device state for {self.name}.",
++                )
+ 
+     def get_property(self, dps_id):
+         cached_state = self._get_cached_state()
+@@ -614,19 +615,24 @@
+         await self._send_pending_updates()
+ 
+     async def _send_pending_updates(self):
+-        pending_properties = self._get_unsent_properties()
+-
+-        _LOGGER.debug(
+-            "%s sending dps update: %s",
+-            self.name,
+-            log_json(pending_properties),
+-        )
+-
+-        await self._retry_on_failed_connection(
+-            lambda: self._set_values(pending_properties),
+-            "Failed to update device state.",
+-            raise_on_failure=True,
+-        )
++        # Share the receive loop lock, including reconnects and retry cleanup.
++        # Snapshot the pending batch only after ownership has been acquired.
++        async with self._api_lock:
++            pending_properties = self._get_unsent_properties()
++            if not pending_properties:
++                return
++
++            _LOGGER.debug(
++                "%s sending dps update: %s",
++                self.name,
++                log_json(pending_properties),
++            )
++
++            await self._retry_on_failed_connection(
++                lambda: self._set_values(pending_properties),
++                "Failed to update device state.",
++                raise_on_failure=True,
++            )
+ 
+     def _set_values(self, properties):
+         try:

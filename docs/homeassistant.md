@@ -368,3 +368,27 @@ IR still has no receiver acknowledgement.
 `test-delivery.py /path/to/custom_components` exercises the patched integration
 source offline: service completion, error propagation, and requested-state
 restoration. It requires only Python's standard library and sends no commands.
+
+### Tuya connection reliability trial
+
+`tuya-serialize-io.patch` makes command writes and startup refreshes use the
+receive loop's shared API lock. The lock covers retries and connection cleanup,
+and pending writes are read after acquiring it. A cancelled receive task waiting
+for the lock cannot close the connection or release another task's lock.
+The existing session-persistence patch remains in place. These changes address
+software races; they do not establish that stock-firmware lockups are solved.
+
+For the first live trial, reconnect only the office blaster (10.73.73.201),
+powered somewhere its IR cannot reach an indoor AC unit. Keep the AC units under
+manual control. Home Assistant's existing controller may still send commands,
+so merely pointing the blaster away is not sufficient isolation from reflected
+IR. Sensor readings during this trial describe the test location, not the office.
+
+Monitor Home Assistant's service journal for Tuya protocol/key errors, failed
+writes, and remote-unavailable warnings; use recorder history for the office
+temperature, humidity, and remote availability. Do not open a second TinyTuya
+client to monitor the device: Home Assistant should own its local connection.
+No raw-protocol debug logging is needed. Observe for at least 24 hours, including
+command traffic, before expanding the trial: the previous patch failed after
+about three hours. Passing this trial still does not verify IR reception or fix
+the separate optimistic-off/override logic.
