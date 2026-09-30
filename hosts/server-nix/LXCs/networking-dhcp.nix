@@ -24,7 +24,6 @@ in
     DNS = [ (lanIp networkTopology.networks.lan.dnsHost) ];
   };
 
-  # Flip to true only when OPNsense's LAN DHCP server is switched off; two
-  # servers on one broadcast domain race each other.
-  my.networking.dhcp.enable = false;
+  # OPNsense's LAN DHCP must stay off; two servers on one broadcast domain race.
+  my.networking.dhcp.enable = true;
 }
