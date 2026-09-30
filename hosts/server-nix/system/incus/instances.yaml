@@ -4,8 +4,6 @@ OPNSense:
   config:
     # Replaced by networking-router-nix; never start alongside it.
     boot.autostart: "false"
-    boot.autostart.delay: "5"
-    boot.autostart.priority: "100"
     limits.cpu: "4"
     limits.memory: "8GiB"
     raw.qemu: "-cpu host"
@@ -19,7 +17,8 @@ OPNSense:
 adguard-nix:
   type: "container"
   profiles: ["nixos-lxc"]
-  config: {}
+  config:
+    boot.autostart.priority: "70"
   devices:
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/adguard-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:cd:cd:ec" }
@@ -262,7 +261,8 @@ syncthing-nix:
 unbound-vpn-na-nix:
   type: "container"
   profiles: ["nixos-lxc"]
-  config: {}
+  config:
+    boot.autostart.priority: "80"
   devices:
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/unbound-vpn-na-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "a6:1e:69:87:fb:f3" }
@@ -297,7 +297,8 @@ unifi-nix:
 networking-vpn-out-na1-nix:
   type: "container"
   profiles: ["nixos-lxc"]
-  config: {}
+  config:
+    boot.autostart.priority: "90"
   devices:
     root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/networking-vpn-out-na1-nix" }
@@ -306,7 +307,8 @@ networking-vpn-out-na1-nix:
 networking-vpn-out-eu1-nix:
   type: "container"
   profiles: ["nixos-lxc"]
-  config: {}
+  config:
+    boot.autostart.priority: "90"
   devices:
     root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/networking-vpn-out-eu1-nix" }
@@ -329,7 +331,7 @@ networking-router-nix:
   type: "container"
   profiles: ["nixos-lxc"]
   config:
-    boot.autostart.priority: "90"
+    boot.autostart.priority: "100"
   devices:
     root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/networking-router-nix" }
@@ -346,7 +348,8 @@ networking-router-nix:
 networking-vpn-in-nix:
   type: "container"
   profiles: ["nixos-lxc"]
-  config: {}
+  config:
+    boot.autostart.priority: "90"
   devices:
     root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/networking-vpn-in-nix" }
