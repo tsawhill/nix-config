@@ -323,7 +323,7 @@ networking-dhcp-nix:
 
 
 # eth0 is the legacy LAN; each zone gets its own NIC on its VLAN, named after the zone.
-# wan reuses OPNsense's WAN MAC so the ISP lease carries over; it stays down until takeover.
+# wan stays down until takeover, when the router gives it OPNsense's WAN MAC (Incus refuses duplicates).
 networking-router-nix:
   type: "container"
   profiles: ["nixos-lxc"]
@@ -338,7 +338,7 @@ networking-router-nix:
     services: { type: "nic", nictype: "bridged", parent: "br0", vlan: "30", hwaddr: "02:c9:07:cb:e2:30", name: "services" }
     guests: { type: "nic", nictype: "bridged", parent: "br0", vlan: "40", hwaddr: "02:c9:07:cb:e2:40", name: "guests" }
     iot: { type: "nic", nictype: "bridged", parent: "br0", vlan: "50", hwaddr: "02:c9:07:cb:e2:50", name: "iot" }
-    wan: { type: "nic", nictype: "bridged", parent: "br1", hwaddr: "14:29:0d:71:37:01", name: "wan" }
+    wan: { type: "nic", nictype: "bridged", parent: "br1", hwaddr: "02:c9:07:cb:e2:99", name: "wan" }
     transit: { type: "nic", nictype: "bridged", parent: "br2", hwaddr: "02:2b:99:b7:74:01", name: "transit" }
 
 

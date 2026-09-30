@@ -84,6 +84,15 @@ in
       default = lanIp "networking-dhcp-nix";
       description = "Kea address that zone DHCP requests are relayed to.";
     };
+
+    wanMacAddress = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        MAC the WAN link takes on at takeover, so the ISP keeps the same lease.
+        Set here rather than in Incus, which refuses a MAC another NIC already has.
+      '';
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -115,12 +124,16 @@ in
             IPv6AcceptRA = false;
             LinkLocalAddressing = "no";
           };
-          # Same client ID as OPNsense sent, so the ISP keeps handing out the same lease.
+          # Same MAC and client ID as OPNsense, so the ISP keeps handing out the same lease.
           dhcpV4Config = {
             ClientIdentifier = "mac";
             UseDNS = false;
           };
-          linkConfig = standbyLink;
+          linkConfig =
+            standbyLink
+            // lib.optionalAttrs (cfg.takeover && cfg.wanMacAddress != null) {
+              MACAddress = cfg.wanMacAddress;
+            };
         };
 
         "60-transit" = {
