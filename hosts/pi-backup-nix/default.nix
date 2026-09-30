@@ -139,7 +139,7 @@ in
     "taylor-laptop-nix"
     "taylor-cube-nix"
     "taylor-deck-nix"
-    "pixel7pro"
+    "taylor-phone"
   ];
 
   my.secrets.wireguard.pi-backup-nix.enable = true;

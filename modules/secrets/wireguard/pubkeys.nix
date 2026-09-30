@@ -8,7 +8,8 @@ let
   keys = {
     wg_pubkey_router_wg_remote = "router_wg_remote";
     wg_pubkey_remote_nginx_nix = "oracle_rocky_proxy";
-    wg_pubkey_pixel7pro = "pixel7pro";
+    # YAML key keeps the old device name; only the secret name follows the host.
+    wg_pubkey_taylor_phone = "pixel7pro";
     wg_pubkey_pi_backup_nix = "pi_backup_nix";
     wg_pubkey_taylor_desktop_nix = "taylor_desktop_nix";
     wg_pubkey_taylor_laptop_nix = "taylor_laptop_nix";

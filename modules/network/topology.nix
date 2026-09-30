@@ -422,7 +422,7 @@ let
         preferredAddress = "wgRemote";
       };
     };
-    pixel7pro.wgRemote.ip = "10.50.50.11";
+    taylor-phone.wgRemote.ip = "10.50.50.11";
     palworld-nix = {
       lan = {
         ip = "10.73.73.31";

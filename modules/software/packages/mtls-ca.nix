@@ -96,7 +96,7 @@ let
     do_issue() {
       [ -r "$CA_CRT" ] || fail "No CA certificate at $CA_CRT"
 
-      NAME=$($GUM input --placeholder "Device name (e.g. pixel7pro)")
+      NAME=$($GUM input --placeholder "Device name (e.g. taylor-phone)")
       [[ "$NAME" =~ ^[a-z0-9][a-z0-9-]{0,62}$ ]] \
         || fail "Use lowercase letters, digits and dashes."
 

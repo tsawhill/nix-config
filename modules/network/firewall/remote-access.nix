@@ -7,7 +7,7 @@
     "taylor-laptop-nix"
     "taylor-deck-nix"
     "taylor-cube-nix"
-    "pixel7pro"
+    "taylor-phone"
   ];
 
   # AdGuard DNS plus the upstreams their own nginx proxies and streams point at,
