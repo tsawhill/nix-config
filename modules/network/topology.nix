@@ -438,6 +438,27 @@ let
       dns.enable = true;
       monitoring.enable = true;
     };
+    ac-controller-office = {
+      lan = {
+        ip = "10.73.73.201";
+        mac = "00:33:7a:3b:e6:2a";
+      };
+      dns.enable = true;
+    };
+    ac-controller-bedroom = {
+      lan = {
+        ip = "10.73.73.202";
+        mac = "00:33:7a:3b:e4:16";
+      };
+      dns.enable = true;
+    };
+    ac-controller-livingroom = {
+      lan = {
+        ip = "10.73.73.203";
+        mac = "00:33:7a:3b:e5:f1";
+      };
+      dns.enable = true;
+    };
     ffsync-nix = {
       lan = {
         ip = "10.73.73.33";
