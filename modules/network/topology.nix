@@ -336,7 +336,7 @@ let
     # WireGuard remote-access server. The factory provisions it on the LAN;
     # set attachment = "transit" to move it behind the router for good.
     networking-vpn-in-nix = {
-      attachment = "lan";
+      attachment = "transit";
       lan = {
         ip = "10.73.73.46";
         mac = "02:22:c3:d2:33:54";

@@ -328,4 +328,4 @@ networking-vpn-in-nix:
   devices:
     root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/networking-vpn-in-nix" }
-    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "02:22:c3:d2:33:54" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br2", hwaddr: "02:22:c3:d2:33:54" }
