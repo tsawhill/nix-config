@@ -52,7 +52,7 @@
   ];
 
   # Never reach the internet, whichever zone they are in. VPN egress clients
-  # (arrs, deluge, qbit-*, searx, socks5, unbound-vpn-na) are added automatically.
+  # (arrs, qbit-*, searx, socks5, unbound-vpn-na) are added automatically.
   noInternet = [
     "amcrest-cameras"
     "ac-controller-office"

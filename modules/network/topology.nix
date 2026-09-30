@@ -9,7 +9,6 @@ let
     "arrs-nix"
     "authentik-nix"
     "build-nix"
-    "deluge-nix"
     "ffsync-nix"
     "gotify-nix"
     "homeassistant-nix"
@@ -177,14 +176,6 @@ let
       lan = {
         ip = "10.73.73.18";
         mac = "bc:24:11:60:3d:cc";
-      };
-      dns.enable = true;
-      monitoring.enable = true;
-    };
-    deluge-nix = {
-      lan = {
-        ip = "10.73.73.20";
-        mac = "bc:24:11:43:7d:c4";
       };
       dns.enable = true;
       monitoring.enable = true;

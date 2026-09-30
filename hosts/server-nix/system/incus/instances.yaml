@@ -35,16 +35,6 @@ build-nix:
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/build-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:e1:63:a2" }
 
-deluge-nix:
-  type: "container"
-  profiles: ["nixos-lxc", "downloadHDD-mount", "downloadSSD-mount"]
-  config:
-    limits.memory: "8GiB"
-  devices:
-    root: { type: "disk", path: "/", pool: "rpool", size: "12GiB" }
-    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/deluge-nix" }
-    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:43:7d:c4" }
-
 qbit-gen-nix:
   type: "container"
   profiles: ["nixos-lxc", "downloadHDD-mount", "downloadSSD-mount"]

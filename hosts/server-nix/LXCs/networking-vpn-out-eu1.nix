@@ -47,7 +47,6 @@ in
   };
 
   my.secrets."networking-vpn-out-eu1-nix".enable = vpnEnabled;
-  my.secrets.deluge-vpn.enable = vpnEnabled;
   my.secrets.qbit-gen-vpn.enable = vpnEnabled;
   my.secrets.qbit-lts-vpn.enable = vpnEnabled;
   my.network.routableAirvpn = {
@@ -62,7 +61,6 @@ in
 
     clientAddresses = [
       (lanIp "arrs-nix")
-      (lanIp "deluge-nix")
       (lanIp "qbit-gen-nix")
       (lanIp "qbit-lts-nix")
       (lanIp "socks5-vpn-eu-nix")
@@ -77,10 +75,6 @@ in
     ];
 
     portForwards = [
-      {
-        portSecret = "deluge_vpn_port";
-        destinationAddress = lanIp "deluge-nix";
-      }
       {
         portSecret = "qbit_gen_vpn_port";
         destinationAddress = lanIp "qbit-gen-nix";
