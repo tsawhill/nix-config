@@ -141,6 +141,10 @@ in
     "networking-dhcp-nix" =
       mkHost "weekly" "networking-dhcp-nix"
         "${self}/hosts/server-nix/LXCs/networking-dhcp.nix";
+    # Second slice: WireGuard remote access. Manual-only until provisioned.
+    "networking-vpn-in-nix" =
+      mkHost null "networking-vpn-in-nix"
+        "${self}/hosts/server-nix/LXCs/networking-vpn-in.nix";
     # Manual-only until the new container and its SOPS keys are provisioned.
     "networking-vpn-out-eu1-nix" =
       mkHost null "networking-vpn-out-eu1-nix"

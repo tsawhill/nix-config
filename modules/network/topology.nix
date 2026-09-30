@@ -22,6 +22,7 @@ let
     "monitoring-nix"
     "nextcloud-nix"
     "networking-dhcp-nix"
+    "networking-vpn-in-nix"
     "networking-vpn-out-eu1-nix"
     "networking-vpn-out-na1-nix"
     "palworld-nix"
@@ -302,6 +303,7 @@ let
         mac = "88:a2:9e:77:6d:8b";
       };
       wgRemote.ip = "10.50.50.5";
+      wgRemote.access = "restricted";
       dns = {
         enable = true;
         preferredAddress = "wgRemote";
@@ -331,12 +333,25 @@ let
       dns.enable = true;
       monitoring.enable = true;
     };
+    # WireGuard remote-access server. The factory provisions it on the LAN;
+    # set attachment = "transit" to move it behind the router for good.
+    networking-vpn-in-nix = {
+      attachment = "lan";
+      lan = {
+        ip = "10.73.73.46";
+        mac = "02:22:c3:d2:33:54";
+      };
+      transit.ip = "10.73.74.2";
+      dns.enable = true;
+      monitoring.enable = true;
+    };
     taylor-laptop-nix = {
       lan = {
         ip = "10.73.73.68";
         mac = "b0:dc:ef:20:5c:ba";
       };
       wgRemote.ip = "10.50.50.3";
+      wgRemote.access = "trusted";
       dns = {
         enable = true;
         roaming = true;
@@ -348,6 +363,7 @@ let
         mac = "c8:7f:54:6c:e2:96";
       };
       wgRemote.ip = "10.50.50.2";
+      wgRemote.access = "trusted";
       dns = {
         enable = true;
         roaming = true;
@@ -366,6 +382,7 @@ let
         mac = "b4:8c:9d:7e:6d:73";
       };
       wgRemote.ip = "10.50.50.4";
+      wgRemote.access = "trusted";
       dns = {
         enable = true;
         roaming = true;
@@ -379,6 +396,7 @@ let
         mac = "ec:b5:0a:e7:24:7c";
       };
       wgRemote.ip = "10.50.50.6";
+      wgRemote.access = "trusted";
       dns = {
         enable = true;
         roaming = true;
@@ -394,12 +412,16 @@ let
     };
     remote-nginx-nix = {
       wgRemote.ip = "10.50.50.16";
+      wgRemote.access = "restricted";
       dns = {
         enable = true;
         preferredAddress = "wgRemote";
       };
     };
-    pixel7pro.wgRemote.ip = "10.50.50.11";
+    pixel7pro.wgRemote = {
+      ip = "10.50.50.11";
+      access = "trusted";
+    };
     palworld-nix = {
       lan = {
         ip = "10.73.73.31";
@@ -451,7 +473,12 @@ let
       preferred =
         entry.dns.preferredAddress or (if entry.dns.roaming or false then "wgRemote" else "lan");
     in
-    if preferred == "wgRemote" then entry.wgRemote.ip else entry.lan.dnsIp or entry.lan.ip;
+    if preferred == "wgRemote" then
+      entry.wgRemote.ip
+    else if (entry.attachment or "lan") == "transit" then
+      entry.transit.ip
+    else
+      entry.lan.dnsIp or entry.lan.ip;
 in
 {
   domains = {
@@ -475,6 +502,13 @@ in
       routerAddress = "10.50.50.1";
       endpoint = "taylordnsfree.zapto.org";
       port = 51820;
+    };
+    # Point-to-point segment between the LAN router and networking-vpn-in-nix,
+    # so tunnel traffic crosses the router both ways.
+    vpnInTransit = {
+      cidr = "10.73.74.0/29";
+      bridge = "br2";
+      gateway = "10.73.74.1";
     };
   };
 

@@ -68,6 +68,12 @@ in
       Name = "br1";
     };
 
+    # Router <-> networking-vpn-in-nix transit bridge (guests only)
+    netdevs."22-br2".netdevConfig = {
+      Kind = "bridge";
+      Name = networkTopology.networks.vpnInTransit.bridge;
+    };
+
     # ┌───────────────────────────────────────────────────────────────────────┐
     # │ Interface Bindings (Plugging Physical Ports into Bridges)             │
     # └───────────────────────────────────────────────────────────────────────┘
@@ -113,6 +119,18 @@ in
         LinkLocalAddressing = "no";
       };
       # We don't want the boot process to hang waiting for br1 to get an IP
+      linkConfig.RequiredForOnline = "no";
+    };
+
+    # No host address; only the router and vpn-in guests sit on this segment
+    networks."42-br2" = {
+      matchConfig.Name = networkTopology.networks.vpnInTransit.bridge;
+      networkConfig = {
+        DHCP = "no";
+        IPv6AcceptRA = false;
+        LinkLocalAddressing = "no";
+        ConfigureWithoutCarrier = true;
+      };
       linkConfig.RequiredForOnline = "no";
     };
 
