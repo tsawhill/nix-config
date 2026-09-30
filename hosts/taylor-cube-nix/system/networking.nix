@@ -3,7 +3,6 @@
 let
   inherit (networkTopology.lib) lanIp wgAddress;
   wgRemote = networkTopology.networks.wgRemote;
-  wgEndpoint = "${wgRemote.endpoint}:${toString wgRemote.port}";
   wgAllowedIPs = "${wgRemote.cidr};${networkTopology.networks.lan.cidr};";
 in
 {
@@ -25,7 +24,6 @@ in
     dnsPriority = 50;
     routeMetric = 50000;
     peer = {
-      endpoint = wgEndpoint;
       allowedIPs = wgAllowedIPs;
     };
   };

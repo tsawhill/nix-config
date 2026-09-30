@@ -141,6 +141,10 @@ in
     "networking-dhcp-nix" =
       mkHost "weekly" "networking-dhcp-nix"
         "${self}/hosts/server-nix/LXCs/networking-dhcp.nix";
+    # Home WAN DNS record in Cloudflare. Manual-only until provisioned.
+    "networking-ddns-nix" =
+      mkHost null "networking-ddns-nix"
+        "${self}/hosts/server-nix/LXCs/networking-ddns.nix";
     # mTLS client CA. Manual-only until provisioned.
     "ca-nix" = mkHost null "ca-nix" "${self}/hosts/server-nix/LXCs/ca.nix";
     # Inter-zone router for the VLANs. Manual-only until provisioned.

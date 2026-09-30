@@ -2,6 +2,7 @@
   config,
   lib,
   pkgs,
+  networkTopology,
   ...
 }:
 
@@ -67,6 +68,8 @@ in
     peer = {
       endpoint = lib.mkOption {
         type = lib.types.str;
+        # The hostname is a sops secret so the public repo never names the home WAN.
+        default = "${config.sops.placeholder.wg_remote_endpoint}:${toString networkTopology.networks.wgRemote.port}";
         description = "Peer endpoint (host:port)";
       };
 
@@ -133,6 +136,8 @@ in
   config = lib.mkIf cfg.enable (
     lib.mkMerge [
       {
+        my.secrets.wireguard.endpoint.enable = true;
+
         sops.templates."nm-wg-remote" = {
           path = "/etc/NetworkManager/system-connections/wg-remote.nmconnection";
           owner = "root";

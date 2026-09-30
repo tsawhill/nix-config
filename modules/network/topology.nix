@@ -21,6 +21,7 @@ let
     "local-nginx-nix"
     "monitoring-nix"
     "nextcloud-nix"
+    "networking-ddns-nix"
     "networking-dhcp-nix"
     "networking-router-nix"
     "networking-vpn-in-nix"
@@ -103,10 +104,9 @@ let
       };
       dns = {
         enable = true;
-        aliases = [
-          "tsawhill.org"
-          "*.tsawhill.org"
-        ];
+        aliases = [ "tsawhill.org" ];
+        # Plus every vhost it serves; no wildcard, so other tsawhill.org names resolve publicly.
+        aliasesFromNginx = true;
       };
       monitoring.enable = true;
     };
@@ -322,6 +322,14 @@ let
       lan = {
         ip = "10.73.73.43";
         mac = "02:5f:6e:64:7f:ef";
+      };
+      dns.enable = true;
+      monitoring.enable = true;
+    };
+    networking-ddns-nix = {
+      lan = {
+        ip = "10.73.73.49";
+        mac = "02:ef:43:75:66:f7";
       };
       dns.enable = true;
       monitoring.enable = true;
@@ -557,7 +565,6 @@ in
       cidr = "10.50.50.0/24";
       routedCidr = "10.50.0.0/16";
       routerAddress = "10.50.50.1";
-      endpoint = "taylordnsfree.zapto.org";
       port = 51820;
     };
     # Point-to-point segment between the LAN router and networking-vpn-in-nix,

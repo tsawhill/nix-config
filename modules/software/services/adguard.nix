@@ -1,6 +1,7 @@
 {
   lib,
   networkTopology,
+  nodes,
   ...
 }:
 
@@ -27,6 +28,24 @@ let
         answer = dnsAnswer name;
       }) (host.dns.aliases or [ ])
     ) dnsAliasHosts
+  );
+
+  # Only the names an nginx host actually serves point at it, so every other
+  # tsawhill.org name (the home WAN record included) resolves publicly.
+  nginxRewrites = lib.concatLists (
+    lib.mapAttrsToList (
+      name: _:
+      map
+        (domain: {
+          inherit domain;
+          answer = dnsAnswer name;
+        })
+        (
+          lib.filter (domain: lib.hasInfix "." domain && !lib.hasInfix "*" domain) (
+            lib.attrNames nodes.${name}.config.services.nginx.virtualHosts
+          )
+        )
+    ) (lib.filterAttrs (_: host: host.dns.aliasesFromNginx or false) networkTopology.hosts)
   );
 in
 {
@@ -250,7 +269,9 @@ in
         blocking_mode = "default";
         parental_block_host = "family-block.dns.adguard.com";
         safebrowsing_block_host = "standard-block.dns.adguard.com";
-        rewrites = map (r: r // { enabled = true; }) (hostRewrites ++ aliasRewrites);
+        rewrites = map (r: r // { enabled = true; }) (
+          lib.unique (hostRewrites ++ aliasRewrites ++ nginxRewrites)
+        );
         safe_fs_patterns = [ "/var/lib/private/AdGuardHome/userfilters/*" ];
         safebrowsing_cache_size = 1048576;
         safesearch_cache_size = 1048576;

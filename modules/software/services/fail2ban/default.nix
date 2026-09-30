@@ -1,4 +1,7 @@
-{ networkTopology, ... }:
+{ config, lib, ... }:
+let
+  cfg = config.services.fail2ban;
+in
 {
   imports = [ ./jails ];
   services.fail2ban = {
@@ -10,7 +13,6 @@
     ignoreIP = [
       # Whitelist some subnets
       "10.0.0.0/8"
-      networkTopology.networks.wgRemote.endpoint # resolve the IP via DNS
     ];
     bantime = "24h"; # Ban IPs for one day on the first ban
     bantime-increment = {
@@ -20,4 +22,17 @@
       overalljails = true; # Calculate the bantime based on all the violations
     };
   };
+
+  # Never ban the home WAN. Its name is a secret, so this re-states jail.local's
+  # ignoreip with it appended; jail.d/*.local is read last and wins.
+  my.secrets.wireguard.endpoint.enable = true;
+  sops.templates."fail2ban-home.local" = {
+    content = ''
+      [DEFAULT]
+      ignoreip = 127.0.0.1/8 ${lib.optionalString config.networking.enableIPv6 "::1"} ${lib.concatStringsSep " " cfg.ignoreIP} ${config.sops.placeholder.wg_remote_endpoint}
+    '';
+    restartUnits = [ "fail2ban.service" ];
+  };
+  environment.etc."fail2ban/jail.d/home.local".source =
+    config.sops.templates."fail2ban-home.local".path;
 }

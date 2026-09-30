@@ -99,6 +99,16 @@ creation_rules:
         - *taylor-cube-nix
         - *pi-backup-nix
         - *networking-vpn-in-nix
+  # Home WAN name for the WireGuard endpoint; kept out of the public repo.
+  - path_regex: modules/secrets/wireguard/endpoint\.yaml$
+    key_groups:
+      - age:
+        - *build-nix
+        - *taylor-desktop-nix
+        - *taylor-laptop-nix
+        - *taylor-deck-nix
+        - *taylor-cube-nix
+        - *pi-backup-nix
   - path_regex: modules/secrets/wireguard/networking-vpn-in-nix/wg-remote-server\.yaml$
     key_groups:
       - age:
