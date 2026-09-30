@@ -24,6 +24,7 @@ jellyseerr-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAID0yjTA+0reP9iV8Kux4iuL5K
 llm-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPVp0FuCa4L/BtikcSR6OfLknJb8SfLTxofZZOtObfnA
 monitoring-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILvitGJPwEakrNFju9O1Y1rc2k+8ibo5+RGCysom6329
 networking-dhcp-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIP3z2g6MRht934cxOjzusFh1kGZMc7mNDTyYNpfNMcGN root@nixos
+networking-router-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDKMy71PT3aEhQOZSZ/TxIWXx3N9Jq98RKJFQGptEXS4 root@nixos
 networking-vpn-in-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGwQErs7kQSvRnEPCd1lWNqJJBzlaJsj2obcN/drMKoD root@nixos
 networking-vpn-out-eu1-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIFaMx61namH6TAsB6RLJOoACakkjYsoskO9WJeXmMuA root@accepted-shark
 networking-vpn-out-na1-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIvgW+lsm95s7os+KXUMT+ETVElCoCxZwvW3Q0OhO1Kg root@accepted-shark
