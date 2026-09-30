@@ -7,7 +7,7 @@ let
   # Leave false for the factory run. After the factory adds this host's age
   # recipient: add the mtls-ca.yaml rule to .sops.yaml, run `mtls-ca init` on
   # build-nix, then flip this.
-  caEnabled = false;
+  caEnabled = true;
 in
 {
   imports = [

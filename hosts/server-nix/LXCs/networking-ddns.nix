@@ -8,7 +8,7 @@ let
   # Leave false for the factory run. After the factory adds this host's age
   # recipient: add it to the cloudflare/ddns.yaml and wireguard/endpoint.yaml
   # rules, run `sops updatekeys` on both, then flip this.
-  ddnsEnabled = false;
+  ddnsEnabled = true;
   placeholder = config.sops.placeholder;
 in
 {
