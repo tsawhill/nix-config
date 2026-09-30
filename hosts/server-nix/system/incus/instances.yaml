@@ -318,3 +318,4 @@ networking-dhcp-nix:
     root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/networking-dhcp-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "02:b7:84:1f:72:f9" }
+
