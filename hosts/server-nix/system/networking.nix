@@ -38,7 +38,7 @@ in
     enable = true;
 
     # ┌───────────────────────────────────────────────────────────────────────┐
-    # │ Physical Interface Links (Renaming to lan0 and wan0)                  │
+    # │ Physical Interface Links (Renaming to lan0)                           │
     # └───────────────────────────────────────────────────────────────────────┘
 
     # LAN port
@@ -46,15 +46,6 @@ in
       matchConfig.MACAddress = "e4:1d:2d:7e:e5:20";
       linkConfig = {
         Name = "lan0";
-        NamePolicy = "none";
-      };
-    };
-
-    # Old WAN port, unused since the modem moved to switch port 6
-    links."11-wan0" = {
-      matchConfig.MACAddress = "9c:6b:00:13:95:4e";
-      linkConfig = {
-        Name = "wan0";
         NamePolicy = "none";
       };
     };
@@ -112,15 +103,6 @@ in
         }
       ]
       ++ map (vlan: { VLAN = vlan; }) trunkVlans;
-    };
-
-    # Kept down and out of br1 so nothing plugged in lands on the modem's network
-    networks."31-wan0" = {
-      matchConfig.Name = "wan0";
-      linkConfig = {
-        ActivationPolicy = "down";
-        RequiredForOnline = "no";
-      };
     };
 
     networks."32-wan-vlan" = {
