@@ -8,7 +8,7 @@
 let
   # Leave false for the factory run. After the factory adds this host's age
   # recipient, create the server key secret, rekey pubkeys.yaml, then flip this.
-  wgEnabled = false;
+  wgEnabled = true;
 
   host = networkTopology.hosts.networking-vpn-in-nix;
   transit = networkTopology.networks.vpnInTransit;

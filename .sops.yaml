@@ -98,6 +98,12 @@ creation_rules:
         - *taylor-deck-nix
         - *taylor-cube-nix
         - *pi-backup-nix
+        - *networking-vpn-in-nix
+  - path_regex: modules/secrets/wireguard/networking-vpn-in-nix/wg-remote-server\.yaml$
+    key_groups:
+      - age:
+        - *build-nix
+        - *networking-vpn-in-nix
   - path_regex: modules/secrets/wireguard/pi-backup-nix\.yaml$
     key_groups:
       - age:
