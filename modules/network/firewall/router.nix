@@ -1,7 +1,8 @@
 # Inter-zone policy, enforced on networking-router-nix.
-# Zones are topology.zones plus "legacy" (the flat 10.73.73.0/24 LAN and anything
-# behind OPNsense) and "internet". Replies are always allowed; this lists who may
-# open connections. Every zone may also reach AdGuard DNS.
+# Zones are topology.zones plus "legacy" (the flat 10.73.73.0/24 LAN), "vpn"
+# (WireGuard peers behind networking-vpn-in-nix, already filtered per peer there)
+# and "internet". Replies are always allowed; this lists who may open connections.
+# Every zone may also reach AdGuard DNS.
 {
   allow = {
     trusted = [
@@ -10,6 +11,7 @@
       "services"
       "guests"
       "iot"
+      "vpn"
       "internet"
     ];
     networking = [
@@ -28,6 +30,16 @@
       "networking"
       "services"
       "iot"
+      "vpn"
+      "internet"
+    ];
+    vpn = [
+      "legacy"
+      "trusted"
+      "networking"
+      "services"
+      "iot"
+      "internet"
     ];
   };
 
@@ -36,6 +48,23 @@
     {
       host = "homeassistant-nix";
       to = "iot";
+    }
+  ];
+
+  # Never reach the internet, whichever zone they are in.
+  noInternet = [
+    "amcrest-cameras"
+    "ac-controller-office"
+    "ac-controller-bedroom"
+    "ac-controller-livingroom"
+  ];
+
+  # Inbound from the WAN address, hairpinned for LAN clients too.
+  portForwards = [
+    {
+      host = "networking-vpn-in-nix";
+      protocol = "udp";
+      port = 51820;
     }
   ];
 }

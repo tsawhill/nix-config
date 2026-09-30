@@ -11,6 +11,9 @@
 
   networking.hostName = "networking-router-nix";
 
-  # Upstream is OPNsense on the legacy LAN until the WAN moves here.
-  my.network.router.enable = true;
+  my.network.router = {
+    enable = true;
+    # Flip with the OPNsense VM stopped. Rollback: stop this container, start OPNsense.
+    takeover = false;
+  };
 }
