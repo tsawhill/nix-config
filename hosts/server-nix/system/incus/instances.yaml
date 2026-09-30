@@ -12,6 +12,8 @@ OPNSense:
     root: { type: "disk", path: "/", pool: "rpool", size: "16GiB" }
     lan0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "14:29:0d:71:37:00" }
     wan0: { type: "nic", nictype: "bridged", parent: "br1", hwaddr: "14:29:0d:71:37:01" }
+    # Name must sort after wan0: OPNsense binds vtnetN by order, so this stays vtnet2.
+    xtransit0: { type: "nic", nictype: "bridged", parent: "br2", hwaddr: "14:29:0d:71:37:02" }
 
 adguard-nix:
   type: "container"
