@@ -22,6 +22,7 @@ from typing import Any, Callable, Iterable
 
 COOLDOWN_EXIT = 75
 BUSY_EXIT = 76
+ENSURE_LOCK_WAIT_SECONDS = 300
 
 
 def load_json(path: Path, default: dict[str, Any]) -> dict[str, Any]:
@@ -45,13 +46,18 @@ def atomic_json(path: Path, value: dict[str, Any]) -> None:
 
 
 @contextlib.contextmanager
-def rotation_lock(path: Path):
+def rotation_lock(path: Path, wait_seconds: float = 0, sleep: Callable[[float], None] = time.sleep):
     path.parent.mkdir(parents=True, exist_ok=True)
+    deadline = time.monotonic() + wait_seconds
     with path.open("a+") as handle:
-        try:
-            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError as error:
-            raise RuntimeError("rotation already in progress") from error
+        while True:
+            try:
+                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError as error:
+                if time.monotonic() >= deadline:
+                    raise RuntimeError("rotation already in progress") from error
+                sleep(1)
         yield
 
 
@@ -473,7 +479,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.action == "remote":
             allowed_reasons = args.allowed_reason or config.get("remoteAllowedReasons", [])
             reason = parse_remote_command(args.command, allowed_reasons)
-        with rotation_lock(lock_path):
+        # Timer-driven actions retry on the next tick; ensure runs once per boot or deploy, so it waits.
+        with rotation_lock(lock_path, wait_seconds=ENSURE_LOCK_WAIT_SECONDS if args.action == "ensure" else 0):
             # Load state only after acquiring the lock, including timer-driven rotations.
             controller = Controller(config, SystemRunner(config))
             if args.action == "health":

@@ -233,6 +233,16 @@ class ControllerTests(unittest.TestCase):
                 with rotation_lock(path):
                     pass
 
+    def test_lock_waits_for_a_concurrent_holder_when_asked(self):
+        path = Path(self.tmp.name) / "lock"
+        holder = path.open("a+")
+        fcntl.flock(holder, fcntl.LOCK_EX)
+        sleep = Mock(side_effect=lambda _: fcntl.flock(holder, fcntl.LOCK_UN))
+        with rotation_lock(path, wait_seconds=30, sleep=sleep):
+            pass
+        sleep.assert_called_once()
+        holder.close()
+
     def test_system_runner_activates_the_networkmanager_profile(self):
         runner = SystemRunner(
             {
