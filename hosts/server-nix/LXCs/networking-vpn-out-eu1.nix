@@ -65,6 +65,7 @@ in
       (lanIp "deluge-nix")
       (lanIp "qbit-gen-nix")
       (lanIp "qbit-lts-nix")
+      (lanIp "socks5-vpn-eu-nix")
     ];
     lanCidr = networkTopology.networks.lan.cidr;
     upstreamGateway = networkTopology.networks.lan.gateway;
