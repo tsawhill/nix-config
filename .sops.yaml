@@ -111,6 +111,7 @@ creation_rules:
         - *taylor-deck-nix
         - *taylor-cube-nix
         - *pi-backup-nix
+        - *networking-ddns-nix
   - path_regex: modules/secrets/wireguard/networking-vpn-in-nix/wg-remote-server\.yaml$
     key_groups:
       - age:
@@ -179,6 +180,12 @@ creation_rules:
       - age:
         - *build-nix
         - *pi-backup-nix
+        - *networking-ddns-nix
+  - path_regex: modules/secrets/server/LXCs/mtls-ca\.yaml$
+    key_groups:
+      - age:
+        - *build-nix
+        - *ca-nix
   ##############################################################################
   #
   #                             Samba account credentials
