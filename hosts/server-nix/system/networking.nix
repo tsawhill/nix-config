@@ -1,6 +1,13 @@
-{ networkTopology, ... }:
+{ lib, networkTopology, ... }:
 let
   inherit (networkTopology.lib) lanIp;
+
+  # Every tagged VLAN in the topology rides the lan0 trunk from switch port 10.
+  trunkVlans = lib.sort lib.lessThan (
+    lib.concatMap (net: lib.optional ((net.vlan or 1) != 1) net.vlan) (
+      lib.attrValues networkTopology.networks
+    )
+  );
 in
 {
   services.resolved = {
@@ -56,10 +63,16 @@ in
     # │ Bridge Netdev Definitions (Creating br0 and br1)                      │
     # └───────────────────────────────────────────────────────────────────────┘
 
-    # LAN bridge
-    netdevs."20-br0".netdevConfig = {
-      Kind = "bridge";
-      Name = "br0";
+    # LAN bridge, VLAN-aware; untagged traffic and guests without a vlan stay on VLAN 1
+    netdevs."20-br0" = {
+      netdevConfig = {
+        Kind = "bridge";
+        Name = "br0";
+      };
+      bridgeConfig = {
+        VLANFiltering = true;
+        DefaultPVID = 1;
+      };
     };
 
     # WAN bridge
@@ -83,6 +96,13 @@ in
       matchConfig.Name = "lan0";
       networkConfig.Bridge = "br0";
       linkConfig.RequiredForOnline = "enslaved";
+      bridgeVLANs = [
+        {
+          PVID = 1;
+          EgressUntagged = 1;
+        }
+      ]
+      ++ map (vlan: { VLAN = vlan; }) trunkVlans;
     };
 
     # WAN interface binding

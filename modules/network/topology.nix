@@ -61,6 +61,11 @@ let
         mac = "28:80:88:70:5a:b0";
       };
       dns.enable = false;
+      ports = {
+        "6" = "ISP modem (wan, untagged)";
+        "7" = "UniFi AP for zone SSIDs (trunk)";
+        "10" = "server-nix lan0 (trunk)";
+      };
     };
     samba-nix = {
       lan = {
@@ -499,7 +504,9 @@ in
   };
 
   networks = {
+    # Legacy flat LAN on untagged VLAN 1; emptied host by host into the zones below.
     lan = {
+      vlan = 1;
       cidr = "10.73.73.0/24";
       gateway = hosts.opnsense.lan.ip;
       dnsHost = "adguard-nix";
@@ -508,6 +515,34 @@ in
         end = "10.73.73.245";
       };
     };
+    # Zones: third octet matches the VLAN ID, .1 is the router.
+    trusted = {
+      vlan = 10;
+      cidr = "10.73.10.0/24";
+      gateway = "10.73.10.1";
+    };
+    networking = {
+      vlan = 20;
+      cidr = "10.73.20.0/24";
+      gateway = "10.73.20.1";
+    };
+    services = {
+      vlan = 30;
+      cidr = "10.73.30.0/24";
+      gateway = "10.73.30.1";
+    };
+    guests = {
+      vlan = 40;
+      cidr = "10.73.40.0/24";
+      gateway = "10.73.40.1";
+    };
+    iot = {
+      vlan = 50;
+      cidr = "10.73.50.0/24";
+      gateway = "10.73.50.1";
+    };
+    # ISP modem on switch port 6, carried to server-nix over the trunk.
+    wan.vlan = 99;
     wgRemote = {
       cidr = "10.50.50.0/24";
       routedCidr = "10.50.0.0/16";
