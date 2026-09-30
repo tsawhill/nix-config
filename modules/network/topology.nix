@@ -22,6 +22,7 @@ let
     "monitoring-nix"
     "nextcloud-nix"
     "networking-dhcp-nix"
+    "networking-router-nix"
     "networking-vpn-in-nix"
     "networking-vpn-out-eu1-nix"
     "networking-vpn-out-na1-nix"
@@ -349,6 +350,14 @@ let
       dns.enable = true;
       monitoring.enable = true;
     };
+    networking-router-nix = {
+      lan = {
+        ip = "10.73.73.47";
+        mac = "02:c9:07:cb:e2:47";
+      };
+      dns.enable = true;
+      monitoring.enable = true;
+    };
     taylor-laptop-nix = {
       lan = {
         ip = "10.73.73.68";
@@ -480,6 +489,36 @@ let
     )
   ) hostDefinitions;
 
+  # VLAN zones behind networking-router-nix; the third octet matches the VLAN ID
+  # and .1 is the router. The attribute name is also the router's interface name.
+  zones = {
+    trusted = {
+      vlan = 10;
+      cidr = "10.73.10.0/24";
+      gateway = "10.73.10.1";
+    };
+    networking = {
+      vlan = 20;
+      cidr = "10.73.20.0/24";
+      gateway = "10.73.20.1";
+    };
+    services = {
+      vlan = 30;
+      cidr = "10.73.30.0/24";
+      gateway = "10.73.30.1";
+    };
+    guests = {
+      vlan = 40;
+      cidr = "10.73.40.0/24";
+      gateway = "10.73.40.1";
+    };
+    iot = {
+      vlan = 50;
+      cidr = "10.73.50.0/24";
+      gateway = "10.73.50.1";
+    };
+  };
+
   fqdn = host: "${host}.${lanDomain}";
   lanIp = host: hosts.${host}.lan.ip;
   wgIp = host: hosts.${host}.wgRemote.ip;
@@ -515,32 +554,6 @@ in
         end = "10.73.73.245";
       };
     };
-    # Zones: third octet matches the VLAN ID, .1 is the router.
-    trusted = {
-      vlan = 10;
-      cidr = "10.73.10.0/24";
-      gateway = "10.73.10.1";
-    };
-    networking = {
-      vlan = 20;
-      cidr = "10.73.20.0/24";
-      gateway = "10.73.20.1";
-    };
-    services = {
-      vlan = 30;
-      cidr = "10.73.30.0/24";
-      gateway = "10.73.30.1";
-    };
-    guests = {
-      vlan = 40;
-      cidr = "10.73.40.0/24";
-      gateway = "10.73.40.1";
-    };
-    iot = {
-      vlan = 50;
-      cidr = "10.73.50.0/24";
-      gateway = "10.73.50.1";
-    };
     # ISP modem on switch port 6, carried to server-nix over the trunk.
     wan.vlan = 99;
     wgRemote = {
@@ -557,9 +570,10 @@ in
       bridge = "br2";
       gateway = "10.73.74.1";
     };
-  };
+  }
+  // zones;
 
-  inherit hosts;
+  inherit hosts zones;
 
   lib = {
     inherit

@@ -20,6 +20,33 @@ let
 
   inherit (networkTopology.lib) lanIp;
 
+  # Zone requests arrive relayed by networking-router-nix; Kea picks the subnet by giaddr.
+  zoneSubnets = lib.mapAttrsToList (
+    _: zone:
+    let
+      base = lib.concatStringsSep "." (lib.take 3 (lib.splitString "." zone.cidr));
+    in
+    {
+      id = zone.vlan;
+      subnet = zone.cidr;
+      pools = [ { pool = "${base}.100 - ${base}.245"; } ];
+      option-data = [
+        {
+          name = "routers";
+          data = zone.gateway;
+        }
+      ]
+      ++ optional (cfg.dnsServers != [ ]) {
+        name = "domain-name-servers";
+        data = lib.concatStringsSep ", " cfg.dnsServers;
+      }
+      ++ optional (cfg.domain != null) {
+        name = "domain-name";
+        data = cfg.domain;
+      };
+    }
+  ) networkTopology.zones;
+
   # Reservations are derived from the topology so a MAC/IP pair is declared in
   # exactly one place, the same way monitoring derives its scrape targets.
   reservationHosts = lib.filterAttrs (
@@ -182,24 +209,24 @@ in
               }
             ) cfg.reservations;
 
-            option-data =
-              [
-                {
-                  name = "routers";
-                  data = cfg.gateway;
-                }
-              ]
-              ++ optional (cfg.dnsServers != [ ]) {
-                name = "domain-name-servers";
-                data = lib.concatStringsSep ", " cfg.dnsServers;
+            option-data = [
+              {
+                name = "routers";
+                data = cfg.gateway;
               }
-              ++ optional (cfg.domain != null) {
-                name = "domain-name";
-                data = cfg.domain;
-              }
-              ++ cfg.extraOptionData;
+            ]
+            ++ optional (cfg.dnsServers != [ ]) {
+              name = "domain-name-servers";
+              data = lib.concatStringsSep ", " cfg.dnsServers;
+            }
+            ++ optional (cfg.domain != null) {
+              name = "domain-name";
+              data = cfg.domain;
+            }
+            ++ cfg.extraOptionData;
           }
-        ];
+        ]
+        ++ zoneSubnets;
       };
     };
 

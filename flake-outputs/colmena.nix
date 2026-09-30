@@ -141,6 +141,10 @@ in
     "networking-dhcp-nix" =
       mkHost "weekly" "networking-dhcp-nix"
         "${self}/hosts/server-nix/LXCs/networking-dhcp.nix";
+    # Inter-zone router for the VLANs. Manual-only until provisioned.
+    "networking-router-nix" =
+      mkHost null "networking-router-nix"
+        "${self}/hosts/server-nix/LXCs/networking-router.nix";
     # Second slice: WireGuard remote access. Manual-only until provisioned.
     "networking-vpn-in-nix" =
       mkHost null "networking-vpn-in-nix"
