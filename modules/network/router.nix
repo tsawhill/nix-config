@@ -95,26 +95,12 @@ in
     ];
 
     systemd.network = {
-      netdevs = lib.mapAttrs' (
-        name: zone:
-        lib.nameValuePair "60-${name}" {
-          netdevConfig = {
-            Kind = "vlan";
-            Name = name;
-          };
-          vlanConfig.Id = zone.vlan;
-        }
-      ) zones;
-
+      # Each zone is its own Incus NIC with the VLAN set on br0: VLAN netdevs made
+      # inside the LXC stay pending forever because udev never initialises them.
       networks = {
         "50-eth0" = {
-          networkConfig = {
-            VLAN = zoneNames;
-          }
-          // lib.optionalAttrs cfg.takeover {
-            # The default route comes from the WAN lease instead.
-            Gateway = lib.mkForce [ ];
-          };
+          # The default route comes from the WAN lease instead.
+          networkConfig = lib.optionalAttrs cfg.takeover { Gateway = lib.mkForce [ ]; };
           # ACD leaves the address off if OPNsense still answers for it.
           addresses = lib.optional cfg.takeover {
             Address = "${lan.gateway}/${prefixOf lan.cidr}";

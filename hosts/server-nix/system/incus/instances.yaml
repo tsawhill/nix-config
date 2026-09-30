@@ -322,7 +322,7 @@ networking-dhcp-nix:
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "02:b7:84:1f:72:f9" }
 
 
-# eth0: VLAN 1 untagged (legacy LAN) plus the zone VLANs tagged.
+# eth0 is the legacy LAN; each zone gets its own NIC on its VLAN, named after the zone.
 # wan reuses OPNsense's WAN MAC so the ISP lease carries over; it stays down until takeover.
 networking-router-nix:
   type: "container"
@@ -332,7 +332,12 @@ networking-router-nix:
   devices:
     root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/networking-router-nix" }
-    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "02:c9:07:cb:e2:47", vlan.tagged: "10,20,30,40,50" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "02:c9:07:cb:e2:47" }
+    trusted: { type: "nic", nictype: "bridged", parent: "br0", vlan: "10", hwaddr: "02:c9:07:cb:e2:10", name: "trusted" }
+    networking: { type: "nic", nictype: "bridged", parent: "br0", vlan: "20", hwaddr: "02:c9:07:cb:e2:20", name: "networking" }
+    services: { type: "nic", nictype: "bridged", parent: "br0", vlan: "30", hwaddr: "02:c9:07:cb:e2:30", name: "services" }
+    guests: { type: "nic", nictype: "bridged", parent: "br0", vlan: "40", hwaddr: "02:c9:07:cb:e2:40", name: "guests" }
+    iot: { type: "nic", nictype: "bridged", parent: "br0", vlan: "50", hwaddr: "02:c9:07:cb:e2:50", name: "iot" }
     wan: { type: "nic", nictype: "bridged", parent: "br1", hwaddr: "14:29:0d:71:37:01", name: "wan" }
     transit: { type: "nic", nictype: "bridged", parent: "br2", hwaddr: "02:2b:99:b7:74:01", name: "transit" }
 
