@@ -81,6 +81,15 @@ in
       Name = "br1";
     };
 
+    # WAN VLAN from the modem on switch port 6, split off br0 and fed into br1
+    netdevs."23-wan-vlan" = {
+      netdevConfig = {
+        Kind = "vlan";
+        Name = "wan-vlan";
+      };
+      vlanConfig.Id = networkTopology.networks.wan.vlan;
+    };
+
     # Router <-> networking-vpn-in-nix transit bridge (guests only)
     netdevs."22-br2".netdevConfig = {
       Kind = "bridge";
@@ -105,11 +114,17 @@ in
       ++ map (vlan: { VLAN = vlan; }) trunkVlans;
     };
 
-    # WAN interface binding
+    # WAN interface binding; fallback port while the modem moves to the switch
     networks."31-wan0" = {
       matchConfig.Name = "wan0";
       networkConfig.Bridge = "br1";
-      linkConfig.RequiredForOnline = "enslaved";
+      linkConfig.RequiredForOnline = "no";
+    };
+
+    networks."32-wan-vlan" = {
+      matchConfig.Name = "wan-vlan";
+      networkConfig.Bridge = "br1";
+      linkConfig.RequiredForOnline = "no";
     };
 
     # ┌───────────────────────────────────────────────────────────────────────┐
@@ -125,8 +140,17 @@ in
         DNS = [
           (lanIp networkTopology.networks.lan.dnsHost)
         ];
+        VLAN = [ "wan-vlan" ];
       };
       linkConfig.RequiredForOnline = "routable";
+      # The host itself only needs VLAN 1 untagged plus the WAN VLAN for wan-vlan.
+      bridgeVLANs = [
+        {
+          PVID = 1;
+          EgressUntagged = 1;
+        }
+        { VLAN = networkTopology.networks.wan.vlan; }
+      ];
     };
 
     # No config on WAN port
