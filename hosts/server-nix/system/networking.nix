@@ -50,7 +50,7 @@ in
       };
     };
 
-    # WAN port
+    # Old WAN port, unused since the modem moved to switch port 6
     links."11-wan0" = {
       matchConfig.MACAddress = "9c:6b:00:13:95:4e";
       linkConfig = {
@@ -114,11 +114,13 @@ in
       ++ map (vlan: { VLAN = vlan; }) trunkVlans;
     };
 
-    # WAN interface binding; fallback port while the modem moves to the switch
+    # Kept down and out of br1 so nothing plugged in lands on the modem's network
     networks."31-wan0" = {
       matchConfig.Name = "wan0";
-      networkConfig.Bridge = "br1";
-      linkConfig.RequiredForOnline = "no";
+      linkConfig = {
+        ActivationPolicy = "down";
+        RequiredForOnline = "no";
+      };
     };
 
     networks."32-wan-vlan" = {
