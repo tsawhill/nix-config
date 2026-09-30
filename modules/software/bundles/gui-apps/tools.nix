@@ -19,9 +19,6 @@
       nemo-with-extensions
       filezilla
 
-      # Downloading
-      deluge-gtk
-
       # Music / tuning
       lingot
 
