@@ -105,6 +105,11 @@
           ssl_verify_client on;
         '')
 
+        # A CRL only exists once something has been revoked.
+        (lib.optionalString (
+          cfg.mTLSCert != null && builtins.pathExists (./mTLS-Certs + "/${cfg.mTLSCert}.crl")
+        ) "ssl_crl /etc/mTLSCerts/${cfg.mTLSCert}.crl;")
+
         (lib.optionalString (cfg.restrictToIPs != [ ]) ''
           ${lib.concatMapStrings (ip: "allow ${ip};\n") cfg.restrictToIPs}
           deny all;

@@ -9,6 +9,7 @@ let
     "arrs-nix"
     "authentik-nix"
     "build-nix"
+    "ca-nix"
     "ffsync-nix"
     "gotify-nix"
     "homeassistant-nix"
@@ -265,6 +266,14 @@ let
       lan = {
         ip = "10.73.73.32";
         mac = "bc:24:11:7a:e0:14";
+      };
+      dns.enable = true;
+      monitoring.enable = true;
+    };
+    ca-nix = {
+      lan = {
+        ip = "10.73.73.48";
+        mac = "02:cb:b1:41:df:0e";
       };
       dns.enable = true;
       monitoring.enable = true;

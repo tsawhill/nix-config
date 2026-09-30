@@ -141,6 +141,8 @@ in
     "networking-dhcp-nix" =
       mkHost "weekly" "networking-dhcp-nix"
         "${self}/hosts/server-nix/LXCs/networking-dhcp.nix";
+    # mTLS client CA. Manual-only until provisioned.
+    "ca-nix" = mkHost null "ca-nix" "${self}/hosts/server-nix/LXCs/ca.nix";
     # Inter-zone router for the VLANs. Manual-only until provisioned.
     "networking-router-nix" =
       mkHost null "networking-router-nix"
