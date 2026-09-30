@@ -337,3 +337,12 @@ ca-nix:
     root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/ca-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "02:cb:b1:41:df:0e" }
+
+networking-ddns-nix:
+  type: "container"
+  profiles: ["nixos-lxc"]
+  config: {}
+  devices:
+    root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/networking-ddns-nix" }
+    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "02:ef:43:75:66:f7" }

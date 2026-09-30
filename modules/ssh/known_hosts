@@ -24,6 +24,7 @@ jellyfin-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAeaK0Ra1oXfXmCX6zm8wfaXQcm
 jellyseerr-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAID0yjTA+0reP9iV8Kux4iuL5KTyUPaeW7UsEJd8Pfsjv
 llm-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPVp0FuCa4L/BtikcSR6OfLknJb8SfLTxofZZOtObfnA
 monitoring-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILvitGJPwEakrNFju9O1Y1rc2k+8ibo5+RGCysom6329
+networking-ddns-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEjJ7zT3fomUHYEfrL+E7nM2j1AfwA+4ID7QGrg4Xlez root@nixos
 networking-dhcp-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIP3z2g6MRht934cxOjzusFh1kGZMc7mNDTyYNpfNMcGN root@nixos
 networking-router-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDKMy71PT3aEhQOZSZ/TxIWXx3N9Jq98RKJFQGptEXS4 root@nixos
 networking-vpn-in-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGwQErs7kQSvRnEPCd1lWNqJJBzlaJsj2obcN/drMKoD root@nixos

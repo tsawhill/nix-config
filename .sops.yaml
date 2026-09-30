@@ -24,6 +24,7 @@ keys:
   - &jellyseerr-nix age1z49zdj5uxmyhg6vtp77rz0u4kpat3zuvs8e2mergvje4caqxg32sfdtj3e
   - &llm-nix age1vntw8mh9ncahfksquz4ws0ukucdq3qndftwur7e2z98kfffa2gdqstdkad
   - &monitoring-nix age1yx2fwu2qyap82xkea4nhjmqaq28g0xe2v3tw0kjrn3gt94fh6gusu0danc
+  - &networking-ddns-nix age16nxlknfyux3myr3ethq7qcmf5ad5v23pjmaeq8msff9x6gznlfksqyh5gu
   - &networking-dhcp-nix age1petwfh939jhsxgml9dq80jdqwqxrvle5p0tjlxrp9y3sg7x3qeaqyszehc
   - &networking-router-nix age198yqu98pjyjx68xfrykzahh8hlklgvvtdynydluzhgqd0eua550q2kgjdw
   - &networking-vpn-in-nix age1q38xv756jx00amlcm423shc0gm6haq2fuq9g2rv89a5csdhmp4jslstf76
