@@ -303,7 +303,6 @@ let
         mac = "88:a2:9e:77:6d:8b";
       };
       wgRemote.ip = "10.50.50.5";
-      wgRemote.access = "restricted";
       dns = {
         enable = true;
         preferredAddress = "wgRemote";
@@ -351,7 +350,6 @@ let
         mac = "b0:dc:ef:20:5c:ba";
       };
       wgRemote.ip = "10.50.50.3";
-      wgRemote.access = "trusted";
       dns = {
         enable = true;
         roaming = true;
@@ -363,7 +361,6 @@ let
         mac = "c8:7f:54:6c:e2:96";
       };
       wgRemote.ip = "10.50.50.2";
-      wgRemote.access = "trusted";
       dns = {
         enable = true;
         roaming = true;
@@ -382,7 +379,6 @@ let
         mac = "b4:8c:9d:7e:6d:73";
       };
       wgRemote.ip = "10.50.50.4";
-      wgRemote.access = "trusted";
       dns = {
         enable = true;
         roaming = true;
@@ -396,7 +392,6 @@ let
         mac = "ec:b5:0a:e7:24:7c";
       };
       wgRemote.ip = "10.50.50.6";
-      wgRemote.access = "trusted";
       dns = {
         enable = true;
         roaming = true;
@@ -412,16 +407,12 @@ let
     };
     remote-nginx-nix = {
       wgRemote.ip = "10.50.50.16";
-      wgRemote.access = "restricted";
       dns = {
         enable = true;
         preferredAddress = "wgRemote";
       };
     };
-    pixel7pro.wgRemote = {
-      ip = "10.50.50.11";
-      access = "trusted";
-    };
+    pixel7pro.wgRemote.ip = "10.50.50.11";
     palworld-nix = {
       lan = {
         ip = "10.73.73.31";

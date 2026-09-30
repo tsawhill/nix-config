@@ -18,11 +18,10 @@ let
   prefix = lib.last (lib.splitString "/" wgRemote.cidr);
   confPath = config.sops.templates."wg-remote.conf".path;
 
-  # Every topology host with a tunnel address and an access tier is a peer.
-  peers = lib.attrNames (
-    lib.filterAttrs (_: host: host ? wgRemote && host.wgRemote ? access) networkTopology.hosts
-  );
-  peersWith = access: lib.filter (name: networkTopology.hosts.${name}.wgRemote.access == access) peers;
+  policy = import ./firewall/remote-access.nix;
+  peers = policy.trusted ++ policy.restricted;
+  peersWith = access: policy.${access};
+  tunnelHosts = lib.attrNames (lib.filterAttrs (_: host: host ? wgRemote) networkTopology.hosts);
   pubkeySecret = name: "wg_pubkey_${lib.replaceStrings [ "-" ] [ "_" ] name}";
 
   # `proxy_pass` targets on *.lan hosts found in nginx config text.
@@ -126,6 +125,13 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    assertions = [
+      {
+        assertion = lib.sort lib.lessThan peers == lib.sort lib.lessThan tunnelHosts;
+        message = "firewall/remote-access.nix must list every topology host with a wgRemote.ip exactly once (listed: ${toString peers}; topology: ${toString tunnelHosts}).";
+      }
+    ];
+
     my.secrets.wireguard.pubkeys.enable = true;
 
     sops.templates."wg-remote.conf" = {
