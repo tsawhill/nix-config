@@ -2,6 +2,7 @@
   config,
   lib,
   networkTopology,
+  self,
   ...
 }:
 
@@ -14,6 +15,14 @@ let
   wgRemote = networkTopology.networks.wgRemote;
 
   policy = import ./firewall/router.nix;
+
+  # VPN egress clients never use the WAN; this backs up their own routing.
+  egressClients = lib.filter (
+    name:
+    self.nixosConfigurations ? ${name}
+    && (self.nixosConfigurations.${name}.config.my.network.vpnEgress.client.enable or false)
+  ) (lib.attrNames hosts);
+  noInternet = policy.noInternet ++ egressClients;
   zoneNames = lib.attrNames zones;
   prefixOf = cidr: lib.last (lib.splitString "/" cidr);
   quoted = names: lib.concatMapStringsSep ", " (name: ''"${name}"'') names;
@@ -177,8 +186,8 @@ in
           content = ''
             set no_internet {
               type ipv4_addr
-              ${lib.optionalString (policy.noInternet != [ ])
-                "elements = { ${lib.concatMapStringsSep ", " addressOf policy.noInternet} }"
+              ${lib.optionalString (noInternet != [ ])
+                "elements = { ${lib.concatMapStringsSep ", " addressOf noInternet} }"
               }
             }
 
