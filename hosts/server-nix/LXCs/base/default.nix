@@ -1,11 +1,18 @@
 {
+  config,
+  lib,
   self,
   modulesPath,
   inputs,
+  networkTopology,
   ...
 }:
 
 let
+  lan = networkTopology.networks.lan;
+  inherit (networkTopology.lib) lanIp;
+  lanPrefix = lib.last (lib.splitString "/" lan.cidr);
+
   desktopSSHUsers = [ "root" ];
   laptopSSHUsers = [ "root" ];
   buildSSHUsers = [ "root" ];
@@ -81,8 +88,11 @@ in
     enable = true;
     networks."50-eth0" = {
       matchConfig.Name = "eth0";
+      # Static from topology so no LXC waits on networking-dhcp-nix at boot.
       networkConfig = {
-        DHCP = "ipv4";
+        Address = "${lanIp config.networking.hostName}/${lanPrefix}";
+        Gateway = lib.mkDefault lan.gateway;
+        DNS = [ (lanIp lan.dnsHost) ];
         IPv6AcceptRA = true;
       };
       linkConfig.RequiredForOnline = "routable";

@@ -38,8 +38,9 @@ in
     };
 
     systemd.network.networks."50-eth0" = {
+      # The only default route must be the VPN one below.
+      networkConfig.Gateway = lib.mkForce [ ];
       networkConfig.IPv6AcceptRA = lib.mkForce false;
-      dhcpV4Config.UseRoutes = false;
       routes = [
         {
           Destination = "0.0.0.0/0";
