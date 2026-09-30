@@ -11,9 +11,10 @@
 
   networking.hostName = "networking-router-nix";
 
-  my.network.router = {
-    enable = true;
-    # Flip with the OPNsense VM stopped. Rollback: stop this container, start OPNsense.
-    takeover = false;
-  };
+  my.network.router.enable = true;
+
+  # Prebuilt so the cutover needs no internet. With the OPNsense VM stopped, run
+  # /run/current-system/specialisation/takeover/bin/switch-to-configuration switch
+  # Rollback: stop this container, start OPNsense.
+  specialisation.takeover.configuration.my.network.router.takeover = true;
 }
