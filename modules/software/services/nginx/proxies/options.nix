@@ -11,6 +11,13 @@
       description = "The name of the CA certificate (stored in /etc/Certs/) to use for mTLS. If null, mTLS is disabled.";
     };
 
+    mTLSClients = lib.mkOption {
+      type = lib.types.listOf (lib.types.strMatching "[a-z0-9][a-z0-9-]*");
+      default = [ ];
+      example = [ "friend-laptop" ];
+      description = "Client cert names allowed on this proxy in addition to my.nginx.mtls.defaultClients.";
+    };
+
     enableAuthentik = lib.mkOption {
       type = lib.types.bool;
       default = false;

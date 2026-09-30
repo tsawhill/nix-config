@@ -133,6 +133,14 @@ in
   networking.firewall.allowedUDPPorts = [ 27017 ];
 
   my.nginx.geoblock.enable = true;
+  # Names given to `mtls-ca issue`; per-proxy extras go in mTLSClients.
+  my.nginx.mtls.defaultClients = [
+    "taylor-desktop-nix"
+    "taylor-laptop-nix"
+    "taylor-cube-nix"
+    "taylor-deck-nix"
+    "pixel7pro"
+  ];
 
   my.secrets.wireguard.pi-backup-nix.enable = true;
   my.secrets.wireguard.pi-backup-nix.wg-remote.enable = true;

@@ -73,6 +73,13 @@ in
         description = "HTTP status returned for blocked countries. Nginx status 444 closes the connection.";
       };
     };
+
+    mtls.defaultClients = lib.mkOption {
+      type = lib.types.listOf (lib.types.strMatching "[a-z0-9][a-z0-9-]*");
+      default = [ ];
+      example = [ "taylor-laptop-nix" ];
+      description = "Client cert names (as issued by mtls-ca) allowed on every mTLS proxy.";
+    };
   };
 
   config = lib.mkMerge [
@@ -98,10 +105,7 @@ in
             else
               "/Certs/fullchain.pem";
           sslCertificateKey =
-            if acmeCfg.enable then
-              "/var/lib/acme/${acmeCfg.certificateName}/key.pem"
-            else
-              "/Certs/key.pem";
+            if acmeCfg.enable then "/var/lib/acme/${acmeCfg.certificateName}/key.pem" else "/Certs/key.pem";
           extraConfig = ''
             access_log /var/log/nginx/unknown-host-access.log combined;
             return 444;

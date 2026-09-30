@@ -15,6 +15,8 @@
       authentikOutpost ? "http://${networkTopology.lib.fqdn "authentik-nix"}:9000",
     }:
     let
+      mTLSClients = lib.unique (config.my.nginx.mtls.defaultClients ++ cfg.mTLSClients);
+
       # --- Define Authentik Configuration Blocks Locally ---
 
       # The configuration injected into the main "/" location
@@ -60,62 +62,68 @@
         };
       };
     in
-    {
-      forceSSL = true;
-      sslCertificate =
-        if config.my.nginx.acme.enable then
-          "/var/lib/acme/${config.my.nginx.acme.certificateName}/fullchain.pem"
-        else
-          "/Certs/fullchain.pem";
-      sslCertificateKey =
-        if config.my.nginx.acme.enable then
-          "/var/lib/acme/${config.my.nginx.acme.certificateName}/key.pem"
-        else
-          "/Certs/key.pem";
-      listen = [
-        {
-          addr = "0.0.0.0";
-          port = 443;
-          ssl = true;
-        }
-      ];
-
-      # Logic:
-      # 1. Start with the standard root location.
-      # 2. If enableAuthentik is true, append the extraRootConfig.
-      # 3. If enableAuthentik is true, merge the authentikLocations set.
-      locations = {
-        "/" = {
-          inherit proxyPass proxyWebsockets;
-          # Conditionally add the auth_request lines
-          extraConfig = lib.optionalString cfg.enableAuthentik authentikRootConfig;
-        };
-      }
-      // (if cfg.enableAuthentik then authentikLocations else { });
-
-      extraConfig = lib.concatStringsSep "\n" [
-        (lib.optionalString config.my.nginx.geoblock.enable ''
-          if ($nginx_geoblock_deny) {
-            return ${toString config.my.nginx.geoblock.blockStatus};
+    lib.throwIf (cfg.mTLSCert != null && mTLSClients == [ ])
+      "${cfg.domain} uses mTLS but allows no client certs; set my.nginx.mtls.defaultClients or mTLSClients."
+      {
+        forceSSL = true;
+        sslCertificate =
+          if config.my.nginx.acme.enable then
+            "/var/lib/acme/${config.my.nginx.acme.certificateName}/fullchain.pem"
+          else
+            "/Certs/fullchain.pem";
+        sslCertificateKey =
+          if config.my.nginx.acme.enable then
+            "/var/lib/acme/${config.my.nginx.acme.certificateName}/key.pem"
+          else
+            "/Certs/key.pem";
+        listen = [
+          {
+            addr = "0.0.0.0";
+            port = 443;
+            ssl = true;
           }
-        '')
+        ];
 
-        (lib.optionalString (cfg.mTLSCert != null) ''
-          ssl_client_certificate /etc/mTLSCerts/${cfg.mTLSCert}.crt;
-          ssl_verify_client on;
-        '')
+        # Logic:
+        # 1. Start with the standard root location.
+        # 2. If enableAuthentik is true, append the extraRootConfig.
+        # 3. If enableAuthentik is true, merge the authentikLocations set.
+        locations = {
+          "/" = {
+            inherit proxyPass proxyWebsockets;
+            # Conditionally add the auth_request lines
+            extraConfig = lib.optionalString cfg.enableAuthentik authentikRootConfig;
+          };
+        }
+        // (if cfg.enableAuthentik then authentikLocations else { });
 
-        # A CRL only exists once something has been revoked.
-        (lib.optionalString (
-          cfg.mTLSCert != null && builtins.pathExists (./mTLS-Certs + "/${cfg.mTLSCert}.crl")
-        ) "ssl_crl /etc/mTLSCerts/${cfg.mTLSCert}.crl;")
+        extraConfig = lib.concatStringsSep "\n" [
+          (lib.optionalString config.my.nginx.geoblock.enable ''
+            if ($nginx_geoblock_deny) {
+              return ${toString config.my.nginx.geoblock.blockStatus};
+            }
+          '')
 
-        (lib.optionalString (cfg.restrictToIPs != [ ]) ''
-          ${lib.concatMapStrings (ip: "allow ${ip};\n") cfg.restrictToIPs}
-          deny all;
-        '')
+          # The CA proves a cert is ours; the name decides whether it may use this proxy.
+          (lib.optionalString (cfg.mTLSCert != null) ''
+            ssl_client_certificate /etc/mTLSCerts/${cfg.mTLSCert}.crt;
+            ssl_verify_client on;
+            if ($ssl_client_s_dn !~ "^CN=(${lib.concatStringsSep "|" mTLSClients})$") {
+              return 403;
+            }
+          '')
 
-        extraExtraConfig
-      ];
-    };
+          # A CRL only exists once something has been revoked.
+          (lib.optionalString (
+            cfg.mTLSCert != null && builtins.pathExists (./mTLS-Certs + "/${cfg.mTLSCert}.crl")
+          ) "ssl_crl /etc/mTLSCerts/${cfg.mTLSCert}.crl;")
+
+          (lib.optionalString (cfg.restrictToIPs != [ ]) ''
+            ${lib.concatMapStrings (ip: "allow ${ip};\n") cfg.restrictToIPs}
+            deny all;
+          '')
+
+          extraExtraConfig
+        ];
+      };
 }
