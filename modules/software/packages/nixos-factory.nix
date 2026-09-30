@@ -713,11 +713,12 @@ with open(sys.argv[2], 'w') as f:
       else
         echo "  YAML:      $INSTANCES_YAML (will be updated)"
       fi
-      if [ "$USE_EXISTING_TOPOLOGY" = true ]; then
-        echo "  Topology:  existing ($HOSTNAME.lan → $IP_ADDRESS)"
-        echo "  DNS:       unchanged"
-      elif [ "$MANAGE_TOPOLOGY" = true ]; then
-        echo "  Topology:  $HOSTNAME.lan → $IP_ADDRESS"
+      if [ "$VERIFY_TOPOLOGY" = true ]; then
+        if [ "$USE_EXISTING_TOPOLOGY" = true ]; then
+          echo "  Topology:  existing ($HOSTNAME.lan → $IP_ADDRESS)"
+        else
+          echo "  Topology:  $HOSTNAME.lan → $IP_ADDRESS"
+        fi
         echo "  DNS:       deploy adguard-nix"
         if [ "$HOSTNAME" != "networking-dhcp-nix" ]; then
           echo "  DHCP:      deploy networking-dhcp-nix"
@@ -811,7 +812,10 @@ with open(sys.argv[2], 'w') as f:
           rollback_create "Topology update failed"
         fi
         TOPOLOGY_ADDED=true
+      fi
 
+      # An existing entry may predate the last AdGuard/Kea deploy, so apply both either way.
+      if [ "$VERIFY_TOPOLOGY" = true ]; then
         echo "==> Deploying AdGuard DNS..."
         ADGUARD_DEPLOY_ATTEMPTED=true
         if ! deploy_adguard; then
