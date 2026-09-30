@@ -6,42 +6,42 @@
     enable = true;
     settings = {
       main = {
-        shell = "zsh";
+        shell = "${pkgs.zsh}/bin/zsh -l";
         font = "DaddyTimeMono Nerd Font:size=16";
         pad = "12x12 center";
       };
       colors-dark = {
         alpha = 0.99;
 
-        # Catppuccin-frappe theme - from https://github.com/catppuccin/foot/blob/main/themes/catppuccin-frappe.ini
-        foreground = "c6d0f5";
-        background = "303446";
+        # Tokyo Night, coordinated with Nushell and Starship.
+        foreground = "c0caf5";
+        background = "1a1b26";
 
-        regular0 = "51576d";
-        regular1 = "e78284";
-        regular2 = "a6d189";
-        regular3 = "e5c890";
-        regular4 = "8caaee";
-        regular5 = "f4b8e4";
-        regular6 = "81c8be";
-        regular7 = "b5bfe2";
+        regular0 = "15161e";
+        regular1 = "f7768e";
+        regular2 = "9ece6a";
+        regular3 = "e0af68";
+        regular4 = "7aa2f7";
+        regular5 = "bb9af7";
+        regular6 = "7dcfff";
+        regular7 = "a9b1d6";
 
-        bright0 = "626880";
-        bright1 = "e78284";
-        bright2 = "a6d189";
-        bright3 = "e5c890";
-        bright4 = "8caaee";
-        bright5 = "f4b8e4";
-        bright6 = "81c8be";
-        bright7 = "a5adce";
+        bright0 = "414868";
+        bright1 = "f7768e";
+        bright2 = "9ece6a";
+        bright3 = "e0af68";
+        bright4 = "7aa2f7";
+        bright5 = "bb9af7";
+        bright6 = "7dcfff";
+        bright7 = "c0caf5";
 
-        "16" = "ef9f76";
-        "17" = "f2d5cf";
+        "16" = "ff9e64";
+        "17" = "db4b4b";
 
-        selection-foreground = "c6d0f5";
-        selection-background = "4f5369";
+        selection-foreground = "c0caf5";
+        selection-background = "283457";
 
-        urls = "8caaee";
+        urls = "7dcfff";
       };
     };
   };

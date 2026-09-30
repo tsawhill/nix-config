@@ -1,17 +1,11 @@
-{ pkgs, lib, config, ... }:
-let
-  presets = {
-    server   = "pure-preset";
-    personal = "pastel-powerline";
-  };
-  preset = presets.${config.my.shell.starshipTheme};
-in
 {
-  options.my.shell.starshipTheme = lib.mkOption {
-    type = lib.types.enum [ "server" "personal" ];
-    default = "server";
-    description = "Starship prompt theme. 'server' uses pure-preset, 'personal' uses pastel-powerline.";
-  };
+  pkgs,
+  lib,
+  config,
+  ...
+}:
+{
+  imports = [ ./starship.nix ];
 
   config = {
     programs.zsh = {
@@ -21,10 +15,10 @@ in
       history = {
         size = 50000;
         save = 50000;
-        share = true;            # Write to history file immediately & share across sessions
-        ignoreDups = true;       # Don't store consecutive duplicate commands
+        share = true; # Write to history file immediately & share across sessions
+        ignoreDups = true; # Don't store consecutive duplicate commands
         expireDuplicatesFirst = true;
-        ignoreSpace = true;      # Prefix a command with a space to keep it out of history
+        ignoreSpace = true; # Prefix a command with a space to keep it out of history
       };
 
       shellAliases = {
@@ -101,16 +95,5 @@ in
       ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE = "fg=140";
     };
 
-    programs.starship = {
-      enable = true;
-      enableZshIntegration = true;
-      settings = lib.mkMerge [
-        (builtins.fromTOML (builtins.readFile "${pkgs.starship}/share/starship/presets/${preset}.toml"))
-        {
-          add_newline = lib.mkForce false;
-          command_timeout = 1500;
-        }
-      ];
-    };
   };
 }
