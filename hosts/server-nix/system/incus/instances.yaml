@@ -2,7 +2,8 @@ OPNSense:
   type: "virtual-machine"
   profiles: ["default"]
   config:
-    boot.autostart: "true"
+    # Replaced by networking-router-nix; never start alongside it.
+    boot.autostart: "false"
     boot.autostart.delay: "5"
     boot.autostart.priority: "100"
     limits.cpu: "4"

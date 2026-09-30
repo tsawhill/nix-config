@@ -13,12 +13,9 @@
 
   my.network.router = {
     enable = true;
-    # OPNsense's wan0 in instances.yaml
+    # Took over from OPNsense on 2026-09-30.
+    takeover = true;
+    # OPNsense's old wan0 MAC, so the ISP lease carried over
     wanMacAddress = "14:29:0d:71:37:01";
   };
-
-  # Prebuilt so the cutover needs no internet. With the OPNsense VM stopped, run
-  # /run/current-system/specialisation/takeover/bin/switch-to-configuration switch
-  # Rollback: stop this container, start OPNsense.
-  specialisation.takeover.configuration.my.network.router.takeover = true;
 }
