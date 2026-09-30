@@ -312,7 +312,8 @@ networking-vpn-out-eu1-nix:
 networking-dhcp-nix:
   type: "container"
   profiles: ["nixos-lxc"]
-  config: {}
+  config:
+    boot.autostart.priority: "90"
   devices:
     root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/networking-dhcp-nix" }
