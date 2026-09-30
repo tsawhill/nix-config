@@ -242,7 +242,7 @@ let
 
     def hosts_bounds(lines):
         try:
-            start = lines.index("  hosts = {\n") + 1
+            start = lines.index("  hostDefinitions = {\n") + 1
         except ValueError:
             raise SystemExit("missing topology hosts section")
 
@@ -572,6 +572,11 @@ with open(sys.argv[2], 'w') as f:
       sleep 30
     }
 
+    # Kea reservations derive from topology, so a new host's lease needs this.
+    deploy_dhcp() {
+      deploy networking-dhcp-nix
+    }
+
     # ── Splash screen ─────────────────────────────────────────────
     clear
     $GUM style --foreground 86 --border-foreground 86 --border double \
@@ -588,7 +593,7 @@ with open(sys.argv[2], 'w') as f:
     #    2. Verify a NixOS / colmena config already exists for it
     #    3. Collect IP, storage pool, and MAC address
     #    4. Show plan and confirm
-    #    5. Optionally add topology and deploy AdGuard
+    #    5. Optionally add topology and deploy AdGuard + DHCP
     #    6. Create the container and nix store on server-nix over SSH
     #    7. Preserve or append the instance in instances.yaml
     #    8. Start the container and verify its expected DHCP address
@@ -639,7 +644,7 @@ with open(sys.argv[2], 'w') as f:
         VERIFY_TOPOLOGY=true
         $GUM style --foreground 212 \
           "Using existing topology: $HOSTNAME.lan → $IP_ADDRESS ($MAC_ADDR)"
-      elif $GUM confirm "Add $HOSTNAME to topology and deploy AdGuard DNS?"; then
+      elif $GUM confirm "Add $HOSTNAME to topology and deploy AdGuard DNS + DHCP?"; then
         MANAGE_TOPOLOGY=true
         VERIFY_TOPOLOGY=true
       fi
@@ -714,6 +719,9 @@ with open(sys.argv[2], 'w') as f:
       elif [ "$MANAGE_TOPOLOGY" = true ]; then
         echo "  Topology:  $HOSTNAME.lan → $IP_ADDRESS"
         echo "  DNS:       deploy adguard-nix"
+        if [ "$HOSTNAME" != "networking-dhcp-nix" ]; then
+          echo "  DHCP:      deploy networking-dhcp-nix"
+        fi
       else
         echo "  Topology:  unchanged"
       fi
@@ -728,6 +736,7 @@ with open(sys.argv[2], 'w') as f:
 
       TOPOLOGY_ADDED=false
       ADGUARD_DEPLOY_ATTEMPTED=false
+      DHCP_DEPLOY_ATTEMPTED=false
       CONTAINER_CREATED=false
       DATASET_CREATED=false
       INSTANCE_ADDED=false
@@ -781,6 +790,10 @@ with open(sys.argv[2], 'w') as f:
           echo "==> Restoring AdGuard DNS..."
           deploy_adguard || true
         fi
+        if [ "$DHCP_DEPLOY_ATTEMPTED" = true ]; then
+          echo "==> Restoring DHCP reservations..."
+          deploy_dhcp || true
+        fi
 
         $GUM style --foreground 196 --border rounded --padding "1 2" \
           "Create aborted. All factory changes were rolled back."
@@ -803,6 +816,15 @@ with open(sys.argv[2], 'w') as f:
         ADGUARD_DEPLOY_ATTEMPTED=true
         if ! deploy_adguard; then
           rollback_create "AdGuard deploy failed"
+        fi
+
+        # The DHCP server can't hand its own container a reservation.
+        if [ "$HOSTNAME" != "networking-dhcp-nix" ]; then
+          echo "==> Deploying DHCP reservations..."
+          DHCP_DEPLOY_ATTEMPTED=true
+          if ! deploy_dhcp; then
+            rollback_create "DHCP deploy failed"
+          fi
         fi
       fi
 
@@ -945,7 +967,7 @@ YAML
             >/dev/null
         then
           $GUM style --foreground 214 \
-            "Expected $IP_ADDRESS for MAC $MAC_ADDR. Check the OPNsense DHCP reservation."
+            "Expected $IP_ADDRESS for MAC $MAC_ADDR. Check the DHCP reservation."
           rollback_create "Container received the wrong IPv4 address"
         fi
       fi

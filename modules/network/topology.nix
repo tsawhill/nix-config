@@ -21,6 +21,7 @@ let
     "local-nginx-nix"
     "monitoring-nix"
     "nextcloud-nix"
+    "networking-dhcp-nix"
     "networking-vpn-out-eu1-nix"
     "networking-vpn-out-na1-nix"
     "palworld-nix"
@@ -318,6 +319,14 @@ let
       lan = {
         ip = "10.73.73.43";
         mac = "02:5f:6e:64:7f:ef";
+      };
+      dns.enable = true;
+      monitoring.enable = true;
+    };
+    networking-dhcp-nix = {
+      lan = {
+        ip = "10.73.73.45";
+        mac = "02:b7:84:1f:72:f9";
       };
       dns.enable = true;
       monitoring.enable = true;
