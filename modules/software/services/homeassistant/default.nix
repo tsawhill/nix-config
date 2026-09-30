@@ -2,6 +2,7 @@
   config,
   lib,
   pkgs,
+  networkTopology,
   ...
 }:
 let
@@ -70,7 +71,12 @@ in
         time_zone = config.time.timeZone;
         unit_system = "us_customary";
       };
-      http.server_port = 8123;
+      http = {
+        server_port = 8123;
+        # Served as ha.tsawhill.org through local-nginx.
+        use_x_forwarded_for = true;
+        trusted_proxies = [ (networkTopology.lib.lanIp "local-nginx-nix") ];
+      };
       recorder.purge_keep_days = 14;
 
       # Slugs follow the Tuya Local device names, which set the entity ids.

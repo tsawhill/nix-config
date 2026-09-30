@@ -64,6 +64,10 @@
     enable = true;
     domain = "qbit.tsawhill.org";
   };
+  proxy.homeassistant = {
+    enable = true;
+    domain = "ha.tsawhill.org";
+  };
   proxy.seerr = {
     enable = true;
     domain = "request.tsawhill.org";
