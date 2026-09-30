@@ -43,10 +43,6 @@ let
   ];
 
   hostDefinitions = {
-    opnsense = {
-      lan.ip = "10.73.73.1";
-      dns.enable = true;
-    };
     server-nix = {
       lan.ip = "10.73.73.3";
       dns.enable = true;
@@ -547,7 +543,8 @@ in
     lan = {
       vlan = 1;
       cidr = "10.73.73.0/24";
-      gateway = hosts.opnsense.lan.ip;
+      # networking-router-nix; its own management address is its lan.ip
+      gateway = "10.73.73.1";
       dnsHost = "adguard-nix";
       dhcpPool = {
         start = "10.73.73.100";
