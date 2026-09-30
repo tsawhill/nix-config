@@ -399,17 +399,6 @@ let
         preferredAddress = "wgRemote";
       };
     };
-    # NixOS replacement for remote-nginx-nix on an OCI A1.Flex (aarch64).
-    # Deliberately given its own tunnel address rather than reusing .16 so the
-    # two can run side by side during cutover. Once traffic is moved, drop the
-    # remote-nginx-nix entry above.
-    oracle-1-nix = {
-      wgRemote.ip = "10.50.50.17";
-      dns = {
-        enable = true;
-        preferredAddress = "wgRemote";
-      };
-    };
     pixel7pro.wgRemote.ip = "10.50.50.11";
     palworld-nix = {
       lan = {

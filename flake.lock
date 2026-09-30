@@ -118,26 +118,6 @@
         "type": "github"
       }
     },
-    "disko": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs-stable"
-        ]
-      },
-      "locked": {
-        "lastModified": 1789770686,
-        "narHash": "sha256-uZkBR7yHdIKUFB5SZdfgh1qkGfI3XmYmI/lTiquxbck=",
-        "owner": "nix-community",
-        "repo": "disko",
-        "rev": "725ea35e410ad83be4931d1bff7e090eacaf3563",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nix-community",
-        "repo": "disko",
-        "type": "github"
-      }
-    },
     "flake-compat": {
       "flake": false,
       "locked": {
@@ -793,7 +773,6 @@
       "inputs": {
         "authentik-nix": "authentik-nix",
         "colmena": "colmena",
-        "disko": "disko",
         "grimoire": "grimoire",
         "home-manager-2511": "home-manager-2511",
         "home-manager-stable": "home-manager-stable",

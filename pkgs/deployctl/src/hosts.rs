@@ -134,8 +134,8 @@ mod tests {
     #[test]
     fn absent_controller_hosts_are_not_added() {
         assert_eq!(
-            controller_last(vec!["oracle-1-nix".into()]),
-            vec!["oracle-1-nix"]
+            controller_last(vec!["remote-nginx-nix".into()]),
+            vec!["remote-nginx-nix"]
         );
     }
 }
