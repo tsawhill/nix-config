@@ -30,10 +30,11 @@
         use_ssl = false;
         from = "authentik@tsawhill.org";
       };
+      # 2026.8's Rust config loader wants lists here, not strings.
       listen = {
-        http = "0.0.0.0:9000";
-        https = "0.0.0.0:9443";
-        # metrics = "0.0.0.0:9300"; # Optional: if you need metrics exposed
+        http = [ "0.0.0.0:9000" ];
+        https = [ "0.0.0.0:9443" ];
+        # metrics = [ "0.0.0.0:9300" ]; # Optional: if you need metrics exposed
       };
       disable_startup_analytics = true;
       avatars = "initials";
