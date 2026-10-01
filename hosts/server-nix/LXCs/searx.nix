@@ -1,6 +1,5 @@
 {
   self,
-  inputs,
   networkTopology,
   ...
 }:
@@ -17,7 +16,6 @@ in
   ];
   networking.hostName = "searx-nix";
   my.secrets.searx_secret_key.enable = true;
-  services.searx.package = inputs.nixpkgs-master.legacyPackages.x86_64-linux.searxng;
 
   my.network.vpnEgress.client = {
     enable = vpnClientEnabled;

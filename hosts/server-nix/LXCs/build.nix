@@ -24,6 +24,9 @@ let
     if [ "$#" -gt 0 ]; then shift; fi
     exec ${pkgs.claude-code}/bin/claude "$@"
   '';
+  vscodiumMachineSettings = pkgs.writeText "vscodium-machine-settings.json" (
+    builtins.toJSON { "claudeCode.claudeProcessWrapper" = "${claudeWrapper}"; }
+  );
 in
 {
   imports = [
@@ -100,9 +103,9 @@ in
 
   nixpkgs.overlays = [ (_final: _prev: { claude-code = unstablePkgs.claude-code; }) ];
 
-  home-manager.users.root.home.file.".vscodium-server/data/Machine/settings.json".text =
-    builtins.toJSON
-      { "claudeCode.claudeProcessWrapper" = "${claudeWrapper}"; };
+  systemd.tmpfiles.rules = [
+    "L+ /root/.vscodium-server/data/Machine/settings.json - - - - ${vscodiumMachineSettings}"
+  ];
 
   networking.hostName = "build-nix";
 }

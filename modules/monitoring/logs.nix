@@ -1,11 +1,27 @@
 {
   config,
   lib,
+  pkgs,
   networkTopology,
   ...
 }:
 
 let
+  # Vector's binary embeds the build's cc path, dragging ~300 MiB of gcc and
+  # binutils into every host. Copy it with that string blanked instead.
+  vectorSlim =
+    pkgs.runCommand "vector-${pkgs.vector.version}-slim"
+      {
+        nativeBuildInputs = [ pkgs.removeReferencesTo ];
+        meta.mainProgram = "vector";
+      }
+      ''
+        cp -r --no-preserve=mode ${pkgs.vector} $out
+        chmod +x $out/bin/vector
+        for cc in $(grep -aoE '/nix/store/[a-z0-9]{32}-gcc-wrapper-[^/]+' $out/bin/vector | sort -u); do
+          remove-references-to -t "$cc" $out/bin/vector
+        done
+      '';
   cfg = config.my.monitoring.logs;
   agent = cfg.agent;
   stack = cfg.stack;
@@ -57,6 +73,7 @@ in
     (lib.mkIf agent.enable {
       services.vector = {
         enable = true;
+        package = vectorSlim;
         journaldAccess = true;
         settings = {
           data_dir = "/var/lib/vector";

@@ -8,7 +8,7 @@
   ];
   users.users.nginx = {
     # This tells NixOS not to use the 'nologin' shell
-    shell = pkgs.zsh;
+    shell = pkgs.bashInteractive;
   };
   my.monitoring.logs.agent = {
     files = [ "/var/log/nginx/*.log" ];

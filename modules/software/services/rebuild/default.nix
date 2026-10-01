@@ -29,9 +29,9 @@ let
     system_profile = "/nix/var/nix/profiles/system";
     lan_domain = networkTopology.domains.lan;
     per_host_build_timeout = "6h";
-    # One evaluator shares work across each small batch. Activation remains
+    # One evaluator shares work across each batch. Activation remains
     # sequential, with the builder and Incus host last.
-    build_batch_size = 4;
+    build_batch_size = 8;
     batch_build_timeout = "24h";
     apply_timeout = "90m";
     incus_boot_timeout_secs = 180;

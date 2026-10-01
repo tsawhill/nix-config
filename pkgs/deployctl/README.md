@@ -12,7 +12,7 @@ commit captured before deploying. Every build uses that same Git-backed flake
 reference, so ignored files and edits made during the run cannot change its
 inputs. Removed-host GC roots are pruned once using that inventory.
 
-Systems are built in batches of four using one pure `nix build` invocation for
+Systems are built in batches of eight using one pure `nix build` invocation for
 the selected `colmenaHive.toplevel` outputs. This shares evaluation work and
 uses the flake evaluation cache without Colmena 0.4's impure temporary-flake
 evaluator. The hive generator comes from the pinned `colmena` flake input; the

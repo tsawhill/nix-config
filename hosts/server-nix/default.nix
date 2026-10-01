@@ -21,8 +21,6 @@ in
     inputs.sops-nix-stable.nixosModules.sops
     "${self}/modules/secrets"
 
-    # Home Manager
-    ./home-manager.nix
     # Boot
     ./system/boot.nix
     # NVIDIA gpu
@@ -66,7 +64,7 @@ in
     (import "${self}/modules/ssh/pubkeys/phone-taylor.nix" phoneSSHUsers)
 
     # Software
-    "${self}/modules/software/bundles/server.nix"
+    "${self}/modules/software/bundles/headless.nix"
     "${self}/modules/software/services/incus.nix"
     "${self}/modules/software/services/incus-declarative.nix"
     "${self}/modules/software/packages/incus-sync.nix"
@@ -77,7 +75,7 @@ in
   # therefore needs WireGuard loaded here rather than trying to load it inside
   # its unprivileged container namespace.
   boot.kernelModules = [ "wireguard" ];
-  software.server.enable = true;
+  software.headless.enable = true;
   my.secrets = {
     gotify_token_zfs.enable = true;
     smtp_password_server.enable = true;

@@ -16,7 +16,6 @@
   config = lib.mkIf config.software.server.enable {
     software.ssh-copy.enable = true;
     software.glow.enable = lib.mkDefault true;
-    programs.zsh.enable = true;
 
     environment.systemPackages =
       with pkgs;
@@ -25,11 +24,9 @@
         curl
         dnsutils
         file
-        git
         htop
         iputils
         lsof
-        neovim
         rsync
         tmux
         tree

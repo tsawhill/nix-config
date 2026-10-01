@@ -49,11 +49,8 @@ in
     # Groups
     "${self}/modules/groups"
 
-    # Home Manager
-    ./home-manager.nix
-
     # Software
-    "${self}/modules/software/bundles/server.nix"
+    "${self}/modules/software/bundles/headless.nix"
   ];
 
   my.users.root = {
@@ -64,16 +61,19 @@ in
     keep-outputs = false;
     keep-derivations = false;
   };
-  software.server.enable = true;
+  software.headless.enable = true;
+
+  # lxc-container.nix pulls in the installer channel: a 197 MiB nixpkgs copy
+  # and a cleanSource walk of all of nixpkgs on every eval.
+  system.installer.channel.enable = false;
+  installer.cloneConfig = false;
+
   my.monitoring.metrics.exporters.enable = true;
   my.monitoring.logs.agent.enable = true;
   # /proc/diskstats is host-global inside these containers, so node_exporter
   # would publish identical and misleading disk I/O for every guest. Incus's
   # host-side metrics endpoint provides the attributable counters instead.
   services.prometheus.exporters.node.disabledCollectors = [ "diskstats" ];
-  environment.sessionVariables = {
-    EDITOR = "nvim";
-  };
 
   # This enables the tmpfs (RAM) mount for /tmp
   boot.tmp.useTmpfs = true;
