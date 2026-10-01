@@ -1,5 +1,7 @@
 { config, pkgs, ... }:
 {
+  # TEMP: 2.x is EOL on 26.05; drop when moving to 26.11 (Immich 3.x).
+  nixpkgs.config.permittedInsecurePackages = [ "immich-2.7.5" ];
 
   services.immich = {
     enable = true;

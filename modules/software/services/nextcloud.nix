@@ -9,6 +9,9 @@ let
   nextcloudFqdn = networkTopology.lib.fqdn "nextcloud-nix";
 in
 {
+  # TEMP: 32 is EOL on 26.05; drop when moving to 26.11.
+  nixpkgs.config.permittedInsecurePackages = [ "nextcloud-32.0.15" ];
+
   services.nextcloud = {
     enable = true;
     hostName = nextcloudFqdn;
