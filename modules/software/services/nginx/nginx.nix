@@ -8,6 +8,9 @@
 let
   acmeCfg = config.my.nginx.acme;
   geoblockCfg = config.my.nginx.geoblock;
+  hasMtls = lib.any (proxy: proxy.enable && proxy.mTLSCert != null) (
+    lib.attrValues (config.proxy or { })
+  );
 in
 {
   options.my.nginx = {
@@ -87,6 +90,16 @@ in
       services.nginx = {
         enable = true;
         logError = "/var/log/nginx/error.log warn";
+        # mTLS vhosts log here when a client sends no cert, a bad one, or one whose name isn't allowed.
+        # Only with mTLS vhosts: nginx rejects a map over a variable no server sets.
+        commonHttpConfig = lib.mkIf hasMtls ''
+          map "$ssl_client_verify:$mtls_denied" $mtls_failed {
+            default 0;
+            "~^NONE:" 1;
+            "~^FAILED" 1;
+            "~:1$" 1;
+          }
+        '';
         recommendedTlsSettings = true;
         recommendedProxySettings = true;
         virtualHosts."_" = {

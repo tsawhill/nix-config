@@ -108,9 +108,15 @@
           (lib.optionalString (cfg.mTLSCert != null) ''
             ssl_client_certificate /etc/mTLSCerts/${cfg.mTLSCert}.crt;
             ssl_verify_client on;
+            # A missing cert is rejected before $mtls_denied is set; that's expected.
+            uninitialized_variable_warn off;
+            set $mtls_denied 0;
             if ($ssl_client_s_dn !~ "^CN=(${lib.concatStringsSep "|" mTLSClients})$") {
+              set $mtls_denied 1;
               return 403;
             }
+            access_log /var/log/nginx/access.log combined;
+            access_log /var/log/nginx/mtls-fail.log combined if=$mtls_failed;
           '')
 
           # A CRL only exists once something has been revoked.

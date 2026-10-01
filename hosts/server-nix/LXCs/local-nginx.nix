@@ -5,7 +5,6 @@
 
     "${self}/modules/software/services/nginx/nginx.nix"
     "${self}/modules/software/services/nginx/proxies"
-    "${self}/modules/software/services/nginx/streams/minecraft.nix"
   ];
   users.users.nginx = {
     # This tells NixOS not to use the 'nologin' shell

@@ -71,7 +71,6 @@ in
     # Nginx
     "${self}/modules/software/services/nginx/nginx.nix"
     "${self}/modules/software/services/nginx/proxies"
-    "${self}/modules/software/services/nginx/streams/minecraft.nix"
 
     # fail2ban
     "${self}/modules/software/services/fail2ban"

@@ -197,12 +197,14 @@ in
     # ignored via jellyfin-known-ip so a legitimate device with an expired token
     # does not immediately ban itself.
     "jellyfin-nginx" = {
+      filter.Definition = {
+        failregex = ''^<HOST> - - \[[^\]]+\] "(GET|POST|HEAD) /(?:Users/Me(?:\?[^ ]*)?|Users/[0-9a-fA-F]{32}(?:[/?][^ ]*)?|Users/Authenticate[^ ]*) HTTP/[0-9.]+" 401\b.*'';
+      };
       settings = {
         enabled = true;
         backend = "polling";
         maxretry = 3;
         findtime = "10m";
-        failregex = ''^<HOST> - - \[[^\]]+\] "(GET|POST|HEAD) /(?:Users/Me(?:\?[^ ]*)?|Users/[0-9a-fA-F]{32}(?:[/?][^ ]*)?|Users/Authenticate[^ ]*) HTTP/[0-9.]+" 401\b.*'';
         ignorecommand = "${jellyfinKnownIp}/bin/jellyfin-known-ip check <HOST>";
         action = ''iptables-multiport[name=jellyfin-nginx, port="http,https", protocol=tcp]'';
         logpath = "/var/log/nginx/access.log";
@@ -217,13 +219,15 @@ in
     # the URL are also ignored here so an expired-token playback retry from a
     # new IP does not immediately ban a real user.
     "jellyfin-api-scanner" = {
+      filter.Definition = {
+        failregex = ''^<HOST> - - \[[^\]]+\] "(GET|POST|HEAD) (/(?i:videos|audio)/[^ /?]+/[^ ]*(?:stream|hls|master|main|live\.m3u8)[^ ]*|/(?i:items)/[^ /?]+/(?i:images|download|file|playbackinfo)[^ ]*|/(?i:images)/(?i:remote)[^ ]*|/.*[?&](?i:imageUrl|StreamOptions|mediaSourceId|deviceProfile|ApiKey)=[^ ]*) HTTP/[0-9.]+" [1-5][0-9]{2}\b.*'';
+        ignoreregex = ''^<HOST> - - \[[^\]]+\] "[^"]*[?&](?i:ApiKey|api_key)=[^ "]+ HTTP/[0-9.]+" .*'';
+      };
       settings = {
         enabled = true;
         backend = "polling";
         maxretry = 3;
         findtime = "15m";
-        failregex = ''^<HOST> - - \[[^\]]+\] "(GET|POST|HEAD) (/(?i:videos|audio)/[^ /?]+/[^ ]*(?:stream|hls|master|main|live\.m3u8)[^ ]*|/(?i:items)/[^ /?]+/(?i:images|download|file|playbackinfo)[^ ]*|/(?i:images)/(?i:remote)[^ ]*|/.*[?&](?i:imageUrl|StreamOptions|mediaSourceId|deviceProfile|ApiKey)=[^ ]*) HTTP/[0-9.]+" [1-5][0-9]{2}\b.*'';
-        ignoreregex = ''^<HOST> - - \[[^\]]+\] "[^"]*[?&](?i:ApiKey|api_key)=[^ "]+ HTTP/[0-9.]+" .*'';
         ignorecommand = "${jellyfinKnownIp}/bin/jellyfin-known-ip check <HOST>";
         action = ''iptables-multiport[name=jellyfin-api-scanner, port="http,https", protocol=tcp]'';
         logpath = "/var/log/nginx/access.log";
