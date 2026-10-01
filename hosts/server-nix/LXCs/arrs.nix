@@ -9,6 +9,7 @@
     "${self}/modules/software/services/lidarr.nix"
     "${self}/modules/software/services/yt-dlp.nix"
     "${self}/modules/software/services/qbit-promote.nix"
+    "${self}/modules/software/packages/qbit-promote-missed.nix"
     "${self}/modules/software/services/byparr.nix"
 
   ];
@@ -37,6 +38,9 @@
     intakeUrl = "http://${networkTopology.lib.fqdn "qbit-gen-nix"}:8080";
     seedingUrl = "http://${networkTopology.lib.fqdn "qbit-lts-nix"}:8080";
   };
+
+  # Re-runs promotion for imports that happened while qbit-lts was unreachable.
+  software.qbit-promote-missed.enable = true;
 
   # Reached by Prowlarr over loopback as http://127.0.0.1:8191.
   my.services.byparr.enable = true;
