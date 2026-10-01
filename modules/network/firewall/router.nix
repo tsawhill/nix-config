@@ -55,7 +55,7 @@
   # (arrs, qbit-*, searx, socks5, unbound-vpn-na) are added automatically.
   noInternet = [
     "amcrest-cameras"
-    "ac-controller-office"
+    # "ac-controller-office"
     "ac-controller-bedroom"
     "ac-controller-livingroom"
   ];
