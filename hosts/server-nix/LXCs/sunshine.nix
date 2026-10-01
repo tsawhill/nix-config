@@ -98,6 +98,18 @@ let
     fi
   '';
 
+  # libglvnd reads the vendor list once, so starting before the bind mount
+  # leaves Sunshine without EGL until it restarts.
+  waitForNvidiaRuntime = pkgs.writeShellScript "sunshine-wait-for-nvidia-runtime" ''
+    for _ in $(seq 1 600); do
+      [ -e ${nvidiaClientEnvironment.__EGL_VENDOR_LIBRARY_FILENAMES} ] && exit 0
+      sleep 0.1
+    done
+
+    echo "NVIDIA runtime did not appear under /run/opengl-driver" >&2
+    exit 1
+  '';
+
   waitForOutput = pkgs.writeShellScript "sunshine-wait-for-output" ''
     set -eu
 
@@ -594,6 +606,7 @@ in
       };
     serviceConfig = {
       ExecStartPre = [
+        "${waitForNvidiaRuntime}"
         "${waitForKWin}"
         "${waitForOutput}"
       ];

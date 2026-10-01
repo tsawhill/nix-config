@@ -13,6 +13,8 @@
   systemd.services.prepare-host-nvidia-runtime = {
     description = "Prepare the host NVIDIA runtime mount point";
     unitConfig.DefaultDependencies = false;
+    # A restart stops the Requires= mount and running GPU clients lose the driver.
+    restartIfChanged = false;
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
