@@ -34,7 +34,8 @@
       listen = {
         http = [ "0.0.0.0:9000" ];
         https = [ "0.0.0.0:9443" ];
-        # metrics = [ "0.0.0.0:9300" ]; # Optional: if you need metrics exposed
+        # Default is [::]:9300; this LXC has no IPv6 and the failed bind kills the server.
+        metrics = [ "0.0.0.0:9300" ];
       };
       disable_startup_analytics = true;
       avatars = "initials";
