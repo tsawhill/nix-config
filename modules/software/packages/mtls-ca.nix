@@ -106,13 +106,22 @@ let
       [ "$P12_PASS" = "$CONFIRM" ] || fail "Passwords don't match."
       export P12_PASS
 
+      $GUM style --foreground 212 "Device key type:"
+      KEY_TYPE=$($GUM choose "ec" "rsa")
+      # RSA for clients that mishandle EC keys from the Android credential store.
+      if [ "$KEY_TYPE" = rsa ]; then
+        NEWKEY=(-newkey rsa:3072)
+      else
+        NEWKEY=(-newkey ec -pkeyopt ec_paramgen_curve:P-256)
+      fi
+
       LEGACY=()
       if $GUM confirm --default=No "Use legacy .p12 encryption (older Android, iOS or macOS)?"; then
         LEGACY=(-legacy)
       fi
 
       echo "==> Generating the device key and CSR..."
-      "$OPENSSL" req -new -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
+      "$OPENSSL" req -new "''${NEWKEY[@]}" -nodes \
         -keyout "$WORK/device.key" -out "$WORK/device.csr" -subj "/CN=$NAME" 2> /dev/null
 
       echo "==> Signing on ca-nix..."
