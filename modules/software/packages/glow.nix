@@ -4,6 +4,9 @@
   pkgs,
   ...
 }:
+let
+  glow = pkgs.callPackage ../../../pkgs/glow { };
+in
 {
   options.software.glow.enable = lib.mkEnableOption "glow transfer dashboard";
 
@@ -15,11 +18,7 @@
           pkgs.rsync
           pkgs.openssh
         ];
-        text = ''
-          exec ${
-            pkgs.python3.withPackages (ps: [ ps.rich ])
-          }/bin/python3 ${../../../pkgs/glow/glow.py} "$@"
-        '';
+        text = ''exec ${lib.getExe glow} "$@"'';
       })
     ];
   };

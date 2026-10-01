@@ -30,11 +30,9 @@ stdout use plain rsync. SSH retains stdin and controlling-terminal access for
 authentication; stderr remains visible. Prefer SSH keys for unattended tmux jobs.
 Exit codes propagate; Ctrl+C cancels and returns 130.
 
-To run the integration checks with Python, Rich, and rsync available:
-
-```sh
-python3 pkgs/glow/test_glow.py
-```
-
-Tests use disposable local directories and pseudo-terminals. They do not contact
-remote hosts. SSH transfers and deployment still require testing on the target.
+Written in Go against the standard library only, so the package is one static
+binary (~3 MiB) instead of a Python + Rich runtime. `go test` runs during the
+Nix build: it drives a real local rsync through the parser and checks that every
+dashboard frame is exactly the terminal width, which the in-place redraw needs.
+Tests use disposable local directories and do not contact remote hosts. SSH
+transfers and deployment still require testing on the target.
