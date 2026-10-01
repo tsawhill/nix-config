@@ -1074,15 +1074,22 @@ let
   roomStatus = room: ''
     {%- set m = states('${effectiveMode}') -%}
     {%- set active = is_state('${overrideTimer room}', 'active') -%}
+    {%- set desired -%}${desiredTemplate room}{%- endset -%}
+    {%- set running = states('${climateEntity room}') -%}
     {%- if not is_number(states('${tempSensor room}')) -%}Sensor unavailable
     {%- elif (as_timestamp(now()) - as_timestamp(states.sensor.ac_controller_${room}_temperature.last_reported, 0)) > ${
       toString (tuning.staleMinutes * 60)
     } -%}Sensor stale
     {%- elif is_state('input_select.hvac_watch_${room}', 'off_failed') -%}Check unit: shutdown unconfirmed
+    {%- elif desired | trim == 'off' and running in ['cool', 'heat'] and is_state('${minRunTimer room}', 'active') -%}
+      {%- set finish = as_timestamp(state_attr('${minRunTimer room}', 'finishes_at'), 0) -%}
+      {{ 'Cooling' if running == 'cool' else 'Heating' }} stop pending · minimum run time{% if finish > 0 %}: {{ ([0, finish - as_timestamp(now())] | max / 60) | round(0, 'ceil') | int }}m remaining{% endif %}
     {%- elif active and is_state('${enableToggle room}', 'off') -%}Paused by override
     {%- elif is_state('${shedTimer room}', 'active') -%}Paused for capacity
     {%- elif m == 'off' -%}System off
-    {%- elif is_state('${climateEntity room}', 'off') and is_state('${minOffTimer room}', 'active') -%}Waiting to restart
+    {%- elif is_state('${climateEntity room}', 'off') and is_state('${minOffTimer room}', 'active') -%}
+      {%- set finish = as_timestamp(state_attr('${minOffTimer room}', 'finishes_at'), 0) -%}
+      Waiting to restart · compressor protection{% if finish > 0 %}: {{ ([0, finish - as_timestamp(now())] | max / 60) | round(0, 'ceil') | int }}m remaining{% endif %}
     {%- elif states('input_select.hvac_watch_${room}') in ['stalled', 'exhausted'] and states('${climateEntity room}') in ['cool', 'heat'] -%}Not reaching target
     {%- else -%}{{ 'Override' if active else 'Following schedule' }}
     {%- endif -%}'';
