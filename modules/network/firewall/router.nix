@@ -56,8 +56,8 @@
   noInternet = [
     "amcrest-cameras"
     # "ac-controller-office"
-    "ac-controller-bedroom"
-    "ac-controller-livingroom"
+    # "ac-controller-bedroom"
+    # "ac-controller-livingroom"
   ];
 
   # Inbound from the WAN address, hairpinned for LAN clients too.
