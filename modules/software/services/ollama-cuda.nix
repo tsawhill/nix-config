@@ -35,6 +35,8 @@
   systemd.services.ollama.serviceConfig = {
     Restart = lib.mkForce "always";
     RestartSec = lib.mkForce 10;
+    # The nvidia-gpu Incus profile hands /dev/nvidia* over as root:video 0660.
+    SupplementaryGroups = [ "video" ];
   };
   # An OOM kill must never leave ollama stopped for good.
   systemd.services.ollama.unitConfig.StartLimitIntervalSec = lib.mkForce 0;
