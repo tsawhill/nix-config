@@ -61,11 +61,23 @@ in
       fi
     '';
 
-    # Drop links left behind by Home Manager; Nu would source their GC'd targets.
+    # Drop what Home Manager left behind: config links Nu would source after
+    # GC, and the GC roots / HM-only nix-env profiles that pin old closures.
     system.activationScripts.headlessHmLeftovers = ''
       for f in /root/.config/nushell/config.nu /root/.config/nushell/env.nu /root/.config/starship.toml \
-               /home/taylor/.config/nushell/config.nu /home/taylor/.config/nushell/env.nu /home/taylor/.config/starship.toml; do
+               /home/taylor/.config/nushell/config.nu /home/taylor/.config/nushell/env.nu /home/taylor/.config/starship.toml \
+               /root/.local/state/home-manager/gcroots/current-home /home/taylor/.local/state/home-manager/gcroots/current-home; do
         if [ -L "$f" ]; then rm -f "$f"; fi
+      done
+      for dir in /root/.local/state/nix/profiles /nix/var/nix/profiles/per-user/root \
+                 /home/taylor/.local/state/nix/profiles /nix/var/nix/profiles/per-user/taylor; do
+        m="$dir/profile/manifest.nix"
+        if [ -f "$m" ] && [ "$(grep -oE 'name = "[^"]+"' "$m" | sort -u)" = 'name = "home-manager-path"' ]; then
+          rm -f "$dir"/profile "$dir"/profile-*-link
+        fi
+      done
+      for l in /root/.nix-profile /home/taylor/.nix-profile; do
+        if [ -L "$l" ] && [ ! -e "$l" ]; then rm -f "$l"; fi
       done
     '';
   };
