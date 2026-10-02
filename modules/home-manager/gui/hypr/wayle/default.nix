@@ -23,6 +23,7 @@ let
       "systray"
       "clock"
       "notifications"
+      "custom-steam-presence"
       "dashboard"
     ];
   };
@@ -45,6 +46,7 @@ let
       "battery"
       "clock"
       "notifications"
+      "custom-steam-presence"
       "dashboard"
     ];
   };
@@ -52,6 +54,7 @@ in
 {
   imports = [
     ./themes/pink.nix
+    ./steam-presence.nix
   ];
 
   options.my.hypr.panel.theme = lib.mkOption {
