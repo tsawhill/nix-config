@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import time
 
 MODES = {"auto": "Auto", "away": "Away", "invisible": "Invisible", "off": "Off"}
 # Stand-ins for Steam's own tray menu, which is hidden from the bar.
@@ -87,18 +88,19 @@ def handle(action):
         return None
 
 
+def supervise():
+    # Wayle shows passive tray items, so the icon only exists while Steam runs.
+    while True:
+        if running("steam"):
+            subprocess.run([sys.executable, os.path.abspath(__file__), "tray-icon"])
+        time.sleep(3)
+
+
 def tray():
     import gi
     gi.require_version("Gtk", "3.0")
     gi.require_version("AyatanaAppIndicator3", "0.1")
     from gi.repository import AyatanaAppIndicator3 as AppIndicator, GLib, Gtk
-
-    indicator = AppIndicator.Indicator.new(
-        "steam-presence", str(ICON_DIR / "off.png"),
-        AppIndicator.IndicatorCategory.APPLICATION_STATUS,
-    )
-    items = {}
-    updating = False
 
     def safe(action):
         try:
@@ -107,13 +109,21 @@ def tray():
             print(f"steam-presence {action}: {error}", file=sys.stderr)
             return None
 
+    if safe("status") is None:
+        return
+    indicator = AppIndicator.Indicator.new(
+        "steam-presence", str(ICON_DIR / "off.png"),
+        AppIndicator.IndicatorCategory.APPLICATION_STATUS,
+    )
+    items = {}
+    updating = False
+
     def refresh():
         nonlocal updating
         current = safe("status")
         if current is None:
-            # Hidden like Steam's own icon while Steam is closed.
-            indicator.set_status(AppIndicator.IndicatorStatus.PASSIVE)
-            return True
+            Gtk.main_quit()
+            return False
         mode, label = current
         indicator.set_icon_full(str(ICON_DIR / (mode + ".png")), "Steam: " + label)
         indicator.set_title("Steam: " + label)
@@ -121,7 +131,6 @@ def tray():
         for key, item in items.items():
             item.set_active(key == mode)
         updating = False
-        indicator.set_status(AppIndicator.IndicatorStatus.ACTIVE)
         return True
 
     def select(_item, action):
@@ -143,6 +152,7 @@ def tray():
         menu.append(item)
     menu.show_all()
     indicator.set_menu(menu)
+    indicator.set_status(AppIndicator.IndicatorStatus.ACTIVE)
 
     refresh()
     GLib.timeout_add_seconds(3, refresh)
@@ -152,6 +162,9 @@ def tray():
 def main():
     action = sys.argv[1] if len(sys.argv) > 1 else "status"
     if action == "tray":
+        supervise()
+        return
+    if action == "tray-icon":
         tray()
         return
     current = handle(action)

@@ -12,7 +12,7 @@ let
     auto = "si-steam";
     away = "ld-moon";
     invisible = "ld-eye-off";
-    off = "ld-gamepad-2";
+    off = "si-steam";
   };
   presence = pkgs.stdenv.mkDerivation {
     pname = "steam-presence";
