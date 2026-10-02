@@ -32,7 +32,7 @@ build-nix:
     limits.cpu: "12"
     limits.memory: "24GiB"
   devices:
-    nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/build-nix" }
+    nix-store: { type: "disk", path: "/nix", source: "/mnt/scratchSSD/nix-stores/build-nix" }
     eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "bc:24:11:e1:63:a2" }
 
 qbit-gen-nix:
@@ -186,7 +186,7 @@ pufferpanel-nix:
 
 samba-nix:
   type: "container"
-  profiles: ["nixos-lxc", "nix-config-mount", "media-mount", "downloadHDD-mount", "downloadSSD-mount", "gameSSD-mount", "roms-mount", "taylor-mount"]
+  profiles: ["nixos-lxc", "nix-config-mount", "media-mount", "downloadHDD-mount", "downloadSSD-mount", "roms-mount", "taylor-mount"]
   config: {}
   devices:
     nix-store: { type: "disk", path: "/nix", source: "/mnt/nix-stores/samba-nix" }
@@ -210,7 +210,7 @@ socks5-vpn-eu-nix:
 
 sunshine-nix:
   type: "container"
-  profiles: ["nixos-lxc", "nvidia-gpu", "gameSSD-mount", "downloadHDD-mount", "roms-mount"]
+  profiles: ["nixos-lxc", "nvidia-gpu", "downloadHDD-mount", "roms-mount"]
   config:
     limits.cpu: "4"
     limits.memory: "8GiB"
@@ -225,7 +225,7 @@ sunshine-nix:
 
 syncthing-nix:
   type: "container"
-  profiles: ["nixos-lxc", "gamesaves-mount", "roms-mount", "nix-config-mount", "gameSSD-mount"]
+  profiles: ["nixos-lxc", "gamesaves-mount", "roms-mount", "nix-config-mount"]
   config: {}
   devices:
     root: { type: "disk", path: "/", pool: "rpool", size: "4GiB" }

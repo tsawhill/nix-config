@@ -38,12 +38,6 @@ in
     options = [ readOnlyMountOptions ];
   };
 
-  fileSystems."/mnt/gameSSD" = {
-    device = "//${sambaHost}/gameSSD/";
-    fsType = "cifs";
-    options = [ mountOptions ];
-  };
-
   fileSystems."/mnt/zpool/taylor/clips" = {
     device = "//${sambaHost}/clips/";
     fsType = "cifs";

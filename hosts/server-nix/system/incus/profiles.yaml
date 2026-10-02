@@ -54,16 +54,6 @@ ffsync-mount:
       source: "/mnt/zpool/ffsync"
       shift: "true"
 
-gameSSD-mount:
-  description: "Disk passthrough for gameSSD directory"
-  config: {}
-  devices:
-    mnt_gameSSD:
-      type: "disk"
-      path: "/mnt/gameSSD"
-      source: "/mnt/gameSSD"
-      shift: "true"
-
 gamesaves-mount:
   description: "Disk passthrough for gamesaves directory"
   config: {}

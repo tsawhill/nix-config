@@ -85,10 +85,6 @@
         path = "/mnt/downloadSSD";
         readOnly = true;
       };
-      gameSSD = {
-        enable = true;
-        path = "/mnt/gameSSD";
-      };
       clips = {
         enable = true;
         path = "/mnt/zpool/taylor/clips";

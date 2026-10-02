@@ -21,6 +21,7 @@
       set_property mountpoint /mnt/zpool zpool
       set_property mountpoint /mnt/downloadHDD downloadHDD
       set_property mountpoint /mnt/downloadSSD downloadSSD
+      set_property mountpoint /mnt/scratchSSD scratchSSD
 
       set_property atime off downloadHDD/nix-stores
     '';
@@ -102,9 +103,9 @@
       ];
     };
 
-    "/mnt/gameSSD" = {
-      device = "/dev/disk/by-uuid/c393d8b8-6567-400d-99f2-551f1d9b69a3";
-      fsType = "xfs";
+    "/mnt/scratchSSD" = {
+      device = "scratchSSD";
+      fsType = "zfs";
       options = [
         "nofail"
       ];
