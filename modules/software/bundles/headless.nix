@@ -45,6 +45,7 @@ in
 
     environment.systemPackages = [
       pkgs.nushell
+      pkgs.carapace
       nuAutoload
     ];
     environment.pathsToLink = [ "/share/nushell" ];
@@ -52,8 +53,6 @@ in
     environment.variables.STARSHIP_CONFIG = "/etc/starship.toml";
 
     # bash stays the login shell so ssh commands, colmena and scp see POSIX.
-    my.users.root.shell = lib.mkDefault pkgs.bashInteractive;
-    my.users.taylor.shell = lib.mkDefault pkgs.bashInteractive;
     # BASH_ONLY=1 bash is the escape hatch.
     programs.bash.interactiveShellInit = ''
       if [[ -z "$BASH_EXECUTION_STRING" && -z "$IN_NIX_SHELL" && -z "$BASH_ONLY" ]]; then

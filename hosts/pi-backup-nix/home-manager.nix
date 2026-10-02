@@ -1,4 +1,9 @@
-{ inputs, self, ... }:
+{
+  inputs,
+  lib,
+  self,
+  ...
+}:
 {
   imports = [
     # TEMP: using 25.11 home-manager (not home-manager-stable/26.05) because this
@@ -10,27 +15,12 @@
   ];
 
   home-manager = {
-    users.root = {
-      # This host is an appliance, not an editing environment. Keep its SSH
-      # shell small instead of pulling in Nixvim/Neovim, tree-sitter, Starship,
-      # and their Rust-heavy ARM build closures.
-      imports = [ "${self}/modules/home-manager/xdg.nix" ];
-
-      programs.zsh = {
-        enable = true;
-        history = {
-          size = 50000;
-          save = 50000;
-          share = true;
-          ignoreDups = true;
-          expireDuplicatesFirst = true;
-          ignoreSpace = true;
-        };
-        shellAliases.g = "git";
-      };
-
+    # Appliance, not an editing environment: the server shell bundle (Nu,
+    # Starship) but no Nixvim/tree-sitter ARM build closures.
+    users = lib.genAttrs [ "root" "taylor" ] (_: {
+      imports = [ "${self}/modules/home-manager/bundles/server.nix" ];
       home.stateVersion = "25.11";
-    };
+    });
 
     backupFileExtension = "bak";
     useGlobalPkgs = true;

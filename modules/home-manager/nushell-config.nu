@@ -23,3 +23,39 @@ $env.config.color_config = ($env.config.color_config | merge {
   shape_pipe: '#ff9e64'
   shape_variable: '#c0caf5'
 })
+
+# Hostnames from known_hosts and ~/.ssh/config, keeping any user@ prefix.
+def ssh-hosts [word: string] {
+  let user = if ($word | str contains '@') { ($word | split row '@' | first) + '@' } else { '' }
+  let known = [/etc/ssh/ssh_known_hosts ($env.HOME | path join .ssh/known_hosts)]
+    | where ($it | path exists)
+    | each { open --raw $in | lines | where $it !~ '^\s*($|#|@|\|)' | each { split row ' ' | first | split row ',' } }
+    | flatten | flatten
+  let config = ($env.HOME | path join .ssh/config)
+  let aliases = if ($config | path exists) {
+    open --raw $config | lines | parse -r '(?i)^\s*host\s+(?<h>.+)$' | get h | each { split row ' ' } | flatten
+  } else { [] }
+  $known | append $aliases
+    | str replace -r '^\[(.+)\]:\d+$' '$1'
+    | where $it !~ '[*?!]'
+    | uniq | sort
+    | each { $user + $in }
+}
+
+# ssh hosts ourselves, everything else via carapace; null means file completion.
+$env.config.completions.external = {
+  enable: true
+  completer: {|spans|
+    let alias = (scope aliases | where name == $spans.0 | get -o 0.expansion)
+    let spans = if $alias != null { $alias | split row ' ' | append ($spans | skip 1) } else { $spans }
+    let word = ($spans | last)
+    let prev = ($spans | drop 1 | last)
+    let flag_args = [-b -B -c -D -E -e -F -I -i -L -l -m -O -o -p -Q -R -S -W -w]
+    if $spans.0 in [ssh sftp mosh] and not ($word | str starts-with '-') and $prev not-in $flag_args {
+      ssh-hosts $word
+    } else if (which carapace | is-not-empty) {
+      carapace $spans.0 nushell ...$spans | from json
+        | if ($in | default [] | where value =~ '^-.*ERR$' | is-empty) { $in } else { null }
+    }
+  }
+}

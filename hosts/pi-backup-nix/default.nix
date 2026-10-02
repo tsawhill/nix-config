@@ -65,7 +65,6 @@ in
     # Software
     # "${self}/modules/software/bundles/all.nix"
     "${self}/modules/software/packages/ssh-copy.nix"
-    "${self}/modules/software/packages/zsh.nix"
     # "${self}/modules/software/services/incus.nix"
 
     # Nginx
@@ -146,7 +145,7 @@ in
 
   users.users.nginx = {
     # This tells NixOS not to use the 'nologin' shell
-    shell = pkgs.zsh;
+    shell = pkgs.bashInteractive;
   };
 
   my.users.taylor = {

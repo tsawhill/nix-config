@@ -8,6 +8,11 @@ let
   server = config.my.shell.starshipTheme == "server";
 in
 {
+  imports = [ ./starship.nix ];
+
+  # Used by the external completer in nushell-config.nu.
+  home.packages = [ pkgs.carapace ];
+
   programs.nushell = {
     enable = true;
     shellAliases = {
@@ -22,12 +27,15 @@ in
     '';
   };
 
-  # Keep the POSIX-style login environment and SSH command handling used by
-  # NixOS and deployment tools; Nu is the default for interactive sessions.
-  # Run before completion/plugin setup. ZSH_ONLY=1 zsh is an escape hatch.
-  programs.zsh.initContent = lib.mkOrder 100 ''
-    if [[ -o interactive && -z "$ZSH_EXECUTION_STRING" && -z "$ZSH_ONLY" ]]; then
-      exec ${lib.getExe pkgs.nushell}
-    fi
-  '';
+  # bash stays the login shell so ssh commands, colmena and scp see POSIX;
+  # interactive sessions hop into Nu from ~/.bashrc, after HM session vars load.
+  # BASH_ONLY=1 bash is the escape hatch.
+  programs.bash = {
+    enable = true;
+    initExtra = ''
+      if [[ -z "$BASH_EXECUTION_STRING" && -z "$IN_NIX_SHELL" && -z "$BASH_ONLY" ]]; then
+        exec ${lib.getExe pkgs.nushell}
+      fi
+    '';
+  };
 }

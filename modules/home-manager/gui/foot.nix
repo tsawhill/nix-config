@@ -6,7 +6,6 @@
     enable = true;
     settings = {
       main = {
-        shell = "${pkgs.zsh}/bin/zsh -l";
         font = "DaddyTimeMono Nerd Font:size=16";
         pad = "12x12 center";
       };

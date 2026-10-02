@@ -27,8 +27,6 @@
     };
 
     programs.mtr.enable = true;
-    # Dropped from the server bundle; headless hosts go without.
-    programs.zsh.enable = true;
     environment.systemPackages = with pkgs; [
       git
       neovim

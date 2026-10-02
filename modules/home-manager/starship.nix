@@ -14,7 +14,6 @@ in
 
   config.programs.starship = {
     enable = true;
-    enableZshIntegration = true;
     enableNushellIntegration = true;
     settings = import ./starship-settings.nix server;
   };

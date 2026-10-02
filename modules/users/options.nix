@@ -25,7 +25,7 @@
 
     shell = lib.mkOption {
       type = lib.types.package;
-      default = pkgs.zsh;
+      default = pkgs.bashInteractive;
       description = "The shell package the user should use.";
     };
   };
