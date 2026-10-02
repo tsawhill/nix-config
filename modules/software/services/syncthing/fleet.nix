@@ -92,6 +92,7 @@ in
       ignores = [
         "runelite/cache" # regenerable client cache
         "runelite/jagexcache" # regenerable asset cache
+        "wine/*/drive_c/users/*/AppData/Local/Temp" # installer scratch, can be tens of GB
         # Skyrim's launcher rewrites this for whatever display it starts on.
         "wine/default/drive_c/users/steamuser/Documents/My Games/Skyrim Special Edition GOG/SkyrimPrefs.ini"
         # RetroArch whitelist: first match wins and `*` doesn't cross `/`, so
