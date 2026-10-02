@@ -203,6 +203,19 @@ in
       monitor: monCfg: lib.nameValuePair "wallpaper-engine-${monitor}" (mkWallpaperService monitor monCfg)
     ) cfg.monitors;
 
+    # Wallpaper Engine can retain a stale render surface after a modeset. Watch
+    # actual output state so this also covers manual changes and reconnects.
+    wayland.windowManager.hyprland.extraConfig = ''
+      dofile("${./wallpaper-monitor.lua}")({
+        ${lib.concatStringsSep "\n" (
+          lib.mapAttrsToList (
+            monitor: _:
+            "[${builtins.toJSON monitor}] = ${builtins.toJSON "${pkgs.systemd}/bin/systemctl --user --no-block try-restart ${lib.escapeShellArg "wallpaper-engine-${monitor}.service"}"},"
+          ) cfg.monitors
+        )}
+      })
+    '';
+
     # wayland.windowManager.hyprland.settings.layer_rule = [
     #   { match = { namespace = "linux-wallpaperengine"; }; }
     # ];
