@@ -21,7 +21,6 @@ let
       "bluetooth"
       "custom-mchose-m7"
       "systray"
-      "custom-steam-presence"
       "clock"
       "notifications"
       "dashboard"
@@ -34,7 +33,6 @@ let
       "hyprland-workspaces"
       "media"
       "systray"
-      "custom-steam-presence"
       "idle-inhibit"
     ];
     center = [ "window-title" ];

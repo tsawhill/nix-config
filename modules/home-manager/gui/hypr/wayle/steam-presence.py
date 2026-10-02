@@ -1,6 +1,6 @@
-"""Steam presence policy; never reads Steam account data or starts Steam."""
+#!/usr/bin/env python3
+"""Steam presence policy and tray icon; never reads Steam account data or starts Steam."""
 import fcntl
-import json
 import os
 from pathlib import Path
 import subprocess
@@ -17,6 +17,7 @@ STEAM = {
     "Big Picture": "open/bigpicture",
     "Exit Steam": "exit",
 }
+ICON_DIR = Path(__file__).resolve().parent.parent / "share/steam-presence/icons"
 
 
 def run(*args):
@@ -38,42 +39,23 @@ def locked():
     return False
 
 
-def read_mode(mode_file):
-    mode = mode_file.read_text().strip() if mode_file.exists() else "off"
-    return mode if mode in MODES else "off"
+def handle(action):
+    """Apply an action; "status" returns (mode, label), or None while Steam is closed."""
+    if action in STEAM:
+        if running("steam"):
+            run("steam", "steam://" + STEAM[action])
+        return None
 
-
-def choose(mode):
-    entries = {("● " if key == mode else "") + label: key for key, label in MODES.items()}
-    entries["────────"] = None
-    entries.update({label: label for label in STEAM})
-    result = subprocess.run(
-        ["@menu@", "--dmenu"], input="\n".join(entries) + "\n",
-        capture_output=True, text=True,
-    )
-    return None if result.returncode else entries.get(result.stdout.strip())
-
-
-def main():
-    action = sys.argv[1] if len(sys.argv) > 1 else "status"
     runtime = Path(os.environ["XDG_RUNTIME_DIR"]) / "steam-presence"
     runtime.mkdir(mode=0o700, exist_ok=True)
     state = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local/state"))) / "steam-presence"
     state.mkdir(mode=0o700, parents=True, exist_ok=True)
-    mode_file = state / "mode"
-
-    if action == "menu":
-        action = choose(read_mode(mode_file))
-        if action is None:
-            return
-    if action in STEAM:
-        if running("steam"):
-            run("steam", "steam://" + STEAM[action])
-        return
-
     with (runtime / "lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
-        mode = read_mode(mode_file)
+        mode_file = state / "mode"
+        mode = mode_file.read_text().strip() if mode_file.exists() else "off"
+        if mode not in MODES:
+            mode = "off"
         idle = runtime / ("idle-" + os.environ.get("HYPRLAND_INSTANCE_SIGNATURE", "session"))
         if action in MODES:
             mode = action
@@ -85,19 +67,16 @@ def main():
         elif action not in ("status", "tick"):
             raise SystemExit("Unknown action")
 
+        if not running("steam"):
+            return None
+        paused = idle.exists() or locked()
         if action == "status":
-            # Empty output hides the button while Steam is closed.
-            if not running("steam"):
-                return
-            paused = idle.exists() or locked()
-            label = MODES[mode] + (" (idle)" if mode == "auto" and paused else "")
-            print(json.dumps({"alt": mode, "tooltip": "Steam: " + label}))
-            return
-        if mode == "off" or not running("steam"):
-            return
+            return mode, MODES[mode] + (" (idle)" if mode == "auto" and paused else "")
+        if mode == "off":
+            return None
         if mode == "auto":
-            if idle.exists() or locked() or not running("hypridle"):
-                return
+            if paused or not running("hypridle"):
+                return None
             target = "online"
         else:
             target = mode
@@ -105,6 +84,79 @@ def main():
         result = run("steam", "steam://friends/status/" + target)
         if result.returncode:
             raise SystemExit(result.returncode)
+        return None
+
+
+def tray():
+    import gi
+    gi.require_version("Gtk", "3.0")
+    gi.require_version("AyatanaAppIndicator3", "0.1")
+    from gi.repository import AyatanaAppIndicator3 as AppIndicator, GLib, Gtk
+
+    indicator = AppIndicator.Indicator.new(
+        "steam-presence", str(ICON_DIR / "off.png"),
+        AppIndicator.IndicatorCategory.APPLICATION_STATUS,
+    )
+    items = {}
+    updating = False
+
+    def safe(action):
+        try:
+            return handle(action)
+        except (OSError, subprocess.SubprocessError, SystemExit) as error:
+            print(f"steam-presence {action}: {error}", file=sys.stderr)
+            return None
+
+    def refresh():
+        nonlocal updating
+        current = safe("status")
+        if current is None:
+            # Hidden like Steam's own icon while Steam is closed.
+            indicator.set_status(AppIndicator.IndicatorStatus.PASSIVE)
+            return True
+        mode, label = current
+        indicator.set_icon_full(str(ICON_DIR / (mode + ".png")), "Steam: " + label)
+        indicator.set_title("Steam: " + label)
+        updating = True
+        for key, item in items.items():
+            item.set_active(key == mode)
+        updating = False
+        indicator.set_status(AppIndicator.IndicatorStatus.ACTIVE)
+        return True
+
+    def select(_item, action):
+        if not updating:
+            safe(action)
+            refresh()
+
+    menu = Gtk.Menu()
+    for key, label in MODES.items():
+        item = Gtk.CheckMenuItem(label=label)
+        item.set_draw_as_radio(True)
+        item.connect("toggled", select, key)
+        items[key] = item
+        menu.append(item)
+    menu.append(Gtk.SeparatorMenuItem())
+    for label in STEAM:
+        item = Gtk.MenuItem(label=label)
+        item.connect("activate", select, label)
+        menu.append(item)
+    menu.show_all()
+    indicator.set_menu(menu)
+
+    refresh()
+    GLib.timeout_add_seconds(3, refresh)
+    Gtk.main()
+
+
+def main():
+    action = sys.argv[1] if len(sys.argv) > 1 else "status"
+    if action == "tray":
+        tray()
+        return
+    current = handle(action)
+    if action == "status" and current:
+        print(current[1])
 
 
 if __name__ == "__main__":
