@@ -2,6 +2,7 @@
   imports = [
     ../gui/usbip-tray.nix
     ../gui/appearance.nix
+    ../gui/default-browser.nix
     ../gui/foot.nix
     ../gui/games-frontends.nix
     ../gui/mpv.nix
