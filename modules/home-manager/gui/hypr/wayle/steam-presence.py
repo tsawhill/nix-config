@@ -19,6 +19,14 @@ STEAM = {
     "Exit Steam": "exit",
 }
 ICON_DIR = Path(__file__).resolve().parent.parent / "share/steam-presence/icons"
+STEAM_ICON = Path.home() / ".local/share/Steam/public/steam_tray_mono.png"
+
+
+def icon(mode):
+    # Steam's real tray icon where it exists, so the swap is seamless.
+    if mode in ("auto", "off") and STEAM_ICON.exists():
+        return str(STEAM_ICON)
+    return str(ICON_DIR / (mode + ".png"))
 
 
 def run(*args):
@@ -112,7 +120,7 @@ def tray():
     if safe("status") is None:
         return
     indicator = AppIndicator.Indicator.new(
-        "steam-presence", str(ICON_DIR / "off.png"),
+        "steam-presence", icon("off"),
         AppIndicator.IndicatorCategory.APPLICATION_STATUS,
     )
     items = {}
@@ -125,7 +133,7 @@ def tray():
             Gtk.main_quit()
             return False
         mode, label = current
-        indicator.set_icon_full(str(ICON_DIR / (mode + ".png")), "Steam: " + label)
+        indicator.set_icon_full(icon(mode), "Steam: " + label)
         indicator.set_title("Steam: " + label)
         updating = True
         for key, item in items.items():

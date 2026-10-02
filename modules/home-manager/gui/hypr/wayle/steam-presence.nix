@@ -6,8 +6,8 @@
 }:
 let
   wayle = config.services.wayle;
-  # Match the other tray icons, which draw in the bar's background colour.
-  color = wayle.settings.styling.palette.bg or "#242438";
+  # Colour and padding of Steam's own steam_tray_mono icon.
+  color = "#dedede";
   icons = {
     auto = "si-steam";
     away = "ld-moon";
@@ -38,7 +38,7 @@ let
       ${lib.concatStrings (
         lib.mapAttrsToList (mode: icon: ''
           sed "s/rgb(0,0,0)/${color}/g" ${wayle.package}/share/icons/hicolor/scalable/actions/${icon}-symbolic.svg > ${mode}.svg
-          rsvg-convert --width 64 --height 64 ${mode}.svg --output $out/share/steam-presence/icons/${mode}.png
+          rsvg-convert --width 39 --height 39 --page-width 48 --page-height 48 --left 4.5 --top 4.5 ${mode}.svg --output $out/share/steam-presence/icons/${mode}.png
         '') icons
       )}
       runHook postInstall
