@@ -27,7 +27,10 @@ $env.config.color_config = ($env.config.color_config | merge {
 # Hostnames from known_hosts and ~/.ssh/config, keeping any user@ prefix.
 def ssh-hosts [word: string] {
   let user = if ($word | str contains '@') { ($word | split row '@' | first) + '@' } else { '' }
-  let known = [/etc/ssh/ssh_known_hosts ($env.HOME | path join .ssh/known_hosts)]
+  # NixOS lists knownHostsFiles in GlobalKnownHostsFile, so ask ssh for the paths.
+  let known = ^ssh -G x err> /dev/null | lines | parse '{key} {value}'
+    | where key in [globalknownhostsfile userknownhostsfile]
+    | get value | each { split row ' ' } | flatten | path expand
     | where ($it | path exists)
     | each { open --raw $in | lines | where $it !~ '^\s*($|#|@|\|)' | each { split row ' ' | first | split row ',' } }
     | flatten | flatten
