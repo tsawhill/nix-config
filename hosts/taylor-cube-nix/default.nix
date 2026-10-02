@@ -165,6 +165,10 @@ in
         qtWrapperArgs = (old.qtWrapperArgs or [ ]) ++ [ "--set QT_QPA_PLATFORM xcb" ];
       });
     })
+    # TEMPORARY: stub out pegasus-frontend so the cube builds; revert when fixed upstream.
+    (_final: prev: {
+      pegasus-frontend = prev.runCommand "pegasus-frontend-disabled" { } "mkdir $out";
+    })
   ];
 
   # DrKonqi's dialog has no display in Game Mode: each crash report crashes and
