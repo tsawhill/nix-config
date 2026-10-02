@@ -31,10 +31,23 @@ in
       id = "steam-presence";
       command = "${command} status";
       interval-ms = 5000;
-      icon-name = "steam-symbolic";
-      label-show = true;
+      hide-if-empty = true;
+      icon-name = "si-steam-symbolic";
+      icon-map = {
+        auto = "si-steam-symbolic";
+        away = "ld-moon-symbolic";
+        invisible = "ld-eye-off-symbolic";
+        off = "ld-gamepad-2-symbolic";
+      };
+      label-show = false;
       left-click = "${command} menu";
+      right-click = "${command} menu";
     }
+  ];
+  # This button replaces Steam's own tray icon and menu.
+  services.wayle.settings.modules.systray.blacklist = [
+    "*steam*"
+    "*Steam*"
   ];
   services.hypridle.settings.listener = lib.mkAfter [
     {

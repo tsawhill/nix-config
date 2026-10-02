@@ -7,6 +7,16 @@ import subprocess
 import sys
 
 MODES = {"auto": "Auto", "away": "Away", "invisible": "Invisible", "off": "Off"}
+# Stand-ins for Steam's own tray menu, which is hidden from the bar.
+STEAM = {
+    "Library": "open/games",
+    "Store": "store",
+    "Community": "url/CommunityHome",
+    "Friends": "open/friends",
+    "Settings": "open/settings",
+    "Big Picture": "open/bigpicture",
+    "Exit Steam": "exit",
+}
 
 
 def run(*args):
@@ -28,27 +38,42 @@ def locked():
     return False
 
 
+def read_mode(mode_file):
+    mode = mode_file.read_text().strip() if mode_file.exists() else "off"
+    return mode if mode in MODES else "off"
+
+
+def choose(mode):
+    entries = {("● " if key == mode else "") + label: key for key, label in MODES.items()}
+    entries["────────"] = None
+    entries.update({label: label for label in STEAM})
+    result = subprocess.run(
+        ["@menu@", "--dmenu"], input="\n".join(entries) + "\n",
+        capture_output=True, text=True,
+    )
+    return None if result.returncode else entries.get(result.stdout.strip())
+
+
 def main():
     action = sys.argv[1] if len(sys.argv) > 1 else "status"
-    if action == "menu":
-        result = subprocess.run(
-            ["@menu@", "--dmenu"], input="\n".join(MODES.values()) + "\n",
-            capture_output=True, text=True,
-        )
-        if result.returncode or result.stdout.strip().lower() not in MODES:
-            return
-        action = result.stdout.strip().lower()
-
     runtime = Path(os.environ["XDG_RUNTIME_DIR"]) / "steam-presence"
     runtime.mkdir(mode=0o700, exist_ok=True)
     state = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local/state"))) / "steam-presence"
     state.mkdir(mode=0o700, parents=True, exist_ok=True)
+    mode_file = state / "mode"
+
+    if action == "menu":
+        action = choose(read_mode(mode_file))
+        if action is None:
+            return
+    if action in STEAM:
+        if running("steam"):
+            run("steam", "steam://" + STEAM[action])
+        return
+
     with (runtime / "lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
-        mode_file = state / "mode"
-        mode = mode_file.read_text().strip() if mode_file.exists() else "off"
-        if mode not in MODES:
-            mode = "off"
+        mode = read_mode(mode_file)
         idle = runtime / ("idle-" + os.environ.get("HYPRLAND_INSTANCE_SIGNATURE", "session"))
         if action in MODES:
             mode = action
@@ -60,16 +85,18 @@ def main():
         elif action not in ("status", "tick"):
             raise SystemExit("Unknown action")
 
-        paused = idle.exists() or locked()
         if action == "status":
+            # Empty output hides the button while Steam is closed.
+            if not running("steam"):
+                return
+            paused = idle.exists() or locked()
             label = MODES[mode] + (" (idle)" if mode == "auto" and paused else "")
-            print(json.dumps({"text": "Steam: " + label,
-                              "tooltip": "Steam mode: " + label + ". Click to choose Auto, Away, Invisible or Off. Change modes here while automation is enabled."}))
+            print(json.dumps({"alt": mode, "tooltip": "Steam: " + label}))
             return
         if mode == "off" or not running("steam"):
             return
         if mode == "auto":
-            if paused or not running("hypridle"):
+            if idle.exists() or locked() or not running("hypridle"):
                 return
             target = "online"
         else:
