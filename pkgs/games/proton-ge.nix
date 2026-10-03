@@ -18,6 +18,10 @@ let
       "528ae7831f909c0a4fff5d83889ac6dab3c9706746cd148f05f3064ac042763853d68277e2a815f18f16c17285d5d128864a03c563956c0dce30bafcd16aa77c";
   };
   sha512 = knownVersions.${version} or (throw "Unsupported GE-Proton version: ${version}");
+  # Release assets gained an -x86_64 suffix starting with 11-4.
+  assetName =
+    "GE-Proton${version}"
+    + lib.optionalString (lib.versionAtLeast (lib.replaceStrings [ "-" ] [ "." ] version) "11.4") "-x86_64";
 in
 stdenvNoCC.mkDerivation {
   pname = "proton-ge";
@@ -32,7 +36,7 @@ stdenvNoCC.mkDerivation {
   ];
 
   src = fetchurl {
-    url = "https://github.com/GloriousEggroll/proton-ge-custom/releases/download/GE-Proton${version}/GE-Proton${version}.tar.gz";
+    url = "https://github.com/GloriousEggroll/proton-ge-custom/releases/download/GE-Proton${version}/${assetName}.tar.gz";
     inherit sha512;
   };
 

@@ -7,11 +7,20 @@
 }:
 let
   cfg = config.software.apps.gaming;
-  protonGe = pkgs.callPackage ../../../../pkgs/games/proton-ge.nix { };
-  protonGeVersions = map (
-    version: pkgs.callPackage ../../../../pkgs/games/proton-ge.nix { inherit version; }
-  ) protonGe.supportedVersions;
-  protonCachyos = pkgs.callPackage ../../../../pkgs/games/proton-cachyos.nix { };
+  mkProtonGe = args: pkgs.callPackage ../../../../pkgs/games/proton-ge.nix args;
+  mkProtonCachyos = args: pkgs.callPackage ../../../../pkgs/games/proton-cachyos.nix args;
+  protonGe = mkProtonGe { };
+  protonCachyos = mkProtonCachyos { };
+  # Game launchers reference their own pinned Proton by store path, so only
+  # the defaults plus explicitly requested versions need to go to Steam.
+  steamCompatTools = lib.unique (
+    [
+      protonCachyos
+      protonGe
+    ]
+    ++ map (version: mkProtonGe { inherit version; }) cfg.proton.extraGeVersions
+    ++ map (version: mkProtonCachyos { inherit version; }) cfg.proton.extraCachyosVersions
+  );
   protonDefault = pkgs.callPackage ../../../../pkgs/games/proton-default.nix {
     protonPath = protonGe.steamcompattool;
   };
@@ -22,6 +31,21 @@ in
   options.software.apps.gaming = {
     enable = lib.mkEnableOption "gaming tools and launchers";
     lsfgVk.enable = lib.mkEnableOption "lsfg-vk frame generation layer";
+
+    proton = {
+      extraGeVersions = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [ ];
+        example = [ "10-34" ];
+        description = "Older GE-Proton versions to offer in Steam besides the pinned default.";
+      };
+
+      extraCachyosVersions = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [ ];
+        description = "Older proton-cachyos versions to offer in Steam besides the pinned default.";
+      };
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -45,7 +69,7 @@ in
       dedicatedServer.openFirewall = true;
       localNetworkGameTransfers.openFirewall = true;
       extraPackages = lib.optionals cfg.lsfgVk.enable [ pkgs.lsfg-vk ];
-      extraCompatPackages = [ protonCachyos ] ++ protonGeVersions;
+      extraCompatPackages = steamCompatTools;
     };
 
     programs.gamescope = {

@@ -57,6 +57,8 @@ in
     enable = true;
   };
   my.garbage.collection.generations = 1;
+  # The downloadHDD/nix-stores datasets already dedup across containers.
+  my.garbage.collection.optimise = lib.mkDefault false;
   nix.settings = {
     keep-outputs = false;
     keep-derivations = false;

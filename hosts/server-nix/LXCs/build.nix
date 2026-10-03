@@ -80,6 +80,8 @@ in
     };
   };
   boot.binfmt.emulatedSystems = [ "aarch64-linux" ];
+  # build-nix's store is on scratchSSD without dedup; the host closures share lots of files.
+  my.garbage.collection.optimise = true;
   nix.settings = {
     # The deploy controller explicitly pins the system closures needed for
     # retries and rollback. Do not also retain every build-time output reachable

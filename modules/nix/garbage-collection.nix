@@ -44,9 +44,17 @@ in
       default = false;
       description = "Also prune /nix/var/nix/profiles/per-host/*/system (Colmena builder machines).";
     };
+
+    optimise = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Periodically hardlink identical files in the store (nix-store --optimise).";
+    };
   };
 
   config = lib.mkIf cfg.enable {
+    nix.optimise.automatic = cfg.optimise;
+
     nix.gc = {
       automatic = true;
       dates = cfg.gcFrequency;
