@@ -15,6 +15,12 @@ let
   factoryTopologyJson = pkgs.writeText "nixos-factory-topology.json" (
     builtins.toJSON factoryTopology
   );
+  # Same registry server-nix applies, so new containers boot with their declared profiles.
+  factoryRegistryJson = pkgs.writeText "nixos-factory-incus-registry.json" (
+    builtins.toJSON
+      (import ../../../hosts/server-nix/system/incus/registry.nix { inherit lib networkTopology; })
+      .instances
+  );
 
   knownHostsManager = pkgs.writeText "known-hosts-manager.py" ''
     import sys
@@ -315,71 +321,55 @@ let
 
         raise SystemExit(f"unterminated topology entry: {host}")
 
+    def guests_bounds(lines):
+        try:
+            start = lines.index("  incusGuestNames = [\n") + 1
+        except ValueError:
+            raise SystemExit("missing topology incusGuestNames list")
+
+        for end in range(start, len(lines)):
+            if lines[end] == "  ];\n":
+                return start, end
+        raise SystemExit("unterminated topology incusGuestNames list")
+
+    # Prints "added" or "present" so callers know whether to roll back.
+    def add_guest(path, host):
+        lines = read_lines(path)
+        start, end = guests_bounds(lines)
+        entry = f'    "{host}"\n'
+
+        if entry in lines[start:end]:
+            print("present")
+            return
+
+        at = next((i for i in range(start, end) if lines[i] > entry), end)
+        lines.insert(at, entry)
+        write_lines(path, lines)
+        print("added")
+
+    def remove_guest(path, host):
+        lines = read_lines(path)
+        start, end = guests_bounds(lines)
+        entry = f'    "{host}"\n'
+
+        if entry in lines[start:end]:
+            del lines[lines.index(entry, start, end)]
+            write_lines(path, lines)
+            print("removed")
+        else:
+            print("absent")
+
     action = sys.argv[1]
     if action == "add":
         add(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
     elif action == "remove":
         remove(sys.argv[2], sys.argv[3])
+    elif action == "add-guest":
+        add_guest(sys.argv[2], sys.argv[3])
+    elif action == "remove-guest":
+        remove_guest(sys.argv[2], sys.argv[3])
     else:
         raise SystemExit(f"unknown action: {action}")
-  '';
-
-  instanceConfigReader = pkgs.writeText "instance-config-reader.py" ''
-    import sys
-    import yaml
-
-    path, host, field = sys.argv[1:]
-    with open(path) as config_file:
-        instances = yaml.safe_load(config_file) or {}
-
-    instance = instances.get(host)
-    if instance is None:
-        raise SystemExit(f"missing instance declaration: {host}")
-
-    if field == "profiles":
-        for profile in instance.get("profiles", []):
-            print(profile)
-    elif field in ("pool", "size"):
-        print(instance.get("devices", {}).get("root", {}).get(field, ""))
-    else:
-        raise SystemExit(f"unknown instance field: {field}")
-  '';
-
-  # Helper: remove a top-level YAML block by key name from a file.
-  # Operates on raw lines to preserve exact formatting.
-  removeYamlBlock = pkgs.writeShellScript "remove-yaml-block" ''
-    set -euo pipefail
-    TARGET="$1"
-    FILE="$2"
-    ${pythonWithYaml}/bin/python3 -c "
-import sys
-target = sys.argv[1]
-with open(sys.argv[2]) as f:
-    lines = f.readlines()
-result = []
-skip = False
-for line in lines:
-    stripped = line.rstrip()
-    # Match the start of the target block (top-level key)
-    if not skip and stripped == target + ':':
-        skip = True
-        # Remove preceding blank line
-        if result and not result[-1].strip():
-            result.pop()
-        continue
-    # End of block: non-indented non-blank line
-    if skip and stripped and not line[0].isspace():
-        skip = False
-    if skip:
-        continue
-    result.append(line)
-# Remove trailing blank lines
-while result and not result[-1].strip():
-    result.pop()
-result.append(chr(10))  # ensure single trailing newline
-with open(sys.argv[2], 'w') as f:
-    f.writelines(result)
-" "$TARGET" "$FILE"
   '';
 
   nixosFactoryScript = pkgs.writeShellScriptBin "nixos-factory" ''
@@ -425,7 +415,7 @@ with open(sys.argv[2], 'w') as f:
     # The repo is bind-mounted from server-nix into build-nix, so local edits
     # here are immediately visible to both hosts.
     NIX_CONFIG="/mnt/zpool/code/nix-config"
-    INSTANCES_YAML="$NIX_CONFIG/hosts/server-nix/system/incus/instances.yaml"
+    REGISTRY_JSON="${factoryRegistryJson}"
     COLMENA_NIX="$NIX_CONFIG/flake-outputs/colmena.nix"
     TOPOLOGY_NIX="$NIX_CONFIG/modules/network/topology.nix"
     KNOWN_HOSTS_FILE="$NIX_CONFIG/modules/ssh/known_hosts"
@@ -595,7 +585,7 @@ with open(sys.argv[2], 'w') as f:
     #    4. Show plan and confirm
     #    5. Optionally add topology and deploy AdGuard + DHCP
     #    6. Create the container and nix store on server-nix over SSH
-    #    7. Preserve or append the instance in instances.yaml
+    #    7. List it in topology incusGuestNames so server-nix declares it
     #    8. Start the container and verify its expected DHCP address
     #    9. Trust the new host key, add its age recipient, and deploy build-nix
     #   10. Deploy the new host from build-nix
@@ -627,14 +617,12 @@ with open(sys.argv[2], 'w') as f:
       MANAGE_TOPOLOGY=false
       USE_EXISTING_TOPOLOGY=false
       VERIFY_TOPOLOGY=false
-      INTERMITTENT=false
       IP_ADDRESS=""
       MAC_ADDR=""
 
       if $JQ -e --arg host "$HOSTNAME" 'has($host)' "$TOPOLOGY_JSON" >/dev/null; then
         IP_ADDRESS=$($JQ -r --arg host "$HOSTNAME" '.[$host].ip // empty' "$TOPOLOGY_JSON")
         MAC_ADDR=$($JQ -r --arg host "$HOSTNAME" '.[$host].mac // empty' "$TOPOLOGY_JSON")
-        INTERMITTENT=$($JQ -r --arg host "$HOSTNAME" '.[$host].intermittent // false' "$TOPOLOGY_JSON")
         if [ -z "$IP_ADDRESS" ] || [ -z "$MAC_ADDR" ]; then
           $GUM style --foreground 196 --bold \
             "$HOSTNAME exists in topology but does not have both a LAN IP and MAC"
@@ -661,8 +649,10 @@ with open(sys.argv[2], 'w') as f:
         exit 1
       fi
 
+      # The registry was baked in when build-nix last deployed; it covers every
+      # host that was already in incusGuestNames then.
       USE_EXISTING_INSTANCE=false
-      if grep -q "^$HOSTNAME:$" "$INSTANCES_YAML"; then
+      if $JQ -e --arg host "$HOSTNAME" 'has($host)' "$REGISTRY_JSON" >/dev/null; then
         USE_EXISTING_INSTANCE=true
       fi
 
@@ -681,8 +671,8 @@ with open(sys.argv[2], 'w') as f:
       fi
 
       if [ "$USE_EXISTING_INSTANCE" = true ]; then
-        SELECTED_POOL=$(${pythonWithYaml}/bin/python3 ${instanceConfigReader} \
-          "$INSTANCES_YAML" "$HOSTNAME" pool)
+        SELECTED_POOL=$($JQ -r --arg host "$HOSTNAME" \
+          '.[$host].devices.root.pool // empty' "$REGISTRY_JSON")
       fi
       if [ -z "''${SELECTED_POOL:-}" ]; then
         $GUM style --foreground 212 "Select target root storage pool:"
@@ -709,9 +699,9 @@ with open(sys.argv[2], 'w') as f:
       echo "  MAC:       $MAC_ADDR"
       echo "  Store:     $NIX_HOST_MOUNT_BASE/$HOSTNAME"
       if [ "$USE_EXISTING_INSTANCE" = true ]; then
-        echo "  YAML:      $INSTANCES_YAML (existing declaration)"
+        echo "  Registry:  existing declaration"
       else
-        echo "  YAML:      $INSTANCES_YAML (will be updated)"
+        echo "  Registry:  defaults (adds $HOSTNAME to incusGuestNames)"
       fi
       if [ "$VERIFY_TOPOLOGY" = true ]; then
         if [ "$USE_EXISTING_TOPOLOGY" = true ]; then
@@ -768,8 +758,9 @@ with open(sys.argv[2], 'w') as f:
         fi
 
         if [ "$INSTANCE_ADDED" = true ]; then
-          echo "==> Removing $HOSTNAME from instances.yaml..."
-          ${removeYamlBlock} "$HOSTNAME" "$INSTANCES_YAML" || true
+          echo "==> Removing $HOSTNAME from topology incusGuestNames..."
+          ${pythonWithYaml}/bin/python3 ${topologyManager} \
+            remove-guest "$TOPOLOGY_NIX" "$HOSTNAME" >/dev/null || true
         fi
 
         if [ "$KNOWN_HOST_ADDED" = true ]; then
@@ -842,8 +833,7 @@ with open(sys.argv[2], 'w') as f:
           if [ -n "$instance_profile" ]; then
             INSTANCE_PROFILES+=("$instance_profile")
           fi
-        done < <(${pythonWithYaml}/bin/python3 ${instanceConfigReader} \
-          "$INSTANCES_YAML" "$HOSTNAME" profiles)
+        done < <($JQ -r --arg host "$HOSTNAME" '.[$host].profiles[]' "$REGISTRY_JSON")
       fi
       if [ "''${#INSTANCE_PROFILES[@]}" -eq 0 ]; then
         INSTANCE_PROFILES=("$PROFILE")
@@ -862,8 +852,8 @@ with open(sys.argv[2], 'w') as f:
       CONTAINER_CREATED=true
 
       if [ "$USE_EXISTING_INSTANCE" = true ]; then
-        ROOT_SIZE=$(${pythonWithYaml}/bin/python3 ${instanceConfigReader} \
-          "$INSTANCES_YAML" "$HOSTNAME" size)
+        ROOT_SIZE=$($JQ -r --arg host "$HOSTNAME" \
+          '.[$host].devices.root.size // empty' "$REGISTRY_JSON")
         if [ -n "$ROOT_SIZE" ]; then
           server_cmd incus config device set "$HOSTNAME" root size="$ROOT_SIZE"
         fi
@@ -906,39 +896,16 @@ with open(sys.argv[2], 'w') as f:
       fi
 
       # --- Step 5: Add to declarative config ---
-      # Preserve a predeclared instance or append a default declaration so
-      # incus-declarative-apply and incus-sync know about the new container.
-      if [ "$USE_EXISTING_INSTANCE" = true ]; then
-        echo "==> Preserving existing $HOSTNAME declaration in instances.yaml..."
-      elif [ "$INTERMITTENT" = true ]; then
-        echo "==> Adding $HOSTNAME to instances.yaml..."
-        cat >> "$INSTANCES_YAML" <<YAML
-
-$HOSTNAME:
-  type: "container"
-  profiles: ["nixos-lxc"]
-  config:
-    boot.autostart: "false"
-  devices:
-    root: { type: "disk", path: "/", pool: "$SELECTED_POOL", size: "4GiB" }
-    nix-store: { type: "disk", path: "/nix", source: "$NIX_HOST_MOUNT_BASE/$HOSTNAME" }
-    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "$MAC_ADDR" }
-YAML
-      else
-        echo "==> Adding $HOSTNAME to instances.yaml..."
-        cat >> "$INSTANCES_YAML" <<YAML
-
-$HOSTNAME:
-  type: "container"
-  profiles: ["nixos-lxc"]
-  config: {}
-  devices:
-    root: { type: "disk", path: "/", pool: "$SELECTED_POOL", size: "4GiB" }
-    nix-store: { type: "disk", path: "/nix", source: "$NIX_HOST_MOUNT_BASE/$HOSTNAME" }
-    eth0: { type: "nic", nictype: "bridged", parent: "br0", hwaddr: "$MAC_ADDR" }
-YAML
+      # The registry gives every incusGuestNames entry a default instance
+      # (MAC and intermittent autostart from topology); overrides go in
+      # hosts/server-nix/system/incus/registry.nix.
+      echo "==> Listing $HOSTNAME in topology incusGuestNames..."
+      if ! GUEST_RESULT=$(${pythonWithYaml}/bin/python3 ${topologyManager} \
+        add-guest "$TOPOLOGY_NIX" "$HOSTNAME")
+      then
+        rollback_create "Topology guest update failed"
       fi
-      if [ "$USE_EXISTING_INSTANCE" = false ]; then
+      if [ "$GUEST_RESULT" = added ]; then
         INSTANCE_ADDED=true
       fi
 
@@ -1041,9 +1008,8 @@ YAML
     #    7. Update the nix-store device source path
     #    8. Restart if it was running
     #
-    #  NOTE: This does NOT update instances.yaml, colmena.nix, or the
-    #  NixOS host config. Run incus-sync pull after, and update the nix
-    #  configs manually.
+    #  NOTE: This does NOT update topology, the Incus registry, colmena.nix,
+    #  or the NixOS host config. Rename the host in those by hand.
     # ══════════════════════════════════════════════════════════════
     do_rename() {
       require_server
@@ -1150,7 +1116,7 @@ YAML
     #    4. Double-confirm (defaults to No)
     #    5. Stop if running, delete container
     #    6. Destroy ZFS dataset if opted in
-    #    7. Remove instance from instances.yaml
+    #    7. Remove it from topology incusGuestNames
     #    8. Remove global trust entries and deploy build-nix
     #
     # ══════════════════════════════════════════════════════════════
@@ -1222,10 +1188,11 @@ YAML
         server_cmd zfs destroy -r "$NIX_DATASET"
       fi
 
-      # Remove from instances.yaml so declarative config stays in sync
-      if grep -q "^$TARGET:" "$INSTANCES_YAML" 2>/dev/null; then
-        echo "==> Removing $TARGET from instances.yaml..."
-        ${removeYamlBlock} "$TARGET" "$INSTANCES_YAML"
+      # Drop it from incusGuestNames so server-nix stops declaring it
+      if [ "$(${pythonWithYaml}/bin/python3 ${topologyManager} \
+        remove-guest "$TOPOLOGY_NIX" "$TARGET")" = removed ]
+      then
+        echo "==> Removed $TARGET from topology incusGuestNames"
       fi
 
       echo "==> Removing $TARGET.lan from known_hosts..."

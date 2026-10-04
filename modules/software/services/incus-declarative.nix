@@ -1,4 +1,9 @@
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   cfg = config.my.incusDeclarative;
@@ -47,92 +52,16 @@ let
     };
   };
 
-  generatedRegistry = pkgs.writeText "incus-declarative.json" (
+  registry = pkgs.writeText "incus-declarative.json" (
     builtins.toJSON {
-      inherit (cfg) profiles instances;
+      inherit (cfg) mode profiles instances;
     }
   );
-
-  registrySource =
-    if cfg.registryFile != null then
-      cfg.registryFile
-    else
-      generatedRegistry;
-
-  profilesSource =
-    if cfg.profilesFile != null then
-      cfg.profilesFile
-    else
-      pkgs.writeText "incus-empty-profiles.yaml" "{}";
-
-  instancesSource =
-    if cfg.instancesFile != null then
-      cfg.instancesFile
-    else
-      pkgs.writeText "incus-empty-instances.yaml" "{}";
-
-  registryFormat =
-    if cfg.profilesFile != null || cfg.instancesFile != null then
-      "split-yaml"
-    else if cfg.registryFile != null then
-      "yaml"
-    else
-      "json";
-
-  pythonWithYaml = pkgs.python3.withPackages (pythonPackages: [
-    pythonPackages.pyyaml
-  ]);
-
-  yamlToJson = pkgs.writeShellScriptBin "incus-registry-yaml-to-json" ''
-    exec ${pythonWithYaml}/bin/python3 -c '
-import json
-import sys
-import yaml
-
-if len(sys.argv) != 2:
-    print("usage: incus-registry-yaml-to-json <registry.yaml>", file=sys.stderr)
-    sys.exit(2)
-
-with open(sys.argv[1], "r", encoding="utf-8") as registry:
-    data = yaml.safe_load(registry) or {}
-
-json.dump(data, sys.stdout)
-' "$@"
-  '';
 
   applyScript = pkgs.writeShellScript "apply-declarative-incus" ''
     set -uo pipefail
 
-    registry_source=${registrySource}
-    profiles_source=${profilesSource}
-    instances_source=${instancesSource}
-    registry_format=${lib.escapeShellArg registryFormat}
-    configured_mode=${lib.escapeShellArg cfg.mode}
-    desired=$(mktemp)
-    trap 'rm -f "$desired"' EXIT
-
-    if [ "$registry_format" = split-yaml ]; then
-      profiles_json=$(mktemp)
-      instances_json=$(mktemp)
-      trap 'rm -f "$desired" "$profiles_json" "$instances_json"' EXIT
-
-      ${yamlToJson}/bin/incus-registry-yaml-to-json "$profiles_source" > "$profiles_json"
-      ${yamlToJson}/bin/incus-registry-yaml-to-json "$instances_source" > "$instances_json"
-      ${pkgs.jq}/bin/jq -n \
-        --slurpfile profiles "$profiles_json" \
-        --slurpfile instances "$instances_json" \
-        --arg mode "$configured_mode" \
-        '{
-          mode: $mode,
-          profiles: ($profiles[0].profiles // $profiles[0] // {}),
-          instances: ($instances[0].instances // $instances[0] // {})
-        }' > "$desired"
-    elif [ "$registry_format" = yaml ]; then
-      ${yamlToJson}/bin/incus-registry-yaml-to-json "$registry_source" \
-        | ${pkgs.jq}/bin/jq --arg mode "$configured_mode" '. + { mode: $mode }' > "$desired"
-    else
-      ${pkgs.jq}/bin/jq --arg mode "$configured_mode" '. + { mode: $mode }' "$registry_source" > "$desired"
-    fi
+    desired=${registry}
 
     if [ -n "''${INCUS_APPLY_MODE:-}" ]; then
       mode="$INCUS_APPLY_MODE"
@@ -327,6 +256,11 @@ json.dump(data, sys.stdout)
 
       local current_value
       current_value=$(incus config device get "$instance" "$dev" "$key" 2>/dev/null || true)
+      # Incus keeps hwaddr as typed; some live NICs are uppercase.
+      if [ "$key" = "hwaddr" ]; then
+        current_value=''${current_value,,}
+        desired_value=''${desired_value,,}
+      fi
       if [ "$current_value" != "$desired_value" ]; then
         log "setting instance device $instance/$dev $key=$desired_value"
         if ! incus config device set "$instance" "$dev" "$key" "$desired_value"; then
@@ -483,38 +417,17 @@ in
       default = { };
     };
 
-    registryFile = lib.mkOption {
-      type = lib.types.nullOr lib.types.path;
-      default = null;
-      description = ''
-        YAML registry containing Incus profiles and instances. When set, this is
-        the source of truth and the Nix attrset options are ignored.
-      '';
-    };
-
-    profilesFile = lib.mkOption {
-      type = lib.types.nullOr lib.types.path;
-      default = null;
-      description = ''
-        YAML registry containing Incus profile definitions. When set with
-        instancesFile, the split YAML files are the source of truth.
-      '';
-    };
-
-    instancesFile = lib.mkOption {
-      type = lib.types.nullOr lib.types.path;
-      default = null;
-      description = ''
-        YAML registry containing Incus instance definitions. When set with
-        profilesFile, the split YAML files are the source of truth.
-      '';
+    registry = lib.mkOption {
+      type = lib.types.path;
+      readOnly = true;
+      default = registry;
+      description = "Generated JSON registry the apply service and incus-sync read.";
     };
   };
 
   config = lib.mkIf cfg.enable {
     environment.systemPackages = [
       pkgs.jq
-      yamlToJson
       (pkgs.writeShellScriptBin "incus-declarative-apply" ''
         exec ${applyScript}
       '')

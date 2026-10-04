@@ -1,3 +1,5 @@
+{ lib, networkTopology, ... }:
+
 {
   imports = [ ../../../../modules/software/services/usbip-tray.nix ];
   my.usbip = {
@@ -19,7 +21,6 @@
   my.incusDeclarative = {
     enable = true;
     mode = "non-destructive";
-    profilesFile = ./profiles.yaml;
-    instancesFile = ./instances.yaml;
+    inherit (import ./registry.nix { inherit lib networkTopology; }) profiles instances;
   };
 }
