@@ -173,7 +173,7 @@ let
     runtimeInputs = [
       (pkgs.python3.withPackages (p: [ p.vdf ]))
       pkgs.procps # pgrep, to warn when Steam is running
-      pkgs.systemd # systemctl, to stop/restart Deck Game Mode when requested
+      pkgs.systemd # systemctl/systemd-run, to restart Steam and defer syncs past games
     ];
     text = ''
       exec python3 ${./sync-steam-shortcuts.py} ${steamGamesJson} ${lib.escapeShellArg artBase} ${binDir} ${
@@ -197,8 +197,8 @@ in
       };
     };
 
-    # Sync non-Steam shortcuts after each rebuild. The script skips safely if
-    # Steam is already running, because Steam rewrites shortcuts.vdf on exit.
+    # Sync non-Steam shortcuts after each rebuild. No-op unless something changed;
+    # with stopSteamDuringSync it waits for running games before restarting Steam.
     systemd.user.services.sync-steam-shortcuts = {
       Unit = {
         Description = "Sync software.games.* into Steam as non-Steam shortcuts";

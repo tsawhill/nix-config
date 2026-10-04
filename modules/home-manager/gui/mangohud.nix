@@ -17,9 +17,10 @@
       output_folder = /tmp;
     };
     settingsPerApplication = {
-      walker.no_display = true;
+      # MangoHud matches /proc/self/exe's basename, i.e. the nix wrapper target
+      ".walker-wrapped".no_display = true;
       mpv.no_display = true;
-      moonlight.no_display = true;
+      ".moonlight-wrapped".no_display = true;
       gamescope.no_display = true;
       jellium-desktop.no_display = true;
     };

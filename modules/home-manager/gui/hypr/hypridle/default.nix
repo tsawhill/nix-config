@@ -1,4 +1,4 @@
-{ lib, config, ... }:
+{ lib, config, pkgs, ... }:
 let
   cfg = config.my.hypr.idle;
   lockCommand = "hyprlock --grace 5";
@@ -28,10 +28,19 @@ in
   config = {
     services.hypridle = {
       enable = true;
+      # Adds general:ignore_dbus_inhibit_apps (matched against the Inhibit app name)
+      package = pkgs.hypridle.overrideAttrs (old: {
+        patches = (old.patches or [ ]) ++ [ ./ignore-dbus-inhibit-apps.patch ];
+      });
       settings = {
         general = {
           lock_cmd = lockCommand;
           after_sleep_cmd = dpmsCommand "enable";
+          ignore_dbus_inhibit_apps = lib.concatStringsSep ", " [
+            "Moonlight"
+            "Steam"
+            "./steamwebhelper"
+          ];
         };
         listener = lib.filter (x: x != null) [
           (if enabled cfg.screenOff.time then {

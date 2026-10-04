@@ -1,0 +1,81 @@
+diff --git a/src/config/ConfigManager.cpp b/src/config/ConfigManager.cpp
+index 73fda8e..d42f5ec 100644
+--- a/src/config/ConfigManager.cpp
++++ b/src/config/ConfigManager.cpp
+@@ -70,6 +70,7 @@ void CConfigManager::init() {
+     m_config.addConfigValue("general:before_sleep_cmd", Hyprlang::STRING{""});
+     m_config.addConfigValue("general:after_sleep_cmd", Hyprlang::STRING{""});
+     m_config.addConfigValue("general:ignore_dbus_inhibit", Hyprlang::INT{0});
++    m_config.addConfigValue("general:ignore_dbus_inhibit_apps", Hyprlang::STRING{""});
+     m_config.addConfigValue("general:ignore_systemd_inhibit", Hyprlang::INT{0});
+     m_config.addConfigValue("general:ignore_wayland_inhibit", Hyprlang::INT{0});
+     m_config.addConfigValue("general:inhibit_sleep", Hyprlang::INT{2});
+diff --git a/src/core/Hypridle.cpp b/src/core/Hypridle.cpp
+index df0f177..ecc2521 100644
+--- a/src/core/Hypridle.cpp
++++ b/src/core/Hypridle.cpp
+@@ -11,6 +11,8 @@
+ #include <algorithm>
+ #include <thread>
+ #include <mutex>
++#include <string_view>
++#include <unordered_set>
+ #include <hyprutils/os/Process.hpp>
+ 
+ CHypridle::CHypridle() {
+@@ -539,10 +541,46 @@ static void handleDbusBlockInhibitsPropertyChanged(sdbus::Message msg) {
+     }
+ }
+ 
++static std::unordered_set<uint32_t> ignoredDbusCookies;
++
++static bool isDbusAppIgnored(const std::string& app) {
++    static const auto IGNOREAPPS = g_pConfigManager->getValue<Hyprlang::STRING>("general:ignore_dbus_inhibit_apps");
++    std::string_view  list       = *IGNOREAPPS;
++
++    while (!list.empty()) {
++        const auto comma = list.find(',');
++        auto       entry = list.substr(0, comma);
++        while (!entry.empty() && entry.front() == ' ')
++            entry.remove_prefix(1);
++        while (!entry.empty() && entry.back() == ' ')
++            entry.remove_suffix(1);
++        if (!entry.empty() && entry == app)
++            return true;
++        if (comma == std::string_view::npos)
++            break;
++        list.remove_prefix(comma + 1);
++    }
++
++    return false;
++}
++
+ static uint32_t handleDbusScreensaver(std::string app, std::string reason, uint32_t cookie, bool inhibit, const char* sender) {
+     std::string ownerID = sender;
+     bool cookieFound = false;
+ 
++    static uint32_t cookieID = 1337;
++
++    if (inhibit && isDbusAppIgnored(app)) {
++        Debug::log(LOG, "ScreenSaver inhibit from {} (owner: {}) ignored by config, content {}", app, ownerID, reason);
++        ignoredDbusCookies.insert(cookieID);
++        return cookieID++;
++    }
++
++    if (!inhibit && ignoredDbusCookies.erase(cookie)) {
++        Debug::log(LOG, "ScreenSaver uninhibit for ignored cookie {}", cookie);
++        return 0;
++    }
++
+     if (!inhibit) {
+         Debug::log(TRACE, "Read uninhibit cookie: {}", cookie);
+         const auto COOKIE = g_pHypridle->getDbusInhibitCookie(cookie);
+@@ -566,8 +604,6 @@ static uint32_t handleDbusScreensaver(std::string app, std::string reason, uint3
+     else if (cookieFound)
+         g_pHypridle->onInhibit(false);
+ 
+-    static uint32_t cookieID = 1337;
+-
+     if (inhibit) {
+         auto cookie = CHypridle::SDbusInhibitCookie{.cookie = cookieID, .app = app, .reason = reason, .ownerID = ownerID};
+ 
