@@ -6,12 +6,6 @@
   ...
 }:
 
-let
-  desktopSSHUsers = [ "root" ];
-  laptopSSHUsers = [ "root" ];
-  buildSSHUsers = [ "root" ];
-  phoneSSHUsers = [ "root" ];
-in
 {
   networking.hostName = "remote-nginx-nix";
   system.stateVersion = "26.05";
@@ -41,10 +35,6 @@ in
 
     # SSH Access
     "${self}/modules/ssh/openssh.nix"
-    (import "${self}/modules/ssh/pubkeys/taylor-desktop-nix-taylor.nix" desktopSSHUsers)
-    (import "${self}/modules/ssh/pubkeys/taylor-laptop-nix-taylor.nix" laptopSSHUsers)
-    (import "${self}/modules/ssh/pubkeys/build-nix-root.nix" buildSSHUsers)
-    (import "${self}/modules/ssh/pubkeys/phone-taylor.nix" phoneSSHUsers)
 
     # Software
     "${self}/modules/software/bundles/headless.nix"

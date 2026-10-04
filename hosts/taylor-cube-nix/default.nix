@@ -12,12 +12,6 @@
 # profile, boot/disks/networking, the Lexar SD sync root, and the cube's samba
 # credentials. Revert this commit when the desktop comes back.
 
-let
-  buildSSHUsers = [ "root" ];
-  desktopSSHUsers = [ "taylor" ];
-  laptopSSHUsers = [ "taylor" ];
-  phoneSSHUsers = [ "taylor" ];
-in
 {
   networking.hostName = "taylor-cube-nix";
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
@@ -61,10 +55,6 @@ in
 
     # SSH Access
     "${self}/modules/ssh/openssh.nix"
-    (import "${self}/modules/ssh/pubkeys/build-nix-root.nix" buildSSHUsers)
-    (import "${self}/modules/ssh/pubkeys/taylor-desktop-nix-taylor.nix" desktopSSHUsers)
-    (import "${self}/modules/ssh/pubkeys/taylor-laptop-nix-taylor.nix" laptopSSHUsers)
-    (import "${self}/modules/ssh/pubkeys/phone-taylor.nix" phoneSSHUsers)
 
     # Software
     "${self}/modules/software/bundles"

@@ -19,7 +19,11 @@
 {
   imports = [
     "${modulesPath}/virtualisation/lxc-container.nix"
-    (import "${self}/modules/ssh/pubkeys/build-nix-root.nix" [ "root" ])
+  ];
+
+  # Not a topology host, so modules/ssh/authorized-keys.nix doesn't cover it.
+  users.users.root.openssh.authorizedKeys.keys = [
+    (import "${self}/modules/ssh/access.nix").keys.build-nix-root
   ];
 
   # Nothing is ever installed from a channel here; colmena pushes closures.

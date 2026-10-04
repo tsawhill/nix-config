@@ -7,8 +7,6 @@
   ...
 }:
 let
-  cubeSSHUsers = [ "root" ];
-
   # TEMP: nixos-26.05 ships claude-code 2.1.223 and the VSCodium remote server's
   # bundled extension CLI is 2.1.278; neither knows claude-opus-5-5. Take the CLI
   # from unstable and point the extension at it. Drop unstablePkgs, claudeWrapper,
@@ -32,8 +30,6 @@ in
   imports = [
     ./base
 
-    # SSH Access: taylor@taylor-cube-nix, on top of base's key set
-    (import "${self}/modules/ssh/pubkeys/taylor-cube-nix-taylor.nix" cubeSSHUsers)
     "${self}/modules/software/bundles/dev.nix"
     "${self}/modules/software/services/rebuild-scripts.nix"
     "${self}/modules/software/packages/nixos-factory.nix"

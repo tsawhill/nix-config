@@ -24,9 +24,14 @@ $env.config.color_config = ($env.config.color_config | merge {
   shape_variable: '#c0caf5'
 })
 
-# Hostnames from known_hosts and ~/.ssh/config, keeping any user@ prefix.
+# Hosts in the repo's SSH access map (modules/ssh/access.nix) only appear as the
+# user@host pairs this login's key can use; other hosts come from known_hosts and
+# ~/.ssh/config, keeping any user@ prefix.
 def ssh-hosts [word: string] {
   let user = if ($word | str contains '@') { ($word | split row '@' | first) + '@' } else { '' }
+  let access = if ('/etc/ssh/access.json' | path exists) { open /etc/ssh/access.json } else { { managed: [] reachable: {} } }
+  let granted = $access.reachable | get -o $"(sys host | get hostname)-($env.USER)" | default []
+    | where ($it | str starts-with $user)
   # NixOS lists knownHostsFiles in GlobalKnownHostsFile, so ask ssh for the paths.
   let known = ^ssh -G x err> /dev/null | lines | parse '{key} {value}'
     | where key in [globalknownhostsfile userknownhostsfile]
@@ -41,8 +46,10 @@ def ssh-hosts [word: string] {
   $known | append $aliases
     | str replace -r '^\[(.+)\]:\d+$' '$1'
     | where $it !~ '[*?!]'
+    | where $it not-in $access.managed
     | uniq | sort
     | each { $user + $in }
+    | prepend $granted
 }
 
 # ssh hosts ourselves, everything else via carapace; null means file completion.
@@ -62,3 +69,34 @@ $env.config.completions.external = {
     }
   }
 }
+
+$env.config.keybindings = ($env.config.keybindings | append [
+  {
+    # Tab takes the grey history hint when one is showing, otherwise completes as usual.
+    name: completion_menu
+    modifier: none
+    keycode: tab
+    mode: [emacs vi_normal vi_insert]
+    event: {
+      until: [
+        { send: historyhintcomplete }
+        { send: menu name: completion_menu }
+        { send: menunext }
+        { edit: complete }
+      ]
+    }
+  }
+  {
+    # Shift+Tab skips the hint and opens the menu; inside the menu it steps back.
+    name: completion_menu_no_hint
+    modifier: shift
+    keycode: backtab
+    mode: [emacs vi_normal vi_insert]
+    event: {
+      until: [
+        { send: menu name: completion_menu }
+        { send: menuprevious }
+      ]
+    }
+  }
+])

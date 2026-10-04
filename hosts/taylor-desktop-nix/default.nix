@@ -4,13 +4,6 @@
   lib,
   ...
 }:
-let
-  buildSSHUsers = [ "root" ];
-  laptopSSHUsers = [ "taylor" ];
-  cubeSSHUsers = [ "taylor" ];
-  phoneSSHUsers = [ "taylor" ];
-
-in
 {
   networking.hostName = "taylor-desktop-nix";
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
@@ -50,11 +43,6 @@ in
 
     # SSH Access
     "${self}/modules/ssh/openssh.nix"
-    (import "${self}/modules/ssh/pubkeys/build-nix-root.nix" buildSSHUsers)
-    (import "${self}/modules/ssh/pubkeys/taylor-laptop-nix-taylor.nix" laptopSSHUsers)
-    # USB/IP sharing from the cube
-    (import "${self}/modules/ssh/pubkeys/taylor-cube-nix-taylor.nix" cubeSSHUsers)
-    (import "${self}/modules/ssh/pubkeys/phone-taylor.nix" phoneSSHUsers)
 
     # Software
     "${self}/modules/software/bundles"

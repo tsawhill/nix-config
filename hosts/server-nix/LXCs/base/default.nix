@@ -12,11 +12,6 @@ let
   lan = networkTopology.networks.lan;
   inherit (networkTopology.lib) lanIp;
   lanPrefix = lib.last (lib.splitString "/" lan.cidr);
-
-  desktopSSHUsers = [ "root" ];
-  laptopSSHUsers = [ "root" ];
-  buildSSHUsers = [ "root" ];
-  phoneSSHUsers = [ "root" ];
 in
 {
   imports = [
@@ -38,10 +33,6 @@ in
 
     # SSH Access
     "${self}/modules/ssh/openssh.nix"
-    (import "${self}/modules/ssh/pubkeys/taylor-desktop-nix-taylor.nix" desktopSSHUsers)
-    (import "${self}/modules/ssh/pubkeys/taylor-laptop-nix-taylor.nix" laptopSSHUsers)
-    (import "${self}/modules/ssh/pubkeys/build-nix-root.nix" buildSSHUsers)
-    (import "${self}/modules/ssh/pubkeys/phone-taylor.nix" phoneSSHUsers)
 
     # Users
     "${self}/modules/users"

@@ -109,8 +109,8 @@ in
       # sshd needs a real shell to run the forced command.
       shell = pkgs.bash;
       openssh.authorizedKeys.keys = [
-        # build-nix's root key (modules/ssh/pubkeys/build-nix-root.nix), limited to the CA commands
-        ''restrict,command="${remote}" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMpZvx4kihRZV1pBxeHwsaIug7sgv7LSZrFl+P+of0fK root@build-nix''
+        # build-nix's root key, limited to the CA commands
+        ''restrict,command="${remote}" ${(import ../../ssh/access.nix).keys.build-nix-root}''
       ];
     };
 

@@ -1,6 +1,7 @@
 {
   imports = [
     ./known-hosts.nix
+    ./authorized-keys.nix
   ];
 
   services.openssh = {

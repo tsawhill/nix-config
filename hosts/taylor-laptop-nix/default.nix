@@ -5,11 +5,6 @@
   ...
 }:
 
-let
-  desktopSSHUsers = [ "taylor" ];
-  buildSSHUsers = [ "root" ];
-  phoneSSHUsers = [ "taylor" ];
-in
 {
   networking.hostName = "taylor-laptop-nix";
   system.stateVersion = "26.05";
@@ -49,9 +44,6 @@ in
 
     # SSH Access
     "${self}/modules/ssh/openssh.nix"
-    (import "${self}/modules/ssh/pubkeys/taylor-desktop-nix-taylor.nix" desktopSSHUsers)
-    (import "${self}/modules/ssh/pubkeys/build-nix-root.nix" buildSSHUsers)
-    (import "${self}/modules/ssh/pubkeys/phone-taylor.nix" phoneSSHUsers)
 
     # Software
     "${self}/modules/software/bundles"

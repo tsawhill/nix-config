@@ -7,13 +7,6 @@
   ...
 }:
 
-let
-  desktopSSHUsers = [ "taylor" ];
-  laptopSSHUsers = [ "taylor" ];
-  serverSSHUsers = [ "root" ];
-  buildSSHUsers = [ "root" ];
-  phoneSSHUsers = [ "taylor" ];
-in
 {
   networking.hostName = "pi-backup-nix";
   system.stateVersion = "25.11";
@@ -56,11 +49,6 @@ in
 
     # SSH Access
     "${self}/modules/ssh/openssh.nix"
-    (import "${self}/modules/ssh/pubkeys/taylor-desktop-nix-taylor.nix" desktopSSHUsers)
-    (import "${self}/modules/ssh/pubkeys/taylor-laptop-nix-taylor.nix" laptopSSHUsers)
-    (import "${self}/modules/ssh/pubkeys/server-nix-root.nix" serverSSHUsers)
-    (import "${self}/modules/ssh/pubkeys/build-nix-root.nix" buildSSHUsers)
-    (import "${self}/modules/ssh/pubkeys/phone-taylor.nix" phoneSSHUsers)
 
     # Software
     # "${self}/modules/software/bundles/all.nix"
