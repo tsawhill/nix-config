@@ -73,7 +73,7 @@ $env.config.completions.external = {
 $env.config.keybindings = ($env.config.keybindings | append [
   {
     # Tab takes the grey history hint when one is showing, otherwise completes as usual.
-    name: completion_menu
+    name: completion_menu_hint
     modifier: none
     keycode: tab
     mode: [emacs vi_normal vi_insert]
