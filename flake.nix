@@ -156,6 +156,7 @@
         };
 
       packages.x86_64-linux = {
+        ultimate-vocal-remover = pkgs.callPackage ./pkgs/ultimate-vocal-remover/package.nix { };
         yarc-launcher = pkgs.callPackage ./pkgs/yarc-launcher.nix { };
         hyprcrosshair = pkgs.callPackage ./pkgs/hyprcrosshair/package.nix { };
         santroller-configurator = pkgs.callPackage ./pkgs/santroller-configurator/package.nix { };

@@ -20,6 +20,7 @@
       # Audio editing
       audacity
       reaper
+      (pkgs.callPackage ../../../../pkgs/ultimate-vocal-remover/package.nix { })
     ];
   };
 }

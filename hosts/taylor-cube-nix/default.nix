@@ -2,6 +2,7 @@
   self,
   inputs,
   lib,
+  pkgs,
   ...
 }:
 
@@ -201,6 +202,10 @@
   };
   software.apps.emulators.enable = true;
   software.apps.tools.enable = true;
+  # TEMPORARY: UVR for the Deadlock voice mod; remove when done.
+  environment.systemPackages = [
+    (pkgs.callPackage ../../pkgs/ultimate-vocal-remover/package.nix { })
+  ];
   software.games.lsfgVk.enable = true;
 
   software.games.steamSync.stopSteamDuringSync = true;

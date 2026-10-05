@@ -1,0 +1,10 @@
+# Keep UVR's older NumPy/librosa stack and checkpoint loading compatible.
+torch==2.5.1+cpu
+torchaudio==2.5.1+cpu
+torchvision==0.20.1+cpu
+torchmetrics==1.3.2
+numba==0.60.0
+llvmlite==0.43.0
+onnx==1.16.2
+onnxruntime==1.19.2
+playsound==1.2.2
