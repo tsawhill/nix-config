@@ -16,6 +16,14 @@ in
     package = unstablePkgs.searxng;
     environmentFile = config.sops.secrets.searx_secret_key.path;
     settings = {
+      # Brave's results are bad; keep every Brave engine out of the defaults.
+      use_default_settings.engines.remove = [
+        "brave"
+        "brave.images"
+        "brave.videos"
+        "brave.news"
+      ];
+
       general = {
         instance_name = "searx-nix";
         debug = false;
@@ -63,16 +71,6 @@ in
           engine = "startpage";
           shortcut = "sp";
           weight = 3;
-          categories = [
-            "general"
-            "images"
-          ];
-        }
-        {
-          name = "brave";
-          engine = "brave";
-          shortcut = "brave";
-          weight = 1;
           categories = [
             "general"
             "images"
