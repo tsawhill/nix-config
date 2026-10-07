@@ -100,12 +100,6 @@ in
           shortcut = "wd";
           categories = [ "general" ];
         }
-        {
-          name = "archive.org";
-          engine = "archive.org";
-          shortcut = "ao";
-          categories = [ "general" ];
-        }
 
         # --- Video ---
         {
@@ -113,14 +107,6 @@ in
           engine = "youtube_noapi";
           shortcut = "yt";
           categories = [ "videos" ];
-        }
-
-        # --- Social ---
-        {
-          name = "reddit";
-          engine = "reddit";
-          shortcut = "re";
-          categories = [ "social media" ];
         }
 
         # --- Tech / Code ---
@@ -157,7 +143,7 @@ in
         }
         {
           name = "dockerhub";
-          engine = "docker hub";
+          engine = "docker_hub";
           shortcut = "dh";
           categories = [ "it" ];
         }
