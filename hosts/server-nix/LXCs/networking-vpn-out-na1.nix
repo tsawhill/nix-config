@@ -47,7 +47,6 @@ in
     presharedKeySecret = "vpn_egress_wireguard_preshared_key";
 
     clientAddresses = [
-      (lanIp "searx-nix")
       (lanIp "unbound-vpn-na-nix")
     ];
     lanCidr = networkTopology.networks.lan.cidr;
@@ -58,18 +57,6 @@ in
         gateway = networkTopology.networks.lan.gateway;
       }
     ];
-
-    # Reuse searx-nix's SSH host key as a client identity. The forced-key
-    # restrictions on this gateway allow exactly one enumerated rotation action
-    # from searx-nix's LAN address and do not grant an interactive root shell.
-    remoteTriggers = [
-      {
-        source = lanIp "searx-nix";
-        publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEkQnFXTyn5xJS70NwfnCyMnDfUyNF/c+8DZw94dd0MD searx-nix-host-key";
-        allowedReasons = [ "searx-startpage-blocked" ];
-      }
-    ];
-    blockedExitReasons = [ "searx-startpage-blocked" ];
 
     gotifyUrl = "https://gotify.tsawhill.org/message";
   }

@@ -36,20 +36,21 @@
 
       engines = [
         # --- Web ---
+        # Direct from the home IP; VPN exits got CAPTCHA-walled constantly.
         {
-          name = "startpage";
-          engine = "startpage";
-          shortcut = "sp";
-          weight = 10;
+          name = "google";
+          engine = "google";
+          shortcut = "g";
+          weight = 3;
           categories = [
             "general"
             "images"
           ];
         }
         {
-          name = "google";
-          engine = "google";
-          shortcut = "g";
+          name = "startpage";
+          engine = "startpage";
+          shortcut = "sp";
           weight = 1;
           categories = [
             "general"
@@ -65,6 +66,13 @@
             "general"
             "images"
           ];
+        }
+        {
+          name = "mojeek";
+          engine = "mojeek";
+          shortcut = "mjk";
+          weight = 1;
+          categories = [ "general" ];
         }
 
         # --- Reference ---

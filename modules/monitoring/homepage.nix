@@ -414,7 +414,6 @@ let
     ''label_replace(up{job="node",instance!~"${intermittentHostRegex}"} == 0, "alert", "down", "", "")''
     ''label_replace(node_zfs_zpool_state{instance="server-nix",state!="online",zpool=~"${zfsPoolRegex}"} == 1, "alert", "zpool", "", "")''
     ''label_replace(vpn_egress_tunnel_up{instance="networking-vpn-out-na1-nix"} == 0, "alert", "vpn", "", "")''
-    ''label_replace(searx_vpn_backoff_active{instance="searx-nix"} == 1, "alert", "searx-vpn", "", "")''
   ];
 
   statusWidget = {
@@ -460,8 +459,6 @@ let
                     {{ .String "metric.zpool" }} {{ .String "metric.state" }}
                   {{ else if eq $kind "vpn" }}
                     VPN tunnel unhealthy (leak prevention active)
-                  {{ else if eq $kind "searx-vpn" }}
-                    Startpage remediation backed off
                   {{ else }}
                     {{ $kind }} {{ printf "%.0f%%" (.Float "value.1") }}
                   {{ end }}

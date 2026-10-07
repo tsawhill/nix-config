@@ -10,7 +10,6 @@ from unittest.mock import Mock, patch
 
 from controller import Controller, SystemRunner, parse_remote_command, rotation_lock
 from dns_recovery import recover, query
-from searx_watchdog import Watchdog, is_startpage_block, render_metrics
 
 
 class Runner:
@@ -307,72 +306,6 @@ class DnsRecoveryTests(unittest.TestCase):
             self.assertFalse(query({"kdig": "kdig"}, [], "example.com"))
             run.return_value.stdout = "status: NXDOMAIN"
             self.assertTrue(query({"kdig": "kdig"}, [], "example.com"))
-
-
-class WatchdogTests(unittest.TestCase):
-    def test_parser_only_matches_startpage_blocks(self):
-        self.assertTrue(is_startpage_block("startpage CAPTCHA challenge"))
-        self.assertTrue(is_startpage_block("access denied while querying Startpage"))
-        self.assertFalse(is_startpage_block("brave engine returned status code 429"))
-
-    def test_successful_remediation_restarts_and_clears_block(self):
-        calls = []
-
-        def run(arguments, **_kwargs):
-            calls.append(arguments)
-            return subprocess.CompletedProcess(arguments, 0, "", "")
-
-        state = {}
-        watchdog = Watchdog(
-            {
-                "ssh": "ssh",
-                "identityFile": "/key",
-                "gateway": "root@gateway",
-                "systemctl": "systemctl",
-                "rotationTimeoutSeconds": 30,
-                "incidentAttempts": 3,
-                "cooldownSeconds": 600,
-                "restartSettleSeconds": 1,
-                "incidentBackoffSeconds": 21600,
-            },
-            state,
-            run=run,
-            sleep=lambda _seconds: None,
-            now=lambda: 1000,
-            canary=lambda: True,
-        )
-        self.assertTrue(watchdog.remediate())
-        self.assertEqual(state["blocked"], 0)
-        self.assertEqual(state["restarts"], 1)
-        self.assertIn(["systemctl", "restart", "searx.service"], calls)
-
-    def test_exhaustion_sets_six_hour_backoff(self):
-        def run(arguments, **_kwargs):
-            return subprocess.CompletedProcess(arguments, 1, "", "")
-
-        state = {}
-        watchdog = Watchdog(
-            {
-                "ssh": "ssh",
-                "identityFile": "/key",
-                "gateway": "root@gateway",
-                "systemctl": "systemctl",
-                "rotationTimeoutSeconds": 30,
-                "incidentAttempts": 3,
-                "cooldownSeconds": 600,
-                "restartSettleSeconds": 1,
-                "incidentBackoffSeconds": 21600,
-            },
-            state,
-            run=run,
-            sleep=lambda _seconds: None,
-            now=lambda: 1000,
-            canary=lambda: False,
-        )
-        self.assertFalse(watchdog.remediate())
-        self.assertEqual(state["rotationRequests"], 3)
-        self.assertEqual(state["backoffUntil"], 22600)
-        self.assertIn("searx_vpn_backoff_active 1", render_metrics(state, 1001))
 
 
 if __name__ == "__main__":
