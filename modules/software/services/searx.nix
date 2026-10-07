@@ -55,48 +55,55 @@ in
 
       engines = [
         # --- Web ---
-        # Startpage proxies Google and gets past its bot checks; Google itself often refuses.
+        # The only two answering normal searches. Startpage and Mojeek are inactive
+        # upstream (proof-of-work CAPTCHAs) and the plain Google engine gets refused.
         {
-          name = "google";
-          engine = "google";
+          name = "google cse";
+          engine = "google_cse";
           shortcut = "g";
-          weight = 1;
-          categories = [
-            "general"
-            "images"
-          ];
+          disabled = false;
         }
         {
-          name = "startpage";
-          engine = "startpage";
-          shortcut = "sp";
-          weight = 3;
-          categories = [
-            "general"
-            "images"
-          ];
-        }
-        {
-          name = "mojeek";
-          engine = "mojeek";
-          shortcut = "mjk";
-          weight = 1;
-          categories = [ "general" ];
+          name = "duckduckgo";
+          engine = "duckduckgo";
+          shortcut = "ddg";
+          disabled = false;
         }
 
-        # --- Reference ---
+        # --- Reference & translation ---
+        # Default general engines kept out of normal searches; bangs still work.
         {
           name = "wikipedia";
           engine = "wikipedia";
           shortcut = "wp";
           categories = [ "general" ];
           language = "en";
+          disabled = true;
         }
         {
           name = "wikidata";
           engine = "wikidata";
           shortcut = "wd";
           categories = [ "general" ];
+          disabled = true;
+        }
+        {
+          name = "lingva";
+          engine = "lingva";
+          shortcut = "lv";
+          disabled = true;
+        }
+        {
+          name = "dictzone";
+          engine = "dictzone";
+          shortcut = "dc";
+          disabled = true;
+        }
+        {
+          name = "mymemory translated";
+          engine = "translated";
+          shortcut = "tl";
+          disabled = true;
         }
 
         # --- Video ---
