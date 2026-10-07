@@ -232,15 +232,28 @@ let
 
   sortByGroup = links: lib.concatMap (g: lib.filter (s: s.group == g) links) (groupsInOrder links);
 
-  # Services link from their monitor tiles, so bookmarks only carry the rest.
-  mkBookmarkGroup = group: {
-    title = group;
-    links = map (s: {
-      title = s.name;
-      url = s.url;
-      icon = s.icon or "";
-    }) (lib.filter (s: s.group == group) cfg.internalLinks);
+  # Mid lightness so they read on both the light and dark presets.
+  groupColors = {
+    Daily = "335 75 62";
+    Media = "280 55 64";
+    Arrs = "200 65 58";
+    Infra = "265 50 64";
+    Tools = "160 45 48";
+    Monitoring = "20 80 62";
   };
+
+  # Services link from their monitor tiles, so bookmarks only carry the rest.
+  mkBookmarkGroup =
+    group:
+    {
+      title = group;
+      links = map (s: {
+        title = s.name;
+        url = s.url;
+        icon = s.icon or "";
+      }) (lib.filter (s: s.group == group) cfg.internalLinks);
+    }
+    // lib.optionalAttrs (groupColors ? ${group}) { color = groupColors.${group}; };
 
   mkMonitorSite =
     s:
@@ -289,10 +302,10 @@ let
   # Go templates refuse to compare a float against an int literal.
   asFloat = n: "${toString n}.0";
 
-  # Expects the percentage in $pct; turns red past the threshold.
+  # Expects the percentage in $pct; styled by cute-bar in cssText.
   usageBar = threshold: ''
-    <div style="height:3px;background:var(--color-separator);margin-top:4px;">
-      <div style="height:3px;width:{{ printf "%.0f" $pct }}%;background:{{ if gt $pct ${asFloat threshold} }}var(--color-negative){{ else }}var(--color-primary){{ end }};"></div>
+    <div class="cute-bar">
+      <div class="cute-bar-fill{{ if gt $pct ${asFloat threshold} }} is-hot{{ end }}" style="width:{{ printf "%.0f" $pct }}%;"></div>
     </div>
   '';
 
@@ -313,7 +326,7 @@ let
   # Prometheus returns value[1] as a numeric string; gjson coerces it for us.
   hostsWidget = {
     type = "custom-api";
-    title = "Hosts";
+    title = "🐾 Hosts";
     cache = "1m";
     url = "${prometheus}/api/v1/query";
     parameters.query = hostsQuery;
@@ -344,7 +357,7 @@ let
 
   zfsWidget = {
     type = "custom-api";
-    title = "Server ZFS Pools";
+    title = "💾 Storage";
     cache = "1m";
     url = "${prometheus}/api/v1/query";
     parameters.query = zfsQuery;
@@ -410,7 +423,7 @@ let
 
   statusWidget = {
     type = "custom-api";
-    title = "Status";
+    title = "✨ Status";
     cache = "1m";
     url = "${prometheus}/api/v1/query";
     parameters.query = statusQuery;
@@ -431,11 +444,11 @@ let
       {{ end }}
       <div class="flex justify-between items-center">
         {{ if $clear }}
-          <span class="size-h3 color-positive">All clear</span>
+          <span class="size-h3 color-positive">All clear 💖</span>
         {{ else }}
-          <span class="size-h3 color-negative">Needs attention</span>
+          <span class="size-h3 color-negative">Needs some love 🩹</span>
         {{ end }}
-        <span class="color-subdue">{{ printf "%.0f/%.0f" $up $total }} hosts up</span>
+        <span class="color-subdue">{{ printf "%.0f/%.0f" $up $total }} hosts up 🌸</span>
       </div>
       {{ if not $clear }}
         <ul class="list list-gap-10" style="margin-top:12px;">
@@ -472,6 +485,113 @@ let
       ${lib.getExe pkgs.curl} -s -o /dev/null --max-time 30 http://127.0.0.1:${toString cfg.port}/api/pages/home/content/ || true
       sleep ${toString cfg.warmInterval}
     done
+  '';
+
+  cssText = ''
+    @font-face {
+      font-family: "Nunito";
+      src: url("/assets/nunito.ttf") format("truetype");
+      font-weight: 200 1000;
+      font-display: swap;
+    }
+
+    :root {
+      --border-radius: 18px;
+      --widget-gap: 26px;
+      --pink-soft: color-mix(in srgb, var(--color-primary) 22%, transparent);
+      --pink-glow: color-mix(in srgb, var(--color-primary) 40%, transparent);
+      --lavender: hsl(270, 70%, 72%);
+    }
+
+    body {
+      font-family: "Nunito", system-ui, sans-serif;
+      font-weight: 600;
+      font-variant-ligatures: normal;
+      background-image:
+        radial-gradient(color-mix(in srgb, var(--color-primary) 16%, transparent) 1.6px, transparent 1.8px),
+        linear-gradient(180deg, color-mix(in srgb, var(--color-primary) 14%, transparent), transparent 480px);
+      background-size: 24px 24px, 100% 100%;
+      background-attachment: fixed;
+    }
+
+    ::selection { background: var(--pink-glow); }
+    * { scrollbar-color: var(--pink-glow) transparent; }
+
+    .widget-content:not(.widget-content-frameless), .widget-content-frame {
+      border: 1.5px solid var(--pink-soft);
+      box-shadow: 0 8px 22px -12px var(--pink-glow);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .widget-content:not(.widget-content-frameless):hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 28px -12px var(--pink-glow);
+    }
+
+    .widget-header h2, .widget-header .uppercase {
+      text-transform: none;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      color: var(--color-text-highlight);
+    }
+
+    .search {
+      border-radius: 999px;
+      border: 1.5px solid var(--pink-soft);
+    }
+    .search:focus-within { box-shadow: 0 0 0 4px var(--pink-soft); }
+
+    .logo { font-size: 2.2rem; animation: cute-float 3s ease-in-out infinite; }
+
+    .bookmarks-icon-container { border-radius: 50%; }
+    .bookmarks-link:not(.bookmarks-link-no-arrow)::after { content: "♡" / ""; }
+    .bookmarks-link:hover { color: var(--bookmarks-group-color); }
+
+    .monitor-site-status-icon-compact, .monitor-site-status-icon { filter: drop-shadow(0 0 3px currentColor); }
+
+    .cute-bar {
+      height: 6px;
+      margin-top: 5px;
+      border-radius: 999px;
+      background: var(--pink-soft);
+      overflow: hidden;
+    }
+    .cute-bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--color-primary), var(--lavender));
+    }
+    .cute-bar-fill.is-hot {
+      background: linear-gradient(90deg, var(--color-negative), hsl(25, 90%, 68%));
+    }
+
+    .footer { opacity: 0.8; }
+
+    @keyframes cute-float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-3px); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .logo { animation: none; }
+      .widget-content:not(.widget-content-frameless):hover { transform: none; }
+    }
+  '';
+
+  favicon = pkgs.writeText "favicon.svg" ''
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🌸</text></svg>
+  '';
+
+  # Served at /assets; the font is local so the page makes no third-party requests.
+  themeAssets = pkgs.runCommand "glance-assets" { } ''
+    mkdir -p $out
+    cp ${pkgs.writeText "cute.css" cssText} $out/cute.css
+    cp ${favicon} $out/favicon.svg
+    for f in ${pkgs.nunito}/share/fonts/truetype/Nunito/*.ttf; do
+      case "$f" in
+        *Italic*) ;;
+        *) cp "$f" $out/nunito.ttf ;;
+      esac
+    done
+    test -f $out/nunito.ttf
   '';
 in
 {
@@ -598,13 +718,44 @@ in
         server = {
           host = "0.0.0.0";
           inherit (cfg) port;
+          assets-path = "${themeAssets}";
         };
 
+        branding = {
+          logo-text = "🌸";
+          favicon-url = "/assets/favicon.svg";
+          app-name = "Home 🌸";
+          custom-footer = "<p>made with 💕</p>";
+        };
+
+        # The base is the default; presets show up in the header's theme picker.
         theme = {
-          background-color = "225 14 12";
-          primary-color = "195 60 65";
-          negative-color = "358 65 60";
-          contrast-multiplier = 1.1;
+          light = true;
+          background-color = "340 60 95";
+          primary-color = "333 70 60";
+          positive-color = "160 50 42";
+          negative-color = "355 75 58";
+          contrast-multiplier = 1.15;
+          text-saturation-multiplier = 0.6;
+          custom-css-file = "/assets/cute.css";
+          presets = {
+            lavender-dream = {
+              light = true;
+              background-color = "265 55 95";
+              primary-color = "272 55 62";
+              positive-color = "160 50 42";
+              negative-color = "355 75 58";
+              contrast-multiplier = 1.15;
+              text-saturation-multiplier = 0.6;
+            };
+            midnight-sakura = {
+              background-color = "320 22 12";
+              primary-color = "330 85 76";
+              positive-color = "160 55 65";
+              negative-color = "355 85 72";
+              contrast-multiplier = 1.15;
+            };
+          };
         };
 
         pages = [
@@ -635,10 +786,12 @@ in
                 widgets = [
                   {
                     type = "bookmarks";
+                    title = "🎀 Bookmarks";
                     groups = map mkBookmarkGroup (groupsInOrder cfg.internalLinks);
                   }
                   {
                     type = "releases";
+                    title = "🧁 Fresh Releases";
                     cache = "6h";
                     collapse-after = 5;
                     repositories = cfg.releaseRepos;
@@ -651,7 +804,7 @@ in
                   statusWidget
                   {
                     type = "monitor";
-                    title = "Services";
+                    title = "🌷 Services";
                     style = "compact";
                     cache = "2m";
                     sites = map mkMonitorSite (sortByGroup cfg.services);
@@ -664,17 +817,20 @@ in
                 widgets = [
                   {
                     type = "clock";
+                    hide-header = true;
                     hour-format = "12h";
                   }
                 ]
                 ++ lib.optional (cfg.weather.location != null) {
                   type = "weather";
+                  title = "☁️ Weather";
                   inherit (cfg.weather) location units;
                   hour-format = "12h";
                 }
                 ++ [
                   {
                     type = "dns-stats";
+                    title = "🛡️ AdGuard";
                     service = "adguard";
                     url = "http://adguard-nix.${lanDomain}";
                     hour-format = "12h";
