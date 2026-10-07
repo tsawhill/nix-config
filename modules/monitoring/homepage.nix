@@ -585,13 +585,7 @@ let
     mkdir -p $out
     cp ${pkgs.writeText "cute.css" cssText} $out/cute.css
     cp ${favicon} $out/favicon.svg
-    for f in ${pkgs.nunito}/share/fonts/truetype/Nunito/*.ttf; do
-      case "$f" in
-        *Italic*) ;;
-        *) cp "$f" $out/nunito.ttf ;;
-      esac
-    done
-    test -f $out/nunito.ttf
+    cp "${pkgs.nunito}/share/fonts/truetype/Nunito/Nunito[wght].ttf" $out/nunito.ttf
   '';
 in
 {
