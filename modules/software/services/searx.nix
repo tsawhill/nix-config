@@ -47,12 +47,12 @@ in
 
       engines = [
         # --- Web ---
-        # Direct from the home IP; VPN exits got CAPTCHA-walled constantly.
+        # Startpage proxies Google and gets past its bot checks; Google itself often refuses.
         {
           name = "google";
           engine = "google";
           shortcut = "g";
-          weight = 3;
+          weight = 1;
           categories = [
             "general"
             "images"
@@ -62,7 +62,7 @@ in
           name = "startpage";
           engine = "startpage";
           shortcut = "sp";
-          weight = 1;
+          weight = 3;
           categories = [
             "general"
             "images"
@@ -138,7 +138,8 @@ in
         }
         {
           name = "stackoverflow";
-          engine = "stackoverflow";
+          engine = "stackexchange";
+          api_site = "stackoverflow";
           shortcut = "st";
           categories = [ "it" ];
         }
