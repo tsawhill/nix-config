@@ -141,12 +141,6 @@ in
           shortcut = "pypi";
           categories = [ "it" ];
         }
-        {
-          name = "dockerhub";
-          engine = "docker_hub";
-          shortcut = "dh";
-          categories = [ "it" ];
-        }
 
         # --- Maps ---
         {

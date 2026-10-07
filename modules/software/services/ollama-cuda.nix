@@ -20,7 +20,7 @@
       # text instead of answering.
       "qwen2.5-coder:7b"
       # General chat and anything needing real tool calling. ~5.2 GiB.
-      "qwen3:8b"
+      "huihui_ai/qwen3-abliterated:8b"
     ];
   };
 

@@ -9,7 +9,7 @@
       DO_NOT_TRACK = "True";
       ANONYMIZED_TELEMETRY = "False";
       # UI chats get built-in tools; qwen2.5-coder prints tool calls as text instead of answering.
-      DEFAULT_MODELS = "qwen3:8b";
+      DEFAULT_MODELS = "huihui_ai/qwen3-abliterated:8b";
     };
   };
 }
