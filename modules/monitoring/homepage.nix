@@ -138,7 +138,7 @@ let
       name = "Unifi";
       url = "https://unifi.tsawhill.org";
       icon = "si:ubiquiti";
-      group = "Infra";
+      group = "Networking";
     }
     {
       name = "Grafana";
@@ -162,7 +162,7 @@ let
       name = "AdGuard";
       url = "http://adguard-nix.${lanDomain}";
       icon = "sh:adguard-home";
-      group = "Monitoring";
+      group = "Networking";
     }
     {
       name = "YouTube";
@@ -228,6 +228,7 @@ let
     Infra = "265 50 64";
     Tools = "160 45 48";
     Monitoring = "20 80 62";
+    Networking = "185 60 52";
   };
 
   # Services link from their monitor tiles, so bookmarks only carry the rest.
@@ -694,6 +695,7 @@ in
         "Arrs"
         "Infra"
         "Tools"
+        "Networking"
         "Monitoring"
       ];
       description = "Order bookmark groups and monitor tiles are rendered in; unlisted groups are appended.";
