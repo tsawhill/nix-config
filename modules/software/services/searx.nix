@@ -1,8 +1,19 @@
-{ config, ... }:
+{
+  config,
+  inputs,
+  pkgs,
+  ...
+}:
+
+let
+  unstablePkgs = inputs.nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system};
+in
 {
   networking.firewall.allowedTCPPorts = [ 8080 ];
   services.searx = {
     enable = true;
+    # Scraper engines break constantly; unstable tracks upstream's anti-bot fixes.
+    package = unstablePkgs.searxng;
     environmentFile = config.sops.secrets.searx_secret_key.path;
     settings = {
       general = {
