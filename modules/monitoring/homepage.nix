@@ -165,18 +165,6 @@ let
       group = "Monitoring";
     }
     {
-      name = "qBittorrent intake";
-      url = "http://qbit-gen-nix.${lanDomain}:8080";
-      icon = "sh:qbittorrent";
-      group = "Infra";
-    }
-    {
-      name = "qBittorrent seeding";
-      url = "http://qbit-lts-nix.${lanDomain}:8080";
-      icon = "sh:qbittorrent";
-      group = "Infra";
-    }
-    {
       name = "YouTube";
       url = "https://youtube.com";
       icon = "si:youtube";
@@ -323,6 +311,11 @@ let
     </div>
   '';
 
+  # Raw values for hosts-sort.js; a missing metric just leaves the attribute off.
+  hostSortAttr =
+    measurement:
+    ''{{ range $results }}{{ if and (eq (.String "metric.instance") $instance) (eq (.String "metric.measurement") "${measurement}") }} data-${measurement}="{{ printf "%.2f" (.Float "value.1") }}"{{ end }}{{ end }}'';
+
   # Prometheus returns value[1] as a numeric string; gjson coerces it for us.
   hostsWidget = {
     type = "custom-api";
@@ -335,14 +328,15 @@ let
       {{ if eq (len $results) 0 }}
         <p class="color-subdue">no data</p>
       {{ else }}
+        <div class="hosts-table">
         <div class="size-h6 color-subdue" style="${hostsGrid}margin-bottom:10px;">
-          <span>Host</span><span>CPU</span><span>Memory</span><span>Disk</span>
+          <span data-sort="host">Host</span><span data-sort="cpu">CPU</span><span data-sort="memory">Memory</span><span data-sort="disk">Disk</span>
         </div>
         <ul class="list list-gap-10 collapsible-container" data-collapse-after="8">
           {{ range sortByFloat "value.1" "desc" $results }}
             {{ if eq (.String "metric.measurement") "worst" }}
               {{ $instance := .String "metric.instance" }}
-              <li style="${hostsGrid}">
+              <li style="${hostsGrid}" data-host="{{ $instance }}" data-worst="{{ printf "%.2f" (.Float "value.1") }}"${hostSortAttr "cpu"}${hostSortAttr "memory"}${hostSortAttr "disk"}>
                 <span class="color-highlight text-truncate">{{ $instance }}</span>
                 ${hostCell "cpu" cfg.thresholds.cpu}
                 ${hostCell "memory" cfg.thresholds.memory}
@@ -351,6 +345,7 @@ let
             {{ end }}
           {{ end }}
         </ul>
+        </div>
       {{ end }}
     '';
   };
@@ -566,6 +561,11 @@ let
 
     .footer { opacity: 0.8; }
 
+    .hosts-table [data-sort] { cursor: pointer; user-select: none; transition: color 0.15s ease; }
+    .hosts-table [data-sort]:hover, .hosts-table [data-active] { color: var(--color-primary); }
+    .hosts-table [data-active="asc"]::after { content: " ▲"; }
+    .hosts-table [data-active="desc"]::after { content: " ▼"; }
+
     @keyframes cute-float {
       0%, 100% { transform: translateY(0); }
       50% { transform: translateY(-3px); }
@@ -581,10 +581,86 @@ let
   '';
 
   # Served at /assets; the font is local so the page makes no third-party requests.
+  # Glance injects widget HTML via innerHTML, so the sorter has to live in <head>.
+  # Clicks cycle a column through first direction, reverse, then the default order.
+  hostsSortJs = pkgs.writeText "hosts-sort.js" ''
+    (() => {
+      const KEY = "glance-hosts-sort";
+      const DEFAULT = { key: "worst", dir: "desc" };
+
+      const load = () => {
+        try { return JSON.parse(localStorage.getItem(KEY)) || DEFAULT; } catch { return DEFAULT; }
+      };
+      const save = (sort) => {
+        try { localStorage.setItem(KEY, JSON.stringify(sort)); } catch {}
+      };
+
+      const apply = (table, sort) => {
+        const list = table.querySelector("ul");
+        const rows = Array.from(list.children);
+        const value = (row) =>
+          sort.key === "host" ? row.dataset.host : parseFloat(row.dataset[sort.key] ?? "-1");
+        rows.sort((a, b) => {
+          const x = value(a), y = value(b);
+          const cmp = typeof x === "string" ? x.localeCompare(y) : x - y;
+          return sort.dir === "asc" ? cmp : -cmp;
+        });
+
+        // Re-sorting moves rows, so redo Glance's "show more" split.
+        const after = parseInt(list.dataset.collapseAfter ?? "-1");
+        const collapses = after >= 0 && rows.length > after;
+        rows.forEach((row, i) => {
+          list.appendChild(row);
+          const hidden = collapses && i >= after;
+          row.classList.toggle("collapsible-item", hidden);
+          row.style.animationDelay = hidden ? (i - after) * 20 + "ms" : "";
+        });
+
+        table.querySelectorAll("[data-sort]").forEach((h) => {
+          if (h.dataset.sort === sort.key) h.dataset.active = sort.dir;
+          else delete h.dataset.active;
+        });
+      };
+
+      document.addEventListener("click", (event) => {
+        const header = event.target.closest(".hosts-table [data-sort]");
+        if (!header) return;
+        const key = header.dataset.sort;
+        const first = key === "host" ? "asc" : "desc";
+        const current = load();
+        let next;
+        if (current.key !== key) next = { key, dir: first };
+        else if (current.dir === first) next = { key, dir: first === "asc" ? "desc" : "asc" };
+        else next = DEFAULT;
+        save(next);
+        apply(header.closest(".hosts-table"), next);
+      });
+
+      const restore = () => {
+        const table = document.querySelector(".hosts-table");
+        const sort = load();
+        if (table && sort.key !== DEFAULT.key) apply(table, sort);
+      };
+
+      document.addEventListener("DOMContentLoaded", () => {
+        const page = document.getElementById("page");
+        if (!page) return;
+        if (page.classList.contains("content-ready")) return restore();
+        const observer = new MutationObserver(() => {
+          if (!page.classList.contains("content-ready")) return;
+          observer.disconnect();
+          restore();
+        });
+        observer.observe(page, { attributes: true, attributeFilter: ["class"] });
+      });
+    })();
+  '';
+
   themeAssets = pkgs.runCommand "glance-assets" { } ''
     mkdir -p $out
     cp ${pkgs.writeText "cute.css" cssText} $out/cute.css
     cp ${favicon} $out/favicon.svg
+    cp ${hostsSortJs} $out/hosts-sort.js
     cp "${pkgs.nunito}/share/fonts/truetype/Nunito/Nunito[wght].ttf" $out/nunito.ttf
   '';
 in
@@ -722,17 +798,26 @@ in
           custom-footer = "<p>made with 💕</p>";
         };
 
-        # The base is the default; presets show up in the header's theme picker.
+        document.head = ''<script src="/assets/hosts-sort.js"></script>'';
+
+        # The base (Midnight Sakura) is the default; presets show up in the header's theme picker.
         theme = {
-          light = true;
-          background-color = "340 60 95";
-          primary-color = "333 70 60";
-          positive-color = "160 50 42";
-          negative-color = "355 75 58";
+          background-color = "320 22 12";
+          primary-color = "330 85 76";
+          positive-color = "160 55 65";
+          negative-color = "355 85 72";
           contrast-multiplier = 1.15;
-          text-saturation-multiplier = 0.6;
           custom-css-file = "/assets/cute.css";
           presets = {
+            strawberry-milk = {
+              light = true;
+              background-color = "340 60 95";
+              primary-color = "333 70 60";
+              positive-color = "160 50 42";
+              negative-color = "355 75 58";
+              contrast-multiplier = 1.15;
+              text-saturation-multiplier = 0.6;
+            };
             lavender-dream = {
               light = true;
               background-color = "265 55 95";
@@ -741,13 +826,6 @@ in
               negative-color = "355 75 58";
               contrast-multiplier = 1.15;
               text-saturation-multiplier = 0.6;
-            };
-            midnight-sakura = {
-              background-color = "320 22 12";
-              primary-color = "330 85 76";
-              positive-color = "160 55 65";
-              negative-color = "355 85 72";
-              contrast-multiplier = 1.15;
             };
           };
         };
