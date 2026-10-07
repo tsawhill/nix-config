@@ -8,8 +8,10 @@
       SCARF_NO_ANALYTICS = "True";
       DO_NOT_TRACK = "True";
       ANONYMIZED_TELEMETRY = "False";
-      # UI chats get built-in tools; qwen2.5-coder prints tool calls as text instead of answering.
+      # qwen2.5-coder is for deployctl and makes a poor chat model.
       DEFAULT_MODELS = "huihui_ai/qwen3-abliterated:8b";
+      # Built-in tool schemas swamp 8B models; they answer every message as a tool-routing task.
+      DEFAULT_MODEL_METADATA = builtins.toJSON { capabilities.builtin_tools = false; };
     };
   };
 }
