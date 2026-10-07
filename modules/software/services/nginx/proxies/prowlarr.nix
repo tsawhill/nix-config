@@ -20,6 +20,8 @@ in
     services.nginx.virtualHosts."${cfg.domain}" = mkProxyVhost {
       inherit cfg;
       proxyPass = "http://${networkTopology.lib.fqdn "arrs-nix"}:9696";
+      # Prowlarr ignores X-Forwarded-Proto and redirects to http://, which hangs.
+      extraExtraConfig = "proxy_redirect http://$host/ https://$host/;";
     };
   };
 }

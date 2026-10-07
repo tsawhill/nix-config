@@ -2,6 +2,7 @@
   config,
   lib,
   networkTopology,
+  pkgs,
   ...
 }:
 
@@ -159,7 +160,7 @@ let
     }
     {
       name = "AdGuard";
-      url = "http://adguard-nix.${lanDomain}:3000";
+      url = "http://adguard-nix.${lanDomain}";
       icon = "sh:adguard-home";
       group = "Monitoring";
     }
@@ -219,23 +220,26 @@ let
     }
   ];
 
-  allLinks = cfg.services ++ cfg.internalLinks;
-
-  presentGroups = lib.unique (map (s: s.group) allLinks);
-
   # Listed groups come first in the order given; anything unlisted keeps its
   # definition order and lands at the bottom.
   groupsInOrder =
-    lib.filter (g: lib.elem g presentGroups) cfg.groupOrder
-    ++ lib.filter (g: !lib.elem g cfg.groupOrder) presentGroups;
+    links:
+    let
+      present = lib.unique (map (s: s.group) links);
+    in
+    lib.filter (g: lib.elem g present) cfg.groupOrder
+    ++ lib.filter (g: !lib.elem g cfg.groupOrder) present;
 
+  sortByGroup = links: lib.concatMap (g: lib.filter (s: s.group == g) links) (groupsInOrder links);
+
+  # Services link from their monitor tiles, so bookmarks only carry the rest.
   mkBookmarkGroup = group: {
     title = group;
     links = map (s: {
       title = s.name;
       url = s.url;
       icon = s.icon or "";
-    }) (lib.filter (s: s.group == group) allLinks);
+    }) (lib.filter (s: s.group == group) cfg.internalLinks);
   };
 
   mkMonitorSite =
@@ -254,33 +258,16 @@ let
   multiMeasurementQuery = measurements: lib.concatStringsSep " or " measurements;
 
   cpuBusy = ''100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)'';
-  topCpuBusy = "topk(5, ${cpuBusy})";
-  memoryUsed = "node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes";
-  memoryPercent = "100 * (${memoryUsed}) / node_memory_MemTotal_bytes";
-  topMemoryPercent = "topk(5, ${memoryPercent})";
+  memoryPercent = "100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)";
   rootFilesystemFilter = ''mountpoint="/",fstype!~"tmpfs|overlay|ramfs"'';
-  rootUsed = "node_filesystem_size_bytes{${rootFilesystemFilter}} - node_filesystem_avail_bytes{${rootFilesystemFilter}}";
-  rootPercent = "100 * (${rootUsed}) / node_filesystem_size_bytes{${rootFilesystemFilter}}";
-  topRootPercent = "topk(5, ${rootPercent})";
+  rootPercent = "100 * (1 - node_filesystem_avail_bytes{${rootFilesystemFilter}} / node_filesystem_size_bytes{${rootFilesystemFilter}})";
 
-  cpuQuery = multiMeasurementQuery [
-    (asMeasurement "percent" topCpuBusy)
-    (asMeasurement "total" ''
-      count by (instance) (node_cpu_seconds_total{mode="idle"})
-        and on (instance) ${topCpuBusy}
-    '')
-  ];
-
-  memoryQuery = multiMeasurementQuery [
-    (asMeasurement "percent" topMemoryPercent)
-    (asMeasurement "used" "(${memoryUsed}) / 1073741824 and on (instance) ${topMemoryPercent}")
-    (asMeasurement "total" "node_memory_MemTotal_bytes / 1073741824 and on (instance) ${topMemoryPercent}")
-  ];
-
-  rootDiskQuery = multiMeasurementQuery [
-    (asMeasurement "percent" topRootPercent)
-    (asMeasurement "used" "(${rootUsed}) / 1073741824 and on (instance) ${topRootPercent}")
-    (asMeasurement "total" "node_filesystem_size_bytes{${rootFilesystemFilter}} / 1073741824 and on (instance) ${topRootPercent}")
+  # "worst" only exists to sort hosts by their most stressed resource.
+  hostsQuery = multiMeasurementQuery [
+    (asMeasurement "cpu" cpuBusy)
+    (asMeasurement "memory" memoryPercent)
+    (asMeasurement "disk" rootPercent)
+    (asMeasurement "worst" "max by (instance) (${cpuBusy} or ${memoryPercent} or ${rootPercent})")
   ];
 
   zfsPercent = ''
@@ -299,43 +286,54 @@ let
     '')
   ];
 
-  fleetQuery = multiMeasurementQuery [
-    (asMeasurement "up" ''sum(up{job="node",instance!~"${intermittentHostRegex}"}) or vector(0)'')
-    (asMeasurement "total" ''count(up{job="node",instance!~"${intermittentHostRegex}"}) or vector(0)'')
-  ];
+  # Go templates refuse to compare a float against an int literal.
+  asFloat = n: "${toString n}.0";
+
+  # Expects the percentage in $pct; turns red past the threshold.
+  usageBar = threshold: ''
+    <div style="height:3px;background:var(--color-separator);margin-top:4px;">
+      <div style="height:3px;width:{{ printf "%.0f" $pct }}%;background:{{ if gt $pct ${asFloat threshold} }}var(--color-negative){{ else }}var(--color-primary){{ end }};"></div>
+    </div>
+  '';
+
+  hostsGrid = "display:grid;grid-template-columns:minmax(0,1.6fr) repeat(3,minmax(0,1fr));gap:14px;align-items:end;";
+
+  hostCell = measurement: threshold: ''
+    <div>
+      {{- range $results -}}
+        {{- if and (eq (.String "metric.instance") $instance) (eq (.String "metric.measurement") "${measurement}") -}}
+          {{- $pct := .Float "value.1" -}}
+          <div class="size-h6{{ if gt $pct ${asFloat threshold} }} color-negative{{ end }}">{{ printf "%.0f%%" $pct }}</div>
+          ${usageBar threshold}
+        {{- end -}}
+      {{- end -}}
+    </div>
+  '';
 
   # Prometheus returns value[1] as a numeric string; gjson coerces it for us.
-  cpuWidget = {
+  hostsWidget = {
     type = "custom-api";
-    title = "CPU Busy";
+    title = "Hosts";
     cache = "1m";
     url = "${prometheus}/api/v1/query";
-    parameters.query = cpuQuery;
+    parameters.query = hostsQuery;
     template = ''
       {{ $results := .JSON.Array "data.result" }}
       {{ if eq (len $results) 0 }}
         <p class="color-subdue">no data</p>
       {{ else }}
-        <ul class="list list-gap-10">
-          {{ range $results }}
-            {{ if eq (.String "metric.measurement") "percent" }}
+        <div class="size-h6 color-subdue" style="${hostsGrid}margin-bottom:10px;">
+          <span>Host</span><span>CPU</span><span>Memory</span><span>Disk</span>
+        </div>
+        <ul class="list list-gap-10 collapsible-container" data-collapse-after="8">
+          {{ range sortByFloat "value.1" "desc" $results }}
+            {{ if eq (.String "metric.measurement") "worst" }}
               {{ $instance := .String "metric.instance" }}
-              {{ $pct := .Float "value.1" }}
-              <li>
-                <div class="flex justify-between">
-                  <span class="color-highlight text-truncate">{{ $instance }}</span>
-                  <span class="size-h5">
-                    {{- printf "%.0f%% of " $pct -}}
-                    {{- range $results -}}
-                      {{- if and (eq (.String "metric.instance") $instance) (eq (.String "metric.measurement") "total") -}}
-                        {{- printf "%.0f logical CPUs" (.Float "value.1") -}}
-                      {{- end -}}
-                    {{- end -}}
-                  </span>
-                </div>
-                <div style="height:3px;background:var(--color-separator);margin-top:4px;">
-                  <div style="height:3px;width:{{ printf "%.0f" $pct }}%;background:var(--color-primary);"></div>
-                </div>
+              <li style="${hostsGrid}">
+                <span class="color-highlight text-truncate">{{ $instance }}</span>
+                ${hostCell "cpu" cfg.thresholds.cpu}
+                ${hostCell "memory" cfg.thresholds.memory}
+                ${hostCell "disk" cfg.thresholds.disk}
               </li>
             {{ end }}
           {{ end }}
@@ -344,80 +342,137 @@ let
     '';
   };
 
-  capacityWidget =
-    {
-      title,
-      query,
-      nameLabel ? "instance",
-      unit ? "GiB",
-      showHealth ? false,
-    }:
-    {
-      type = "custom-api";
-      inherit title;
-      cache = "1m";
-      url = "${prometheus}/api/v1/query";
-      parameters.query = query;
-      template = ''
-        {{ $results := .JSON.Array "data.result" }}
-        {{ if eq (len $results) 0 }}
-          <p class="color-subdue">no data</p>
-        {{ else }}
-          <ul class="list list-gap-10">
-            {{ range $results }}
-              {{ if eq (.String "metric.measurement") "percent" }}
-                {{ $name := .String "metric.${nameLabel}" }}
-                {{ $pct := .Float "value.1" }}
-                <li>
-                  <div class="flex justify-between">
-                    <span class="color-highlight text-truncate">{{ $name }}</span>
-                    ${lib.optionalString showHealth ''
-                      {{ range $results }}
-                        {{ if and (eq (.String "metric.${nameLabel}") $name) (eq (.String "metric.measurement") "online") }}
-                          {{ if eq (.String "value.1") "1" }}
-                            <span class="size-h6 color-positive">ONLINE</span>
-                          {{ else }}
-                            <span class="size-h6 color-negative">NOT ONLINE</span>
-                          {{ end }}
-                        {{ end }}
+  zfsWidget = {
+    type = "custom-api";
+    title = "Server ZFS Pools";
+    cache = "1m";
+    url = "${prometheus}/api/v1/query";
+    parameters.query = zfsQuery;
+    template = ''
+      {{ $results := .JSON.Array "data.result" }}
+      {{ if eq (len $results) 0 }}
+        <p class="color-subdue">no data</p>
+      {{ else }}
+        <ul class="list list-gap-10">
+          {{ range $results }}
+            {{ if eq (.String "metric.measurement") "percent" }}
+              {{ $name := .String "metric.pool" }}
+              {{ $pct := .Float "value.1" }}
+              <li>
+                <div class="flex justify-between">
+                  <span class="color-highlight text-truncate">{{ $name }}</span>
+                  {{ range $results }}
+                    {{ if and (eq (.String "metric.pool") $name) (eq (.String "metric.measurement") "online") }}
+                      {{ if eq (.String "value.1") "1" }}
+                        <span class="size-h6 color-positive">ONLINE</span>
+                      {{ else }}
+                        <span class="size-h6 color-negative">NOT ONLINE</span>
                       {{ end }}
-                    ''}
-                  </div>
-                  <div class="flex justify-end size-h5">
-                    <span>
-                      {{- range $results -}}
-                        {{- if and (eq (.String "metric.${nameLabel}") $name) (eq (.String "metric.measurement") "used") -}}
-                          {{- printf "%.1f/" (.Float "value.1") -}}
-                        {{- end -}}
+                    {{ end }}
+                  {{ end }}
+                </div>
+                <div class="flex justify-end size-h5">
+                  <span>
+                    {{- range $results -}}
+                      {{- if and (eq (.String "metric.pool") $name) (eq (.String "metric.measurement") "used") -}}
+                        {{- printf "%.1f/" (.Float "value.1") -}}
                       {{- end -}}
-                      {{- range $results -}}
-                        {{- if and (eq (.String "metric.${nameLabel}") $name) (eq (.String "metric.measurement") "total") -}}
-                          {{- printf "%.1f" (.Float "value.1") -}}
-                        {{- end -}}
+                    {{- end -}}
+                    {{- range $results -}}
+                      {{- if and (eq (.String "metric.pool") $name) (eq (.String "metric.measurement") "total") -}}
+                        {{- printf "%.1f" (.Float "value.1") -}}
                       {{- end -}}
-                      ${unit} ({{ printf "%.0f%%" $pct }})
-                    </span>
-                  </div>
-                  <div style="height:3px;background:var(--color-separator);margin-top:4px;">
-                    <div style="height:3px;width:{{ printf "%.0f" $pct }}%;background:var(--color-primary);"></div>
-                  </div>
-                </li>
-              {{ end }}
+                    {{- end -}}
+                    TiB ({{ printf "%.0f%%" $pct }})
+                  </span>
+                </div>
+                ${usageBar cfg.thresholds.zfs}
+              </li>
             {{ end }}
-          </ul>
-        {{ end }}
-      '';
-    };
+          {{ end }}
+        </ul>
+      {{ end }}
+    '';
+  };
 
-  alertsQuery = lib.concatStringsSep " or " [
-    ''label_replace(100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > ${toString cfg.thresholds.cpu}, "alert", "cpu", "", "")''
-    ''label_replace(100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) > ${toString cfg.thresholds.memory}, "alert", "memory", "", "")''
-    ''label_replace(100 * (1 - node_filesystem_avail_bytes{mountpoint="/",fstype!~"tmpfs|overlay|ramfs"} / node_filesystem_size_bytes{mountpoint="/",fstype!~"tmpfs|overlay|ramfs"}) > ${toString cfg.thresholds.disk}, "alert", "disk", "", "")''
+  # fleet-* rows feed the header line; every other row is an alert.
+  statusQuery = lib.concatStringsSep " or " [
+    ''label_replace(sum(up{job="node",instance!~"${intermittentHostRegex}"}) or vector(0), "alert", "fleet-up", "", "")''
+    ''label_replace(count(up{job="node",instance!~"${intermittentHostRegex}"}) or vector(0), "alert", "fleet-total", "", "")''
+    ''label_replace(${cpuBusy} > ${toString cfg.thresholds.cpu}, "alert", "cpu", "", "")''
+    ''label_replace(${memoryPercent} > ${toString cfg.thresholds.memory}, "alert", "memory", "", "")''
+    ''label_replace(${rootPercent} > ${toString cfg.thresholds.disk}, "alert", "disk", "", "")''
     ''label_replace(up{job="node",instance!~"${intermittentHostRegex}"} == 0, "alert", "down", "", "")''
     ''label_replace(node_zfs_zpool_state{instance="server-nix",state!="online",zpool=~"${zfsPoolRegex}"} == 1, "alert", "zpool", "", "")''
     ''label_replace(vpn_egress_tunnel_up{instance="networking-vpn-out-na1-nix"} == 0, "alert", "vpn", "", "")''
     ''label_replace(searx_vpn_backoff_active{instance="searx-nix"} == 1, "alert", "searx-vpn", "", "")''
   ];
+
+  statusWidget = {
+    type = "custom-api";
+    title = "Status";
+    cache = "1m";
+    url = "${prometheus}/api/v1/query";
+    parameters.query = statusQuery;
+    template = ''
+      {{ $results := .JSON.Array "data.result" }}
+      {{ $up := 0.0 }}
+      {{ $total := 0.0 }}
+      {{ $clear := true }}
+      {{ range $results }}
+        {{ $kind := .String "metric.alert" }}
+        {{ if eq $kind "fleet-up" }}
+          {{ $up = .Float "value.1" }}
+        {{ else if eq $kind "fleet-total" }}
+          {{ $total = .Float "value.1" }}
+        {{ else }}
+          {{ $clear = false }}
+        {{ end }}
+      {{ end }}
+      <div class="flex justify-between items-center">
+        {{ if $clear }}
+          <span class="size-h3 color-positive">All clear</span>
+        {{ else }}
+          <span class="size-h3 color-negative">Needs attention</span>
+        {{ end }}
+        <span class="color-subdue">{{ printf "%.0f/%.0f" $up $total }} hosts up</span>
+      </div>
+      {{ if not $clear }}
+        <ul class="list list-gap-10" style="margin-top:12px;">
+          {{ range $results }}
+            {{ $kind := .String "metric.alert" }}
+            {{ if and (ne $kind "fleet-up") (ne $kind "fleet-total") }}
+              <li class="flex justify-between">
+                <span class="color-negative text-truncate">{{ .String "metric.instance" }}</span>
+                <span class="size-h6 color-subdue">
+                  {{ if eq $kind "down" }}
+                    exporter down
+                  {{ else if eq $kind "zpool" }}
+                    {{ .String "metric.zpool" }} {{ .String "metric.state" }}
+                  {{ else if eq $kind "vpn" }}
+                    VPN tunnel unhealthy (leak prevention active)
+                  {{ else if eq $kind "searx-vpn" }}
+                    Startpage remediation backed off
+                  {{ else }}
+                    {{ $kind }} {{ printf "%.0f%%" (.Float "value.1") }}
+                  {{ end }}
+                </span>
+              </li>
+            {{ end }}
+          {{ end }}
+        </ul>
+      {{ end }}
+    '';
+  };
+
+  # Glance only refreshes stale widgets when a page is requested, so poll it
+  # ourselves and visitors always land on a warm cache.
+  cacheWarmer = pkgs.writeShellScript "glance-cache-warmer" ''
+    while true; do
+      ${lib.getExe pkgs.curl} -s -o /dev/null --max-time 30 http://127.0.0.1:${toString cfg.port}/api/pages/home/content/ || true
+      sleep ${toString cfg.warmInterval}
+    done
+  '';
 in
 {
   options.my.monitoring.homepage = {
@@ -438,7 +493,7 @@ in
     services = lib.mkOption {
       type = lib.types.listOf lib.types.attrs;
       default = defaultServices;
-      description = "Externally reachable services to monitor and link.";
+      description = "Externally reachable services to health-check; their monitor tiles double as links.";
     };
 
     groupOrder = lib.mkOption {
@@ -451,13 +506,52 @@ in
         "Tools"
         "Monitoring"
       ];
-      description = "Order bookmark groups are rendered in; unlisted groups are appended.";
+      description = "Order bookmark groups and monitor tiles are rendered in; unlisted groups are appended.";
     };
 
     internalLinks = lib.mkOption {
       type = lib.types.listOf lib.types.attrs;
       default = defaultInternalLinks;
       description = "Pages to link but not health-check: LAN-only admin UIs, hosts that are usually off, and everyday external sites.";
+    };
+
+    releaseRepos = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [
+        "glanceapp/glance"
+        "jellyfin/jellyfin"
+        "immich-app/immich"
+        "goauthentik/authentik"
+        "Sonarr/Sonarr"
+        "Radarr/Radarr"
+        "Prowlarr/Prowlarr"
+        "open-webui/open-webui"
+        "dani-garcia/vaultwarden"
+        "nextcloud/server"
+      ];
+      description = "GitHub repositories whose latest releases are listed.";
+    };
+
+    weather = {
+      location = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "Location for the weather widget; the widget is hidden when null.";
+      };
+      units = lib.mkOption {
+        type = lib.types.enum [
+          "metric"
+          "imperial"
+        ];
+        default = "imperial";
+        description = "Units for the weather widget.";
+      };
+    };
+
+    warmInterval = lib.mkOption {
+      type = lib.types.ints.positive;
+      default = 15;
+      description = "Seconds between background requests that keep widget caches fresh.";
     };
 
     thresholds = {
@@ -476,10 +570,27 @@ in
         default = 85;
         description = "Root disk used percent above which a host is flagged.";
       };
+      zfs = lib.mkOption {
+        type = lib.types.int;
+        default = 80;
+        description = "ZFS pool used percent above which its bar turns red.";
+      };
     };
   };
 
   config = lib.mkIf cfg.enable {
+    systemd.services.glance-cache-warmer = {
+      description = "Keep Glance widget caches warm";
+      after = [ "glance.service" ];
+      bindsTo = [ "glance.service" ];
+      wantedBy = [ "glance.service" ];
+      serviceConfig = {
+        ExecStart = cacheWarmer;
+        DynamicUser = true;
+        Restart = "always";
+      };
+    };
+
     services.glance = {
       enable = true;
       openFirewall = true;
@@ -524,60 +635,28 @@ in
                 widgets = [
                   {
                     type = "bookmarks";
-                    groups = map mkBookmarkGroup groupsInOrder;
+                    groups = map mkBookmarkGroup (groupsInOrder cfg.internalLinks);
+                  }
+                  {
+                    type = "releases";
+                    cache = "6h";
+                    collapse-after = 5;
+                    repositories = cfg.releaseRepos;
                   }
                 ];
               }
               {
                 size = "full";
                 widgets = [
-                  {
-                    type = "custom-api";
-                    title = "Needs Attention";
-                    css-class = "needs-attention-widget";
-                    cache = "1m";
-                    url = "${prometheus}/api/v1/query";
-                    parameters.query = alertsQuery;
-                    template = ''
-                      {{ $results := .JSON.Array "data.result" }}
-                      {{ if eq (len $results) 0 }}
-                        <style>.needs-attention-widget { display: none; }</style>
-                      {{ else }}
-                        <ul class="list list-gap-10">
-                          {{ range $results }}
-                            {{ $kind := .String "metric.alert" }}
-                            <li class="flex justify-between">
-                              <span class="color-negative text-truncate">{{ .String "metric.instance" }}</span>
-                              <span class="size-h6 color-subdue">
-                                {{ if eq $kind "down" }}
-                                  exporter down
-                                {{ else if eq $kind "zpool" }}
-                                  {{ .String "metric.zpool" }} {{ .String "metric.state" }}
-                                {{ else if eq $kind "vpn" }}
-                                  VPN tunnel unhealthy (leak prevention active)
-                                {{ else if eq $kind "searx-vpn" }}
-                                  Startpage remediation backed off
-                                {{ else }}
-                                  {{ $kind }} {{ printf "%.0f%%" (.Float "value.1") }}
-                                {{ end }}
-                              </span>
-                            </li>
-                          {{ end }}
-                        </ul>
-                      {{ end }}
-                    '';
-                  }
+                  statusWidget
                   {
                     type = "monitor";
                     title = "Services";
+                    style = "compact";
                     cache = "2m";
-                    sites = map mkMonitorSite cfg.services;
+                    sites = map mkMonitorSite (sortByGroup cfg.services);
                   }
-                  cpuWidget
-                  (capacityWidget {
-                    title = "Memory Used";
-                    query = memoryQuery;
-                  })
+                  hostsWidget
                 ];
               }
               {
@@ -587,42 +666,21 @@ in
                     type = "clock";
                     hour-format = "12h";
                   }
+                ]
+                ++ lib.optional (cfg.weather.location != null) {
+                  type = "weather";
+                  inherit (cfg.weather) location units;
+                  hour-format = "12h";
+                }
+                ++ [
                   {
-                    type = "custom-api";
-                    title = "Fleet";
-                    cache = "1m";
-                    url = "${prometheus}/api/v1/query";
-                    parameters.query = fleetQuery;
-                    template = ''
-                      {{ $results := .JSON.Array "data.result" }}
-                      <div class="flex justify-between">
-                        <span class="color-subdue">Hosts up</span>
-                        <span class="size-h3 color-highlight">
-                          {{- range $results -}}
-                            {{- if eq (.String "metric.measurement") "up" -}}
-                              {{- printf "%.0f/" (.Float "value.1") -}}
-                            {{- end -}}
-                          {{- end -}}
-                          {{- range $results -}}
-                            {{- if eq (.String "metric.measurement") "total" -}}
-                              {{- printf "%.0f" (.Float "value.1") -}}
-                            {{- end -}}
-                          {{- end -}}
-                        </span>
-                      </div>
-                    '';
+                    type = "dns-stats";
+                    service = "adguard";
+                    url = "http://adguard-nix.${lanDomain}";
+                    hour-format = "12h";
+                    cache = "5m";
                   }
-                  (capacityWidget {
-                    title = "Root Disk Used";
-                    query = rootDiskQuery;
-                  })
-                  (capacityWidget {
-                    title = "Server ZFS Pools";
-                    query = zfsQuery;
-                    nameLabel = "pool";
-                    unit = "TiB";
-                    showHealth = true;
-                  })
+                  zfsWidget
                 ];
               }
             ];
