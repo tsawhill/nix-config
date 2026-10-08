@@ -721,6 +721,7 @@ let
 
   # Pure decision template, exercised by the offline regression suite. Progress
   # refreshes the observation window, never the per-cycle retry budget.
+  # Starts get two blind resends before temperature can show anything.
   # A dark sensor cannot confirm a stop, and it rides the same blaster that
   # drops, so the off ladder walks blind rather than stalling on stale data.
   watchDecision = ''
@@ -738,13 +739,15 @@ let
       {{ 'wait' if elapsed < 300 else ('off_correct' if phase == 'off_check' else 'off_failed') }}
     {%- elif mode not in ['cool', 'heat'] or desired != mode or not fresh -%}wait
     {%- elif phase == 'idle' or checkpoint <= 0 -%}initialize
+    {%- elif phase == 'starting' and elapsed < 300 -%}
+      {{ 'confirm' if elapsed >= 60 and recovery_elapsed >= 110 else 'wait' }}
     {%- elif elapsed < 300 -%}wait
     {%- elif progress >= ${toString tuning.progressDegrees} -%}progress
     {%- elif not unmet -%}progress
-    {%- elif phase == 'watching' -%}retry
+    {%- elif phase in ['starting', 'watching'] -%}retry
     {%- elif phase == 'retried' and elapsed >= ${toString tuning.boostMinutes} * patience * 60 -%}boost
     {%- elif phase == 'boosted' and elapsed >= ${toString tuning.stallMinutes} * patience * 60 -%}stall
-    {%- elif phase in ['retried', 'boosted', 'stalled', 'exhausted', 'settled'] and recovery_elapsed >= 300 -%}recover
+    {%- elif phase in ['retried', 'boosted', 'stalled', 'exhausted', 'settled'] and recovery_elapsed >= 170 -%}recover
     {%- else -%}wait
     {%- endif -%}'';
 
@@ -851,7 +854,7 @@ let
             {
               conditions = "{{ trigger.id == 'transition' and trigger.from_state is not none and trigger.to_state is not none and trigger.from_state.state in ['cool', 'heat', 'off'] and trigger.to_state.state in ['cool', 'heat', 'off'] and trigger.from_state.state != trigger.to_state.state }}";
               sequence = [
-                (setPhase "{{ 'off_pending' if mode == 'off' else 'watching' }}")
+                (setPhase "{{ 'off_pending' if mode == 'off' else 'starting' }}")
                 captureBoundary
                 {
                   choose = [
@@ -936,12 +939,12 @@ let
                 {
                   conditions = "{{ decision == 'progress' }}";
                   sequence = [
-                    (setPhase "{{ 'settled' if phase in ['stalled', 'exhausted'] else phase }}")
+                    (setPhase "{{ 'settled' if phase in ['stalled', 'exhausted'] else ('watching' if phase == 'starting' else phase) }}")
                   ]
                   ++ checkpoint;
                 }
                 {
-                  conditions = "{{ decision in ['retry', 'recover'] }}";
+                  conditions = "{{ decision in ['confirm', 'retry', 'recover'] }}";
                   # Rate-limit delivery attempts without resetting observation
                   # windows or replenishing the fan/shedding escalation budget.
                   sequence = [
@@ -1563,6 +1566,7 @@ in
             name = "${rooms.${room}} progress watch";
             options = [
               "idle"
+              "starting"
               "watching"
               "retried"
               "boosted"

@@ -396,6 +396,26 @@ class Templates(unittest.TestCase):
         self.assertEqual(self.watch(phase="idle"), "initialize")
         self.assertEqual(self.watch(phase="exhausted", progress=0.5), "progress")
 
+    def test_start_resends_blind_before_progress_can_show(self):
+        # Replay 2026-10-07: cool at 22:01 never landed, first retry was 22:07.
+        # Ticks are minute-aligned; a send records last_recovery on the tick.
+        sends = []
+        last = None
+        for elapsed in range(0, 300, 60):
+            recovery = 10**9 if last is None else elapsed - last
+            if self.watch(phase="starting", elapsed=elapsed, recovery_elapsed=recovery) == "confirm":
+                sends.append(elapsed)
+                last = elapsed
+        self.assertEqual(sends, [60, 180])
+        self.assertEqual(self.watch(phase="starting", elapsed=300), "retry")
+        self.assertEqual(self.watch(phase="starting", elapsed=300, progress=0.4), "progress")
+        self.assertEqual(self.watch(phase="starting", elapsed=120, fresh=False), "wait")
+        self.assertEqual(self.watch(phase="starting", elapsed=120, desired="off"), "wait")
+        # A progress refresh must leave the blind window, or every window beeps.
+        self.assertIn(
+            "('watching' if phase == 'starting' else phase)", SOURCE
+        )
+
     def test_shutdown_keeps_monitoring_after_first_retry(self):
         # Replay the incident: HA said off at 71.58F, bedroom kept cooling.
         args = dict(
@@ -511,11 +531,11 @@ class Templates(unittest.TestCase):
                     mode=mode,
                     desired=mode,
                     elapsed=300,
-                    recovery_elapsed=300,
+                    recovery_elapsed=170,
                 )
                 self.assertEqual(self.watch(**args), "recover")
                 self.assertEqual(
-                    self.watch(**(args | {"recovery_elapsed": 299})), "wait"
+                    self.watch(**(args | {"recovery_elapsed": 169})), "wait"
                 )
                 self.assertEqual(self.watch(**args, progress=0.4), "progress")
                 self.assertEqual(self.watch(**args, unmet=False), "progress")
@@ -553,7 +573,7 @@ class Templates(unittest.TestCase):
         self.assertEqual(self.watch(phase="off_failed", **args), "wait")
         self.assertEqual(self.watch(phase="off_failed", **(args | {"elapsed": 86400})), "wait")
         # Blind retries never fire for a unit that was never commanded off.
-        for phase in ["watching", "retried", "idle"]:
+        for phase in ["starting", "watching", "retried", "idle"]:
             self.assertEqual(self.watch(phase=phase, **args), "wait")
 
     def test_dark_sensor_ladder_resumes_when_sensor_returns(self):
