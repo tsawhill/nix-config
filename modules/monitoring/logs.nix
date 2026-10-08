@@ -102,6 +102,18 @@ in
               .unit = replace(unit, r'^session-[^.]+\.scope$', "session.scope")
               priority = to_int(.PRIORITY) ?? 6
               .level = to_syslog_level(priority) ?? "info"
+              msg = string(.message) ?? ""
+              # JSON loggers write everything at journal priority info; use their own level instead.
+              if starts_with(msg, "{") {
+                fields = object(parse_json(msg) ?? null) ?? {}
+                lvl = downcase(string(fields.level) ?? "")
+                levels = {"trace": "debug", "debug": "debug", "info": "info", "warn": "warning", "warning": "warning", "error": "err", "err": "err", "critical": "crit", "crit": "crit", "fatal": "crit", "panic": "emerg"}
+                .level = string(get(levels, [lvl]) ?? null) ?? .level
+              }
+              # Aborting drops the event: debug noise, per-path GC deletions, and passing Gatus checks.
+              if .level == "debug" { abort }
+              if .unit == "nix-gc.service" && starts_with(msg, "deleting '/nix/store/") { abort }
+              if .unit == "gatus.service" && contains(msg, "success=true") { abort }
             '';
           };
 
@@ -147,6 +159,8 @@ in
           server = {
             http_listen_address = "0.0.0.0";
             http_listen_port = 3100;
+            # Info logs every query and flush, and those land back in Loki.
+            log_level = "warn";
           };
           common = {
             path_prefix = lokiDir;

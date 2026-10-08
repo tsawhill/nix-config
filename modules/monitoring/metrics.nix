@@ -156,6 +156,8 @@ let
     endpoint:
     {
       interval = "1m";
+      # Stop at the first 302 so forward-auth apps don't walk the whole Authentik login flow every check.
+      client.ignore-redirect = true;
       conditions = [
         "[STATUS] >= 200"
         "[STATUS] < 500"

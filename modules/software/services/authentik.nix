@@ -38,6 +38,7 @@
         metrics = [ "0.0.0.0:9300" ];
       };
       disable_startup_analytics = true;
+      log_level = "warning";
       avatars = "initials";
     };
   };
