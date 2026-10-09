@@ -152,6 +152,8 @@ let
       config."limits.memory" = "8GiB";
       rootSize = "8GiB";
     };
+    # vaultwarden signs in through it.
+    authentik-nix.tier = "critical";
     build-nix = {
       profiles = [ "nix-config-mount" ];
       config = {
@@ -187,6 +189,8 @@ let
       profiles = [ "nvidia-gpu" ];
       rootSize = "32GiB";
     };
+    # vaultwarden is only reachable through it.
+    local-nginx-nix.tier = "critical";
     monitoring-nix = {
       config = {
         "limits.cpu" = "2";
