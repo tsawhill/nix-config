@@ -67,7 +67,6 @@ in
       tv-sonarr.savePath = "/mnt/downloadHDD/downloads/sonarr";
       radarr.savePath = "/mnt/downloadHDD/downloads/radarr";
       lidarr.savePath = "/mnt/downloadSSD/Seeding";
-      music-seed.savePath = "/mnt/downloadSSD/Seeding";
     };
   };
 
@@ -91,7 +90,7 @@ in
     };
 
     categories = {
-      music-seed = "/mnt/downloadSSD/Seeding";
+      lidarr = "/mnt/downloadSSD/Seeding";
     };
 
     # Lowest priority wins; each torrent takes the first group it matches.
