@@ -15,14 +15,13 @@ let
   # `rpool` is intentionally split into children. The bare `backup/rpool`
   # dataset is just a container on the target, and trying to replicate the empty
   # parent caused Syncoid to refuse the sync once children already existed.
-  # Nix stores are deliberately absent: they are reproducible from this flake,
-  # while the container state that is not lives in rpool/VMDisks. Snapshotting
-  # them cost ~865G (build-nix alone held 621G of churn) to protect nothing a
-  # `deploy` cannot rebuild.
+  # Nix stores are deliberately absent: they are reproducible from this flake.
+  # Snapshotting them cost ~865G (build-nix alone held 621G of churn) to protect
+  # nothing a `deploy` cannot rebuild. Guest root disks go to zpool hourly
+  # instead (lxcRootDisks below); the Pi gets them again once it is rebuilt.
   backupDatasets = [
     "VM-Disks"
     "downloadSSD"
-    "rpool/VMDisks"
     "rpool/home"
     "rpool/root"
     "zpool/ffsync"
@@ -64,11 +63,11 @@ let
   orphanGraceDays = 90;
   backupDatasetArgs = builtins.concatStringsSep " " backupDatasets;
 
-  # Standard-tier guest root disks (incus/registry.nix tiers) live on single-disk
-  # scratchSSD, so they are copied to raidz2 zpool every hour. A guest opts out with
-  # `zfs set syncoid:sync=false` plus a sanoid entry with autosnap = false.
-  containersSource = "scratchSSD/incus/containers";
-  containersTarget = "zpool/backups/containers";
+  # Every guest root disk, on both tiers (incus/registry.nix), is copied to raidz2
+  # zpool every hour at zpool/backups/<same path>. Their /nix custom volumes are
+  # siblings under custom/, so they are never included.
+  incusRegistry = import ./incus/registry.nix { inherit lib networkTopology; };
+  lxcRootDisks = lib.mapAttrs (_: tier: "${tier.zpool}/lxc/incus/containers") incusRegistry.tiers;
 in
 {
   # Source-side snapshot policy: daily/monthly retention, no hourly/yearly
@@ -85,8 +84,8 @@ in
       monthly = 12;
       yearly = 0;
     };
-    # Short history on the SSD; the long history lives on the zpool copy.
-    templates.containers = {
+    # Short history on the source; the long history lives on the zpool copy.
+    templates.lxc = {
       autosnap = true;
       autoprune = true;
       hourly = 0;
@@ -95,7 +94,7 @@ in
       yearly = 0;
     };
     # Receive side: prune what syncoid brings over, never snapshot.
-    templates.containers-backup = {
+    templates.local-backup = {
       autosnap = false;
       autoprune = true;
       hourly = 0;
@@ -103,16 +102,21 @@ in
       monthly = 6;
       yearly = 0;
     };
-    datasets = builtins.listToAttrs (map mkDatasetConfig backupDatasets) // {
-      ${containersSource} = {
-        useTemplate = [ "containers" ];
-        recursive = true;
+    datasets =
+      builtins.listToAttrs (map mkDatasetConfig backupDatasets)
+      // lib.mapAttrs' (
+        _: source:
+        lib.nameValuePair source {
+          useTemplate = [ "lxc" ];
+          recursive = true;
+        }
+      ) lxcRootDisks
+      // {
+        "zpool/backups" = {
+          useTemplate = [ "local-backup" ];
+          recursive = true;
+        };
       };
-      ${containersTarget} = {
-        useTemplate = [ "containers-backup" ];
-        recursive = true;
-      };
-    };
   };
 
   # Replication runs after Sanoid has had time to create the day's snapshots.
@@ -121,19 +125,22 @@ in
     interval = "*-*-* 03:00:00";
     sshKey = config.sops.secrets.server_nix_syncoid_id_ed25519.path;
     commonArgs = [ "--no-sync-snap" ];
-    commands = builtins.listToAttrs (map mkSyncoidCommand backupDatasets) // {
+    commands =
+      builtins.listToAttrs (map mkSyncoidCommand backupDatasets)
       # No --no-sync-snap: each run takes its own snapshot and sends just the
       # changes, so zpool trails by at most an hour. Daily history comes from sanoid.
-      containers = {
-        source = containersSource;
-        target = containersTarget;
-        recursive = true;
-        useCommonArgs = false;
-        recvOptions = "u x mountpoint";
-      };
-    };
+      // lib.mapAttrs' (
+        tierName: source:
+        lib.nameValuePair "lxc-${tierName}" {
+          inherit source;
+          target = "zpool/backups/${source}";
+          recursive = true;
+          useCommonArgs = false;
+          recvOptions = "u x mountpoint";
+          service.startAt = lib.mkForce "hourly";
+        }
+      ) lxcRootDisks;
   };
-  systemd.services.syncoid-containers.startAt = lib.mkForce "hourly";
 
   programs.ssh.knownHosts.${piBackupFqdn}.publicKey =
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILWyZ/i1VfPZmQphX5HtPsO4DEd0YhHeut7BTTHd8znI";

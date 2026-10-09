@@ -7,6 +7,13 @@ let
   metricsDirectory = "/var/lib/prometheus-node-exporter-text-files";
 in
 {
+  # nixos-factory unshifts /nix ownership with it when moving stores into custom volumes.
+  environment.systemPackages = [
+    (pkgs.writeShellScriptBin "fuidshift" ''
+      exec ${config.virtualisation.incus.package}/bin/fuidshift "$@"
+    '')
+  ];
+
   virtualisation.incus = {
     enable = true;
     ui.enable = true;

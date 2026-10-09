@@ -6,11 +6,11 @@ server-nix:
 | Artifact | Location | What it is |
 | --- | --- | --- |
 | Rootfs image | Incus alias `barebones-nixos-allow-keys` | `/`, minus the store |
-| Store template | `rpool/VMDisks/nix-templates/nixos-base-nix@ready` | the `/nix` that rootfs boots from |
+| Store template | `rpool/lxc/templates/nixos-base-nix@ready` | the `/nix` that rootfs boots from |
 
 `create` initialises the container from the image, `zfs send`s the snapshot into
-the host's store tier (`nixStores` in
-[incus/registry.nix](../hosts/server-nix/system/incus/registry.nix)), and mounts it at `/nix`. The container then has
+a `store-<host>` custom volume in the host's tier pool (`tiers` in
+[incus/registry.nix](../hosts/server-nix/system/incus/registry.nix)), attached at `/nix`. The container then has
 to boot far enough for colmena to SSH in and push the real configuration.
 
 Both artifacts come from one build of `nixosConfigurations.lxc-template`

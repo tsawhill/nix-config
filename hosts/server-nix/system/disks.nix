@@ -9,6 +9,8 @@
     description = "Ensure ZFS datasets have correct mountpoints";
     wantedBy = [ "zfs.target" ];
     after = [ "zfs-import.target" ];
+    # The Incus tier pools are created under these parents.
+    before = [ "incus-declarative-apply.service" ];
     serviceConfig.Type = "oneshot";
     script = ''
       # Setting a property remounts the dataset, which Incus bind mounts block.
@@ -25,15 +27,33 @@
 
       set_property atime off downloadHDD/nix-stores
 
-      # Mirrored-NVMe tier of guest /nix stores (see incus/registry.nix nixStores).
-      ${pkgs.zfs}/bin/zfs list -H rpool/nix-stores >/dev/null 2>&1 \
-        || ${pkgs.zfs}/bin/zfs create -o mountpoint=/mnt/rpool/nix-stores \
-          -o compression=zstd -o atime=off rpool/nix-stores
+      ensure_dataset() {
+        name="$1"
+        shift
+        ${pkgs.zfs}/bin/zfs list -H "$name" >/dev/null 2>&1 \
+          || ${pkgs.zfs}/bin/zfs create "$@" "$name"
+      }
 
-      # Never-mounted receive side for zfs-backups.nix's local replication; a
+      # LXC tier parents (incus/registry.nix tiers); Incus creates <zpool>/lxc/incus.
+      # Nothing under them is mounted on the host.
+      ensure_dataset rpool/lxc -o canmount=off -o mountpoint=none -o compression=zstd -o atime=off
+      if ${pkgs.zfs}/bin/zfs list -H scratchSSD >/dev/null 2>&1; then
+        ensure_dataset scratchSSD/lxc -o canmount=off -o mountpoint=none -o atime=off
+      fi
+
+      # nixos-factory's /nix template moved here from inside the old rpool Incus pool.
+      if ${pkgs.zfs}/bin/zfs list -H rpool/VMDisks/nix-templates >/dev/null 2>&1 \
+        && ! ${pkgs.zfs}/bin/zfs list -H rpool/lxc/templates >/dev/null 2>&1
+      then
+        ${pkgs.zfs}/bin/zfs rename rpool/VMDisks/nix-templates rpool/lxc/templates
+      fi
+
+      # Never-mounted receive side for zfs-backups.nix, mirroring source paths; a
       # mounted copy could be written to and break the next incremental receive.
-      ${pkgs.zfs}/bin/zfs list -H zpool/backups >/dev/null 2>&1 \
-        || ${pkgs.zfs}/bin/zfs create -o canmount=off -o mountpoint=none zpool/backups
+      ensure_dataset zpool/backups -o canmount=off -o mountpoint=none
+      for parent in rpool rpool/lxc rpool/lxc/incus scratchSSD scratchSSD/lxc scratchSSD/lxc/incus; do
+        ensure_dataset "zpool/backups/$parent" -o canmount=off
+      done
     '';
   };
   boot.zfs.forceImportRoot = true; # Import root even if booting from the mirrored boot drive.

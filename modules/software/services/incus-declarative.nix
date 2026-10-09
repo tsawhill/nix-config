@@ -272,7 +272,7 @@ let
       local current_value
       current_value=$(incus config device get "$instance" "$dev" "$key" 2>/dev/null || true)
       # Swapping /nix or the root pool under a running guest breaks it; nixos-factory moves them offline.
-      if { [ "$dev" = "nix-store" ] && [ "$key" = "source" ]; } \
+      if { [ "$dev" = "nix-store" ] && { [ "$key" = "source" ] || [ "$key" = "pool" ]; }; } \
         || { [ "$dev" = "root" ] && [ "$key" = "pool" ]; }
       then
         if [ "$current_value" != "$desired_value" ]; then

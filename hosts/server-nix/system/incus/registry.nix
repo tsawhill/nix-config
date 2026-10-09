@@ -39,43 +39,29 @@ let
     inherit pool size;
   };
 
-  # Per-guest /nix stores live at <mount>/<guest>; nixos-factory reads this too.
-  nixStores = {
-    scratchSSD = {
-      dataset = "scratchSSD/nix-stores";
-      mount = "/mnt/scratchSSD/nix-stores";
-    };
-    rpool = {
-      dataset = "rpool/nix-stores";
-      mount = "/mnt/rpool/nix-stores";
-    };
-  };
-  defaultNixStore = tiers.${defaultTier}.nixStore;
-
-  # Each guest lives wholly on one tier: root disk and /nix together. critical
-  # is mirrored NVMe for what the network can't run without; standard is
-  # single-disk scratchSSD, root disks copied hourly to zpool (zfs-backups.nix).
+  # Each guest lives wholly on one tier: an Incus pool named after the tier on
+  # <zpool>/lxc/incus, holding both its root disk (containers/<guest>) and its
+  # /nix as the custom volume store-<guest> (custom/default_store-<guest>).
+  # Incus mounts both only while the guest runs. critical is mirrored NVMe for
+  # what the network can't run without; standard is single-disk scratchSSD.
+  # zfs-backups.nix copies every root disk hourly to zpool/backups/<same path>.
   tiers = {
-    critical = {
-      rootPool = "rpool";
-      nixStore = "rpool";
-    };
-    standard = {
-      rootPool = "scratch";
-      nixStore = "scratchSSD";
-    };
+    critical.zpool = "rpool";
+    standard.zpool = "scratchSSD";
   };
   defaultTier = "standard";
   defaultRootSize = "4GiB";
 
+  storeVolume = guest: "store-${guest}";
+
   # Incus pools the apply service creates if missing (never modifies existing ones).
-  storagePools.scratch = {
+  storagePools = lib.mapAttrs (_: tier: {
     driver = "zfs";
     config = {
-      source = "scratchSSD/incus";
+      source = "${tier.zpool}/lxc/incus";
       "volume.zfs.use_refquota" = "true";
     };
-  };
+  }) tiers;
 
   profiles = {
     default.description = "Default Incus profile";
@@ -93,6 +79,7 @@ let
           nictype = "bridged";
           parent = "br0";
         };
+        # TODO: switch to "standard" once the old rpool pool is retired.
         root = rootDisk "rpool" defaultRootSize;
       };
     };
@@ -371,7 +358,7 @@ let
     name: host:
     let
       extra = guests.${name} or { };
-      tier = tiers.${extra.tier or defaultTier};
+      tierName = extra.tier or defaultTier;
     in
     {
       type = "container";
@@ -381,11 +368,12 @@ let
         // extra.config or { };
       devices = lib.recursiveUpdate (
         {
-          root = rootDisk tier.rootPool (extra.rootSize or defaultRootSize);
+          root = rootDisk tierName (extra.rootSize or defaultRootSize);
           nix-store = {
             type = "disk";
             path = "/nix";
-            source = "${nixStores.${tier.nixStore}.mount}/${name}";
+            pool = tierName;
+            source = storeVolume name;
           };
           eth0 = {
             type = "nic";
@@ -410,8 +398,8 @@ assert lib.assertMsg (
   inherit
     profiles
     storagePools
-    nixStores
-    defaultNixStore
+    tiers
+    defaultTier
     ;
   instances = lib.mapAttrs mkInstance incusGuests;
 }
