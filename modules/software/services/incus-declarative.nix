@@ -426,7 +426,8 @@ let
         args+=("$kv")
       done < <(${pkgs.jq}/bin/jq -r "$expr.config | to_entries[] | \"\(.key)=\(.value)\"" "$desired")
       log "creating storage pool $pool"
-      if ! incus storage create "$pool" "$(json_get "$expr.driver")" "''${args[@]}"; then
+      # Like profile create, it reads YAML from a non-tty stdin (here: the pool list).
+      if ! incus storage create "$pool" "$(json_get "$expr.driver")" "''${args[@]}" </dev/null; then
         warn "failed to create storage pool $pool"
       fi
     }
