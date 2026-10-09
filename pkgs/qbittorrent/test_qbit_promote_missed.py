@@ -104,22 +104,38 @@ class ClassifyTests(unittest.TestCase):
         seeding = FakeQbit([torrent("c")])
         arrs = [FakeArr("sonarr"), FakeArr("radarr", imported={"a", "d"})]
 
-        ready, unimported, duplicated = classify(intake, seeding, arrs, warn=lambda m: None)
+        ready, unimported, duplicated, separate = classify(intake, seeding, arrs, warn=lambda m: None)
 
         self.assertEqual([(arr, t["hash"]) for arr, t in ready], [("radarr", "a")])
         self.assertEqual([t["hash"] for t in unimported], ["b"])
         self.assertEqual([t["hash"] for t in duplicated], ["c"])
+        self.assertEqual(separate, [])
+
+    def test_copy_at_another_path_is_separate(self):
+        intake = FakeQbit([
+            dict(torrent("a"), content_path="/hdd/a"),
+            dict(torrent("b"), content_path="/ssd/b/"),
+        ])
+        seeding = FakeQbit([
+            dict(torrent("a"), content_path="/ssd/a"),
+            dict(torrent("b"), content_path="/ssd/b"),
+        ])
+
+        _, _, duplicated, separate = classify(intake, seeding, [], warn=lambda m: None)
+
+        self.assertEqual([t["hash"] for t in duplicated], ["b"])
+        self.assertEqual([t["hash"] for t in separate], ["a"])
 
     def test_unreachable_arr_is_never_treated_as_an_import(self):
         warnings = []
         intake = FakeQbit([torrent("a")])
         arrs = [FakeArr("lidarr", error="lidarr: down"), FakeArr("radarr", imported={"a"})]
 
-        ready, unimported, _ = classify(intake, FakeQbit([]), arrs, warn=warnings.append)
+        ready, unimported, _, _ = classify(intake, FakeQbit([]), arrs, warn=warnings.append)
         self.assertEqual([arr for arr, _ in ready], ["radarr"])
         self.assertEqual(warnings, ["lidarr: down"])
 
-        ready, unimported, _ = classify(intake, FakeQbit([]), arrs[:1], warn=warnings.append)
+        ready, unimported, _, _ = classify(intake, FakeQbit([]), arrs[:1], warn=warnings.append)
         self.assertEqual(ready, [])
         self.assertEqual([t["hash"] for t in unimported], ["a"])
 

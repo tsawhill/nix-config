@@ -63,7 +63,7 @@ in
     categories = {
       tv-sonarr.savePath = "/mnt/downloadHDD/downloads/sonarr";
       radarr.savePath = "/mnt/downloadHDD/downloads/radarr";
-      # TODO: confirm where Lidarr actually drops new grabs on downloadSSD.
+      # Lidarr's download client category; grabs land beside the seeding collection.
       lidarr.savePath = "/mnt/downloadSSD/Seeding";
       prowlarr.savePath = "/mnt/downloadHDD/downloads/complete";
       manual.savePath = "/mnt/downloadHDD/downloads/complete";

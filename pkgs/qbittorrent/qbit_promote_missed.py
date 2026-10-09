@@ -95,25 +95,38 @@ def imported_by(arrs, torrent_hash, warn):
     return None
 
 
+def data_path(torrent):
+    """Where a torrent's data lives. Unknown paths compare equal, the safe answer."""
+    return os.path.normpath(torrent.get("content_path") or torrent.get("save_path") or "")
+
+
 def classify(intake, seeding, arrs, warn):
-    """Split completed intake torrents into (ready, unimported, duplicated)."""
+    """Split completed intake torrents into (ready, unimported, duplicated, separate).
+
+    duplicated shares its files with the seeding copy; separate is a second
+    download of the same data at another path.
+    """
     # Seeding first, so an instance that is still down fails before anything else.
-    on_seeding = {t["hash"] for t in seeding.get_json("torrents/info", {})}
+    on_seeding = {t["hash"]: t for t in seeding.get_json("torrents/info", {})}
     completed = intake.get_json("torrents/info", {"filter": "completed"})
 
-    ready, unimported, duplicated = [], [], []
+    ready, unimported, duplicated, separate = [], [], [], []
     for torrent in sorted(completed, key=lambda t: t.get("name", "")):
         if torrent.get("progress", 0) < COMPLETE_PROGRESS:
             continue
-        if torrent["hash"] in on_seeding:
-            duplicated.append(torrent)
+        seeded = on_seeding.get(torrent["hash"])
+        if seeded is not None:
+            if data_path(seeded) == data_path(torrent):
+                duplicated.append(torrent)
+            else:
+                separate.append(torrent)
             continue
         arr = imported_by(arrs, torrent["hash"], warn)
         if arr:
             ready.append((arr, torrent))
         else:
             unimported.append(torrent)
-    return ready, unimported, duplicated
+    return ready, unimported, duplicated, separate
 
 
 def size(torrent):
@@ -155,7 +168,7 @@ def main(argv=None, env=None):
 
     try:
         arrs = build_arrs(env)
-        ready, unimported, duplicated = classify(intake, seeding, arrs, warn)
+        ready, unimported, duplicated, separate = classify(intake, seeding, arrs, warn)
     except (PromotionError, OSError) as error:
         print(f"qbit-promote-missed: {error}", file=sys.stderr)
         return 1
@@ -164,6 +177,13 @@ def main(argv=None, env=None):
         print(f"On both instances; remove from intake by hand, keeping files ({len(duplicated)}):")
         for torrent in duplicated:
             print(f"  {torrent.get('category') or '-':<12} {torrent['name']}")
+        print()
+
+    # Same infohash, so seeding still holds identical data at its own path.
+    if separate:
+        print(f"Separate copy of a torrent already seeding; remove from intake with its files ({len(separate)}):")
+        for torrent in separate:
+            print(f"  {torrent.get('category') or '-':<12} {size(torrent):>8}  {torrent['name']}")
         print()
 
     if unimported:
