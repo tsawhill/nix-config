@@ -54,12 +54,18 @@ in
     keep-outputs = false;
     keep-derivations = false;
   };
+  # No own kernel, so booted-system only pins old generations from GC.
+  system.activationScripts.lxcBootedSystem = ''
+    ln -sfn "$(readlink -f "$systemConfig")" /run/booted-system
+  '';
   software.headless.enable = true;
 
   # lxc-container.nix pulls in the installer channel: a 197 MiB nixpkgs copy
   # and a cleanSource walk of all of nixpkgs on every eval.
   system.installer.channel.enable = false;
   installer.cloneConfig = false;
+  # Old containers still carry a root channel profile; this warns until it's removed.
+  nix.channel.enable = false;
 
   my.monitoring.metrics.exporters.enable = true;
   my.monitoring.logs.agent.enable = true;
