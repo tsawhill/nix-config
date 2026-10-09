@@ -624,7 +624,10 @@ let
       --align center --width 50 "$($FIGLET -f small "NIXOS FACTORY")"
 
     # Top-level action picker
-    ACTION=$($GUM choose "create" "rename" "delete" "move-store" "template")
+    ACTION="''${1:-}"
+    if [ -z "$ACTION" ]; then
+      ACTION=$($GUM choose "create" "rename" "delete" "move-store" "template")
+    fi
 
     # ══════════════════════════════════════════════════════════════
     #  CREATE — provision a new NixOS container end-to-end
@@ -1301,8 +1304,11 @@ let
     #    5. Optionally destroy the old dataset
     #
     #  server-nix is reached by IP, so moving DNS can't strand the factory.
+    #  `nixos-factory move-store <host>` skips the picker and exits 0 when
+    #  moved or already in place, 3 when declined, 1 on failure.
     # ══════════════════════════════════════════════════════════════
     do_move_store() {
+      MOVE_HOST="''${1:-}"
       SERVER_IP=$($JQ -r '.["server-nix"].ip // empty' "$TOPOLOGY_JSON")
       if [ -n "$SERVER_IP" ]; then
         SERVER_HOST="root@$SERVER_IP"
@@ -1328,13 +1334,27 @@ let
         '.[] | select((.devices // {})["nix-store"].source != null)
           | [.name, .devices["nix-store"].source] | @tsv')
 
-      if [ "''${#PENDING[@]}" -eq 0 ]; then
-        $GUM style --foreground 82 "Every container's nix store already matches the registry."
-        return 1
-      fi
+      if [ -n "$MOVE_HOST" ]; then
+        if ! printf '%s' "$INSTANCES_JSON" \
+          | $JQ -e --arg h "$MOVE_HOST" 'any(.[]; .name == $h)' >/dev/null
+        then
+          $GUM style --foreground 196 --bold "No container named $MOVE_HOST."
+          exit 1
+        fi
+        if [[ ! " ''${PENDING[*]} " =~ " $MOVE_HOST " ]]; then
+          $GUM style --foreground 82 "$MOVE_HOST already matches the registry; nothing to move."
+          exit 0
+        fi
+        HOST="$MOVE_HOST"
+      else
+        if [ "''${#PENDING[@]}" -eq 0 ]; then
+          $GUM style --foreground 82 "Every container's nix store already matches the registry."
+          return 1
+        fi
 
-      $GUM style --foreground 212 "Select container to move (''${#PENDING[@]} differ from the registry):"
-      HOST=$($GUM choose "''${PENDING[@]}")
+        $GUM style --foreground 212 "Select container to move (''${#PENDING[@]} differ from the registry):"
+        HOST=$($GUM choose "''${PENDING[@]}")
+      fi
 
       OLD_SOURCE=$(printf '%s' "$INSTANCES_JSON" | $JQ -r --arg h "$HOST" \
         '.[] | select(.name == $h) | .devices["nix-store"].source')
@@ -1373,6 +1393,9 @@ let
       echo ""
       if ! $GUM confirm "Move $HOST's nix store?"; then
         $GUM style --foreground 214 "Aborted."
+        if [ -n "$MOVE_HOST" ]; then
+          exit 3
+        fi
         return 1
       fi
 
@@ -1758,9 +1781,17 @@ let
       rename) do_rename ;;
       delete) do_delete ;;
       move-store)
-        while do_move_store && $GUM confirm "Move another container?"; do
-          clear
-        done
+        if [ -n "''${2:-}" ]; then
+          do_move_store "$2"
+        else
+          while do_move_store && $GUM confirm "Move another container?"; do
+            clear
+          done
+        fi
+        ;;
+      *)
+        echo "usage: nixos-factory [create|rename|delete|move-store [host]|template]" >&2
+        exit 2
         ;;
       template) do_template ;;
     esac
