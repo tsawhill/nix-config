@@ -256,6 +256,13 @@ let
 
       local current_value
       current_value=$(incus config device get "$instance" "$dev" "$key" 2>/dev/null || true)
+      # Swapping /nix under a running guest breaks it; nixos-factory move-store does this offline.
+      if [ "$dev" = "nix-store" ] && [ "$key" = "source" ]; then
+        if [ "$current_value" != "$desired_value" ]; then
+          warn "$instance nix-store is $current_value, declared $desired_value; run nixos-factory move-store"
+        fi
+        return
+      fi
       # Incus keeps hwaddr as typed; some live NICs are uppercase.
       if [ "$key" = "hwaddr" ]; then
         current_value=''${current_value,,}

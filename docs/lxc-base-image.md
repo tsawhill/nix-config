@@ -9,7 +9,8 @@ server-nix:
 | Store template | `rpool/VMDisks/nix-templates/nixos-base-nix@ready` | the `/nix` that rootfs boots from |
 
 `create` initialises the container from the image, `zfs send`s the snapshot into
-`downloadHDD/nix-stores/<host>`, and mounts it at `/nix`. The container then has
+the host's store tier (`nixStores` in
+[incus/registry.nix](../hosts/server-nix/system/incus/registry.nix)), and mounts it at `/nix`. The container then has
 to boot far enough for colmena to SSH in and push the real configuration.
 
 Both artifacts come from one build of `nixosConfigurations.lxc-template`

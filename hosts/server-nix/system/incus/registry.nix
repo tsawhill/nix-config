@@ -40,6 +40,20 @@ let
     inherit size;
   };
 
+  # Per-guest /nix stores live at <mount>/<guest>; nixos-factory reads this too.
+  nixStores = {
+    scratchSSD = {
+      dataset = "scratchSSD/nix-stores";
+      mount = "/mnt/scratchSSD/nix-stores";
+    };
+    # Mirrored NVMe, for guests the network can't run without.
+    rpool = {
+      dataset = "rpool/nix-stores";
+      mount = "/mnt/rpool/nix-stores";
+    };
+  };
+  defaultNixStore = "scratchSSD";
+
   profiles = {
     default.description = "Default Incus profile";
 
@@ -113,9 +127,12 @@ let
   };
 
   # Per-guest differences: extra profiles (after nixos-lxc), config, devices,
-  # and rootSize for a local root disk on rpool.
+  # rootSize for a local root disk on rpool, and nixStore (a nixStores key).
   guests = {
-    adguard-nix.config."boot.autostart.priority" = "70";
+    adguard-nix = {
+      config."boot.autostart.priority" = "70";
+      nixStore = "rpool";
+    };
     arrs-nix = {
       profiles = [
         "media-mount"
@@ -131,7 +148,6 @@ let
         "limits.cpu" = "12";
         "limits.memory" = "24GiB";
       };
-      devices.nix-store.source = "/mnt/scratchSSD/nix-stores/build-nix";
     };
     ca-nix.rootSize = "4GiB";
     ffsync-nix = {
@@ -168,16 +184,21 @@ let
       };
       rootSize = "32GiB";
     };
-    networking-ddns-nix.rootSize = "4GiB";
+    networking-ddns-nix = {
+      rootSize = "4GiB";
+      nixStore = "rpool";
+    };
     networking-dhcp-nix = {
       config."boot.autostart.priority" = "90";
       rootSize = "4GiB";
+      nixStore = "rpool";
     };
     # eth0 is the legacy LAN; each zone gets its own NIC on its VLAN, named after the zone.
     # wan stays down until takeover, when the router gives it OPNsense's WAN MAC (Incus refuses duplicates).
     networking-router-nix = {
       config."boot.autostart.priority" = "100";
       rootSize = "4GiB";
+      nixStore = "rpool";
       devices =
         lib.mapAttrs (zone: _: {
           type = "nic";
@@ -207,14 +228,17 @@ let
     networking-vpn-in-nix = {
       config."boot.autostart.priority" = "90";
       rootSize = "4GiB";
+      nixStore = "rpool";
     };
     networking-vpn-out-eu1-nix = {
       config."boot.autostart.priority" = "90";
       rootSize = "4GiB";
+      nixStore = "rpool";
     };
     networking-vpn-out-na1-nix = {
       config."boot.autostart.priority" = "90";
       rootSize = "4GiB";
+      nixStore = "rpool";
     };
     nextcloud-nix.profiles = [
       "nextcloud-mount"
@@ -312,8 +336,12 @@ let
       ];
       rootSize = "4GiB";
     };
-    unbound-vpn-na-nix.config."boot.autostart.priority" = "80";
+    unbound-vpn-na-nix = {
+      config."boot.autostart.priority" = "80";
+      nixStore = "rpool";
+    };
     unifi-nix.rootSize = "4GiB";
+    vaultwarden-nix.nixStore = "rpool";
   };
 
   mkInstance =
@@ -332,7 +360,7 @@ let
           nix-store = {
             type = "disk";
             path = "/nix";
-            source = "/mnt/nix-stores/${name}";
+            source = "${nixStores.${extra.nixStore or defaultNixStore}.mount}/${name}";
           };
           eth0 = {
             type = "nic";
@@ -355,6 +383,6 @@ assert lib.assertMsg (
   unknownGuests == [ ]
 ) "incus registry: not in topology: ${toString unknownGuests}";
 {
-  inherit profiles;
+  inherit profiles nixStores defaultNixStore;
   instances = lib.mapAttrs mkInstance incusGuests;
 }

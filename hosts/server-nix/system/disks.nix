@@ -24,6 +24,11 @@
       set_property mountpoint /mnt/scratchSSD scratchSSD
 
       set_property atime off downloadHDD/nix-stores
+
+      # Mirrored-NVMe tier of guest /nix stores (see incus/registry.nix nixStores).
+      ${pkgs.zfs}/bin/zfs list -H rpool/nix-stores >/dev/null 2>&1 \
+        || ${pkgs.zfs}/bin/zfs create -o mountpoint=/mnt/rpool/nix-stores \
+          -o compression=zstd -o atime=off rpool/nix-stores
     '';
   };
   boot.zfs.forceImportRoot = true; # Import root even if booting from the mirrored boot drive.

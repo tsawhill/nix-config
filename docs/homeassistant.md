@@ -7,7 +7,7 @@ This is the NixOS-packaged installation, without Home Assistant OS/Supervisor
 or its app management; additional services belong in NixOS modules.
 
 Declared resources: 2 CPUs, 4 GiB memory, 16 GiB root on `rpool`, separate
-`/nix` on `downloadHDD/nix-stores/homeassistant-nix`, bridged to `br0`.
+`/nix` on `scratchSSD/nix-stores/homeassistant-nix`, bridged to `br0`.
 The LAN reservation is `10.73.73.34`, MAC `02:5f:6e:64:81:22`;
 Taylor has configured it in OPNsense.
 After provisioning, open `http://homeassistant-nix.lan:8123` to onboard.

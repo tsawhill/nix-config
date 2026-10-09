@@ -16,10 +16,17 @@ let
     builtins.toJSON factoryTopology
   );
   # Same registry server-nix applies, so new containers boot with their declared profiles.
+  incusRegistry = import ../../../hosts/server-nix/system/incus/registry.nix {
+    inherit lib networkTopology;
+  };
   factoryRegistryJson = pkgs.writeText "nixos-factory-incus-registry.json" (
-    builtins.toJSON
-      (import ../../../hosts/server-nix/system/incus/registry.nix { inherit lib networkTopology; })
-      .instances
+    builtins.toJSON incusRegistry.instances
+  );
+  factoryNixStoresJson = pkgs.writeText "nixos-factory-nix-stores.json" (
+    builtins.toJSON {
+      locations = incusRegistry.nixStores;
+      default = incusRegistry.defaultNixStore;
+    }
   );
 
   knownHostsManager = pkgs.writeText "known-hosts-manager.py" ''
@@ -386,6 +393,7 @@ let
     # Incus and ZFS live on server-nix. The factory itself runs on build-nix,
     # whose root SSH key is authorized on server-nix.
     SERVER_HOST="root@server-nix.lan"
+    SSH_EXTRA_OPTS=()
 
     # --- Incus / ZFS defaults (on server-nix) ---
     IMAGE_ALIAS="barebones-nixos-allow-keys" # local image alias for base NixOS LXC
@@ -400,13 +408,10 @@ let
     # Flake attribute the base image and its nix store are both built from.
     TEMPLATE_ATTR="nixosConfigurations.lxc-template.config.system.build"
 
-    # Parent ZFS dataset under which per-container nix stores live.
-    # e.g. downloadHDD/nix-stores/jellyfin-nix
-    NIX_PARENT_DATASET="downloadHDD/nix-stores"
-
-    # Host-side mount base — each container's nix store is bind-mounted from
-    # $NIX_HOST_MOUNT_BASE/<hostname> into the container at /nix.
-    NIX_HOST_MOUNT_BASE="/mnt/nix-stores"
+    # Store tiers from incus/registry.nix nixStores: each container's /nix is
+    # dataset <tier dataset>/<host>, bind-mounted from <tier mount>/<host>.
+    NIX_STORES_JSON="${factoryNixStoresJson}"
+    DEFAULT_NIX_STORE=$($JQ -r '.default' "$NIX_STORES_JSON")
 
     # UID/GID the nix store is chowned to — matches the container's id mapping
     # (security.idmap.base = 100000 in the nixos-lxc profile).
@@ -427,8 +432,54 @@ let
         -n \
         -o BatchMode=yes \
         -o ConnectTimeout=10 \
+        "''${SSH_EXTRA_OPTS[@]}" \
         "$SERVER_HOST" \
         "$@"
+    }
+
+    nix_store_names() {
+      $JQ -r '.locations | keys[]' "$NIX_STORES_JSON"
+    }
+
+    nix_store_dataset() {
+      $JQ -r --arg s "$1" '.locations[$s].dataset // empty' "$NIX_STORES_JSON"
+    }
+
+    nix_store_mount() {
+      $JQ -r --arg s "$1" '.locations[$s].mount // empty' "$NIX_STORES_JSON"
+    }
+
+    # Tier name for a store source path (<tier mount>/<host>), empty if none matches.
+    nix_store_for_source() {
+      $JQ -r --arg m "''${1%/*}" \
+        '.locations | to_entries[] | select(.value.mount == $m) | .key' "$NIX_STORES_JSON"
+    }
+
+    # Tier the registry declares for a host, empty if the host is undeclared.
+    declared_nix_store() {
+      declared_source=$($JQ -r --arg host "$1" \
+        '.[$host].devices["nix-store"].source // empty' "$REGISTRY_JSON")
+      if [ -n "$declared_source" ]; then
+        nix_store_for_source "$declared_source"
+      fi
+    }
+
+    # ZFS dataset actually mounted at an existing store path on server-nix.
+    # Fails if the path is not its own dataset (zfs list would name the parent).
+    dataset_for_source() {
+      store_dataset=$(server_cmd zfs list -H -o name "$1" 2>/dev/null) || return 1
+      if [ "''${store_dataset##*/}" != "''${1##*/}" ]; then
+        return 1
+      fi
+      printf '%s\n' "$store_dataset"
+    }
+
+    require_nix_store_parent() {
+      if ! server_cmd zfs list -H -o name "$1" >/dev/null 2>&1; then
+        $GUM style --foreground 196 --bold "Store parent dataset $1 does not exist."
+        $GUM style --foreground 214 "Deploy server-nix first; it creates the store parents."
+        exit 1
+      fi
     }
 
     require_server() {
@@ -573,7 +624,7 @@ let
       --align center --width 50 "$($FIGLET -f small "NIXOS FACTORY")"
 
     # Top-level action picker
-    ACTION=$($GUM choose "create" "rename" "delete" "template")
+    ACTION=$($GUM choose "create" "rename" "delete" "move-store" "template")
 
     # ══════════════════════════════════════════════════════════════
     #  CREATE — provision a new NixOS container end-to-end
@@ -679,6 +730,29 @@ let
         SELECTED_POOL=$($GUM choose "''${ROOT_POOLS[@]}")
       fi
 
+      # The registry declares the store tier; undeclared hosts get the default.
+      NIX_STORE=""
+      if [ "$USE_EXISTING_INSTANCE" = true ]; then
+        NIX_STORE=$(declared_nix_store "$HOSTNAME")
+      fi
+      if [ -z "$NIX_STORE" ]; then
+        $GUM style --foreground 212 "Select nix store location:"
+        mapfile -t NIX_STORE_CHOICES < <(nix_store_names)
+        NIX_STORE=$($GUM choose --selected="$DEFAULT_NIX_STORE" "''${NIX_STORE_CHOICES[@]}")
+        if [ "$NIX_STORE" != "$DEFAULT_NIX_STORE" ]; then
+          $GUM style --foreground 214 \
+            "Also set nixStore = \"$NIX_STORE\" for $HOSTNAME in hosts/server-nix/system/incus/registry.nix."
+        fi
+      fi
+      NIX_STORE_PARENT=$(nix_store_dataset "$NIX_STORE")
+      NIX_DATASET="$NIX_STORE_PARENT/$HOSTNAME"
+      NIX_SOURCE="$(nix_store_mount "$NIX_STORE")/$HOSTNAME"
+      require_nix_store_parent "$NIX_STORE_PARENT"
+      if server_cmd zfs list -H -o name "$NIX_DATASET" >/dev/null 2>&1; then
+        $GUM style --foreground 196 "Nix store dataset $NIX_DATASET already exists."
+        exit 1
+      fi
+
       # MAC can be manually specified (e.g. to match a DHCP reservation)
       # or auto-generated with a locally-administered prefix (02:xx:xx:xx:xx:xx).
       if [ "$USE_EXISTING_TOPOLOGY" = false ]; then
@@ -697,7 +771,7 @@ let
       echo "  Hostname:  $HOSTNAME"
       echo "  Pool:      $SELECTED_POOL"
       echo "  MAC:       $MAC_ADDR"
-      echo "  Store:     $NIX_HOST_MOUNT_BASE/$HOSTNAME"
+      echo "  Store:     $NIX_SOURCE ($NIX_DATASET)"
       if [ "$USE_EXISTING_INSTANCE" = true ]; then
         echo "  Registry:  existing declaration"
       else
@@ -751,10 +825,10 @@ let
         fi
 
         if [ "$DATASET_CREATED" = true ] \
-          && server_cmd zfs list "$NIX_PARENT_DATASET/$HOSTNAME" >/dev/null 2>&1
+          && server_cmd zfs list "$NIX_DATASET" >/dev/null 2>&1
         then
-          echo "==> Destroying ZFS dataset $NIX_PARENT_DATASET/$HOSTNAME..."
-          server_cmd zfs destroy -r "$NIX_PARENT_DATASET/$HOSTNAME" || true
+          echo "==> Destroying ZFS dataset $NIX_DATASET..."
+          server_cmd zfs destroy -r "$NIX_DATASET" || true
         fi
 
         if [ "$INSTANCE_ADDED" = true ]; then
@@ -862,9 +936,9 @@ let
       # --- Step 3: Clone the template nix store ---
       # ZFS send/receive copies the pre-built /nix from the template snapshot
       # into a new dataset for this container. Both ends stay on server-nix.
-      echo "==> Replicating nix store to $NIX_PARENT_DATASET/$HOSTNAME..."
+      echo "==> Replicating nix store to $NIX_DATASET..."
       if ! server_cmd \
-        "zfs send $NIX_TEMPLATE_SNAPSHOT | zfs receive $NIX_PARENT_DATASET/$HOSTNAME"
+        "zfs send $NIX_TEMPLATE_SNAPSHOT | zfs receive $NIX_DATASET"
       then
         rollback_create "Nix store replication failed"
       fi
@@ -873,8 +947,7 @@ let
       # `zfs receive` preserves the source snapshot. It is only transport for
       # provisioning; leaving it on every guest pins the initial store forever.
       # The reusable template snapshot above remains untouched.
-      if ! server_cmd zfs destroy \
-        "$NIX_PARENT_DATASET/$HOSTNAME@$NIX_TEMPLATE_SNAPSHOT_NAME"
+      if ! server_cmd zfs destroy "$NIX_DATASET@$NIX_TEMPLATE_SNAPSHOT_NAME"
       then
         rollback_create "Removing received nix store template snapshot failed"
       fi
@@ -884,9 +957,9 @@ let
       # - Attach the host-side nix store as a disk device at /nix
       # - Set or create the eth0 NIC with the chosen MAC address
       echo "==> Configuring container devices on server-nix..."
-      server_cmd chown -R "$UID_GID" "$NIX_HOST_MOUNT_BASE/$HOSTNAME"
+      server_cmd chown -R "$UID_GID" "$NIX_SOURCE"
       server_cmd incus config device add "$HOSTNAME" nix-store disk \
-        source="$NIX_HOST_MOUNT_BASE/$HOSTNAME" path=/nix
+        source="$NIX_SOURCE" path=/nix
 
       if server_cmd incus config device show "$HOSTNAME" | grep -q '^eth0:'; then
         server_cmd incus config device set "$HOSTNAME" eth0 hwaddr="$MAC_ADDR"
@@ -992,7 +1065,7 @@ let
         "Successfully created and deployed $HOSTNAME
     Pool:  $SELECTED_POOL
     MAC:   $MAC_ADDR
-    Store: $NIX_HOST_MOUNT_BASE/$HOSTNAME"
+    Store: $NIX_SOURCE"
     }
 
     # ══════════════════════════════════════════════════════════════
@@ -1052,6 +1125,13 @@ let
       HAS_NIX_STORE=false
       if [ -n "$OLD_NIX_SOURCE" ]; then
         HAS_NIX_STORE=true
+        if ! OLD_NIX_DATASET=$(dataset_for_source "$OLD_NIX_SOURCE"); then
+          $GUM style --foreground 196 "$OLD_NIX_SOURCE is not its own ZFS dataset."
+          exit 1
+        fi
+        # Renaming keeps the dataset under the same parent, so its mount follows.
+        NEW_NIX_DATASET="''${OLD_NIX_DATASET%/*}/$NEW_NAME"
+        NEW_NIX_SOURCE="''${OLD_NIX_SOURCE%/*}/$NEW_NAME"
       fi
 
       # --- Show plan and confirm ---
@@ -1064,8 +1144,8 @@ let
         echo "  Status:    Stopped"
       fi
       if [ "$HAS_NIX_STORE" = true ]; then
-        echo "  Nix store: $NIX_HOST_MOUNT_BASE/$OLD_NAME → $NIX_HOST_MOUNT_BASE/$NEW_NAME"
-        echo "  ZFS:       $NIX_PARENT_DATASET/$OLD_NAME → $NIX_PARENT_DATASET/$NEW_NAME"
+        echo "  Nix store: $OLD_NIX_SOURCE → $NEW_NIX_SOURCE"
+        echo "  ZFS:       $OLD_NIX_DATASET → $NEW_NIX_DATASET"
       fi
       echo ""
 
@@ -1089,12 +1169,11 @@ let
       # device source path so the container mounts the right location.
       if [ "$HAS_NIX_STORE" = true ]; then
         echo "==> Renaming ZFS dataset..."
-        server_cmd zfs rename \
-          "$NIX_PARENT_DATASET/$OLD_NAME" "$NIX_PARENT_DATASET/$NEW_NAME"
+        server_cmd zfs rename "$OLD_NIX_DATASET" "$NEW_NIX_DATASET"
 
         echo "==> Updating nix-store device source..."
         server_cmd incus config device set \
-          "$NEW_NAME" nix-store source="$NIX_HOST_MOUNT_BASE/$NEW_NAME"
+          "$NEW_NAME" nix-store source="$NEW_NIX_SOURCE"
       fi
 
       if [ "$WAS_RUNNING" = true ]; then
@@ -1142,7 +1221,10 @@ let
       NIX_DATASET=""
       if [ -n "$NIX_SOURCE" ]; then
         HAS_NIX_STORE=true
-        NIX_DATASET="$NIX_PARENT_DATASET/$TARGET"
+        if ! NIX_DATASET=$(dataset_for_source "$NIX_SOURCE"); then
+          $GUM style --foreground 214 "$NIX_SOURCE is not its own ZFS dataset; leaving it alone."
+          HAS_NIX_STORE=false
+        fi
       fi
 
       # --- Show plan ---
@@ -1206,6 +1288,182 @@ let
 
       $GUM style --foreground 82 --border rounded --padding "1 2" \
         "Deleted $TARGET"
+    }
+
+    # ══════════════════════════════════════════════════════════════
+    #  MOVE-STORE — move a container's /nix to the tier the registry declares
+    #
+    #  Flow:
+    #    1. List containers whose store differs from the registry, pick one
+    #    2. Copy the store to the new tier while the container keeps running
+    #    3. Stop it, copy what changed, repoint nix-store, start it
+    #    4. Wait for boot; on failure put it back on the old store
+    #    5. Optionally destroy the old dataset
+    #
+    #  server-nix is reached by IP, so moving DNS can't strand the factory.
+    # ══════════════════════════════════════════════════════════════
+    do_move_store() {
+      SERVER_IP=$($JQ -r '.["server-nix"].ip // empty' "$TOPOLOGY_JSON")
+      if [ -n "$SERVER_IP" ]; then
+        SERVER_HOST="root@$SERVER_IP"
+        SSH_EXTRA_OPTS=(-o HostKeyAlias=server-nix.lan)
+      fi
+      require_server
+
+      if ! INSTANCES_JSON=$(server_cmd incus list --format json); then
+        $GUM style --foreground 196 --bold "Could not list Incus instances."
+        exit 1
+      fi
+
+      PENDING=()
+      while IFS=$'\t' read -r host source; do
+        declared_store=$(declared_nix_store "$host")
+        if [ -z "$declared_store" ]; then
+          continue
+        fi
+        if [ "$source" != "$(nix_store_mount "$declared_store")/$host" ]; then
+          PENDING+=("$host")
+        fi
+      done < <(printf '%s' "$INSTANCES_JSON" | $JQ -r \
+        '.[] | select((.devices // {})["nix-store"].source != null)
+          | [.name, .devices["nix-store"].source] | @tsv')
+
+      if [ "''${#PENDING[@]}" -eq 0 ]; then
+        $GUM style --foreground 82 "Every container's nix store already matches the registry."
+        return 1
+      fi
+
+      $GUM style --foreground 212 "Select container to move (''${#PENDING[@]} differ from the registry):"
+      HOST=$($GUM choose "''${PENDING[@]}")
+
+      OLD_SOURCE=$(printf '%s' "$INSTANCES_JSON" | $JQ -r --arg h "$HOST" \
+        '.[] | select(.name == $h) | .devices["nix-store"].source')
+      STATE=$(printf '%s' "$INSTANCES_JSON" | $JQ -r --arg h "$HOST" \
+        '.[] | select(.name == $h) | .status')
+      WAS_RUNNING=false
+      if [ "$STATE" = "Running" ]; then
+        WAS_RUNNING=true
+      fi
+
+      NEW_STORE=$(declared_nix_store "$HOST")
+      NEW_PARENT=$(nix_store_dataset "$NEW_STORE")
+      NEW_DATASET="$NEW_PARENT/$HOST"
+      NEW_SOURCE="$(nix_store_mount "$NEW_STORE")/$HOST"
+
+      if ! OLD_DATASET=$(dataset_for_source "$OLD_SOURCE"); then
+        $GUM style --foreground 196 "$OLD_SOURCE is not its own ZFS dataset."
+        exit 1
+      fi
+      require_nix_store_parent "$NEW_PARENT"
+      if server_cmd zfs list -H -o name "$NEW_DATASET" >/dev/null 2>&1; then
+        $GUM style --foreground 196 "$NEW_DATASET already exists (a failed earlier move?)."
+        $GUM style --foreground 214 "Destroy it on server-nix if it is stale, then retry."
+        exit 1
+      fi
+      OLD_USED=$(server_cmd zfs get -H -o value used "$OLD_DATASET")
+
+      echo ""
+      $GUM style --foreground 86 --bold "Move plan:"
+      echo "  Container: $HOST ($STATE)"
+      echo "  From:      $OLD_SOURCE ($OLD_DATASET, $OLD_USED)"
+      echo "  To:        $NEW_SOURCE ($NEW_DATASET)"
+      if [ "$WAS_RUNNING" = true ]; then
+        echo "  Downtime:  stop, copy what changed since the first pass, start"
+      fi
+      echo ""
+      if ! $GUM confirm "Move $HOST's nix store?"; then
+        $GUM style --foreground 214 "Aborted."
+        return 1
+      fi
+
+      SNAP="factory-move-$(date +%Y%m%d%H%M%S)"
+
+      drop_move_snapshots() {
+        server_cmd "zfs destroy $OLD_DATASET@$SNAP-a; zfs destroy $OLD_DATASET@$SNAP-b" \
+          >/dev/null 2>&1 || true
+      }
+
+      move_failed() {
+        $GUM style --foreground 196 --bold "$1 — putting $HOST back on $OLD_SOURCE..."
+        server_cmd incus stop "$HOST" --force >/dev/null 2>&1 || true
+        server_cmd incus config device set "$HOST" nix-store source="$OLD_SOURCE" || true
+        if [ "$WAS_RUNNING" = true ]; then
+          server_cmd incus start "$HOST" || true
+        fi
+        server_cmd zfs destroy -r "$NEW_DATASET" >/dev/null 2>&1 || true
+        drop_move_snapshots
+        exit 1
+      }
+
+      echo "==> Copying $OLD_DATASET to $NEW_DATASET while $HOST runs..."
+      if ! server_cmd "zfs snapshot $OLD_DATASET@$SNAP-a \
+        && zfs send $OLD_DATASET@$SNAP-a | zfs receive -u $NEW_DATASET"
+      then
+        server_cmd zfs destroy -r "$NEW_DATASET" >/dev/null 2>&1 || true
+        drop_move_snapshots
+        $GUM style --foreground 196 --bold "Initial copy failed. $HOST was not touched."
+        exit 1
+      fi
+
+      if [ "$WAS_RUNNING" = true ]; then
+        echo "==> Stopping $HOST..."
+        server_cmd incus stop "$HOST" --timeout 60 \
+          || server_cmd incus stop "$HOST" --force \
+          || move_failed "Stopping $HOST failed"
+      fi
+
+      echo "==> Copying changes since the first pass..."
+      server_cmd "zfs snapshot $OLD_DATASET@$SNAP-b \
+        && zfs send -i @$SNAP-a $OLD_DATASET@$SNAP-b | zfs receive -u -F $NEW_DATASET" \
+        || move_failed "Final copy failed"
+      # Received snapshots would pin the old store contents forever.
+      server_cmd "zfs destroy $NEW_DATASET@$SNAP-a && zfs destroy $NEW_DATASET@$SNAP-b" \
+        || move_failed "Dropping transfer snapshots failed"
+      server_cmd zfs mount "$NEW_DATASET" || move_failed "Mounting $NEW_DATASET failed"
+
+      echo "==> Pointing $HOST's nix-store at $NEW_SOURCE..."
+      server_cmd incus config device set "$HOST" nix-store source="$NEW_SOURCE" \
+        || move_failed "Updating the nix-store device failed"
+
+      if [ "$WAS_RUNNING" = true ]; then
+        echo "==> Starting $HOST..."
+        server_cmd incus start "$HOST" || move_failed "Starting $HOST failed"
+
+        echo "==> Waiting for $HOST to finish booting..."
+        BOOT_STATE=""
+        for i in $(seq 1 60); do
+          BOOT_STATE=$(server_cmd incus exec "$HOST" -- \
+            systemctl is-system-running 2>/dev/null || true)
+          case "$BOOT_STATE" in
+            running|degraded) break ;;
+          esac
+          sleep 3
+        done
+
+        case "$BOOT_STATE" in
+          running) ;;
+          degraded)
+            $GUM style --foreground 214 "$HOST booted degraded. Failed units:"
+            server_cmd incus exec "$HOST" -- systemctl --failed --no-legend || true
+            if ! $GUM confirm "Keep $HOST on the new store anyway?"; then
+              move_failed "Degraded after the move"
+            fi
+            ;;
+          *) move_failed "$HOST did not finish booting (state: ''${BOOT_STATE:-unknown})" ;;
+        esac
+      fi
+
+      drop_move_snapshots
+      $GUM style --foreground 82 --border rounded --padding "1 2" \
+        "$HOST now runs from $NEW_SOURCE"
+
+      if $GUM confirm --default=No "Destroy the old store $OLD_DATASET ($OLD_USED)?"; then
+        echo "==> Destroying $OLD_DATASET..."
+        server_cmd zfs destroy -r "$OLD_DATASET"
+      else
+        $GUM style --foreground 214 \
+          "Kept $OLD_DATASET. Remove it later with: zfs destroy -r $OLD_DATASET"
+      fi
     }
 
     # ══════════════════════════════════════════════════════════════
@@ -1431,19 +1689,20 @@ let
     verify_template() {
       CHECK_HOST="factory-template-check"
       CHECK_RESULT=1
+      CHECK_DATASET="$(nix_store_dataset "$DEFAULT_NIX_STORE")/$CHECK_HOST"
+      CHECK_SOURCE="$(nix_store_mount "$DEFAULT_NIX_STORE")/$CHECK_HOST"
 
       server_cmd "incus delete --force $CHECK_HOST 2>/dev/null || true"
-      server_cmd "zfs destroy -r $NIX_PARENT_DATASET/$CHECK_HOST 2>/dev/null || true"
+      server_cmd "zfs destroy -r $CHECK_DATASET 2>/dev/null || true"
 
       echo "==> Creating $CHECK_HOST..."
       if server_cmd incus init "$IMAGE_ALIAS" "$CHECK_HOST" -p "$PROFILE" -s rpool \
         && server_cmd \
-          "zfs send $NIX_TEMPLATE_SNAPSHOT | zfs receive $NIX_PARENT_DATASET/$CHECK_HOST" \
-        && server_cmd zfs destroy \
-          "$NIX_PARENT_DATASET/$CHECK_HOST@$NIX_TEMPLATE_SNAPSHOT_NAME" \
-        && server_cmd chown -R "$UID_GID" "$NIX_HOST_MOUNT_BASE/$CHECK_HOST" \
+          "zfs send $NIX_TEMPLATE_SNAPSHOT | zfs receive $CHECK_DATASET" \
+        && server_cmd zfs destroy "$CHECK_DATASET@$NIX_TEMPLATE_SNAPSHOT_NAME" \
+        && server_cmd chown -R "$UID_GID" "$CHECK_SOURCE" \
         && server_cmd incus config device add "$CHECK_HOST" nix-store disk \
-          source="$NIX_HOST_MOUNT_BASE/$CHECK_HOST" path=/nix \
+          source="$CHECK_SOURCE" path=/nix \
         && server_cmd incus start "$CHECK_HOST"
       then
         echo "==> Waiting for $CHECK_HOST to come up..."
@@ -1488,7 +1747,7 @@ let
 
       echo "==> Removing $CHECK_HOST..."
       server_cmd "incus delete --force $CHECK_HOST 2>/dev/null || true"
-      server_cmd "zfs destroy -r $NIX_PARENT_DATASET/$CHECK_HOST 2>/dev/null || true"
+      server_cmd "zfs destroy -r $CHECK_DATASET 2>/dev/null || true"
 
       return "$CHECK_RESULT"
     }
@@ -1498,6 +1757,11 @@ let
       create) do_create ;;
       rename) do_rename ;;
       delete) do_delete ;;
+      move-store)
+        while do_move_store && $GUM confirm "Move another container?"; do
+          clear
+        done
+        ;;
       template) do_template ;;
     esac
   '';
