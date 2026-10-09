@@ -29,6 +29,7 @@ $env.config.color_config = ($env.config.color_config | merge {
 # ~/.ssh/config, keeping any user@ prefix.
 def ssh-hosts [word: string] {
   let user = if ($word | str contains '@') { ($word | split row '@' | first) + '@' } else { '' }
+  let host = $word | split row '@' | last
   let access = if ('/etc/ssh/access.json' | path exists) { open /etc/ssh/access.json } else { { managed: [] reachable: {} } }
   let granted = $access.reachable | get -o $"(sys host | get hostname)-($env.USER)" | default []
     | where ($it | str starts-with $user)
@@ -50,6 +51,7 @@ def ssh-hosts [word: string] {
     | uniq | sort
     | each { $user + $in }
     | prepend $granted
+    | where ($it | split row '@' | last | str contains $host)
 }
 
 # ssh hosts ourselves, everything else via carapace; null means file completion.
