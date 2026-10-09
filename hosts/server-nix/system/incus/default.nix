@@ -21,6 +21,6 @@
   my.incusDeclarative = {
     enable = true;
     mode = "non-destructive";
-    inherit (import ./registry.nix { inherit lib networkTopology; }) profiles instances;
+    inherit (import ./registry.nix { inherit lib networkTopology; }) storagePools profiles instances;
   };
 }

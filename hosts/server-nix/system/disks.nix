@@ -1,13 +1,4 @@
-{
-  lib,
-  networkTopology,
-  pkgs,
-  ...
-}:
-let
-  incusRegistry = import ./incus/registry.nix { inherit lib networkTopology; };
-  inherit (incusRegistry) appData;
-in
+{ pkgs, ... }:
 {
   # Enable ZFS support
   boot.supportedFilesystems = [ "zfs" ];
@@ -18,11 +9,6 @@ in
     description = "Ensure ZFS datasets have correct mountpoints";
     wantedBy = [ "zfs.target" ];
     after = [ "zfs-import.target" ];
-    # Guests' /appdata sources must exist before Incus starts or hot-adds them.
-    before = [
-      "incus.service"
-      "incus-declarative-apply.service"
-    ];
     serviceConfig.Type = "oneshot";
     script = ''
       # Setting a property remounts the dataset, which Incus bind mounts block.
@@ -44,24 +30,10 @@ in
         || ${pkgs.zfs}/bin/zfs create -o mountpoint=/mnt/rpool/nix-stores \
           -o compression=zstd -o atime=off rpool/nix-stores
 
-      # Never-mounted receive side for zfs-backups.nix's appdata replication.
+      # Never-mounted receive side for zfs-backups.nix's local replication; a
+      # mounted copy could be written to and break the next incremental receive.
       ${pkgs.zfs}/bin/zfs list -H zpool/backups >/dev/null 2>&1 \
         || ${pkgs.zfs}/bin/zfs create -o canmount=off -o mountpoint=none zpool/backups
-      ${pkgs.zfs}/bin/zfs list -H zpool/backups/appdata >/dev/null 2>&1 \
-        || ${pkgs.zfs}/bin/zfs create -o canmount=off zpool/backups/appdata
-
-      # One app data dataset per declared guest (see incus/registry.nix appData),
-      # owned by container root (idmap base 100000).
-      if ${pkgs.zfs}/bin/zfs list -H scratchSSD >/dev/null 2>&1; then
-        ${pkgs.zfs}/bin/zfs list -H ${appData.dataset} >/dev/null 2>&1 \
-          || ${pkgs.zfs}/bin/zfs create -o atime=off ${appData.dataset}
-        for guest in ${lib.escapeShellArgs (lib.attrNames incusRegistry.instances)}; do
-          if ! ${pkgs.zfs}/bin/zfs list -H "${appData.dataset}/$guest" >/dev/null 2>&1; then
-            ${pkgs.zfs}/bin/zfs create "${appData.dataset}/$guest"
-            chown 100000:100000 "${appData.mount}/$guest"
-          fi
-        done
-      fi
     '';
   };
   boot.zfs.forceImportRoot = true; # Import root even if booting from the mirrored boot drive.

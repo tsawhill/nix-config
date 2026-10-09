@@ -64,11 +64,11 @@ let
   orphanGraceDays = 90;
   backupDatasetArgs = builtins.concatStringsSep " " backupDatasets;
 
-  # Guest app data (incus/registry.nix appData) lives on single-disk scratchSSD,
-  # so it is copied to raidz2 zpool every hour. A child dataset opts out with
+  # Standard-tier guest root disks (incus/registry.nix tiers) live on single-disk
+  # scratchSSD, so they are copied to raidz2 zpool every hour. A guest opts out with
   # `zfs set syncoid:sync=false` plus a sanoid entry with autosnap = false.
-  appDataSource = "scratchSSD/appdata";
-  appDataTarget = "zpool/backups/appdata";
+  containersSource = "scratchSSD/incus/containers";
+  containersTarget = "zpool/backups/containers";
 in
 {
   # Source-side snapshot policy: daily/monthly retention, no hourly/yearly
@@ -86,7 +86,7 @@ in
       yearly = 0;
     };
     # Short history on the SSD; the long history lives on the zpool copy.
-    templates.appdata = {
+    templates.containers = {
       autosnap = true;
       autoprune = true;
       hourly = 0;
@@ -95,7 +95,7 @@ in
       yearly = 0;
     };
     # Receive side: prune what syncoid brings over, never snapshot.
-    templates.appdata-backup = {
+    templates.containers-backup = {
       autosnap = false;
       autoprune = true;
       hourly = 0;
@@ -104,12 +104,12 @@ in
       yearly = 0;
     };
     datasets = builtins.listToAttrs (map mkDatasetConfig backupDatasets) // {
-      ${appDataSource} = {
-        useTemplate = [ "appdata" ];
+      ${containersSource} = {
+        useTemplate = [ "containers" ];
         recursive = true;
       };
-      ${appDataTarget} = {
-        useTemplate = [ "appdata-backup" ];
+      ${containersTarget} = {
+        useTemplate = [ "containers-backup" ];
         recursive = true;
       };
     };
@@ -124,16 +124,16 @@ in
     commands = builtins.listToAttrs (map mkSyncoidCommand backupDatasets) // {
       # No --no-sync-snap: each run takes its own snapshot and sends just the
       # changes, so zpool trails by at most an hour. Daily history comes from sanoid.
-      appdata = {
-        source = appDataSource;
-        target = appDataTarget;
+      containers = {
+        source = containersSource;
+        target = containersTarget;
         recursive = true;
         useCommonArgs = false;
         recvOptions = "u x mountpoint";
       };
     };
   };
-  systemd.services.syncoid-appdata.startAt = lib.mkForce "hourly";
+  systemd.services.syncoid-containers.startAt = lib.mkForce "hourly";
 
   programs.ssh.knownHosts.${piBackupFqdn}.publicKey =
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILWyZ/i1VfPZmQphX5HtPsO4DEd0YhHeut7BTTHd8znI";

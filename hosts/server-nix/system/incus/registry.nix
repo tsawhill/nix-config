@@ -33,11 +33,10 @@ let
     "security.nesting" = "true";
   };
 
-  rootDisk = size: {
+  rootDisk = pool: size: {
     type = "disk";
     path = "/";
-    pool = "rpool";
-    inherit size;
+    inherit pool size;
   };
 
   # Per-guest /nix stores live at <mount>/<guest>; nixos-factory reads this too.
@@ -46,19 +45,36 @@ let
       dataset = "scratchSSD/nix-stores";
       mount = "/mnt/scratchSSD/nix-stores";
     };
-    # Mirrored NVMe, for guests the network can't run without.
     rpool = {
       dataset = "rpool/nix-stores";
       mount = "/mnt/rpool/nix-stores";
     };
   };
-  defaultNixStore = "scratchSSD";
+  defaultNixStore = tiers.${defaultTier}.nixStore;
 
-  # Per-guest app data at <mount>/<guest>, mounted at /appdata. Snapshotted and
-  # replicated to zpool by zfs-backups.nix; child datasets show up via recursive.
-  appData = {
-    dataset = "scratchSSD/appdata";
-    mount = "/mnt/scratchSSD/appdata";
+  # Each guest lives wholly on one tier: root disk and /nix together. critical
+  # is mirrored NVMe for what the network can't run without; standard is
+  # single-disk scratchSSD, root disks copied hourly to zpool (zfs-backups.nix).
+  tiers = {
+    critical = {
+      rootPool = "rpool";
+      nixStore = "rpool";
+    };
+    standard = {
+      rootPool = "scratch";
+      nixStore = "scratchSSD";
+    };
+  };
+  defaultTier = "standard";
+  defaultRootSize = "4GiB";
+
+  # Incus pools the apply service creates if missing (never modifies existing ones).
+  storagePools.scratch = {
+    driver = "zfs";
+    config = {
+      source = "scratchSSD/incus";
+      "volume.zfs.use_refquota" = "true";
+    };
   };
 
   profiles = {
@@ -77,7 +93,7 @@ let
           nictype = "bridged";
           parent = "br0";
         };
-        root = rootDisk "4GiB";
+        root = rootDisk "rpool" defaultRootSize;
       };
     };
 
@@ -134,11 +150,11 @@ let
   };
 
   # Per-guest differences: extra profiles (after nixos-lxc), config, devices,
-  # rootSize for a local root disk on rpool, and nixStore (a nixStores key).
+  # rootSize (default defaultRootSize), and tier (a tiers key, default defaultTier).
   guests = {
     adguard-nix = {
       config."boot.autostart.priority" = "70";
-      nixStore = "rpool";
+      tier = "critical";
     };
     arrs-nix = {
       profiles = [
@@ -193,19 +209,19 @@ let
     };
     networking-ddns-nix = {
       rootSize = "4GiB";
-      nixStore = "rpool";
+      tier = "critical";
     };
     networking-dhcp-nix = {
       config."boot.autostart.priority" = "90";
       rootSize = "4GiB";
-      nixStore = "rpool";
+      tier = "critical";
     };
     # eth0 is the legacy LAN; each zone gets its own NIC on its VLAN, named after the zone.
     # wan stays down until takeover, when the router gives it OPNsense's WAN MAC (Incus refuses duplicates).
     networking-router-nix = {
       config."boot.autostart.priority" = "100";
       rootSize = "4GiB";
-      nixStore = "rpool";
+      tier = "critical";
       devices =
         lib.mapAttrs (zone: _: {
           type = "nic";
@@ -235,17 +251,17 @@ let
     networking-vpn-in-nix = {
       config."boot.autostart.priority" = "90";
       rootSize = "4GiB";
-      nixStore = "rpool";
+      tier = "critical";
     };
     networking-vpn-out-eu1-nix = {
       config."boot.autostart.priority" = "90";
       rootSize = "4GiB";
-      nixStore = "rpool";
+      tier = "critical";
     };
     networking-vpn-out-na1-nix = {
       config."boot.autostart.priority" = "90";
       rootSize = "4GiB";
-      nixStore = "rpool";
+      tier = "critical";
     };
     nextcloud-nix.profiles = [
       "nextcloud-mount"
@@ -345,16 +361,17 @@ let
     };
     unbound-vpn-na-nix = {
       config."boot.autostart.priority" = "80";
-      nixStore = "rpool";
+      tier = "critical";
     };
     unifi-nix.rootSize = "4GiB";
-    vaultwarden-nix.nixStore = "rpool";
+    vaultwarden-nix.tier = "critical";
   };
 
   mkInstance =
     name: host:
     let
       extra = guests.${name} or { };
+      tier = tiers.${extra.tier or defaultTier};
     in
     {
       type = "container";
@@ -364,16 +381,11 @@ let
         // extra.config or { };
       devices = lib.recursiveUpdate (
         {
+          root = rootDisk tier.rootPool (extra.rootSize or defaultRootSize);
           nix-store = {
             type = "disk";
             path = "/nix";
-            source = "${nixStores.${extra.nixStore or defaultNixStore}.mount}/${name}";
-          };
-          appdata = {
-            type = "disk";
-            path = "/appdata";
-            source = "${appData.mount}/${name}";
-            recursive = "true";
+            source = "${nixStores.${tier.nixStore}.mount}/${name}";
           };
           eth0 = {
             type = "nic";
@@ -386,7 +398,6 @@ let
             hwaddr = host.lan.mac;
           };
         }
-        // lib.optionalAttrs (extra ? rootSize) { root = rootDisk extra.rootSize; }
       ) (extra.devices or { });
     };
 
@@ -398,9 +409,9 @@ assert lib.assertMsg (
 {
   inherit
     profiles
+    storagePools
     nixStores
     defaultNixStore
-    appData
     ;
   instances = lib.mapAttrs mkInstance incusGuests;
 }

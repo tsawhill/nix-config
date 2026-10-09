@@ -52,9 +52,24 @@ let
     };
   };
 
+  storagePoolType = lib.types.submodule {
+    options = {
+      driver = lib.mkOption { type = lib.types.str; };
+      config = lib.mkOption {
+        type = strAttrs;
+        default = { };
+      };
+    };
+  };
+
   registry = pkgs.writeText "incus-declarative.json" (
     builtins.toJSON {
-      inherit (cfg) mode profiles instances;
+      inherit (cfg)
+        mode
+        storagePools
+        profiles
+        instances
+        ;
     }
   );
 
@@ -256,10 +271,12 @@ let
 
       local current_value
       current_value=$(incus config device get "$instance" "$dev" "$key" 2>/dev/null || true)
-      # Swapping /nix or /appdata under a running guest breaks it; those move offline.
-      if { [ "$dev" = "nix-store" ] || [ "$dev" = "appdata" ]; } && [ "$key" = "source" ]; then
+      # Swapping /nix or the root pool under a running guest breaks it; nixos-factory moves them offline.
+      if { [ "$dev" = "nix-store" ] && [ "$key" = "source" ]; } \
+        || { [ "$dev" = "root" ] && [ "$key" = "pool" ]; }
+      then
         if [ "$current_value" != "$desired_value" ]; then
-          warn "$instance $dev is $current_value, declared $desired_value; move it offline (nixos-factory move-store for /nix)"
+          warn "$instance $dev $key is $current_value, declared $desired_value; move it with nixos-factory"
         fi
         return
       fi
@@ -284,6 +301,17 @@ let
       type=$(json_get "$expr.type")
 
       if ! incus config device get "$instance" "$dev" type >/dev/null 2>&1; then
+        # A root inherited from a profile can only be overridden on the same pool.
+        if [ "$dev" = "root" ]; then
+          local live_pool desired_pool
+          live_pool=$(incus query "/1.0/instances/$instance" \
+            | ${pkgs.jq}/bin/jq -r '.expanded_devices.root.pool // empty')
+          desired_pool=$(json_get "$expr.pool // empty")
+          if [ -n "$live_pool" ] && [ "$live_pool" != "$desired_pool" ]; then
+            warn "$instance root pool is $live_pool, declared $desired_pool; move it with nixos-factory"
+            return
+          fi
+        fi
         local args=()
         while IFS= read -r kv; do
           args+=("$kv")
@@ -386,7 +414,28 @@ let
       done < <(json_keys ".instances")
     }
 
+    # Pools are only ever created; changing a live pool's config is left to a human.
+    apply_storage_pool() {
+      local pool="$1"
+      local expr=".storagePools[$(printf '%s' "$pool" | ${pkgs.jq}/bin/jq -Rsa .)]"
+      if incus storage show "$pool" >/dev/null 2>&1; then
+        return
+      fi
+      local args=()
+      while IFS= read -r kv; do
+        args+=("$kv")
+      done < <(${pkgs.jq}/bin/jq -r "$expr.config | to_entries[] | \"\(.key)=\(.value)\"" "$desired")
+      log "creating storage pool $pool"
+      if ! incus storage create "$pool" "$(json_get "$expr.driver")" "''${args[@]}"; then
+        warn "failed to create storage pool $pool"
+      fi
+    }
+
     log "applying Incus desired state in $mode mode"
+
+    while IFS= read -r pool; do
+      apply_storage_pool "$pool"
+    done < <(json_keys ".storagePools")
 
     while IFS= read -r profile; do
       apply_profile "$profile"
@@ -412,6 +461,12 @@ in
       ];
       default = "non-destructive";
       description = "How aggressively to reconcile live Incus state against the registry.";
+    };
+
+    storagePools = lib.mkOption {
+      type = lib.types.attrsOf storagePoolType;
+      default = { };
+      description = "Incus storage pools to create if missing. Existing pools are never modified.";
     };
 
     profiles = lib.mkOption {
