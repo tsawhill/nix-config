@@ -618,15 +618,13 @@ let
       deploy networking-dhcp-nix
     }
 
-    # ── Splash screen ─────────────────────────────────────────────
-    clear
-    $GUM style --foreground 86 --border-foreground 86 --border double \
-      --align center --width 50 "$($FIGLET -f small "NIXOS FACTORY")"
-
-    # Top-level action picker
+    # ── Splash screen and action picker (skipped when scripted) ─
     ACTION="''${1:-}"
     if [ -z "$ACTION" ]; then
-      ACTION=$($GUM choose "create" "rename" "delete" "move-store" "template")
+      clear
+      $GUM style --foreground 86 --border-foreground 86 --border double \
+        --align center --width 50 "$($FIGLET -f small "NIXOS FACTORY")"
+      ACTION=$($GUM choose "create" "rename" "delete" "move" "template")
     fi
 
     # ══════════════════════════════════════════════════════════════
@@ -1316,45 +1314,134 @@ let
     }
 
     # ══════════════════════════════════════════════════════════════
-    #  MOVE-STORE — move a container's /nix to the tier the registry declares
+    #  MOVE — put a container's root disk and /nix on its declared tier
     #
     #  Flow:
-    #    1. List containers whose store differs from the registry, pick one
-    #    2. Copy the store to the new tier while the container keeps running
-    #    3. Stop it, copy what changed, repoint nix-store, start it
-    #    4. Wait for boot; on failure put it back on the old store
-    #    5. Optionally destroy the old dataset
+    #    1. Work out what differs from the registry: root pool, store, or both
+    #    2. Copy the store to its new tier while the container keeps running
+    #    3. Stop it, copy what changed, repoint nix-store
+    #    4. Move the root disk with `incus move --storage` (Incus copies it and
+    #       only deletes the original once the copy succeeded)
+    #    5. Start it and wait for boot; on failure put everything back
+    #    6. Keep or destroy the old store
     #
+    #  Scriptable: `nixos-factory move <host> [flags]` exits 0 when moved or
+    #  already in place, 3 when declined, 1 on failure (rolled back).
+    #    --no-confirm                       skip the plan confirmation
+    #    --strict                           a degraded boot fails (and rolls back)
+    #    --destroy-old-store/--keep-old-store  skip that question
+    #  `nixos-factory move-plan` prints a TSV line per container that differs.
     #  server-nix is reached by IP, so moving DNS can't strand the factory.
-    #  `nixos-factory move-store <host>` skips the picker and exits 0 when
-    #  moved or already in place, 3 when declined, 1 on failure.
     # ══════════════════════════════════════════════════════════════
-    do_move_store() {
-      MOVE_HOST="''${1:-}"
+    use_server_ip() {
       SERVER_IP=$($JQ -r '.["server-nix"].ip // empty' "$TOPOLOGY_JSON")
       if [ -n "$SERVER_IP" ]; then
         SERVER_HOST="root@$SERVER_IP"
         SSH_EXTRA_OPTS=(-o HostKeyAlias=server-nix.lan)
       fi
-      require_server
+    }
 
+    load_instances() {
       if ! INSTANCES_JSON=$(server_cmd incus list --format json); then
         $GUM style --foreground 196 --bold "Could not list Incus instances."
         exit 1
       fi
+    }
 
-      PENDING=()
-      while IFS=$'\t' read -r host source; do
-        declared_store=$(declared_nix_store "$host")
-        if [ -z "$declared_store" ]; then
+    instance_field() {
+      printf '%s' "$INSTANCES_JSON" | $JQ -r --arg h "$1" ".[] | select(.name == \$h) | $2"
+    }
+
+    # Display name for a store source: its tier, or downloadHDD for the old layout.
+    store_label() {
+      label=$(nix_store_for_source "$1")
+      if [ -n "$label" ]; then
+        echo "$label"
+      elif [ "''${1%/*}" = "/mnt/nix-stores" ]; then
+        echo "downloadHDD"
+      else
+        echo "''${1%/*}"
+      fi
+    }
+
+    # Sets ROOT_FROM/ROOT_TO, STORE_FROM/STORE_TO and MOVE_ROOT/MOVE_STORE for $1.
+    plan_move() {
+      ROOT_FROM=$(instance_field "$1" '.expanded_devices.root.pool // empty')
+      ROOT_TO=$($JQ -r --arg h "$1" '.[$h].devices.root.pool // empty' "$REGISTRY_JSON")
+      STORE_FROM=$(instance_field "$1" '.devices["nix-store"].source // empty')
+      STORE_TO=""
+      declared_store=$(declared_nix_store "$1")
+      if [ -n "$declared_store" ]; then
+        STORE_TO="$(nix_store_mount "$declared_store")/$1"
+      fi
+      MOVE_ROOT=false
+      if [ -n "$ROOT_FROM" ] && [ -n "$ROOT_TO" ] && [ "$ROOT_FROM" != "$ROOT_TO" ]; then
+        MOVE_ROOT=true
+      fi
+      MOVE_STORE=false
+      if [ -n "$STORE_FROM" ] && [ -n "$STORE_TO" ] && [ "$STORE_FROM" != "$STORE_TO" ]; then
+        MOVE_STORE=true
+      fi
+    }
+
+    # host, state, root from, root to, root bytes, store from, store to, store bytes
+    # ("-" where that part stays put). Only containers that differ are listed.
+    do_move_plan() {
+      use_server_ip
+      require_server
+      load_instances
+      ZFS_LIST=$(server_cmd zfs list -H -p -o name,used,mountpoint -t filesystem)
+      POOL_SOURCES=$(server_cmd incus storage list --format json \
+        | $JQ -r '.[] | [.name, (.config.source // "")] | @tsv')
+
+      while IFS= read -r host; do
+        plan_move "$host"
+        if [ "$MOVE_ROOT" = false ] && [ "$MOVE_STORE" = false ]; then
           continue
         fi
-        if [ "$source" != "$(nix_store_mount "$declared_store")/$host" ]; then
-          PENDING+=("$host")
+        root_from="-" root_to="-" root_used="-"
+        if [ "$MOVE_ROOT" = true ]; then
+          root_from="$ROOT_FROM" root_to="$ROOT_TO"
+          pool_source=$(awk -F'\t' -v p="$ROOT_FROM" '$1 == p { print $2 }' <<< "$POOL_SOURCES")
+          root_used=$(awk -v d="$pool_source/containers/$host" '$1 == d { print $2 }' <<< "$ZFS_LIST")
         fi
-      done < <(printf '%s' "$INSTANCES_JSON" | $JQ -r \
-        '.[] | select((.devices // {})["nix-store"].source != null)
-          | [.name, .devices["nix-store"].source] | @tsv')
+        store_from="-" store_to="-" store_used="-"
+        if [ "$MOVE_STORE" = true ]; then
+          store_from=$(store_label "$STORE_FROM")
+          store_to=$(store_label "$STORE_TO")
+          store_used=$(awk -v m="$STORE_FROM" '$3 == m { print $2 }' <<< "$ZFS_LIST")
+        fi
+        printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$host" \
+          "$(instance_field "$host" '.status')" \
+          "$root_from" "$root_to" "''${root_used:--}" \
+          "$store_from" "$store_to" "''${store_used:--}"
+      done < <(printf '%s' "$INSTANCES_JSON" | $JQ -r '.[].name' | sort)
+    }
+
+    do_move() {
+      MOVE_HOST="''${1:-}"
+      if [ "$#" -gt 0 ]; then
+        shift
+      fi
+      NO_CONFIRM=false
+      STRICT=false
+      OLD_STORE_ACTION=ask
+      for flag in "$@"; do
+        case "$flag" in
+          --no-confirm) NO_CONFIRM=true ;;
+          --strict) STRICT=true ;;
+          --destroy-old-store) OLD_STORE_ACTION=destroy ;;
+          --keep-old-store) OLD_STORE_ACTION=keep ;;
+          *)
+            echo "nixos-factory move: unknown flag $flag" >&2
+            exit 2
+            ;;
+        esac
+      done
+
+      use_server_ip
+      require_server
+      load_instances
 
       if [ -n "$MOVE_HOST" ]; then
         if ! printf '%s' "$INSTANCES_JSON" \
@@ -1363,57 +1450,83 @@ let
           $GUM style --foreground 196 --bold "No container named $MOVE_HOST."
           exit 1
         fi
-        if [[ ! " ''${PENDING[*]} " =~ " $MOVE_HOST " ]]; then
-          $GUM style --foreground 82 "$MOVE_HOST already matches the registry; nothing to move."
-          exit 0
-        fi
         HOST="$MOVE_HOST"
       else
+        PENDING=()
+        while IFS= read -r host; do
+          plan_move "$host"
+          if [ "$MOVE_ROOT" = true ] || [ "$MOVE_STORE" = true ]; then
+            PENDING+=("$host")
+          fi
+        done < <(printf '%s' "$INSTANCES_JSON" | $JQ -r '.[].name' | sort)
+
         if [ "''${#PENDING[@]}" -eq 0 ]; then
-          $GUM style --foreground 82 "Every container's nix store already matches the registry."
+          $GUM style --foreground 82 "Every container already matches the registry."
           return 1
         fi
-
         $GUM style --foreground 212 "Select container to move (''${#PENDING[@]} differ from the registry):"
         HOST=$($GUM choose "''${PENDING[@]}")
       fi
 
-      OLD_SOURCE=$(printf '%s' "$INSTANCES_JSON" | $JQ -r --arg h "$HOST" \
-        '.[] | select(.name == $h) | .devices["nix-store"].source')
-      STATE=$(printf '%s' "$INSTANCES_JSON" | $JQ -r --arg h "$HOST" \
-        '.[] | select(.name == $h) | .status')
+      plan_move "$HOST"
+      if [ "$MOVE_ROOT" = false ] && [ "$MOVE_STORE" = false ]; then
+        $GUM style --foreground 82 "$HOST already matches the registry; nothing to move."
+        exit 0
+      fi
+
+      STATE=$(instance_field "$HOST" '.status')
       WAS_RUNNING=false
       if [ "$STATE" = "Running" ]; then
         WAS_RUNNING=true
       fi
 
-      NEW_STORE=$(declared_nix_store "$HOST")
-      NEW_PARENT=$(nix_store_dataset "$NEW_STORE")
-      NEW_DATASET="$NEW_PARENT/$HOST"
-      NEW_SOURCE="$(nix_store_mount "$NEW_STORE")/$HOST"
+      if [ "$MOVE_STORE" = true ]; then
+        OLD_SOURCE="$STORE_FROM"
+        NEW_SOURCE="$STORE_TO"
+        NEW_STORE=$(declared_nix_store "$HOST")
+        NEW_PARENT=$(nix_store_dataset "$NEW_STORE")
+        NEW_DATASET="$NEW_PARENT/$HOST"
+        if ! OLD_DATASET=$(dataset_for_source "$OLD_SOURCE"); then
+          $GUM style --foreground 196 "$OLD_SOURCE is not its own ZFS dataset."
+          exit 1
+        fi
+        require_nix_store_parent "$NEW_PARENT"
+        if server_cmd zfs list -H -o name "$NEW_DATASET" >/dev/null 2>&1; then
+          $GUM style --foreground 196 "$NEW_DATASET already exists (a failed earlier move?)."
+          $GUM style --foreground 214 "Destroy it on server-nix if it is stale, then retry."
+          exit 1
+        fi
+        OLD_USED=$(server_cmd zfs get -H -o value used "$OLD_DATASET")
+      fi
 
-      if ! OLD_DATASET=$(dataset_for_source "$OLD_SOURCE"); then
-        $GUM style --foreground 196 "$OLD_SOURCE is not its own ZFS dataset."
-        exit 1
+      if [ "$MOVE_ROOT" = true ]; then
+        if ! server_cmd incus storage show "$ROOT_TO" >/dev/null 2>&1; then
+          $GUM style --foreground 196 "Storage pool $ROOT_TO does not exist; deploy server-nix first."
+          exit 1
+        fi
+        ROOT_POOL_SOURCE=$(server_cmd incus storage get "$ROOT_FROM" source)
+        OLD_ROOT_DATASET="$ROOT_POOL_SOURCE/containers/$HOST"
+        ROOT_USED=$(server_cmd zfs get -H -o value used "$OLD_ROOT_DATASET" 2>/dev/null || echo "?")
       fi
-      require_nix_store_parent "$NEW_PARENT"
-      if server_cmd zfs list -H -o name "$NEW_DATASET" >/dev/null 2>&1; then
-        $GUM style --foreground 196 "$NEW_DATASET already exists (a failed earlier move?)."
-        $GUM style --foreground 214 "Destroy it on server-nix if it is stale, then retry."
-        exit 1
-      fi
-      OLD_USED=$(server_cmd zfs get -H -o value used "$OLD_DATASET")
 
       echo ""
       $GUM style --foreground 86 --bold "Move plan:"
       echo "  Container: $HOST ($STATE)"
-      echo "  From:      $OLD_SOURCE ($OLD_DATASET, $OLD_USED)"
-      echo "  To:        $NEW_SOURCE ($NEW_DATASET)"
+      if [ "$MOVE_ROOT" = true ]; then
+        echo "  Root disk: $ROOT_FROM → $ROOT_TO ($ROOT_USED; its old snapshots are dropped)"
+      else
+        echo "  Root disk: stays on $ROOT_FROM"
+      fi
+      if [ "$MOVE_STORE" = true ]; then
+        echo "  Nix store: $(store_label "$OLD_SOURCE") → $(store_label "$NEW_SOURCE") ($OLD_DATASET, $OLD_USED)"
+      else
+        echo "  Nix store: stays on $(store_label "$STORE_FROM")"
+      fi
       if [ "$WAS_RUNNING" = true ]; then
-        echo "  Downtime:  stop, copy what changed since the first pass, start"
+        echo "  Downtime:  stop, final store copy, root disk copy, start"
       fi
       echo ""
-      if ! $GUM confirm "Move $HOST's nix store?"; then
+      if [ "$NO_CONFIRM" = false ] && ! $GUM confirm "Move $HOST?"; then
         $GUM style --foreground 214 "Aborted."
         if [ -n "$MOVE_HOST" ]; then
           exit 3
@@ -1424,30 +1537,49 @@ let
       SNAP="factory-move-$(date +%Y%m%d%H%M%S)"
 
       drop_move_snapshots() {
-        server_cmd "zfs destroy $OLD_DATASET@$SNAP-a; zfs destroy $OLD_DATASET@$SNAP-b" \
-          >/dev/null 2>&1 || true
+        if [ "$MOVE_STORE" = true ]; then
+          server_cmd "zfs destroy $OLD_DATASET@$SNAP-a; zfs destroy $OLD_DATASET@$SNAP-b" \
+            >/dev/null 2>&1 || true
+        fi
       }
 
       move_failed() {
-        $GUM style --foreground 196 --bold "$1 — putting $HOST back on $OLD_SOURCE..."
+        $GUM style --foreground 196 --bold "$1 — putting $HOST back where it was..."
         server_cmd incus stop "$HOST" --force >/dev/null 2>&1 || true
-        server_cmd incus config device set "$HOST" nix-store source="$OLD_SOURCE" || true
+        if [ "$MOVE_ROOT" = true ]; then
+          live_pool=$(server_cmd incus query "/1.0/instances/$HOST" 2>/dev/null \
+            | $JQ -r '.expanded_devices.root.pool // empty' || true)
+          if [ -z "$live_pool" ]; then
+            $GUM style --foreground 196 --bold \
+              "Incus no longer lists $HOST. Check 'incus list' and the pools on server-nix by hand."
+          elif [ "$live_pool" != "$ROOT_FROM" ]; then
+            echo "==> Moving the root disk back to $ROOT_FROM..."
+            server_cmd incus move "$HOST" --storage "$ROOT_FROM" \
+              || $GUM style --foreground 196 --bold \
+                "Could not move the root disk back; $HOST stays on $live_pool."
+          fi
+        fi
+        if [ "$MOVE_STORE" = true ]; then
+          server_cmd incus config device set "$HOST" nix-store source="$OLD_SOURCE" || true
+          server_cmd zfs destroy -r "$NEW_DATASET" >/dev/null 2>&1 || true
+          drop_move_snapshots
+        fi
         if [ "$WAS_RUNNING" = true ]; then
           server_cmd incus start "$HOST" || true
         fi
-        server_cmd zfs destroy -r "$NEW_DATASET" >/dev/null 2>&1 || true
-        drop_move_snapshots
         exit 1
       }
 
-      echo "==> Copying $OLD_DATASET to $NEW_DATASET while $HOST runs..."
-      if ! server_cmd "zfs snapshot $OLD_DATASET@$SNAP-a \
-        && zfs send $OLD_DATASET@$SNAP-a | zfs receive -u $NEW_DATASET"
-      then
-        server_cmd zfs destroy -r "$NEW_DATASET" >/dev/null 2>&1 || true
-        drop_move_snapshots
-        $GUM style --foreground 196 --bold "Initial copy failed. $HOST was not touched."
-        exit 1
+      if [ "$MOVE_STORE" = true ]; then
+        echo "==> Copying $OLD_DATASET to $NEW_DATASET while $HOST runs..."
+        if ! server_cmd "zfs snapshot $OLD_DATASET@$SNAP-a \
+          && zfs send $OLD_DATASET@$SNAP-a | zfs receive -u $NEW_DATASET"
+        then
+          server_cmd zfs destroy -r "$NEW_DATASET" >/dev/null 2>&1 || true
+          drop_move_snapshots
+          $GUM style --foreground 196 --bold "Initial copy failed. $HOST was not touched."
+          exit 1
+        fi
       fi
 
       if [ "$WAS_RUNNING" = true ]; then
@@ -1457,18 +1589,35 @@ let
           || move_failed "Stopping $HOST failed"
       fi
 
-      echo "==> Copying changes since the first pass..."
-      server_cmd "zfs snapshot $OLD_DATASET@$SNAP-b \
-        && zfs send -i @$SNAP-a $OLD_DATASET@$SNAP-b | zfs receive -u -F $NEW_DATASET" \
-        || move_failed "Final copy failed"
-      # Received snapshots would pin the old store contents forever.
-      server_cmd "zfs destroy $NEW_DATASET@$SNAP-a && zfs destroy $NEW_DATASET@$SNAP-b" \
-        || move_failed "Dropping transfer snapshots failed"
-      server_cmd zfs mount "$NEW_DATASET" || move_failed "Mounting $NEW_DATASET failed"
+      if [ "$MOVE_STORE" = true ]; then
+        echo "==> Copying store changes since the first pass..."
+        server_cmd "zfs snapshot $OLD_DATASET@$SNAP-b \
+          && zfs send -i @$SNAP-a $OLD_DATASET@$SNAP-b | zfs receive -u -F $NEW_DATASET" \
+          || move_failed "Final store copy failed"
+        # Received snapshots would pin the old store contents forever.
+        server_cmd "zfs destroy $NEW_DATASET@$SNAP-a && zfs destroy $NEW_DATASET@$SNAP-b" \
+          || move_failed "Dropping transfer snapshots failed"
+        server_cmd zfs mount "$NEW_DATASET" || move_failed "Mounting $NEW_DATASET failed"
 
-      echo "==> Pointing $HOST's nix-store at $NEW_SOURCE..."
-      server_cmd incus config device set "$HOST" nix-store source="$NEW_SOURCE" \
-        || move_failed "Updating the nix-store device failed"
+        echo "==> Pointing $HOST's nix-store at $NEW_SOURCE..."
+        server_cmd incus config device set "$HOST" nix-store source="$NEW_SOURCE" \
+          || move_failed "Updating the nix-store device failed"
+      fi
+
+      if [ "$MOVE_ROOT" = true ]; then
+        echo "==> Moving the root disk to $ROOT_TO..."
+        server_cmd incus move "$HOST" --storage "$ROOT_TO" \
+          || move_failed "Moving the root disk failed"
+        live_pool=$(server_cmd incus query "/1.0/instances/$HOST" \
+          | $JQ -r '.expanded_devices.root.pool // empty')
+        if [ "$live_pool" != "$ROOT_TO" ]; then
+          move_failed "Root disk reports pool '$live_pool' after the move"
+        fi
+        if server_cmd zfs list -H -o name "$OLD_ROOT_DATASET" >/dev/null 2>&1; then
+          $GUM style --foreground 214 \
+            "Incus left $OLD_ROOT_DATASET behind; check and destroy it by hand."
+        fi
+      fi
 
       if [ "$WAS_RUNNING" = true ]; then
         echo "==> Starting $HOST..."
@@ -1490,7 +1639,9 @@ let
           degraded)
             $GUM style --foreground 214 "$HOST booted degraded. Failed units:"
             server_cmd incus exec "$HOST" -- systemctl --failed --no-legend || true
-            if ! $GUM confirm "Keep $HOST on the new store anyway?"; then
+            if [ "$STRICT" = true ]; then
+              move_failed "Degraded after the move (--strict)"
+            elif ! $GUM confirm "Keep $HOST where it is now anyway?"; then
               move_failed "Degraded after the move"
             fi
             ;;
@@ -1499,15 +1650,35 @@ let
       fi
 
       drop_move_snapshots
+      FINAL_ROOT="$ROOT_FROM"
+      FINAL_STORE="$STORE_FROM"
+      if [ "$MOVE_ROOT" = true ]; then
+        FINAL_ROOT="$ROOT_TO"
+      fi
+      if [ "$MOVE_STORE" = true ]; then
+        FINAL_STORE="$NEW_SOURCE"
+      fi
       $GUM style --foreground 82 --border rounded --padding "1 2" \
-        "$HOST now runs from $NEW_SOURCE"
+        "$HOST moved: root disk on $FINAL_ROOT, store on $(store_label "$FINAL_STORE")"
 
-      if $GUM confirm --default=No "Destroy the old store $OLD_DATASET ($OLD_USED)?"; then
-        echo "==> Destroying $OLD_DATASET..."
-        server_cmd zfs destroy -r "$OLD_DATASET"
-      else
-        $GUM style --foreground 214 \
-          "Kept $OLD_DATASET. Remove it later with: zfs destroy -r $OLD_DATASET"
+      if [ "$MOVE_STORE" = true ]; then
+        case "$OLD_STORE_ACTION" in
+          destroy) DESTROY_OLD=true ;;
+          keep) DESTROY_OLD=false ;;
+          *)
+            DESTROY_OLD=false
+            if $GUM confirm --default=No "Destroy the old store $OLD_DATASET ($OLD_USED)?"; then
+              DESTROY_OLD=true
+            fi
+            ;;
+        esac
+        if [ "$DESTROY_OLD" = true ]; then
+          echo "==> Destroying $OLD_DATASET..."
+          server_cmd zfs destroy -r "$OLD_DATASET"
+        else
+          $GUM style --foreground 214 \
+            "Kept $OLD_DATASET. Remove it later with: zfs destroy -r $OLD_DATASET"
+        fi
       fi
     }
 
@@ -1802,20 +1973,23 @@ let
       create) do_create ;;
       rename) do_rename ;;
       delete) do_delete ;;
-      move-store)
+      # move-store is the old name, kept so existing scripts still work.
+      move|move-store)
         if [ -n "''${2:-}" ]; then
-          do_move_store "$2"
+          shift
+          do_move "$@"
         else
-          while do_move_store && $GUM confirm "Move another container?"; do
+          while do_move && $GUM confirm "Move another container?"; do
             clear
           done
         fi
         ;;
+      move-plan) do_move_plan ;;
+      template) do_template ;;
       *)
-        echo "usage: nixos-factory [create|rename|delete|move-store [host]|template]" >&2
+        echo "usage: nixos-factory [create|rename|delete|move [host] [flags]|move-plan|template]" >&2
         exit 2
         ;;
-      template) do_template ;;
     esac
   '';
 in
