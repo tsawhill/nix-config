@@ -1,6 +1,37 @@
-{ config, ... }:
+{ config, pkgs, ... }:
 
 {
+  # CUDA in the GPU guests needs /dev/nvidia-uvm, which the driver only creates on
+  # first host-side CUDA use. Incus passes through the nodes that exist when a guest
+  # starts, so without this every guest started after a reboot had no CUDA.
+  boot.kernelModules = [ "nvidia_uvm" ];
+  systemd.services.nvidia-uvm-devices = {
+    description = "Create NVIDIA UVM device nodes for the GPU guests";
+    wantedBy = [
+      "multi-user.target"
+      "incus.service"
+    ];
+    before = [ "incus.service" ];
+    after = [ "systemd-modules-load.service" ];
+    path = [
+      pkgs.coreutils
+      pkgs.gawk
+    ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    script = ''
+      major=$(awk '$2 == "nvidia-uvm" { print $1 }' /proc/devices)
+      if [ -z "$major" ]; then
+        echo "nvidia_uvm is not loaded" >&2
+        exit 1
+      fi
+      [ -e /dev/nvidia-uvm ] || mknod -m 666 /dev/nvidia-uvm c "$major" 0
+      [ -e /dev/nvidia-uvm-tools ] || mknod -m 666 /dev/nvidia-uvm-tools c "$major" 1
+    '';
+  };
+
   hardware.graphics.enable = true;
   services.xserver.videoDrivers = [ "nvidia" ];
   hardware.nvidia = {
