@@ -104,7 +104,7 @@ let
         "limits.cpu" = "2";
         "limits.memory" = "2GiB";
       };
-      devices.root = rootDisk "4GiB";
+      devices.root = rootDisk "rpool" defaultRootSize;
     };
 
     nvidia-gpu = {
