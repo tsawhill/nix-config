@@ -7,16 +7,17 @@
 
 let
   driver = config.hardware.nvidia.package;
-  graphicsPackages =
-    [ config.hardware.graphics.package ]
-    ++ config.hardware.graphics.extraPackages
-    ++ (with pkgs; [
-      libdrm
-      libffi
-      libgbm
-      stdenv.cc.cc.lib
-      wayland
-    ]);
+  graphicsPackages = [
+    config.hardware.graphics.package
+  ]
+  ++ config.hardware.graphics.extraPackages
+  ++ (with pkgs; [
+    libdrm
+    libffi
+    libgbm
+    stdenv.cc.cc.lib
+    wayland
+  ]);
   graphicsRuntime = pkgs.buildEnv {
     name = "nvidia-lxc-graphics-runtime-${driver.version}";
     paths = map lib.getLib graphicsPackages;
@@ -91,4 +92,61 @@ in
   systemd.services.incus-declarative-apply.unitConfig.RequiresMountsFor = [
     "/run/host-nvidia-runtime"
   ];
+
+  # Changing the source mount does not replace the bind mounts in existing
+  # containers. Restart GPU guests after the new runtime is mounted so their
+  # device nodes and userspace libraries are acquired together.
+  systemd.services.incus-nvidia-runtime-refresh = {
+    description = "Restart running GPU containers after NVIDIA runtime changes";
+    wantedBy = [ "multi-user.target" ];
+    requires = [
+      "incus.service"
+      "incus-declarative-apply.service"
+    ];
+    after = [
+      "incus.service"
+      "incus-declarative-apply.service"
+    ];
+    unitConfig.RequiresMountsFor = [ "/run/host-nvidia-runtime" ];
+    restartTriggers = [ nvidiaRuntime ];
+    path = [
+      config.virtualisation.incus.package
+      pkgs.jq
+    ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      TimeoutStartSec = "10min";
+    };
+    script = ''
+      set -euo pipefail
+
+      # A live switch cannot replace an in-use NVIDIA kernel module. Restarting
+      # guests against newer userspace would leave them with an API mismatch.
+      loaded=$(cat /sys/module/nvidia/version)
+      runtime=$(cat /run/host-nvidia-runtime/driver-version)
+      if [ "$loaded" != "$runtime" ]; then
+        echo "NVIDIA kernel module $loaded differs from runtime $runtime; reboot server-nix before refreshing GPU containers." >&2
+        exit 1
+      fi
+
+      # Fetch before the loop so a failed query cannot silently look like an
+      # empty list. Stopped guests will get the new runtime on their next start.
+      instances=$(incus list local: --project default --format json)
+      guests=$(printf '%s' "$instances" | jq -r '
+        .[] | select(.type == "container" and .status == "Running")
+        | select(.profiles | index("nvidia-gpu")) | .name
+      ')
+      failed=0
+      while IFS= read -r guest; do
+        [ -n "$guest" ] || continue
+        echo "Restarting $guest to refresh its host NVIDIA runtime"
+        if ! incus restart "local:$guest" --project default --timeout 60; then
+          echo "Failed to restart $guest" >&2
+          failed=1
+        fi
+      done <<< "$guests"
+      exit "$failed"
+    '';
+  };
 }
