@@ -166,8 +166,38 @@
   # spawns another, which is how the user manager collected 130k failed units.
   systemd.services."drkonqi-coredump-processor@".wantedBy = lib.mkForce [ ];
 
-  # MOTU M2 interface moved over from the desktop along with the monitors.
-  my.desktop.audio.motuMic.enable = true;
+  my.desktop.audio.filteredMic = {
+    enable = true;
+    source = "alsa_input.usb-Kingston_HyperX_Cloud_II_Wireless_000000000001-00.mono-fallback";
+    description = "HyperX Cloud II Wireless Mic (Processed)";
+    # Initial tuning at the measured input volume; remeasure if gain changes.
+    # Raw mean/peak dBFS: typing -47.6/-16.6, quiet -40.2/-21.6,
+    # normal -37.4/-18.0, loud -34.0/-6.5. Silence was digital zero.
+    # Whole-recording means include pauses, so these are starting values.
+    controls = {
+      gate = {
+        # Gentle -50 dBFS gate to preserve quiet speech. Typing peaks overlap
+        # speech, so RNNoise must do the keyboard rejection, not this gate.
+        "Curve threshold (G)" = 0.003162;
+        "Attack (ms)" = 5.0;
+        "Release (ms)" = 180.0;
+        "High-pass filter frequency (Hz)" = 100.0;
+      };
+      rnnoise = {
+        "VAD Threshold (%)" = 70.0;
+        "VAD Grace Period (ms)" = 200.0;
+        "Retroactive VAD Grace (ms)" = 30.0;
+      };
+      # Keep both EQ stages, starting flat until listening reveals tonal needs.
+      eq_presence."Gain" = 0.0;
+      eq_air."Gain" = 0.0;
+      compressor = {
+        "Attack threshold (G)" = 0.0631; # -24 dBFS
+        "Ratio" = 3.0;
+        "Makeup gain (G)" = 3.981; # +12 dB; limiter catches loud transients.
+      };
+    };
+  };
   my.desktop.audio.lowLatency = {
     enable = true;
     quantum = 128;

@@ -15,29 +15,36 @@ in
     services.pipewire = {
 
       # Passthrough loopback: only created when no DSP chain is providing mic_input.
-      # When motuMic is enabled, the filter chain output IS mic_input — no loopback
+      # When filteredMic is enabled, the filter chain output IS mic_input — no loopback
       # needed. When disabled, this loopback creates mic_input from the default source.
       extraConfig.pipewire."93-virtual-mic"."context.modules" =
-        lib.optionals (!config.my.desktop.audio.motuMic.enable) [
-          {
-            name = "libpipewire-module-loopback";
-            args = {
-              "node.description" = "Mic Input";
-              "capture.props" = {
-                "node.name"        = "mic_input_capture";
-                "node.description" = "Mic Input Capture";
-                "audio.position"   = [ "FL" "FR" ];
-              };
-              "playback.props" = {
-                "node.name"        = "mic_input";
+        lib.optionals (!config.my.desktop.audio.filteredMic.enable)
+          [
+            {
+              name = "libpipewire-module-loopback";
+              args = {
                 "node.description" = "Mic Input";
-                "media.class"      = "Audio/Source/Virtual";
-                "audio.position"   = [ "FL" "FR" ];
-                "priority.session" = 2200;
+                "capture.props" = {
+                  "node.name" = "mic_input_capture";
+                  "node.description" = "Mic Input Capture";
+                  "audio.position" = [
+                    "FL"
+                    "FR"
+                  ];
+                };
+                "playback.props" = {
+                  "node.name" = "mic_input";
+                  "node.description" = "Mic Input";
+                  "media.class" = "Audio/Source/Virtual";
+                  "audio.position" = [
+                    "FL"
+                    "FR"
+                  ];
+                  "priority.session" = 2200;
+                };
               };
-            };
-          }
-        ];
+            }
+          ];
 
       # Force PulseAudio-compat input streams to mic_input.
       # NOTE: pipewire-pulse rules only affect PulseAudio clients — native PipeWire

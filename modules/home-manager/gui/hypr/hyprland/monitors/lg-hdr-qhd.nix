@@ -11,10 +11,9 @@
         mode = "2560x1440@74.97Hz";
         position = "0x0";
         scale = 1;
-        bitdepth = 10;
-        # Use the display's advertised HDR capabilities rather than forcing support.
-        supports_hdr = 0;
-        cm = "hdr";
+        bitdepth = 8;
+        supports_hdr = -1;
+        cm = "srgb";
       }
     ];
   };
