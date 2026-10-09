@@ -54,6 +54,13 @@ let
   };
   defaultNixStore = "scratchSSD";
 
+  # Per-guest app data at <mount>/<guest>, mounted at /appdata. Snapshotted and
+  # replicated to zpool by zfs-backups.nix; child datasets show up via recursive.
+  appData = {
+    dataset = "scratchSSD/appdata";
+    mount = "/mnt/scratchSSD/appdata";
+  };
+
   profiles = {
     default.description = "Default Incus profile";
 
@@ -362,6 +369,12 @@ let
             path = "/nix";
             source = "${nixStores.${extra.nixStore or defaultNixStore}.mount}/${name}";
           };
+          appdata = {
+            type = "disk";
+            path = "/appdata";
+            source = "${appData.mount}/${name}";
+            recursive = "true";
+          };
           eth0 = {
             type = "nic";
             nictype = "bridged";
@@ -383,6 +396,11 @@ assert lib.assertMsg (
   unknownGuests == [ ]
 ) "incus registry: not in topology: ${toString unknownGuests}";
 {
-  inherit profiles nixStores defaultNixStore;
+  inherit
+    profiles
+    nixStores
+    defaultNixStore
+    appData
+    ;
   instances = lib.mapAttrs mkInstance incusGuests;
 }

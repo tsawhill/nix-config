@@ -1,5 +1,6 @@
 {
   config,
+  lib,
   networkTopology,
   pkgs,
   ...
@@ -62,6 +63,12 @@ let
   staleSnapshotProperty = "org.tsawhill:stale-snapshot-since";
   orphanGraceDays = 90;
   backupDatasetArgs = builtins.concatStringsSep " " backupDatasets;
+
+  # Guest app data (incus/registry.nix appData) lives on single-disk scratchSSD,
+  # so it is copied to raidz2 zpool every hour. A child dataset opts out with
+  # `zfs set syncoid:sync=false` plus a sanoid entry with autosnap = false.
+  appDataSource = "scratchSSD/appdata";
+  appDataTarget = "zpool/backups/appdata";
 in
 {
   # Source-side snapshot policy: daily/monthly retention, no hourly/yearly
@@ -78,7 +85,34 @@ in
       monthly = 12;
       yearly = 0;
     };
-    datasets = builtins.listToAttrs (map mkDatasetConfig backupDatasets);
+    # Short history on the SSD; the long history lives on the zpool copy.
+    templates.appdata = {
+      autosnap = true;
+      autoprune = true;
+      hourly = 0;
+      daily = 7;
+      monthly = 1;
+      yearly = 0;
+    };
+    # Receive side: prune what syncoid brings over, never snapshot.
+    templates.appdata-backup = {
+      autosnap = false;
+      autoprune = true;
+      hourly = 0;
+      daily = 30;
+      monthly = 6;
+      yearly = 0;
+    };
+    datasets = builtins.listToAttrs (map mkDatasetConfig backupDatasets) // {
+      ${appDataSource} = {
+        useTemplate = [ "appdata" ];
+        recursive = true;
+      };
+      ${appDataTarget} = {
+        useTemplate = [ "appdata-backup" ];
+        recursive = true;
+      };
+    };
   };
 
   # Replication runs after Sanoid has had time to create the day's snapshots.
@@ -87,8 +121,19 @@ in
     interval = "*-*-* 03:00:00";
     sshKey = config.sops.secrets.server_nix_syncoid_id_ed25519.path;
     commonArgs = [ "--no-sync-snap" ];
-    commands = builtins.listToAttrs (map mkSyncoidCommand backupDatasets);
+    commands = builtins.listToAttrs (map mkSyncoidCommand backupDatasets) // {
+      # No --no-sync-snap: each run takes its own snapshot and sends just the
+      # changes, so zpool trails by at most an hour. Daily history comes from sanoid.
+      appdata = {
+        source = appDataSource;
+        target = appDataTarget;
+        recursive = true;
+        useCommonArgs = false;
+        recvOptions = "u x mountpoint";
+      };
+    };
   };
+  systemd.services.syncoid-appdata.startAt = lib.mkForce "hourly";
 
   programs.ssh.knownHosts.${piBackupFqdn}.publicKey =
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILWyZ/i1VfPZmQphX5HtPsO4DEd0YhHeut7BTTHd8znI";

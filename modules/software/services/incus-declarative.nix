@@ -256,10 +256,10 @@ let
 
       local current_value
       current_value=$(incus config device get "$instance" "$dev" "$key" 2>/dev/null || true)
-      # Swapping /nix under a running guest breaks it; nixos-factory move-store does this offline.
-      if [ "$dev" = "nix-store" ] && [ "$key" = "source" ]; then
+      # Swapping /nix or /appdata under a running guest breaks it; those move offline.
+      if { [ "$dev" = "nix-store" ] || [ "$dev" = "appdata" ]; } && [ "$key" = "source" ]; then
         if [ "$current_value" != "$desired_value" ]; then
-          warn "$instance nix-store is $current_value, declared $desired_value; run nixos-factory move-store"
+          warn "$instance $dev is $current_value, declared $desired_value; move it offline (nixos-factory move-store for /nix)"
         fi
         return
       fi

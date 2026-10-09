@@ -26,6 +26,7 @@ let
     builtins.toJSON {
       locations = incusRegistry.nixStores;
       default = incusRegistry.defaultNixStore;
+      inherit (incusRegistry) appData;
     }
   );
 
@@ -412,6 +413,10 @@ let
     # dataset <tier dataset>/<host>, bind-mounted from <tier mount>/<host>.
     NIX_STORES_JSON="${factoryNixStoresJson}"
     DEFAULT_NIX_STORE=$($JQ -r '.default' "$NIX_STORES_JSON")
+    # Per-guest app data (<dataset>/<host>, mounted at /appdata); backed up hourly to zpool.
+    APPDATA_PARENT=$($JQ -r '.appData.dataset' "$NIX_STORES_JSON")
+    APPDATA_MOUNT=$($JQ -r '.appData.mount' "$NIX_STORES_JSON")
+    APPDATA_BACKUP_PARENT="zpool/backups/appdata"
 
     # UID/GID the nix store is chowned to — matches the container's id mapping
     # (security.idmap.base = 100000 in the nixos-lxc profile).
@@ -756,6 +761,15 @@ let
         exit 1
       fi
 
+      # server-nix pre-creates this for declared guests; reuse it if present.
+      APPDATA_DATASET="$APPDATA_PARENT/$HOSTNAME"
+      APPDATA_SOURCE="$APPDATA_MOUNT/$HOSTNAME"
+      require_nix_store_parent "$APPDATA_PARENT"
+      APPDATA_EXISTS=false
+      if server_cmd zfs list -H -o name "$APPDATA_DATASET" >/dev/null 2>&1; then
+        APPDATA_EXISTS=true
+      fi
+
       # MAC can be manually specified (e.g. to match a DHCP reservation)
       # or auto-generated with a locally-administered prefix (02:xx:xx:xx:xx:xx).
       if [ "$USE_EXISTING_TOPOLOGY" = false ]; then
@@ -775,6 +789,11 @@ let
       echo "  Pool:      $SELECTED_POOL"
       echo "  MAC:       $MAC_ADDR"
       echo "  Store:     $NIX_SOURCE ($NIX_DATASET)"
+      if [ "$APPDATA_EXISTS" = true ]; then
+        echo "  App data:  $APPDATA_SOURCE (existing $APPDATA_DATASET)"
+      else
+        echo "  App data:  $APPDATA_SOURCE (new $APPDATA_DATASET)"
+      fi
       if [ "$USE_EXISTING_INSTANCE" = true ]; then
         echo "  Registry:  existing declaration"
       else
@@ -807,6 +826,7 @@ let
       DHCP_DEPLOY_ATTEMPTED=false
       CONTAINER_CREATED=false
       DATASET_CREATED=false
+      APPDATA_CREATED=false
       INSTANCE_ADDED=false
       KNOWN_HOST_ADDED=false
       SOPS_KEY_ADDED=false
@@ -832,6 +852,11 @@ let
         then
           echo "==> Destroying ZFS dataset $NIX_DATASET..."
           server_cmd zfs destroy -r "$NIX_DATASET" || true
+        fi
+
+        if [ "$APPDATA_CREATED" = true ]; then
+          echo "==> Destroying ZFS dataset $APPDATA_DATASET..."
+          server_cmd zfs destroy -r "$APPDATA_DATASET" || true
         fi
 
         if [ "$INSTANCE_ADDED" = true ]; then
@@ -964,6 +989,14 @@ let
       server_cmd incus config device add "$HOSTNAME" nix-store disk \
         source="$NIX_SOURCE" path=/nix
 
+      if [ "$APPDATA_EXISTS" = false ]; then
+        server_cmd zfs create "$APPDATA_DATASET"
+        APPDATA_CREATED=true
+        server_cmd chown "$UID_GID" "$APPDATA_SOURCE"
+      fi
+      server_cmd incus config device add "$HOSTNAME" appdata disk \
+        source="$APPDATA_SOURCE" path=/appdata recursive=true
+
       if server_cmd incus config device show "$HOSTNAME" | grep -q '^eth0:'; then
         server_cmd incus config device set "$HOSTNAME" eth0 hwaddr="$MAC_ADDR"
       else
@@ -1068,7 +1101,8 @@ let
         "Successfully created and deployed $HOSTNAME
     Pool:  $SELECTED_POOL
     MAC:   $MAC_ADDR
-    Store: $NIX_SOURCE"
+    Store: $NIX_SOURCE
+    Data:  $APPDATA_SOURCE"
     }
 
     # ══════════════════════════════════════════════════════════════
@@ -1137,6 +1171,17 @@ let
         NEW_NIX_SOURCE="''${OLD_NIX_SOURCE%/*}/$NEW_NAME"
       fi
 
+      OLD_APPDATA_SOURCE=$(server_cmd incus config device get \
+        "$OLD_NAME" appdata source 2>/dev/null || true)
+      HAS_APPDATA=false
+      if [ -n "$OLD_APPDATA_SOURCE" ] \
+        && OLD_APPDATA_DATASET=$(dataset_for_source "$OLD_APPDATA_SOURCE")
+      then
+        HAS_APPDATA=true
+        NEW_APPDATA_DATASET="''${OLD_APPDATA_DATASET%/*}/$NEW_NAME"
+        NEW_APPDATA_SOURCE="''${OLD_APPDATA_SOURCE%/*}/$NEW_NAME"
+      fi
+
       # --- Show plan and confirm ---
       echo ""
       $GUM style --foreground 86 --bold "Rename plan:"
@@ -1149,6 +1194,10 @@ let
       if [ "$HAS_NIX_STORE" = true ]; then
         echo "  Nix store: $OLD_NIX_SOURCE → $NEW_NIX_SOURCE"
         echo "  ZFS:       $OLD_NIX_DATASET → $NEW_NIX_DATASET"
+      fi
+      if [ "$HAS_APPDATA" = true ]; then
+        echo "  App data:  $OLD_APPDATA_DATASET → $NEW_APPDATA_DATASET"
+        echo "             (the zpool backup restarts under the new name)"
       fi
       echo ""
 
@@ -1177,6 +1226,13 @@ let
         echo "==> Updating nix-store device source..."
         server_cmd incus config device set \
           "$NEW_NAME" nix-store source="$NEW_NIX_SOURCE"
+      fi
+
+      if [ "$HAS_APPDATA" = true ]; then
+        echo "==> Renaming app data dataset..."
+        server_cmd zfs rename "$OLD_APPDATA_DATASET" "$NEW_APPDATA_DATASET"
+        server_cmd incus config device set \
+          "$NEW_NAME" appdata source="$NEW_APPDATA_SOURCE"
       fi
 
       if [ "$WAS_RUNNING" = true ]; then
@@ -1230,6 +1286,20 @@ let
         fi
       fi
 
+      APPDATA_SOURCE=$(server_cmd incus config device get \
+        "$TARGET" appdata source 2>/dev/null || true)
+      HAS_APPDATA=false
+      if [ -n "$APPDATA_SOURCE" ] \
+        && APPDATA_DATASET=$(dataset_for_source "$APPDATA_SOURCE")
+      then
+        HAS_APPDATA=true
+      fi
+      APPDATA_BACKUP="$APPDATA_BACKUP_PARENT/$TARGET"
+      HAS_APPDATA_BACKUP=false
+      if server_cmd zfs list -H -o name "$APPDATA_BACKUP" >/dev/null 2>&1; then
+        HAS_APPDATA_BACKUP=true
+      fi
+
       # --- Show plan ---
       echo ""
       $GUM style --foreground 196 --bold "DELETE plan:"
@@ -1237,6 +1307,12 @@ let
       echo "  Status:    $STATE"
       if [ "$HAS_NIX_STORE" = true ]; then
         echo "  Nix store: $NIX_SOURCE (ZFS: $NIX_DATASET)"
+      fi
+      if [ "$HAS_APPDATA" = true ]; then
+        echo "  App data:  $APPDATA_SOURCE (ZFS: $APPDATA_DATASET)"
+      fi
+      if [ "$HAS_APPDATA_BACKUP" = true ]; then
+        echo "  Backup:    $APPDATA_BACKUP"
       fi
       echo ""
       $GUM style --foreground 196 "This is DESTRUCTIVE and cannot be undone."
@@ -1247,6 +1323,20 @@ let
       if [ "$HAS_NIX_STORE" = true ]; then
         if $GUM confirm --default=No "Also destroy nix store dataset ($NIX_DATASET)?"; then
           DESTROY_STORE=true
+        fi
+      fi
+
+      # App data and its backup are the only copies of the guest's state.
+      DESTROY_APPDATA=false
+      if [ "$HAS_APPDATA" = true ]; then
+        if $GUM confirm --default=No "Also destroy app data ($APPDATA_DATASET)?"; then
+          DESTROY_APPDATA=true
+        fi
+      fi
+      DESTROY_APPDATA_BACKUP=false
+      if [ "$HAS_APPDATA_BACKUP" = true ]; then
+        if $GUM confirm --default=No "Also destroy its zpool backup ($APPDATA_BACKUP)?"; then
+          DESTROY_APPDATA_BACKUP=true
         fi
       fi
 
@@ -1271,6 +1361,14 @@ let
       if [ "$DESTROY_STORE" = true ]; then
         echo "==> Destroying ZFS dataset $NIX_DATASET..."
         server_cmd zfs destroy -r "$NIX_DATASET"
+      fi
+      if [ "$DESTROY_APPDATA" = true ]; then
+        echo "==> Destroying ZFS dataset $APPDATA_DATASET..."
+        server_cmd zfs destroy -r "$APPDATA_DATASET"
+      fi
+      if [ "$DESTROY_APPDATA_BACKUP" = true ]; then
+        echo "==> Destroying ZFS dataset $APPDATA_BACKUP..."
+        server_cmd zfs destroy -r "$APPDATA_BACKUP"
       fi
 
       # Drop it from incusGuestNames so server-nix stops declaring it
