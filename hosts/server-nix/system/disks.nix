@@ -29,11 +29,24 @@ in
   # Set a unique Host ID (Required for ZFS)
   networking.hostId = "42526202";
 
-  # The JBOD pools; rpool is on the boot NVMe and imports in the initrd.
-  systemd.services.zfs-import-zpool.preStart = waitForPool "zpool";
-  systemd.services.zfs-import-downloadHDD.preStart = waitForPool "downloadHDD";
-  systemd.services.zfs-import-downloadSSD.preStart = waitForPool "downloadSSD";
-  systemd.services.zfs-import-scratchSSD.preStart = waitForPool "scratchSSD";
+  # The JBOD pools; rpool is on the boot NVMe and imports in the initrd. Never
+  # restart an import on switch: the pool's mounts depend on it and go down with it.
+  systemd.services.zfs-import-zpool = {
+    preStart = waitForPool "zpool";
+    restartIfChanged = false;
+  };
+  systemd.services.zfs-import-downloadHDD = {
+    preStart = waitForPool "downloadHDD";
+    restartIfChanged = false;
+  };
+  systemd.services.zfs-import-downloadSSD = {
+    preStart = waitForPool "downloadSSD";
+    restartIfChanged = false;
+  };
+  systemd.services.zfs-import-scratchSSD = {
+    preStart = waitForPool "scratchSSD";
+    restartIfChanged = false;
+  };
 
   systemd.services.configure-zfs-datasets = {
     description = "Ensure ZFS datasets have correct mountpoints";
@@ -131,11 +144,13 @@ in
       ];
     };
 
+    # zfsutil: these mountpoints are ZFS properties, which plain mount(8) refuses.
     "/mnt/nix-stores" = {
       device = "downloadHDD/nix-stores";
       fsType = "zfs";
       options = [
         "nofail"
+        "zfsutil"
       ];
     };
 
@@ -144,6 +159,7 @@ in
       fsType = "zfs";
       options = [
         "nofail"
+        "zfsutil"
       ];
     };
 
@@ -152,6 +168,7 @@ in
       fsType = "zfs";
       options = [
         "nofail"
+        "zfsutil"
       ];
     };
 
@@ -160,6 +177,7 @@ in
       fsType = "zfs";
       options = [
         "nofail"
+        "zfsutil"
       ];
     };
 
@@ -168,6 +186,7 @@ in
       fsType = "zfs";
       options = [
         "nofail"
+        "zfsutil"
       ];
     };
   };
