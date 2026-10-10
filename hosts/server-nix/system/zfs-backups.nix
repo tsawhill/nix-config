@@ -20,7 +20,6 @@ let
   # nothing a `deploy` cannot rebuild. Guest root disks go to zpool hourly
   # instead (lxcRootDisks below); the Pi gets them again once it is rebuilt.
   backupDatasets = [
-    "VM-Disks"
     "downloadSSD"
     "rpool/home"
     "rpool/root"
