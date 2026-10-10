@@ -81,8 +81,7 @@ let
           nictype = "bridged";
           parent = "br0";
         };
-        # TODO: switch to "standard" once the old rpool pool is retired.
-        root = rootDisk "rpool" defaultRootSize;
+        root = rootDisk defaultTier defaultRootSize;
       };
     };
 
@@ -94,7 +93,7 @@ let
         "limits.cpu" = "2";
         "limits.memory" = "2GiB";
       };
-      devices.root = rootDisk "rpool" defaultRootSize;
+      devices.root = rootDisk defaultTier defaultRootSize;
     };
 
     nvidia-gpu = {

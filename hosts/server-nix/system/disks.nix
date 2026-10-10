@@ -62,13 +62,10 @@ in
           || ${pkgs.zfs}/bin/zfs set "$1=$2" "$3"
       }
 
-      set_property mountpoint /mnt/nix-stores downloadHDD/nix-stores
       set_property mountpoint /mnt/zpool zpool
       set_property mountpoint /mnt/downloadHDD downloadHDD
       set_property mountpoint /mnt/downloadSSD downloadSSD
       set_property mountpoint /mnt/scratchSSD scratchSSD
-
-      set_property atime off downloadHDD/nix-stores
 
       ensure_dataset() {
         name="$1"
@@ -82,13 +79,6 @@ in
       ensure_dataset rpool/lxc -o canmount=off -o mountpoint=none -o compression=zstd -o atime=off
       if ${pkgs.zfs}/bin/zfs list -H scratchSSD >/dev/null 2>&1; then
         ensure_dataset scratchSSD/lxc -o canmount=off -o mountpoint=none -o atime=off
-      fi
-
-      # nixos-factory's /nix template moved here from inside the old rpool Incus pool.
-      if ${pkgs.zfs}/bin/zfs list -H rpool/VMDisks/nix-templates >/dev/null 2>&1 \
-        && ! ${pkgs.zfs}/bin/zfs list -H rpool/lxc/templates >/dev/null 2>&1
-      then
-        ${pkgs.zfs}/bin/zfs rename rpool/VMDisks/nix-templates rpool/lxc/templates
       fi
 
       # Never-mounted receive side for zfs-backups.nix, mirroring source paths; a
@@ -145,15 +135,6 @@ in
     };
 
     # zfsutil: these mountpoints are ZFS properties, which plain mount(8) refuses.
-    "/mnt/nix-stores" = {
-      device = "downloadHDD/nix-stores";
-      fsType = "zfs";
-      options = [
-        "nofail"
-        "zfsutil"
-      ];
-    };
-
     "/mnt/zpool" = {
       device = "zpool";
       fsType = "zfs";
