@@ -52,6 +52,19 @@ in
         exit 1
       fi
 
+      # Only the dummy plug (EDID name 28E850, or SUNSHINE once overridden) gets the
+      # override; a real monitor on this port keeps its own modes.
+      dummy=false
+      for edid in /sys/class/drm/*-HDMI-A-1/edid; do
+        if ${pkgs.gnugrep}/bin/grep -aq -e 28E850 -e SUNSHINE "$edid"; then
+          dummy=true
+        fi
+      done
+      if [ "$dummy" = false ]; then
+        echo "HDMI-A-1 is not the Sunshine dummy plug; leaving its EDID alone"
+        exit 0
+      fi
+
       ${pkgs.coreutils}/bin/cat ${sunshineEdid} > "$override"
 
       # The connector was already probed while the driver loaded, so the new

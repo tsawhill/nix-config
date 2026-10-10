@@ -1553,7 +1553,39 @@ let
         server_cmd incus config device add "$HOST" nix-store disk "$@" path=/nix
       }
 
+      # `incus move --storage` copies through a temporary move-of-<id> instance. An
+      # interrupted move can leave one behind with autostart on, and at the next boot
+      # its first start re-owns every file while all other autostarts wait.
+      list_move_copies() {
+        server_cmd incus list --format csv -c n | grep '^move-of-' || true
+      }
+      MOVE_COPIES_BEFORE=" $(list_move_copies | tr '\n' ' ') "
+      clean_move_copies() {
+        while IFS= read -r copy; do
+          if [ -z "$copy" ] || [[ "$MOVE_COPIES_BEFORE" == *" $copy "* ]]; then
+            continue
+          fi
+          server_cmd incus config set "$copy" boot.autostart false >/dev/null 2>&1 || true
+          if server_cmd incus info "$HOST" >/dev/null 2>&1; then
+            echo "==> Deleting Incus's leftover move copy $copy..."
+            server_cmd incus delete --force "$copy" \
+              || $GUM style --foreground 196 "Could not delete $copy; its autostart is off."
+          else
+            $GUM style --foreground 196 --bold \
+              "Kept $copy (autostart off): $HOST is gone, so it may be the only copy."
+          fi
+        done < <(list_move_copies)
+      }
+
+      # Incus keeps moving or starting server-side even if the client is killed, and
+      # an abandoned move is what leaves move-of copies behind, so ignore Ctrl-C there.
+      no_interrupt() {
+        trap "" INT
+        $GUM style --foreground 214 "$1 Ctrl-C is ignored until this step finishes."
+      }
+
       move_failed() {
+        trap - INT
         $GUM style --foreground 196 --bold "$1 — putting $HOST back where it was..."
         server_cmd incus stop "$HOST" --force >/dev/null 2>&1 || true
         if [ "$MOVE_ROOT" = true ]; then
@@ -1583,6 +1615,7 @@ let
         elif [ "$STORE_SWAPPED" = true ]; then
           attach_store pool="$STORE_POOL" source="$STORE_SOURCE" || true
         fi
+        clean_move_copies
         if [ "$WAS_RUNNING" = true ]; then
           server_cmd incus start "$HOST" || true
         fi
@@ -1646,8 +1679,11 @@ let
 
       if [ "$MOVE_ROOT" = true ]; then
         echo "==> Moving the root disk to $ROOT_TO..."
+        no_interrupt "Copying the root disk can take a few minutes."
         server_cmd incus move "$HOST" --storage "$ROOT_TO" \
           || move_failed "Moving the root disk failed"
+        trap - INT
+        clean_move_copies
         live_pool=$(server_cmd incus query "/1.0/instances/$HOST" \
           | $JQ -r '.expanded_devices.root.pool // empty')
         if [ "$live_pool" != "$ROOT_TO" ]; then
@@ -1661,7 +1697,9 @@ let
 
       if [ "$WAS_RUNNING" = true ]; then
         echo "==> Starting $HOST..."
+        no_interrupt "The first start after a move re-owns every file in $HOST's /nix volume; a big store can take many minutes."
         server_cmd incus start "$HOST" || move_failed "Starting $HOST failed"
+        trap - INT
 
         echo "==> Waiting for $HOST to finish booting..."
         BOOT_STATE=""

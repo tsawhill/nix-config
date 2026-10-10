@@ -1,9 +1,39 @@
-{ pkgs, ... }:
+{
+  config,
+  pkgs,
+  ...
+}:
+let
+  # The JBOD's HBA brings its disks up one by one, ~4.5 s apart, so the last one
+  # appears ~55 s into boot: right at the end of NixOS's ~60 s import wait. Wait
+  # (up to 3 min) for the whole pool first so it never imports degraded or not at all.
+  waitForPool = pool: ''
+    zpool=${config.boot.zfs.package}/bin/zpool
+    for _ in $(seq 1 180); do
+      if "$zpool" list -H ${pool} >/dev/null 2>&1; then
+        exit 0
+      fi
+      state=$("$zpool" import -d ${config.boot.zfs.devNodes} 2>/dev/null \
+        | ${pkgs.gawk}/bin/awk -v p=${pool} '$1 == "pool:" { found = ($2 == p) } found && $1 == "state:" { print $2; exit }')
+      if [ "$state" = ONLINE ]; then
+        exit 0
+      fi
+      sleep 1
+    done
+    echo "${pool} not ONLINE after 3 minutes; trying the import anyway" >&2
+  '';
+in
 {
   # Enable ZFS support
   boot.supportedFilesystems = [ "zfs" ];
   # Set a unique Host ID (Required for ZFS)
   networking.hostId = "42526202";
+
+  # The JBOD pools; rpool is on the boot NVMe and imports in the initrd.
+  systemd.services.zfs-import-zpool.preStart = waitForPool "zpool";
+  systemd.services.zfs-import-downloadHDD.preStart = waitForPool "downloadHDD";
+  systemd.services.zfs-import-downloadSSD.preStart = waitForPool "downloadSSD";
+  systemd.services.zfs-import-scratchSSD.preStart = waitForPool "scratchSSD";
 
   systemd.services.configure-zfs-datasets = {
     description = "Ensure ZFS datasets have correct mountpoints";

@@ -70,6 +70,8 @@ let
       description = "Base NixOS LXC config";
       config = lxcSecurity // {
         "boot.autostart" = "true";
+        # Incus starts unprioritised guests first (in parallel); one on every guest makes it strict priority order.
+        "boot.autostart.priority" = "10";
         "limits.cpu" = "2";
         "limits.memory" = "2GiB";
       };
@@ -88,6 +90,7 @@ let
       description = "NixOS router LXC config without inherited LAN eth0";
       config = lxcSecurity // {
         "boot.autostart" = "false";
+        "boot.autostart.priority" = "10";
         "limits.cpu" = "2";
         "limits.memory" = "2GiB";
       };
@@ -153,7 +156,10 @@ let
       rootSize = "8GiB";
     };
     # vaultwarden signs in through it.
-    authentik-nix.tier = "critical";
+    authentik-nix = {
+      config."boot.autostart.priority" = "60";
+      tier = "critical";
+    };
     build-nix = {
       profiles = [ "nix-config-mount" ];
       config = {
@@ -190,7 +196,10 @@ let
       rootSize = "32GiB";
     };
     # vaultwarden is only reachable through it.
-    local-nginx-nix.tier = "critical";
+    local-nginx-nix = {
+      config."boot.autostart.priority" = "60";
+      tier = "critical";
+    };
     monitoring-nix = {
       config = {
         "limits.cpu" = "2";
@@ -355,7 +364,10 @@ let
       tier = "critical";
     };
     unifi-nix.rootSize = "4GiB";
-    vaultwarden-nix.tier = "critical";
+    vaultwarden-nix = {
+      config."boot.autostart.priority" = "60";
+      tier = "critical";
+    };
   };
 
   mkInstance =
