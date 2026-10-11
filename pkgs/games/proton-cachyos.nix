@@ -12,13 +12,15 @@ let
   # proton-cachyos-slr is built against the Steam Linux Runtime. umu always
   # launches inside a pressure-vessel container, so the -slr flavour is the one
   # that applies here; the plain "proton-cachyos" package no longer exists.
+  # CachyOS's repo only keeps the current build; older ones 404. Version and
+  # sha256 come from the %VERSION%/%SHA256SUM% entries in its cachyos.db.
   latestVersion = {
-    packageVersion = "11.0.20260703-1";
-    sha256 = "4fa7285f34718c799c2e46ec9959cee7021190ee69c478bd08045caaa0e5c0bd";
+    packageVersion = "11.0.20261005-1";
+    sha256 = "ae7207af056fcd6c1dd17e3a40dc7b3a6761db464b6569c91459eceb0522848d";
   };
   knownVersions = {
     latest = latestVersion;
-    "11.0.20260703-1" = latestVersion;
+    "11.0.20261005-1" = latestVersion;
   };
   selectedVersion =
     knownVersions.${version} or (throw "Unsupported proton-cachyos version: ${version}");
