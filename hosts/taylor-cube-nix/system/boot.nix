@@ -1,8 +1,6 @@
 { ... }:
 {
-  boot.loader.systemd-boot = {
-    enable = true;
-  };
+  my.boot.limine.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 
   # Valve's kernel (with the CEC adapter drivers now enabled in linux-jovian

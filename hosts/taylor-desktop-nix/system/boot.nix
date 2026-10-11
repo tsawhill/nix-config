@@ -27,8 +27,11 @@ in
   boot.loader.efi.canTouchEfiVariables = true;
   boot.zfs.devNodes = "/dev/disk/by-partuuid";
 
+  # TODO: move to my.boot.limine once Windows' ESP partition GUID can be read for its entry.
   boot.loader.systemd-boot = {
     enable = true;
+    # Full-resolution text mode, so entry titles (and their build dates) fit.
+    consoleMode = "max";
     edk2-uefi-shell.enable = true;
     windows."10" = {
       efiDeviceHandle = "HD1b";

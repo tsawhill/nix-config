@@ -2,8 +2,10 @@
 {
   # Steam Deck boots UEFI; jovian.devices.steamdeck.enable handles the APU,
   # firmware, kernel modules, controls, fan and backlight.
-  boot.loader.systemd-boot = {
+  my.boot.limine = {
     enable = true;
+    # 1280x800 panel
+    fontScale = "1x1";
   };
   boot.loader.efi.canTouchEfiVariables = true;
 

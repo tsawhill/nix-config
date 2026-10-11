@@ -18,7 +18,5 @@
   boot.loader.efi.canTouchEfiVariables = true;
   boot.zfs.devNodes = "/dev/disk/by-partuuid";
 
-  boot.loader.systemd-boot = {
-    enable = true;
-  };
+  my.boot.limine.enable = true;
 }

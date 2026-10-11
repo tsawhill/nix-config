@@ -77,6 +77,7 @@
 
     # Hardware services
     "${self}/modules/hardware/bluetooth.nix"
+    "${self}/modules/hardware/limine.nix"
     "${self}/modules/hardware/udev"
     "${self}/modules/hardware/lexar-sd.nix"
   ];

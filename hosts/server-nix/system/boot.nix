@@ -2,6 +2,8 @@
 
 {
   boot.loader.systemd-boot.enable = true;
+  # Full-resolution text mode, so entry titles (and their build dates) fit.
+  boot.loader.systemd-boot.consoleMode = "max";
   boot.loader.efi.canTouchEfiVariables = true;
 
   # This script runs every time you switch configurations
