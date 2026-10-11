@@ -59,8 +59,12 @@ in
 
   config = lib.mkIf cfg.enable {
     boot.loader.systemd-boot.enable = false;
+    # Valve firmware boots the disk's default \EFI\BOOT\BOOTX64.EFI ahead of any
+    # named entry, so install Limine there instead of adding an NVRAM entry.
+    boot.loader.efi.canTouchEfiVariables = lib.mkForce false;
     boot.loader.limine = {
       enable = true;
+      efiInstallAsRemovable = true;
       maxGenerations = 10;
       style = {
         wallpapers = [ wallpaper ];
