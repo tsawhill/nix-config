@@ -14,7 +14,7 @@ let
   waylandDisplay = "wayland-0";
   streamOutput = "HEADLESS-1";
   # Matches the desktops' home-manager pointer cursor.
-  cursorTheme = "catppuccin-mocha-pink-cursors";
+  cursorTheme = "ComixCursors-Opaque-Orange";
   cursorSize = 24;
   boltLauncher = pkgs.bolt-launcher.override { jdk17 = pkgs.openjdk; };
   sunshinePackage = (pkgs.sunshine.override { cudaSupport = true; }).overrideAttrs (oldAttrs: {
@@ -405,7 +405,7 @@ in
   environment.systemPackages = with pkgs; [
     adwaita-icon-theme
     boltLauncher
-    catppuccin-cursors.mochaPink
+    comixcursors.Opaque_Orange
     foot
     fuzzel
     wlr-randr

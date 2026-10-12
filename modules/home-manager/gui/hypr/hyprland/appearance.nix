@@ -56,15 +56,15 @@
     enable = true;
     gtk.enable = true;
     x11.enable = true;
-    package = pkgs.catppuccin-cursors.mochaPink;
-    name = "catppuccin-mocha-pink-cursors";
-    size = 16;
+    package = pkgs.comixcursors.Opaque_Orange;
+    name = "ComixCursors-Opaque-Orange";
+    size = 24;
   };
   wayland.windowManager.hyprland.settings.env = [
-    { _args = [ "HYPRCURSOR_THEME" "catppuccin-mocha-pink-cursors" ]; }
-    { _args = [ "HYPRCURSOR_SIZE" "16" ]; }
-    { _args = [ "XCURSOR_THEME" "catppuccin-mocha-pink-cursors" ]; }
-    { _args = [ "XCURSOR_SIZE" "16" ]; }
+    { _args = [ "HYPRCURSOR_THEME" "ComixCursors-Opaque-Orange" ]; }
+    { _args = [ "HYPRCURSOR_SIZE" "24" ]; }
+    { _args = [ "XCURSOR_THEME" "ComixCursors-Opaque-Orange" ]; }
+    { _args = [ "XCURSOR_SIZE" "24" ]; }
   ];
   # Disable hardware cursors to fix Hyprland rendering bugs
   wayland.windowManager.hyprland.settings.config.cursor = {
