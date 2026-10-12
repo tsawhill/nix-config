@@ -264,8 +264,17 @@ awk -v pre="$preamp" -v hpf_mode="$hpf_mode" -v hpf_hz="$hpf_hz" -v known="$know
     printf "      # Speech peaks %+.1f dB from the M2 reference; shifted to match.\n", d > module
     printf "      compressor.\"Attack threshold (G)\" = %s; # %.1f dBFS\n", g(ct), ct > module
     printf "      compressor.\"Makeup gain (G)\" = %s; # %+.1f dB\n", g(mk), mk > module
-    printf "    };\n  };\n}\n" > module
   }' <<<"$results"
+
+# Carry over hand-tuned controls from this mic's current module that aren't measured here.
+kept=$(jq -r '(.controls // {}) | to_entries[] | .key as $stage | .value | to_entries[]
+  | select([$stage, .key] | IN(["gate", "Curve threshold (G)"], ["compressor", "Attack threshold (G)"],
+      ["compressor", "Makeup gain (G)"]) | not)
+  | "      \($stage).\"\(.key)\" = \(.value);"' <<<"$settings")
+if [[ -n $kept ]]; then
+  printf '      # Kept from the previous module.\n%s\n' "$kept" >>"$module"
+fi
+printf '    };\n  };\n}\n' >>"$module"
 
 target=modules/software/desktop/pipewire/filtered-mics/$name.nix
 printf '\n----- %s -----\n' "$target"

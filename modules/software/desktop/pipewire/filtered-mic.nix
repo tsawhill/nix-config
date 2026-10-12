@@ -205,7 +205,7 @@ let
               lib.nameValuePair mic.source (
                 {
                   inherit name;
-                  inherit (mic) channel description;
+                  inherit (mic) channel description controls;
                 }
                 // levelControls (micStages mic)
               )

@@ -10,6 +10,8 @@
       # Speech peaks +1.3 dB from the M2 reference; shifted to match.
       compressor."Attack threshold (G)" = 0.2113; # -13.5 dBFS
       compressor."Makeup gain (G)" = 1.679; # +4.5 dB
+      # Mutes faint keystrokes the model is unsure about (default -15).
+      deepfilter."Min processing threshold (dB)" = -5;
     };
   };
 }
