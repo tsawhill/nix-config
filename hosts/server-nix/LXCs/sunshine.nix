@@ -164,24 +164,21 @@ let
 
   labwc = "${pkgs.labwc}/bin/labwc";
 
-  # Launchers such as Bolt exit once the game is up, so keep a game session
-  # alive while anything in its cgroup besides labwc and Xwayland still runs.
+  # Launchers such as Bolt exit once the game is up, and Chromium-based ones
+  # move into their own systemd scope, so a game session lasts while the
+  # launcher runs or any window is open, ending after 5s without one.
   streamApp = pkgs.writeShellScript "stream-app" ''
-    "$@" || true
+    "$@" &
+    launcher=$!
 
-    read -r cgroup < /proc/self/cgroup
-    procs=/sys/fs/cgroup''${cgroup#0::}/cgroup.procs
-    while :; do
-      running=0
-      while read -r pid; do
-        # $PPID is labwc, which started this script.
-        [ "$pid" = $$ ] || [ "$pid" = "$PPID" ] && continue
-        read -r comm 2>/dev/null < "/proc/$pid/comm" || continue
-        [ "$comm" = Xwayland ] && continue
-        running=1
-        break
-      done < "$procs"
-      [ "$running" -eq 1 ] || exit 0
+    idle=0
+    while [ "$idle" -lt 5 ]; do
+      if kill -0 "$launcher" 2>/dev/null \
+        || [ -n "$(${pkgs.coreutils}/bin/timeout 2 ${lib.getExe pkgs.lswt} -c i 2>/dev/null)" ]; then
+        idle=0
+      else
+        idle=$((idle + 1))
+      fi
       ${pkgs.coreutils}/bin/sleep 1
     done
   '';
