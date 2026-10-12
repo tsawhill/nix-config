@@ -1,4 +1,4 @@
-# One module per mic; a chain only processes its own device and idles without it.
+# One module per mic; each chain only runs while its device is plugged in.
 { lib, ... }:
 let
   micFiles = lib.filterAttrs (

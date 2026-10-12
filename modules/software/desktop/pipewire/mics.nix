@@ -14,7 +14,8 @@ in
   config = lib.mkIf cfg.virtual.enable {
     services.pipewire = {
 
-      # Passthrough loopback, only when no filtered mic's chain provides mic_input.
+      # Passthrough loopback only on hosts without filtered mics; with them, a
+      # plugged-in mic's chain is mic_input and apps otherwise fall back to default.
       extraConfig.pipewire."93-virtual-mic"."context.modules" =
         lib.optionals (lib.all (mic: !mic.enable) (lib.attrValues config.my.desktop.audio.filteredMics))
           [
