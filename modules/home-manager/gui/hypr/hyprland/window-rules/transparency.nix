@@ -1,6 +1,6 @@
 { config, lib, ... }:
-# All windows default to 99% inactive opacity.
-# Add classes to dimApps for 97% inactive opacity.
+# All windows default to 96% inactive opacity.
+# Add classes to dimApps for 93% inactive opacity.
 # Add raw match strings to opaqueApps to exempt windows from dimming (full inactive opacity).
 # Both lists are additive — definitions across modules are concatenated.
 let
@@ -22,7 +22,7 @@ in
     dimApps = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [];
-      description = "Window classes to dim to 97% opacity when inactive.";
+      description = "Window classes to dim to 93% opacity when inactive.";
     };
     opaqueApps = lib.mkOption {
       type = lib.types.listOf lib.types.str;
@@ -47,12 +47,12 @@ in
       [
         {
           match = { class = ".+"; };
-          opacity = "1.0 override 0.99 override";
+          opacity = "1.0 override 0.96 override";
         }
       ]
       ++ map (c: {
         match = { class = c; };
-        opacity = "1.0 override 0.97 override";
+        opacity = "1.0 override 0.93 override";
       }) config.my.hypr.transparency.dimApps
       ++ map (m: {
         match = mkMatch m;
