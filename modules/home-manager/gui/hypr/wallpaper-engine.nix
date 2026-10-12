@@ -7,6 +7,11 @@
 let
   cfg = config.my.hypr.wallpaperEngine;
 
+  # Upstream crashes on text layers whose padding is an "x y" string (issue #532).
+  linuxWallpaperengine = pkgs.linux-wallpaperengine.overrideAttrs (old: {
+    patches = (old.patches or [ ]) ++ [ ./linux-wallpaperengine-text-padding.patch ];
+  });
+
   # Build the per-monitor rotation service
   mkWallpaperService =
     monitor: monCfg:
@@ -31,6 +36,28 @@ let
 
       # Fake mpv config with null audio output — prevents PipeWire node creation
       mpvNullAudioConf = pkgs.writeTextDir "mpv.conf" "ao=null";
+
+      mpvOptions = lib.concatStringsSep " " (
+        [
+          "loop-file=inf"
+          "hwdec=auto-safe"
+        ]
+        ++ {
+          fill = [ "panscan=1.0" ];
+          stretch = [ "keepaspect=no" ];
+          fit = [ ];
+          default = [ ];
+        }
+        .${monCfg.scaling}
+        ++ (
+          if !monCfg.audio then
+            [ "no-audio" ]
+          else if monCfg.silent then
+            [ "mute=yes" ]
+          else
+            [ "volume=${toString monCfg.volume}" ]
+        )
+      );
 
       audioEnv = lib.optionals (!monCfg.audio) [
         "SDL_AUDIODRIVER=dummy"
@@ -63,14 +90,25 @@ let
 
           WID=''${CANDIDATES[$(( RANDOM % ''${#CANDIDATES[@]} ))]}
 
-          ${lib.getExe pkgs.linux-wallpaperengine} \
-            --screen-root ${lib.escapeShellArg monitor} \
-            --bg "$WID" \
-            --fps ${toString monCfg.fps} \
-            --scaling ${monCfg.scaling} \
-            --clamp ${cfg.clamping} \
-            ${audioArgs} \
-            ${assetsArg} &
+          # Video wallpapers play more reliably and cheaply in mpvpaper.
+          DIR=${lib.escapeShellArg cfg.workshopPath}/$WID
+          TYPE=$(${lib.getExe pkgs.jq} -r '.type // "" | ascii_downcase' "$DIR/project.json" 2>/dev/null)
+          FILE=$(${lib.getExe pkgs.jq} -r '.file // ""' "$DIR/project.json" 2>/dev/null)
+
+          if [ "$TYPE" = video ] && [ -n "$FILE" ] && [ -f "$DIR/$FILE" ]; then
+            ${lib.getExe pkgs.mpvpaper} -p \
+              -o ${lib.escapeShellArg mpvOptions} \
+              ${lib.escapeShellArg monitor} "$DIR/$FILE" &
+          else
+            ${lib.getExe linuxWallpaperengine} \
+              --screen-root ${lib.escapeShellArg monitor} \
+              --bg "$WID" \
+              --fps ${toString monCfg.fps} \
+              --scaling ${monCfg.scaling} \
+              --clamp ${cfg.clamping} \
+              ${audioArgs} \
+              ${assetsArg} &
+          fi
 
           WPE_PID=$!
 
@@ -129,6 +167,12 @@ in
       type = lib.types.nullOr lib.types.str;
       default = "${config.home.homeDirectory}/.steam/steam/steamapps/common/wallpaper_engine/assets";
       description = "Path to the wallpaper_engine/assets directory.";
+    };
+
+    workshopPath = lib.mkOption {
+      type = lib.types.str;
+      default = "${config.home.homeDirectory}/.steam/steam/steamapps/workshop/content/431960";
+      description = "Wallpaper Engine's Steam Workshop content directory, used to detect video wallpapers.";
     };
 
     clamping = lib.mkOption {
