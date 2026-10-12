@@ -39,7 +39,8 @@ let
 
       rotationScript = pkgs.writeShellScript "wallpaper-engine-${monitor}" ''
         WALLPAPERS=(${wallpaperList})
-        COUNT=''${#WALLPAPERS[@]}
+        # Wallpapers that crashed the engine this session; skipped until all have.
+        declare -A FAILED=()
 
         trap 'kill $WPE_PID $SLEEP_PID 2>/dev/null; exit' SIGTERM SIGINT
 
@@ -49,8 +50,18 @@ let
             sleep 1
           done
 
-          IDX=$(( RANDOM % COUNT ))
-          WID=''${WALLPAPERS[$IDX]}
+          CANDIDATES=()
+          for W in "''${WALLPAPERS[@]}"; do
+            [ -n "''${FAILED[$W]}" ] || CANDIDATES+=("$W")
+          done
+          if [ ''${#CANDIDATES[@]} -eq 0 ]; then
+            echo "Every wallpaper crashed; retrying all in 60s" >&2
+            sleep 60
+            FAILED=()
+            continue
+          fi
+
+          WID=''${CANDIDATES[$(( RANDOM % ''${#CANDIDATES[@]} ))]}
 
           ${lib.getExe pkgs.linux-wallpaperengine} \
             --screen-root ${lib.escapeShellArg monitor} \
@@ -67,12 +78,19 @@ let
           sleep ${lib.escapeShellArg monCfg.rotateInterval} &
           SLEEP_PID=$!
 
-          # Wait until the interval ends or a disable-app starts
+          # Wait until the interval ends, a disable-app starts, or the engine dies
           while kill -0 $SLEEP_PID 2>/dev/null; do
             if ${disableAppsCheck}; then
               kill $SLEEP_PID 2>/dev/null
               kill $WPE_PID 2>/dev/null
               wait $WPE_PID 2>/dev/null
+              WPE_PID=
+              break
+            fi
+            if ! kill -0 $WPE_PID 2>/dev/null; then
+              echo "Wallpaper $WID exited early; skipping it this session" >&2
+              FAILED[$WID]=1
+              kill $SLEEP_PID 2>/dev/null
               WPE_PID=
               break
             fi
