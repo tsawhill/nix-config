@@ -155,8 +155,53 @@ class HvacControls extends HTMLElement {
   }
 }
 class HvacNap extends HvacControls { constructor() { super(); this.nap=true; } }
+// Room picks are browser-local, like the override tabs; only timers live in HA.
+class HvacMax extends HvacControls {
+  constructor() { super(); this.picked = new Set(); }
+  getCardSize() { return 4; }
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 12 }; }
+  render(force = false) {
+    if (!this._hass) return;
+    const keys = Object.keys(ROOMS);
+    const timer = r => this._hass.states[`timer.hvac_max_${r}`];
+    const running = keys.filter(r => timer(r)?.state === "active");
+    const picked = keys.filter(r => this.picked.has(r));
+    const maxMode = this.state("input_select.hvac_max_mode");
+    const mode = this.state("sensor.hvac_effective_mode");
+    const signature = JSON.stringify([picked,running,running.map(r => timer(r).attributes?.finishes_at),maxMode,mode,this.busy,this.error]);
+    if (!force && signature === this._signature) return;
+    if (!force && this.shadowRoot.activeElement?.tagName === "INPUT") return;
+    this._signature = signature;
+    const until = r => { const d = new Date(timer(r)?.attributes?.finishes_at); return Number.isNaN(d.getTime()) ? "" : ` until ${d.toLocaleTimeString([], {hour:"numeric",minute:"2-digit"})}`; };
+    const [h, m] = String(timer("office")?.attributes?.duration ?? "").split(":").map(Number);
+    const length = Number.isFinite(h) && Number.isFinite(m) ? `${h * 60 + m} min` : "a short burst";
+    const disabled = this.busy ? "disabled" : "";
+    const start = this.busy || !picked.length ? "disabled" : "";
+    const opposite = mode === "cool" ? "heat" : mode === "heat" ? "cool" : "";
+    const note = running.length ? `Max ${maxMode} running.`
+      : opposite ? `Max ${opposite} switches the shared outdoor unit; unselected rooms pause until it ends.`
+      : "Unselected rooms stay off.";
+    this.shadowRoot.innerHTML = `<style>${CSS}</style><ha-card>
+      <h2>Max</h2>
+      <div class="muted">Full fan at the coldest or hottest setting for ${escapeHtml(length)}, then back to normal.</div>
+      ${keys.map(r => `<div class="row"><label for="pick-${r}">${ROOMS[r]}${running.includes(r) ? `<span class="muted"> · max ${escapeHtml(maxMode)}${escapeHtml(until(r))}</span>` : ""}</label>
+        <input id="pick-${r}" class="switch" type="checkbox" ${this.picked.has(r) ? "checked" : ""} ${disabled}></div>`).join("")}
+      <div class="actions"><button id="max-cool" class="${mode === "cool" ? "primary" : ""}" ${start}>Max cool</button>
+        <button id="max-heat" class="${mode === "heat" ? "primary" : ""}" ${start}>Max heat</button></div>
+      <div class="actions"><button id="stop" ${this.busy || !running.length ? "disabled" : ""}>Stop max</button></div>
+      <div class="status muted" role="status">${escapeHtml(note)}</div>
+      ${this.error ? `<div class="error" role="alert">${escapeHtml(this.error)}</div>` : ""}
+    </ha-card>`;
+    const find = id => this.shadowRoot.getElementById(id);
+    for (const r of keys) find(`pick-${r}`).onchange = e => { e.target.checked ? this.picked.add(r) : this.picked.delete(r); this.render(true); };
+    for (const which of ["cool", "heat"]) find(`max-${which}`).onclick = () => this.call("script", "hvac_start_max", {rooms: picked, hvac_mode: which});
+    find("stop").onclick = () => this.call("timer", "cancel", {entity_id: running.map(r => `timer.hvac_max_${r}`)});
+  }
+}
 customElements.define("hvac-override-card", HvacControls);
 customElements.define("hvac-nap-card", HvacNap);
+customElements.define("hvac-max-card", HvacMax);
 window.customCards = window.customCards || [];
 window.customCards.push({type:"hvac-override-card",name:"HVAC override",description:"Room tabs with timed local HVAC controls"},
-  {type:"hvac-nap-card",name:"Bedroom nap",description:"Bedroom sleep preset and duration"});
+  {type:"hvac-nap-card",name:"Bedroom nap",description:"Bedroom sleep preset and duration"},
+  {type:"hvac-max-card",name:"HVAC max",description:"Timed full-power cooling or heating for chosen rooms"});

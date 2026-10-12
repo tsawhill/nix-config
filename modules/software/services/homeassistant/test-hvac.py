@@ -56,6 +56,7 @@ class Templates(unittest.TestCase):
             states=self.states,
             is_state=lambda entity, value: self.values.get(entity) == value,
             is_number=lambda value: self.numeric(value),
+            state_attr=lambda entity, attribute: None,
             now=lambda: self.now,
             timedelta=timedelta,
             as_timestamp=lambda value, default=0: (
@@ -91,9 +92,29 @@ class Templates(unittest.TestCase):
             "anyOverrideActive": " or ".join(
                 f"is_state('timer.hvac_override_{r}', 'active')" for r in ROOMS
             ),
+            "anyMaxActive": " or ".join(
+                f"is_state('timer.hvac_max_{r}', 'active')" for r in ROOMS
+            ),
+            "maxMode": "input_select.hvac_max_mode",
+            "builtins.toJSON roomNames": json.dumps(ROOMS),
             "currentBlock": (
                 self.expand(raw_template("currentBlock"))
                 if "${currentBlock}" in text
+                else ""
+            ),
+            "baseModeTemplate": (
+                self.expand(raw_template("baseModeTemplate"))
+                if "${baseModeTemplate}" in text
+                else ""
+            ),
+            "preemptedTemplate room": (
+                self.expand(raw_template("preemptedTemplate"))
+                if "${preemptedTemplate room}" in text
+                else ""
+            ),
+            "desiredTemplate room": (
+                self.expand(raw_template("desiredTemplate"))
+                if "${desiredTemplate room}" in text
                 else ""
             ),
             "scheduleJson": json.dumps(self.schedule()),
@@ -115,6 +136,8 @@ class Templates(unittest.TestCase):
             "appliedAirflow": "input_select.hvac_override_airflow_office",
             "fanSelect": "input_select.hvac_fan_office",
             "airflowSelect": "input_select.hvac_airflow_office",
+            "maxTimer": "timer.hvac_max_office",
+            "minRunTimer": "timer.hvac_min_run_office",
         }
         refs.update({k + " room": v for k, v in helpers.items()})
 
@@ -326,7 +349,9 @@ class Templates(unittest.TestCase):
         self.assertEqual(self.render("roomStatus"), "Sensor stale")
         self.reported = self.now
         self.values["timer.hvac_min_off_office"] = "active"
-        self.assertEqual(self.render("roomStatus"), "Waiting to restart")
+        self.assertEqual(
+            self.render("roomStatus"), "Waiting to restart · compressor protection"
+        )
 
     def test_restore_settings_and_no_background_draft_overwrite(self):
         selects = SOURCE.split("    input_select =", 1)[1].split(
@@ -597,6 +622,47 @@ class Templates(unittest.TestCase):
         self.assertEqual(self.render("desiredTemplate"), "off")
         self.values["climate.office_ac"] = "cool"
         self.assertEqual(self.render("desiredTemplate"), "cool")
+
+    def test_max_runs_chosen_rooms_and_pauses_others_in_opposite_mode(self):
+        self.values["input_select.hvac_max_mode"] = "cool"
+        self.values["timer.hvac_max_office"] = "active"
+        self.values["timer.hvac_override_office"] = "active"
+        self.values["input_boolean.hvac_enable_office"] = "off"
+        self.values["timer.hvac_shed_office"] = "active"
+        self.values["sensor.ac_controller_office_temperature"] = "70"
+        self.assertEqual(self.render("effectiveModeTemplate"), "cool")
+        self.assertEqual(self.render("desiredTemplate"), "cool")
+        self.assertEqual(self.render("fanTemplate"), "5")
+        self.assertEqual(self.render("roomStatus"), "Max cool")
+        # Another room on max heat holds the shared unit, so this one stays off.
+        for key in ["max", "override", "shed"]:
+            self.values[f"timer.hvac_{key}_office"] = "idle"
+        self.values["timer.hvac_max_bedroom"] = "active"
+        self.values["input_select.hvac_max_mode"] = "heat"
+        self.assertEqual(self.render("effectiveModeTemplate"), "heat")
+        self.values["sensor.hvac_effective_mode"] = "heat"
+        self.values["sensor.ac_controller_office_temperature"] = "60"
+        self.assertEqual(self.render("desiredTemplate"), "off")
+        self.assertEqual(
+            self.render("roomStatus"), "Paused for max heat in another room"
+        )
+        # Max in the scheduled mode leaves the other rooms on their thresholds.
+        self.values["input_select.hvac_max_mode"] = "cool"
+        self.values["sensor.hvac_effective_mode"] = "cool"
+        self.values["sensor.ac_controller_office_temperature"] = "78"
+        self.assertEqual(self.render("desiredTemplate"), "cool")
+        self.values["timer.hvac_max_bedroom"] = "idle"
+        self.assertEqual(self.render("effectiveModeTemplate"), "cool")
+
+    def test_max_script_accepts_room_lists_or_one_room(self):
+        expr = re.search(r'selected = "(.*?)";', SOURCE).group(1)
+        template = self.env.from_string(self.expand(expr))
+        self.assertEqual(
+            template.render(rooms=["office", "garage", "living_room"]),
+            "['office', 'living_room']",
+        )
+        self.assertEqual(template.render(rooms="bedroom"), "['bedroom']")
+        self.assertEqual(template.render(), "[]")
 
     def test_outdoor_gap_only_delays_escalation(self):
         self.assertEqual(self.watch(patience=2), "retry")

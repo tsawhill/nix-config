@@ -64,6 +64,9 @@ let
     # A capacity pause is bounded and limited to one victim per stalled cycle.
     shedMinutes = 30;
     overridePriority = 10;
+    # Manual max run: extreme setpoint and top fan for a fixed window per press.
+    maxMinutes = 20;
+    maxPriority = 20;
   };
 
   minutesOf =
@@ -226,6 +229,8 @@ let
   targetSensor = room: "sensor.hvac_target_${room}";
   heatTargetSensor = room: "sensor.hvac_heat_target_${room}";
   prioritySensor = room: "sensor.hvac_priority_${room}";
+  maxTimer = room: "timer.hvac_max_${room}";
+  maxMode = "input_select.hvac_max_mode";
 
   # One outdoor unit means the heads cannot run opposing modes, so this is a
   # single system-wide choice rather than a per-room one. systemMode is the
@@ -284,12 +289,30 @@ let
     map (room: "is_state('${overrideTimer room}', 'active')") roomNames
   );
 
-  effectiveModeTemplate = ''
+  anyMaxActive = lib.concatStringsSep " or " (
+    map (room: "is_state('${maxTimer room}', 'active')") roomNames
+  );
+
+  # The mode the schedule and overrides ask for, before any max run.
+  baseModeTemplate = ''
     {%- if (${anyOverrideActive}) and not is_state('${overrideMode}', '${followSystem}') -%}
       {{ states('${overrideMode}') }}
     {%- else -%}
       {{ states('${systemMode}') }}
     {%- endif -%}'';
+
+  # A max run owns the shared outdoor unit for its window.
+  effectiveModeTemplate = ''
+    {%- if ${anyMaxActive} -%}
+      {{ states('${maxMode}') }}
+    {%- else -%}
+      ${baseModeTemplate}
+    {%- endif -%}'';
+
+  # Rooms left out of a max run in the other mode cannot run their own.
+  preemptedTemplate = room: ''
+    {%- set base -%}${baseModeTemplate}{%- endset -%}
+    {%- set preempted = (${anyMaxActive}) and not is_state('${maxTimer room}', 'active') and states('${maxMode}') != base | trim -%}'';
 
   # Resolve today's pattern and the block covering the current minute. Every
   # tag trims its own whitespace: Home Assistant types rendered results
@@ -322,7 +345,9 @@ let
 
   priorityTemplate = room: ''
     ${currentBlock}
-    {%- if is_state('${overrideTimer room}', 'active') -%}
+    {%- if is_state('${maxTimer room}', 'active') -%}
+      ${toString tuning.maxPriority}
+    {%- elif is_state('${overrideTimer room}', 'active') -%}
       ${toString tuning.overridePriority}
     {%- else -%}
       {{ ns.current.rooms['${room}'].priority }}
@@ -340,7 +365,7 @@ let
 
   fanTemplate = room: ''
     {%- set normal = states('sensor.hvac_normal_fan_${room}') -%}
-    {{ '5' if normal == 'auto' and states('input_select.hvac_watch_${room}') in ['boosted', 'stalled', 'exhausted', 'settled'] and states('${climateEntity room}') in ['cool', 'heat'] else normal }}'';
+    {{ '5' if is_state('${maxTimer room}', 'active') or (normal == 'auto' and states('input_select.hvac_watch_${room}') in ['boosted', 'stalled', 'exhausted', 'settled'] and states('${climateEntity room}') in ['cool', 'heat']) else normal }}'';
 
   # Which block of today's pattern is in force, for the dashboard.
   scheduleBlockTemplate = ''
@@ -362,20 +387,23 @@ let
   # Resolve what the room should be doing into one value, so the automation
   # below is "apply this" rather than a tree of cool and heat branches. Holding
   # the current mode inside the hysteresis band is what stops a room chattering
-  # on and off around a single number.
+  # on and off around a single number. A max run is time-boxed, so it skips
+  # thresholds, the room toggle, shedding and sensor health.
   desiredTemplate = room: ''
+    ${preemptedTemplate room}
     {%- set sys = states('${effectiveMode}') -%}
     {%- set enabled = not is_state('${overrideTimer room}', 'active') or not is_state('${enableToggle room}', 'off') -%}
     {%- set r = states('${tempSensor room}') | float(-999) -%}
     {%- set ct = states('${targetSensor room}') | float(999) -%}
     {%- set ht = states('${heatTargetSensor room}') | float(-999) -%}
     {%- set cur = states('${climateEntity room}') -%}
-    {%- set blocked = (not enabled) or sys == 'off' or is_state('${shedTimer room}', 'active')
+    {%- set blocked = (not enabled) or preempted or sys == 'off' or is_state('${shedTimer room}', 'active')
         or states('${tempSensor room}') in ['unknown', 'unavailable']
         or (as_timestamp(now()) - as_timestamp(states.sensor.ac_controller_${room}_temperature.last_reported, 0)) > ${
           toString (tuning.staleMinutes * 60)
         } -%}
-    {%- if blocked -%}off
+    {%- if is_state('${maxTimer room}', 'active') and sys in ['cool', 'heat'] -%}{{ sys }}
+    {%- elif blocked -%}off
     {%- elif sys == 'cool' -%}
       {{ 'cool' if r > ct else ('off' if r <= ct - ${toString tuning.hysteresis} else (cur if cur == 'cool' else 'off')) }}
     {%- elif sys == 'heat' -%}
@@ -388,7 +416,9 @@ let
   setpointTemplate = room: ''
     {%- set sys = states('${effectiveMode}') -%}
     {%- set r = states('${tempSensor room}') | float(0) -%}
-    {%- if sys == 'heat' -%}
+    {%- if is_state('${maxTimer room}', 'active') -%}
+      {{ 86 if sys == 'heat' else ${toString tuning.setpointFloor} }}
+    {%- elif sys == 'heat' -%}
       {%- set ht = states('${heatTargetSensor room}') | float(68) -%}
       {{ [[ht + (${toString tuning.setpointBase} + ${toString tuning.setpointGain} * [ht - r, 0] | max), 86] | min, ${toString tuning.setpointFloor}] | max | round(0) }}
     {%- else -%}
@@ -403,6 +433,7 @@ let
     current_mode = "{{ states('${climateEntity room}') }}";
     min_run_active = "{{ is_state('${minRunTimer room}', 'active') }}";
     min_off_active = "{{ is_state('${minOffTimer room}', 'active') }}";
+    maxed = "{{ is_state('${maxTimer room}', 'active') }}";
     setpoint = setpointTemplate room;
     airflow = "{{ states('${airflowSensor room}') }}";
     current_airflow = "{{ state_attr('${climateEntity room}', 'swing_mode') }}";
@@ -443,6 +474,11 @@ let
       {
         trigger = "state";
         entity_id = overrideTimer room;
+      }
+      {
+        trigger = "state";
+        entity_id = maxTimer room;
+        id = "target";
       }
       {
         trigger = "state";
@@ -495,7 +531,8 @@ let
             ];
             sequence = [ (offAction room) ];
           }
-          # Start, switch mode, or correct a setpoint that has drifted.
+          # Start, switch mode, or correct a setpoint that has drifted. A max
+          # press is a one-off, not chatter, so it skips the minimum off time.
           {
             conditions = [
               {
@@ -504,7 +541,7 @@ let
                   {{ desired != 'off'
                      and (current_mode != desired
                           or (trigger.id | default("") == 'target' and (state_attr('${climateEntity room}', 'temperature') | float(0)) != setpoint))
-                     and (current_mode != 'off' or not min_off_active)
+                     and (current_mode != 'off' or not min_off_active or maxed)
                      and is_state('script.hvac_mode_handoff', 'off')
                      and (as_timestamp(now()) - as_timestamp(states.sensor.hvac_effective_mode.last_changed, 0)) >= 10 }}'';
               }
@@ -1079,7 +1116,9 @@ let
     {%- set active = is_state('${overrideTimer room}', 'active') -%}
     {%- set desired -%}${desiredTemplate room}{%- endset -%}
     {%- set running = states('${climateEntity room}') -%}
-    {%- if not is_number(states('${tempSensor room}')) -%}Sensor unavailable
+    ${preemptedTemplate room}
+    {%- if is_state('${maxTimer room}', 'active') -%}Max {{ m }}
+    {%- elif not is_number(states('${tempSensor room}')) -%}Sensor unavailable
     {%- elif (as_timestamp(now()) - as_timestamp(states.sensor.ac_controller_${room}_temperature.last_reported, 0)) > ${
       toString (tuning.staleMinutes * 60)
     } -%}Sensor stale
@@ -1089,6 +1128,7 @@ let
       {{ 'Cooling' if running == 'cool' else 'Heating' }} stop pending · minimum run time{% if finish > 0 %}: {{ ([0, finish - as_timestamp(now())] | max / 60) | round(0, 'ceil') | int }}m remaining{% endif %}
     {%- elif active and is_state('${enableToggle room}', 'off') -%}Paused by override
     {%- elif is_state('${shedTimer room}', 'active') -%}Paused for capacity
+    {%- elif preempted -%}Paused for max {{ m }} in another room
     {%- elif m == 'off' -%}System off
     {%- elif is_state('${climateEntity room}', 'off') and is_state('${minOffTimer room}', 'active') -%}
       {%- set finish = as_timestamp(state_attr('${minOffTimer room}', 'finishes_at'), 0) -%}
@@ -1181,7 +1221,7 @@ let
                 content = roomSummary room;
               }
               (activeTimerCard (shedTimer room) "Capacity pause")
-
+              (activeTimerCard (maxTimer room) "Max run")
             ];
           }) roomNames)
           ++ [
@@ -1198,6 +1238,10 @@ let
             {
               type = "grid";
               cards = [
+                {
+                  type = "custom:hvac-max-card";
+                  grid_options.columns = 12;
+                }
                 {
                   type = "custom:hvac-nap-card";
                   grid_options.columns = 12;
@@ -1505,6 +1549,14 @@ in
             restore = true;
           };
         }
+        {
+          name = "hvac_max_${room}";
+          value = {
+            name = "${rooms.${room}} max run";
+            duration = "00:${toString tuning.maxMinutes}:00";
+            restore = true;
+          };
+        }
       ]) roomNames
     );
 
@@ -1545,6 +1597,14 @@ in
           "off"
         ];
         icon = "mdi:hvac";
+      };
+      hvac_max_mode = {
+        name = "Max mode";
+        options = [
+          "cool"
+          "heat"
+        ];
+        icon = "mdi:fan-plus";
       };
     }
     // (lib.listToAttrs (
@@ -1918,6 +1978,68 @@ in
             };
           }
         ];
+      };
+      # Each press restarts the window. Switching mode drops rooms still on
+      # max in the old one, since the heads cannot run opposing modes.
+      hvac_start_max = {
+        alias = "Run rooms at max";
+        icon = "mdi:fan-plus";
+        mode = "queued";
+        fields = {
+          rooms = {
+            description = "Rooms to run: office, bedroom, living_room";
+            example = [ "bedroom" ];
+          };
+          hvac_mode = {
+            description = "cool or heat";
+            example = "cool";
+          };
+        };
+        sequence = [
+          {
+            variables = {
+              selected = "{%- set r = rooms | default([]) -%}{{ ([r] if r is string else r) | select('in', ${builtins.toJSON roomNames}) | list }}";
+              max_mode = "{{ hvac_mode | default('') }}";
+              mode_changed = "{{ not is_state('${maxMode}', hvac_mode | default('')) }}";
+            };
+          }
+          {
+            condition = "template";
+            value_template = "{{ selected | count > 0 and max_mode in ['cool', 'heat'] }}";
+          }
+          {
+            action = "input_select.select_option";
+            target.entity_id = maxMode;
+            data.option = "{{ max_mode }}";
+          }
+        ]
+        ++ map (room: {
+          choose = [
+            {
+              conditions = "{{ '${room}' in selected }}";
+              sequence = [
+                {
+                  action = "timer.cancel";
+                  target.entity_id = shedTimer room;
+                }
+                {
+                  action = "timer.start";
+                  target.entity_id = maxTimer room;
+                  data.duration = tuning.maxMinutes * 60;
+                }
+              ];
+            }
+            {
+              conditions = "{{ mode_changed }}";
+              sequence = [
+                {
+                  action = "timer.cancel";
+                  target.entity_id = maxTimer room;
+                }
+              ];
+            }
+          ];
+        }) roomNames;
       };
       # Deliberate user action, never background synchronization over a draft.
       hvac_use_current_targets = {
