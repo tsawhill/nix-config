@@ -44,17 +44,9 @@
       my.hypr.monitors.framework16.enable = true;
       my.hypr.gpuRecorder.enable = false;
 
-      my.hypr.wallpaperEngine = {
+      my.hypr.wallpapers = {
         enable = true;
-        monitors."eDP-1" = {
-          wallpapers = [
-            "3272204393"
-            "1132505365"
-            "2784382079"
-          ];
-          rotateInterval = "10m";
-          fps = 30;
-        };
+        # e.g. monitors."eDP-1".videos = [ "name.mp4" ]; (after wallpapers-sync on build-nix)
       };
       wayland.windowManager.hyprland.settings.device = {
         name = "pixa3854:00-093a:0274-touchpad";

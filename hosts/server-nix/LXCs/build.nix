@@ -35,6 +35,7 @@ in
     "${self}/modules/software/packages/nixos-factory.nix"
     "${self}/modules/software/packages/qbit-promote-tui.nix"
     "${self}/modules/software/packages/mtls-ca.nix"
+    "${self}/modules/software/packages/wallpapers-sync.nix"
 
     # Secrets (SOPS)
     inputs.sops-nix-stable.nixosModules.sops

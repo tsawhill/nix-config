@@ -62,26 +62,9 @@
             "alsa_input.usb-MOTU_M2_M2MA072BWT-00.pro-input-0"
           ];
         };
-        wallpaperEngine = {
+        wallpapers = {
           enable = true;
-          monitors."DP-1" = {
-            wallpapers = [
-              "3648098553"
-              "3652040138"
-              "3687714819"
-            ];
-            fps = 15;
-            rotateInterval = "10m";
-          };
-          monitors."DP-2" = {
-            wallpapers = [
-              "3648098553"
-              "3652040138"
-              "3687714819"
-            ];
-            fps = 15;
-            rotateInterval = "10m";
-          };
+          # e.g. monitors."DP-1".videos = [ "name.mp4" ]; (after wallpapers-sync on build-nix)
         };
       };
 

@@ -286,7 +286,7 @@ in
         monitor = "primary";
       };
 
-      # Wallpaper Engine is managed separately by wallpaper-engine.nix.
+      # Wallpapers are mpvpaper services from ../wallpapers.nix.
       wallpaper.engine-enabled = false;
     };
   };
