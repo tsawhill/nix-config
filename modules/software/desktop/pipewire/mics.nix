@@ -14,34 +14,35 @@ in
   config = lib.mkIf cfg.virtual.enable {
     services.pipewire = {
 
-      # mic_input always exists; its loopback picks a processed mic when one is
-      # plugged in (higher priority) and the plain default source otherwise.
-      extraConfig.pipewire."93-virtual-mic"."context.modules" = [
-        {
-          name = "libpipewire-module-loopback";
-          args = {
-            "node.description" = "Mic Input";
-            "capture.props" = {
-              "node.name" = "mic_input_capture";
-              "node.description" = "Mic Input Capture";
-              "audio.position" = [
-                "FL"
-                "FR"
-              ];
-            };
-            "playback.props" = {
-              "node.name" = "mic_input";
-              "node.description" = "Mic Input";
-              "media.class" = "Audio/Source/Virtual";
-              "audio.position" = [
-                "FL"
-                "FR"
-              ];
-              "priority.session" = 2200;
-            };
-          };
-        }
-      ];
+      # Passthrough loopback, only when no filtered mic's chain provides mic_input.
+      extraConfig.pipewire."93-virtual-mic"."context.modules" =
+        lib.optionals (lib.all (mic: !mic.enable) (lib.attrValues config.my.desktop.audio.filteredMics))
+          [
+            {
+              name = "libpipewire-module-loopback";
+              args = {
+                "node.description" = "Mic Input";
+                "capture.props" = {
+                  "node.name" = "mic_input_capture";
+                  "node.description" = "Mic Input Capture";
+                  "audio.position" = [
+                    "FL"
+                    "FR"
+                  ];
+                };
+                "playback.props" = {
+                  "node.name" = "mic_input";
+                  "node.description" = "Mic Input";
+                  "media.class" = "Audio/Source/Virtual";
+                  "audio.position" = [
+                    "FL"
+                    "FR"
+                  ];
+                  "priority.session" = 2200;
+                };
+              };
+            }
+          ];
 
       # Force PulseAudio-compat input streams to mic_input.
       # NOTE: pipewire-pulse rules only affect PulseAudio clients — native PipeWire

@@ -5,7 +5,7 @@
   ...
 }:
 let
-  mics = config.my.desktop.audio.filteredMics;
+  mics = lib.filterAttrs (_: mic: mic.enable) config.my.desktop.audio.filteredMics;
 
   # Defaults were tuned on the MOTU M2; each mic's module overrides what differs.
   stages = [
@@ -121,8 +121,7 @@ let
       }
     ) stages;
 
-  # Filter-chain module args; filtered-mics.lua loads them when the source appears.
-  mkChain = name: mic: {
+  mkChain = mic: {
     "node.description" = mic.description;
     "media.name" = mic.description;
     # RNNoise buffers its own 480-sample frames; it does not require
@@ -159,24 +158,23 @@ let
       outputs = [ "limiter:Output" ];
     };
     "capture.props" = {
-      "node.name" = "filtered_mic_capture.${name}";
+      "node.name" = "filtered_mic_capture";
       "target.object" = mic.source;
       "audio.position" = [ mic.channel ];
       "audio.rate" = 48000;
       "stream.dont-remix" = true;
       "node.passive" = true;
-      # Never process a different mic; wait unlinked until torn down on unplug.
+      # Only process this mic; linger idles the chain while it's unplugged.
       "node.dont-fallback" = true;
       "node.linger" = true;
     };
     "playback.props" = {
-      "node.name" = "filtered_mic.${name}";
-      "node.description" = mic.description;
+      "node.name" = "mic_input";
+      "node.description" = "Mic Input";
       "media.class" = "Audio/Source";
       "audio.position" = [ "MONO" ];
       "audio.rate" = 48000;
-      # Above hardware sources and below mic_input, whose loopback then picks it.
-      "priority.session" = 2150;
+      "priority.session" = 2200;
     };
   };
 
@@ -212,7 +210,7 @@ let
                 }
                 // levelControls (micStages mic)
               )
-            ) mics
+            ) config.my.desktop.audio.filteredMics
           )
         )
       }
@@ -227,14 +225,19 @@ in
   options.my.desktop.audio.filteredMics = lib.mkOption {
     default = { };
     description = ''
-      Microphones to process, keyed by name. Each chain exists only while its
-      source is present. mic-measure generates entries for new mics.
+      Microphones to process, keyed by name; the enabled one provides
+      mic_input. mic-measure generates entries for new mics.
     '';
     type = lib.types.attrsOf (
       lib.types.submodule (
         { name, ... }:
         {
           options = {
+            enable = lib.mkOption {
+              type = lib.types.bool;
+              default = true;
+              description = "Process this mic on this host.";
+            };
             source = lib.mkOption {
               type = lib.types.str;
               description = "Physical PipeWire source node name to process.";
@@ -269,39 +272,36 @@ in
     { environment.systemPackages = [ micMeasure ]; }
 
     (lib.mkIf (mics != { }) {
-      assertions = lib.mapAttrsToList (name: mic: {
+      assertions = [
+        {
+          assertion = lib.length (lib.attrNames mics) == 1;
+          message = "Only one filteredMics entry can provide mic_input; set enable = false on the others (${lib.concatStringsSep ", " (lib.attrNames mics)}).";
+        }
+      ]
+      ++ lib.mapAttrsToList (name: mic: {
         assertion = lib.all (stage: builtins.elem stage stageNames) (builtins.attrNames mic.controls);
         message = "filteredMics.${name}.controls contains an unknown filter stage.";
       }) mics;
 
-      # Chains run inside WirePlumber, so it needs the plugins.
-      services.pipewire.wireplumber = {
+      services.pipewire = {
+        # Keep the processed capture device awake.
+        wireplumber.extraConfig."13-filtered-mic-awake"."monitor.alsa.rules" = [
+          {
+            matches = map (mic: { "node.name" = mic.source; }) (lib.attrValues mics);
+            actions.update-props."session.suspend-timeout-seconds" = 0;
+          }
+        ];
+
         extraLadspaPackages = with pkgs; [
           lsp-plugins
           rnnoise-plugin
         ];
-        extraScripts."filtered-mics.lua" = builtins.readFile ./filtered-mics.lua;
-        extraConfig."95-filtered-mics" = {
-          "wireplumber.components" = [
-            {
-              name = "filtered-mics.lua";
-              type = "script/lua";
-              provides = "custom.filtered-mics";
-            }
-          ];
-          "wireplumber.profiles".main."custom.filtered-mics" = "required";
-          "filtered-mics.rules" = lib.mapAttrsToList (name: mic: {
-            matches = [ { "node.name" = mic.source; } ];
-            actions.load-filter-chain = mkChain name mic;
-          }) mics;
-          # Keep processed capture devices awake.
-          "monitor.alsa.rules" = [
-            {
-              matches = map (mic: { "node.name" = mic.source; }) (lib.attrValues mics);
-              actions.update-props."session.suspend-timeout-seconds" = 0;
-            }
-          ];
-        };
+
+        # Filter chain: physical mic → DSP → mic_input
+        extraConfig.pipewire."95-filtered-mic"."context.modules" = map (mic: {
+          name = "libpipewire-module-filter-chain";
+          args = mkChain mic;
+        }) (lib.attrValues mics);
       };
     })
   ];
