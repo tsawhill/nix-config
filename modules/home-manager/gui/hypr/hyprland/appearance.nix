@@ -2,7 +2,7 @@
 {
   # Decoration settings -> hl.config({ decoration = { ... } })
   wayland.windowManager.hyprland.settings.config.decoration = {
-    rounding = 0;
+    rounding = 8;
     blur = {
       enabled = true;
       size = 6;
@@ -22,8 +22,8 @@
   wayland.windowManager.hyprland.settings.config.animations.enabled = true;
 
   wayland.windowManager.hyprland.settings.config.general = {
-    gaps_in = 4;
-    gaps_out = 12;
+    gaps_in = 6;
+    gaps_out = 14;
     border_size = 3;
     col = {
       # Gradient: hyprlang "rgba(a) rgba(b) 45deg" -> { colors = {..}, angle = 45 }

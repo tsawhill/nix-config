@@ -172,7 +172,7 @@ in
         button-variant = "block-prefix";
         button-bg-opacity = 80;
         button-label-weight = "medium";
-        button-rounding = "sm";
+        button-rounding = "md";
         button-border-location = "all";
       };
 
