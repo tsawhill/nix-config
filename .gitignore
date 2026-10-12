@@ -9,3 +9,7 @@ AGENTS.md
 /oci-grab-a1.sh
 
 __pycache__/
+
+# Wallpaper videos stay on build-nix; only the name -> hash manifest is tracked.
+/wallpapers/*
+!/wallpapers/manifest.json
