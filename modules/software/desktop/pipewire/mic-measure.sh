@@ -115,9 +115,9 @@ trap cleanup EXIT
 
 record() {
   local rc=0
-  # Same channel pick as the filter chain's capture stream.
+  # Same channel pick as the filter chain; brackets stop pw-record reading AUX0 as a layout.
   timeout --signal=INT "$secs" pw-record --target "$source" --rate 48000 \
-    --channels 1 --channel-map "$channel" --format f32 \
+    --channels 1 --channel-map "[$channel]" --format f32 \
     -P '{ stream.dont-remix = true node.dont-fallback = true node.dont-reconnect = true }' \
     "$dir/$1.wav" || rc=$?
   # timeout exits 124 when it ended a recording that ran the full length.
