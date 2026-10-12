@@ -6,6 +6,144 @@
 }:
 let
   cfg = config.my.desktop.audio.filteredMic;
+
+  nodes =
+    map
+      (
+        node:
+        node
+        // {
+          control = node.control // (cfg.controls.${node.name} or { });
+        }
+      )
+      [
+        {
+          type = "ladspa";
+          name = "gate";
+          plugin = "lsp-plugins-ladspa";
+          label = "http://lsp-plug.in/plugins/ladspa/gate_mono";
+          control = {
+            # Thresholds below are absolute dBFS and were measured at the
+            # M2's current hardware gain (fan floor peaks -46 dB, speech
+            # peaks -16 dB). MOVING THE GAIN KNOB INVALIDATES THEM — remeasure
+            # with mic-measure.
+            #
+            # -38 dBFS: 8 dB above the fan's peak, below conversational speech.
+            "Curve threshold (G)" = 0.0126;
+            # Slow enough that a desk tap is over before the gate finishes
+            # opening. Speech is sustained and still opens it cleanly;
+            # a few-ms transient only ever gets it partway.
+            "Attack (ms)" = 15.0;
+            "Release (ms)" = 120.0;
+            # -60 dB when closed — effectively silent between phrases.
+            "Reduction (G)" = 0.001;
+            # Hysteresis OFF deliberately. It latches: the gate opens on
+            # speech and won't close until the signal drops below the
+            # separate (lower) hysteresis threshold, which the fan now sits
+            # above — so airflow held the gate open indefinitely. Equal
+            # open/close points plus the release time avoid that entirely.
+            "Hysteresis" = 0.0;
+            "High-pass filter mode" = 1.0;
+            # Sidechain deaf below 700 Hz so fan/rumble can't hold the gate
+            # open and desk thumps can't trigger it — both are dominated by
+            # low frequencies, while speech keeps plenty of energy above.
+            "High-pass filter frequency (Hz)" = 700.0;
+            "Sidechain mode" = 1.0;
+            # Unity, so the threshold above reads directly as dBFS.
+            "Sidechain preamp (G)" = 1.0;
+          };
+        }
+        {
+          type = "builtin";
+          name = "hpf";
+          label = "bq_highpass";
+          control = {
+            "Freq" = 100.0;
+            "Q" = 0.707;
+          };
+        }
+        {
+          type = "ladspa";
+          name = "rnnoise";
+          plugin = "librnnoise_ladspa";
+          label = "noise_suppressor_mono";
+          control = {
+            "VAD Threshold (%)" = 95.0;
+            "VAD Grace Period (ms)" = 100.0;
+            # Bumped to protect word onsets from the more aggressive VAD.
+            "Retroactive VAD Grace (ms)" = 30.0;
+          };
+        }
+        {
+          type = "builtin";
+          name = "eq_presence";
+          label = "bq_peaking";
+          control = {
+            "Freq" = 3000.0;
+            "Q" = 1.0;
+            "Gain" = 2.0;
+          };
+        }
+        {
+          type = "builtin";
+          name = "eq_air";
+          label = "bq_highshelf";
+          control = {
+            "Freq" = 10000.0;
+            "Q" = 0.707;
+            "Gain" = 2.0;
+          };
+        }
+        {
+          type = "ladspa";
+          name = "compressor";
+          plugin = "lsp-plugins-ladspa";
+          label = "http://lsp-plug.in/plugins/ladspa/compressor_mono";
+          control = {
+            "Sidechain mode" = 1.0;
+            "Attack threshold (G)" = 0.178;
+            "Ratio" = 3.0;
+            "Knee (G)" = 0.5;
+            "Attack time (ms)" = 5.0;
+            "Release time (ms)" = 150.0;
+            "Makeup gain (G)" = 2.0;
+          };
+        }
+        {
+          type = "ladspa";
+          name = "limiter";
+          plugin = "lsp-plugins-ladspa";
+          label = "http://lsp-plug.in/plugins/ladspa/limiter_mono";
+          control = {
+            "Threshold (G)" = 0.891;
+            "Lookahead (ms)" = 1.5;
+          };
+        }
+      ];
+
+  control = lib.listToAttrs (map (node: lib.nameValuePair node.name node.control) nodes);
+
+  # Guided remeasure for the absolute thresholds above, seeded with this host's settings.
+  micMeasure = pkgs.writeShellApplication {
+    name = "mic-measure";
+    runtimeInputs = [
+      config.services.pipewire.package
+      pkgs.coreutils
+      pkgs.ffmpeg-headless
+      pkgs.gawk
+      pkgs.jq
+    ];
+    text = ''
+      MIC_SOURCE=${lib.escapeShellArg cfg.source}
+      MIC_CHANNEL=${lib.escapeShellArg cfg.channel}
+      GATE_HPF_MODE=${toString (builtins.floor control.gate."High-pass filter mode")}
+      GATE_HPF_HZ=${toString control.gate."High-pass filter frequency (Hz)"}
+      GATE_PREAMP=${toString control.gate."Sidechain preamp (G)"}
+      GATE_THRESHOLD=${toString control.gate."Curve threshold (G)"}
+      COMP_THRESHOLD=${toString control.compressor."Attack threshold (G)"}
+    ''
+    + builtins.readFile ./mic-measure.sh;
+  };
 in
 {
   options.my.desktop.audio.filteredMic = {
@@ -54,6 +192,8 @@ in
       }
     ];
 
+    environment.systemPackages = [ micMeasure ];
+
     services.pipewire = {
       # Keep the selected capture device awake.
       wireplumber.extraConfig."13-filtered-mic-awake"."monitor.alsa.rules" = [
@@ -81,120 +221,7 @@ in
             # a 480-sample graph quantum. Both streams explicitly use 48 kHz.
 
             "filter.graph" = {
-              "nodes" =
-                map
-                  (
-                    node:
-                    node
-                    // {
-                      control = node.control // (cfg.controls.${node.name} or { });
-                    }
-                  )
-                  [
-                    {
-                      type = "ladspa";
-                      name = "gate";
-                      plugin = "lsp-plugins-ladspa";
-                      label = "http://lsp-plug.in/plugins/ladspa/gate_mono";
-                      control = {
-                        # Thresholds below are absolute dBFS and were measured at the
-                        # M2's current hardware gain (fan floor peaks -46 dB, speech
-                        # peaks -16 dB). MOVING THE GAIN KNOB INVALIDATES THEM — remeasure
-                        # with: ffmpeg -f pulse -i <m2 source> -t 5 \
-                        #   -af "pan=mono|c0=c0,volumedetect" -f null -
-                        #
-                        # -38 dBFS: 8 dB above the fan's peak, below conversational speech.
-                        "Curve threshold (G)" = 0.0126;
-                        # Slow enough that a desk tap is over before the gate finishes
-                        # opening. Speech is sustained and still opens it cleanly;
-                        # a few-ms transient only ever gets it partway.
-                        "Attack (ms)" = 15.0;
-                        "Release (ms)" = 120.0;
-                        # -60 dB when closed — effectively silent between phrases.
-                        "Reduction (G)" = 0.001;
-                        # Hysteresis OFF deliberately. It latches: the gate opens on
-                        # speech and won't close until the signal drops below the
-                        # separate (lower) hysteresis threshold, which the fan now sits
-                        # above — so airflow held the gate open indefinitely. Equal
-                        # open/close points plus the release time avoid that entirely.
-                        "Hysteresis" = 0.0;
-                        "High-pass filter mode" = 1.0;
-                        # Sidechain deaf below 700 Hz so fan/rumble can't hold the gate
-                        # open and desk thumps can't trigger it — both are dominated by
-                        # low frequencies, while speech keeps plenty of energy above.
-                        "High-pass filter frequency (Hz)" = 700.0;
-                        "Sidechain mode" = 1.0;
-                        # Unity, so the threshold above reads directly as dBFS.
-                        "Sidechain preamp (G)" = 1.0;
-                      };
-                    }
-                    {
-                      type = "builtin";
-                      name = "hpf";
-                      label = "bq_highpass";
-                      control = {
-                        "Freq" = 100.0;
-                        "Q" = 0.707;
-                      };
-                    }
-                    {
-                      type = "ladspa";
-                      name = "rnnoise";
-                      plugin = "librnnoise_ladspa";
-                      label = "noise_suppressor_mono";
-                      control = {
-                        "VAD Threshold (%)" = 95.0;
-                        "VAD Grace Period (ms)" = 100.0;
-                        # Bumped to protect word onsets from the more aggressive VAD.
-                        "Retroactive VAD Grace (ms)" = 30.0;
-                      };
-                    }
-                    {
-                      type = "builtin";
-                      name = "eq_presence";
-                      label = "bq_peaking";
-                      control = {
-                        "Freq" = 3000.0;
-                        "Q" = 1.0;
-                        "Gain" = 2.0;
-                      };
-                    }
-                    {
-                      type = "builtin";
-                      name = "eq_air";
-                      label = "bq_highshelf";
-                      control = {
-                        "Freq" = 10000.0;
-                        "Q" = 0.707;
-                        "Gain" = 2.0;
-                      };
-                    }
-                    {
-                      type = "ladspa";
-                      name = "compressor";
-                      plugin = "lsp-plugins-ladspa";
-                      label = "http://lsp-plug.in/plugins/ladspa/compressor_mono";
-                      control = {
-                        "Sidechain mode" = 1.0;
-                        "Attack threshold (G)" = 0.178;
-                        "Ratio" = 3.0;
-                        "Knee (G)" = 0.5;
-                        "Attack time (ms)" = 5.0;
-                        "Release time (ms)" = 150.0;
-                        "Makeup gain (G)" = 2.0;
-                      };
-                    }
-                    {
-                      type = "ladspa";
-                      name = "limiter";
-                      plugin = "lsp-plugins-ladspa";
-                      label = "http://lsp-plug.in/plugins/ladspa/limiter_mono";
-                      control = {
-                        "Threshold (G)" = 0.891;
-                        "Lookahead (ms)" = 1.5;
-                      };
-                    }
-                  ];
+              "nodes" = nodes;
               "links" = [
                 {
                   output = "gate:Output";

@@ -171,7 +171,7 @@
     enable = true;
     source = "alsa_input.usb-Kingston_HyperX_Cloud_II_Wireless_000000000001-00.mono-fallback";
     description = "HyperX Cloud II Wireless Mic (Processed)";
-    # Initial tuning at the measured input volume; remeasure if gain changes.
+    # Initial tuning at the measured input volume; rerun mic-measure if gain changes.
     # Raw mean/peak dBFS: typing -47.6/-16.6, quiet -40.2/-21.6,
     # normal -37.4/-18.0, loud -34.0/-6.5. Silence was digital zero.
     # Whole-recording means include pauses, so these are starting values.
