@@ -8,6 +8,7 @@ let
     runtimeInputs = [
       config.nix.package
       pkgs.coreutils
+      pkgs.gnused
       pkgs.jq
     ];
     # jq filters reference $vars inside single quotes on purpose.
@@ -31,11 +32,33 @@ let
         [ -f "$file" ] || continue
         [ "$name" != manifest.json ] || continue
 
-        # Nix store path names only allow these characters.
-        if [[ ! $name =~ ^[A-Za-z0-9+_?=-][A-Za-z0-9+._?=-]*$ ]]; then
-          echo "skipping '$name': rename it using only letters, digits and + - _ . ? =" >&2
-          status=1
-          continue
+        # Store path names allow few characters, so turn anything else into "-".
+        ext=
+        if [[ $name =~ (\.[A-Za-z0-9]+)$ ]]; then
+          ext=''${BASH_REMATCH[1]}
+        fi
+        # Also keeps half-finished downloads (.part, .crdownload) out.
+        case ''${ext,,} in
+          .mp4 | .m4v | .webm | .mkv | .mov) ;;
+          *)
+            echo "ignoring '$name': not a video file" >&2
+            continue
+            ;;
+        esac
+        base=$(sed -E 's/[^A-Za-z0-9._+-]+/-/g; s/-{2,}/-/g; s/^[-.]+//; s/[-.]+$//' <<<"''${name%"$ext"}")
+        base=''${base:-wallpaper}
+        safe=$base$ext
+        if [ "$safe" != "$name" ]; then
+          target=$safe
+          i=2
+          while [ -e "$dir/$target" ]; do
+            target=$base-$i$ext
+            i=$((i + 1))
+          done
+          mv -n -- "$file" "$dir/$target"
+          echo "renamed '$name' -> '$target'" >&2
+          name=$target
+          file=$dir/$target
         fi
 
         sum=$(jq -r --arg n "$name" '.[$n] // empty' <<<"$old")

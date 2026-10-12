@@ -10,10 +10,10 @@
 #   - Pixabay Videos      https://pixabay.com/videos/
 #
 # Adding videos:
-#   1. Copy the MP4s into wallpapers/ in the repo on build-nix. That directory is
-#      git-ignored; names may only use letters, digits and - _ . + = ? (no spaces).
-#   2. Run `wallpapers-sync` on build-nix. It adds them to the Nix store, keeps
-#      them from being garbage collected, and updates wallpapers/manifest.json.
+#   1. Copy the MP4s into wallpapers/ in the repo on build-nix (git-ignored).
+#   2. Run `wallpapers-sync` on build-nix. It renames files to Nix-safe names
+#      (spaces etc. become -), adds them to the Nix store, keeps them from being
+#      garbage collected, and updates wallpapers/manifest.json.
 #   3. Deploy the hosts. Monitors without a `videos` list rotate through every
 #      synced video; list names in `videos` to pick specific ones.
 {
@@ -175,7 +175,7 @@ in
             videos = lib.mkOption {
               type = lib.types.nullOr (lib.types.nonEmptyListOf lib.types.str);
               default = null;
-              description = "File names in the repo's wallpapers/ directory; more than one rotates. Null (the default) rotates every video in wallpapers/manifest.json.";
+              description = "File names in the repo's wallpapers/ directory, as renamed by wallpapers-sync; more than one rotates. Null (the default) rotates every video in wallpapers/manifest.json.";
             };
 
             rotateInterval = lib.mkOption {
