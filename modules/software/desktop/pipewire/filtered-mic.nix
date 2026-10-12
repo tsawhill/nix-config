@@ -51,14 +51,12 @@ let
     }
     {
       type = "ladspa";
-      name = "rnnoise";
-      plugin = "librnnoise_ladspa";
-      label = "noise_suppressor_mono";
+      name = "deepfilter";
+      plugin = "libdeep_filter_ladspa";
+      label = "deep_filter_mono";
       control = {
-        "VAD Threshold (%)" = 95.0;
-        "VAD Grace Period (ms)" = 100.0;
-        # Bumped to protect word onsets from the more aggressive VAD.
-        "Retroactive VAD Grace (ms)" = 30.0;
+        # 100 = no limit; 18-24 dB trades some noise for a more natural voice.
+        "Attenuation Limit (dB)" = 100.0;
       };
     }
     {
@@ -125,8 +123,8 @@ let
   mkChain = name: mic: {
     "node.description" = mic.description;
     "media.name" = mic.description;
-    # RNNoise buffers its own 480-sample frames; it does not require
-    # a 480-sample graph quantum. Both streams explicitly use 48 kHz.
+    # DeepFilterNet buffers its own 480-sample hops (20 ms+ latency) and
+    # only runs at 48 kHz, which both streams set explicitly.
     "filter.graph" = {
       nodes = micStages mic;
       links = [
@@ -136,10 +134,10 @@ let
         }
         {
           output = "hpf:Out";
-          input = "rnnoise:Input";
+          input = "deepfilter:Audio In";
         }
         {
-          output = "rnnoise:Output";
+          output = "deepfilter:Audio Out";
           input = "eq_presence:In";
         }
         {
@@ -257,7 +255,7 @@ in
               type = lib.types.attrsOf (lib.types.attrsOf lib.types.number);
               default = { };
               description = ''
-                Per-stage control overrides for gate, hpf, rnnoise, eq_presence,
+                Per-stage control overrides for gate, hpf, deepfilter, eq_presence,
                 eq_air, compressor, and limiter. Gain controls marked (G) are
                 linear amplitudes, not dB.
               '';
@@ -283,7 +281,7 @@ in
       services.pipewire.wireplumber = {
         extraLadspaPackages = with pkgs; [
           lsp-plugins
-          rnnoise-plugin
+          deepfilternet
         ];
         extraScripts."filtered-mics.lua" = builtins.readFile ./filtered-mics.lua;
         extraConfig."95-filtered-mics" = {

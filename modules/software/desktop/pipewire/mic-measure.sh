@@ -12,7 +12,7 @@ declare -A cue=(
 
 usage() {
   cat <<EOF
-Usage: mic-measure [-s SOURCE] [-c CHANNEL] [-d SECONDS] [-k] [-l]
+Usage: mic-measure [-s SOURCE] [-c CHANNEL] [-d SECONDS] [-k] [-m] [-l]
 
 Pick a mic, record ${#takes[@]} guided takes from it, and get a filteredMics
 module with gate and compressor levels for it. Rerun after changing the mic's
@@ -22,6 +22,7 @@ gain or input volume.
   -c CHANNEL  input channel, e.g. MONO or AUX0, instead of picking
   -d SECONDS  length of each take (default: 8)
   -k          keep the recordings
+  -m          live level meter for setting the gain knob, instead of measuring
   -l          list capture devices and exit
 EOF
 }
@@ -44,12 +45,14 @@ source=""
 channel=""
 secs=8
 keep=0
-while getopts 's:c:d:klh' opt; do
+meter=0
+while getopts 's:c:d:kmlh' opt; do
   case $opt in
     s) source=$OPTARG ;;
     c) channel=$OPTARG ;;
     d) secs=$OPTARG ;;
     k) keep=1 ;;
+    m) meter=1 ;;
     l)
       devices | awk -F'\t' '{ printf "%s  [%s]  %s\n", $2, $3, $1 }'
       exit 0
@@ -102,6 +105,28 @@ if [[ -z $channel ]]; then
 fi
 if [[ -n $positions && ,$positions, != *",$channel,"* ]]; then
   die "'$desc' has channels $positions, not $channel"
+fi
+
+# Live peak meter: 10 updates a second, 2 s peak hold, bar from -60 to 0 dBFS.
+if ((meter)); then
+  echo "Live level of $desc ($channel); Ctrl-C to stop."
+  echo "Turn the knob until normal talking peaks near -16 (first |) and loud laughs stay under -6 (second |)."
+  pw-record --target "$source" --rate 48000 --channels 1 --channel-map "[$channel]" --format f32 --raw \
+    -P '{ stream.dont-remix = true node.dont-fallback = true node.dont-reconnect = true }' - |
+    ffmpeg -nostdin -hide_banner -loglevel error -f f32le -ar 48000 -ac 1 -i - -af \
+      "asetnsamples=n=4800,astats=metadata=1:reset=1:measure_perchannel=none,ametadata=mode=print:key=lavfi.astats.Overall.Peak_level:file=/dev/stdout:direct=1" \
+      -f null - |
+    awk -F= '$1 == "lavfi.astats.Overall.Peak_level" {
+      v = $2 ~ /inf/ ? -99 : $2 + 0
+      held[n++ % 20] = v; hold = -99
+      for (i in held) if (held[i] > hold) hold = held[i]
+      bar = ""
+      for (i = 0; i < 40; i++) bar = bar (-60 + i * 1.5 < v ? "#" : (i == 29 || i == 36 ? "|" : "."))
+      verdict = hold > -3 ? "TOO HOT" : hold > -10 ? "loud range" : hold >= -20 ? "talking range" : "low"
+      printf "\r%s %6.1f dBFS  peak %6.1f  %-13s", bar, v, hold, verdict
+      fflush ()
+    }'
+  exit 0
 fi
 
 read -r hpf_mode hpf_hz preamp < <(jq -r '.gate | [(.["High-pass filter mode"] | floor),
@@ -227,7 +252,7 @@ awk -v pre="$preamp" -v hpf_mode="$hpf_mode" -v hpf_hz="$hpf_hz" -v known="$know
     if (known)
       printf "Configured now: gate %.1f, compressor %.1f, makeup %+.1f\n", lg(gate_now), lg(comp_now), lg(makeup_now)
     if (max["typing"] > gt)
-      printf "Typing reaches %.1f in the gate, so its attack time and RNNoise must reject it.\n", max["typing"]
+      printf "Typing reaches %.1f in the gate, so its attack time and DeepFilterNet must reject it.\n", max["typing"]
     if (room > -199 && quiet - room < 16)
       print "Little room between noise and quiet speech: move the mic closer or raise the gain."
 
