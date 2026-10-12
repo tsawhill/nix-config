@@ -13,6 +13,9 @@ let
   # Only one stream compositor runs at a time, so it always gets this socket.
   waylandDisplay = "wayland-0";
   streamOutput = "HEADLESS-1";
+  # Matches the desktops' home-manager pointer cursor.
+  cursorTheme = "catppuccin-mocha-pink-cursors";
+  cursorSize = 24;
   boltLauncher = pkgs.bolt-launcher.override { jdk17 = pkgs.openjdk; };
   sunshinePackage = (pkgs.sunshine.override { cudaSupport = true; }).overrideAttrs (oldAttrs: {
     patches = (oldAttrs.patches or [ ]) ++ [
@@ -71,8 +74,8 @@ let
     WLR_HEADLESS_OUTPUTS = "1";
     WLR_LIBINPUT_NO_DEVICES = "1";
     XCURSOR_PATH = "/run/current-system/sw/share/icons";
-    XCURSOR_SIZE = "24";
-    XCURSOR_THEME = "Adwaita";
+    XCURSOR_SIZE = toString cursorSize;
+    XCURSOR_THEME = cursorTheme;
     XDG_CURRENT_DESKTOP = "labwc:wlroots";
     XDG_SESSION_TYPE = "wayland";
     __GLX_VENDOR_LIBRARY_NAME = "nvidia";
@@ -367,9 +370,20 @@ in
     ];
   };
 
+  # GTK apps take their cursor from GSettings rather than XCURSOR_*.
+  programs.dconf.profiles.user.databases = [
+    {
+      settings."org/gnome/desktop/interface" = {
+        cursor-theme = cursorTheme;
+        cursor-size = cursorSize;
+      };
+    }
+  ];
+
   environment.systemPackages = with pkgs; [
     adwaita-icon-theme
     boltLauncher
+    catppuccin-cursors.mochaPink
     foot
     fuzzel
     wlr-randr
