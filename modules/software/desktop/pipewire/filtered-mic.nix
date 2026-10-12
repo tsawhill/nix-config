@@ -180,7 +180,7 @@ let
   # WebRTC echo canceller on the raw mic, ahead of the chain; filtered-mics.lua loads it first.
   mkEchoCancel = name: mic: {
     "library.name" = "aec/libspa-aec-webrtc";
-    # The reference is the default sink's monitor, i.e. everything the speakers play.
+    # Monitor the speaker output; an explicit target avoids following headphones.
     "monitor.mode" = true;
     "audio.rate" = 48000;
     "capture.props" = {
@@ -199,7 +199,14 @@ let
       "media.class" = "Audio/Source/Internal";
       "audio.position" = [ "MONO" ];
     };
-    "sink.props"."node.name" = "echo_cancel_reference.${name}";
+    "sink.props" = {
+      "node.name" = "echo_cancel_reference.${name}";
+    }
+    // lib.optionalAttrs (mic.echoReferenceSink != null) {
+      "target.object" = mic.echoReferenceSink;
+      "node.dont-fallback" = true;
+      "node.dont-move" = true;
+    };
     # The chain after it does noise removal and gain.
     "aec.args" = {
       "webrtc.gain_control" = false;
@@ -240,6 +247,7 @@ let
                     description
                     controls
                     echoCancel
+                    echoReferenceSink
                     ;
                 }
                 // levelControls (micStages mic)
@@ -273,8 +281,17 @@ in
               description = "Process this mic on this host.";
             };
             echoCancel = lib.mkEnableOption ''
-              WebRTC echo cancellation ahead of this mic's chain, using whatever the
-              default sink plays as the reference. For mics used with speakers'';
+              WebRTC echo cancellation ahead of this mic's chain.
+              For mics used with speakers'';
+            echoReferenceSink = lib.mkOption {
+              type = lib.types.nullOr lib.types.str;
+              default = null;
+              description = ''
+                Speaker output node to monitor for echo cancellation. Null follows
+                the default sink. Set this to the physical speaker output to avoid
+                coupling the microphone's clock to Bluetooth headphones.
+              '';
+            };
             source = lib.mkOption {
               type = lib.types.str;
               description = "Physical PipeWire source node name to process.";

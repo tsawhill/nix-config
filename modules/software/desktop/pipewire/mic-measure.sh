@@ -206,6 +206,7 @@ awk -v pre="$preamp" -v hpf_mode="$hpf_mode" -v hpf_hz="$hpf_hz" -v known="$know
   -v comp_ref="$(jq -r '.compressor["Attack threshold (G)"]' <<<"$MIC_DEFAULTS")" \
   -v makeup_ref="$(jq -r '.compressor["Makeup gain (G)"]' <<<"$MIC_DEFAULTS")" \
   -v ref_peak="$MIC_REFERENCE_PEAK" -v module="$module" -v name="$name" -v source="$source" \
+  -v echo_reference_sink="$(jq -r '.echoReferenceSink // empty' <<<"$settings")" \
   -v channel="$channel" -v description="$description" -v echo_cancel="$(jq -r '.echoCancel // false' <<<"$settings")" -v host="$(uname -n)" -v date="$(date +%F)" '
   function lg(g) { return 20 * log(g) / log(10) }
   function f(v) { return v <= -199 ? "-inf" : sprintf("%.1f", v) }
@@ -260,6 +261,7 @@ awk -v pre="$preamp" -v hpf_mode="$hpf_mode" -v hpf_hz="$hpf_hz" -v known="$know
     printf "{\n  my.desktop.audio.filteredMics.%s = {\n", name > module
     printf "    source = \"%s\";\n    channel = \"%s\";\n    description = \"%s\";\n", source, channel, description > module
     if (echo_cancel == "true") print "    echoCancel = true;" > module
+    if (echo_reference_sink != "") printf "    echoReferenceSink = \"%s\";\n", echo_reference_sink > module
     printf "    controls = {\n      # %s\n", why > module
     printf "      gate.\"Curve threshold (G)\" = %s; # %.1f dBFS\n", g(gt), gt > module
     printf "      # Speech peaks %+.1f dB from the M2 reference; shifted to match.\n", d > module
