@@ -2078,7 +2078,8 @@ in
         fields = {
           rooms = {
             description = "Rooms to run: office, bedroom, living_room";
-            example = [ "bedroom" ];
+            # HA only accepts string examples; a list here disables the script.
+            example = "bedroom";
           };
           hvac_mode = {
             description = "cool or heat";
