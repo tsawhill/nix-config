@@ -397,7 +397,7 @@ in
     {
       settings."org/gnome/desktop/interface" = {
         cursor-theme = cursorTheme;
-        cursor-size = cursorSize;
+        cursor-size = lib.gvariant.mkInt32 cursorSize;
       };
     }
   ];
@@ -409,7 +409,7 @@ in
     foot
     fuzzel
     wlr-randr
-    xorg.xcbutilcursor
+    libxcb-cursor
   ];
 
   users.users.${user} = {
