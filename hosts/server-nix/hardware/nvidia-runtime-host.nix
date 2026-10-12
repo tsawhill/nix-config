@@ -52,13 +52,15 @@ let
         done < <(find "$out/lib" -type f)
 
         patchelf \
-          --set-interpreter /run/opengl-driver/lib/ld-linux-x86-64.so.2 \
-          --set-rpath /run/opengl-driver/lib \
+          --set-interpreter /run/opengl-driver/glibc/ld-linux-x86-64.so.2 \
+          --set-rpath /run/opengl-driver/glibc:/run/opengl-driver/lib \
           "$out/bin/nvidia-smi"
 
         # Supply the loader and libc used by the host-built NVIDIA binaries. This
         # keeps the runtime independent of both the guest's glibc and Nix store.
-        cp -a ${pkgs.glibc}/lib/. "$out/lib/"
+        # Kept out of lib/ so LD_LIBRARY_PATH users never mix it with their own.
+        mkdir -p "$out/glibc"
+        cp -a ${pkgs.glibc}/lib/. "$out/glibc/"
 
         # GLVND, EGL, and Vulkan manifests use absolute package paths. All
         # libraries have been flattened above, so point those manifests at the
