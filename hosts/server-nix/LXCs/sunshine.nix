@@ -325,6 +325,7 @@ in
   imports = [
     ./base
     ./nvidia-runtime.nix
+    "${self}/modules/software/bundles/fonts.nix"
     "${self}/modules/software/bundles/gui-apps/gaming.nix"
     "${self}/modules/software/services/sunshine.nix"
   ];
@@ -336,6 +337,7 @@ in
   programs.firefox.enable = true;
 
   software.apps.gaming.enable = true;
+  software.fonts.enable = true;
 
   # nvidia-runtime.nix bind-mounts the host driver over /run/opengl-driver, so
   # the guest must not build its own. programs/steam.nix still reads package
