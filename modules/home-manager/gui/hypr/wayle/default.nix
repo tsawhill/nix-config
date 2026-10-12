@@ -80,8 +80,8 @@ in
       };
 
       general = {
-        font-sans = "DaddyTimeMono Nerd Font";
-        font-mono = "DaddyTimeMono Nerd Font";
+        font-sans = "RecMonoCasual Nerd Font";
+        font-mono = "RecMonoCasual Nerd Font";
         tearing-mode = true;
       };
 

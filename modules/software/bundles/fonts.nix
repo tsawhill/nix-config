@@ -19,6 +19,9 @@
       nerd-fonts.departure-mono
       nerd-fonts.daddy-time-mono
       nerd-fonts.victor-mono
+      nerd-fonts.recursive-mono
+      nerd-fonts.fantasque-sans-mono
+      maple-mono.NF
     ];
   };
 }

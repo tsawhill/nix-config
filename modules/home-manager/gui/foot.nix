@@ -1,12 +1,12 @@
 { pkgs, ... }:
 {
-  home.packages = [ pkgs.nerd-fonts.daddy-time-mono ];
+  home.packages = [ pkgs.nerd-fonts.recursive-mono ];
 
   programs.foot = {
     enable = true;
     settings = {
       main = {
-        font = "DaddyTimeMono Nerd Font:size=16";
+        font = "RecMonoCasual Nerd Font:size=16";
         pad = "12x12 center";
       };
       colors-dark = {

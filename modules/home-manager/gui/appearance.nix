@@ -25,8 +25,8 @@
       package = pkgs.tela-icon-theme;
     };
     font = {
-      name = "DaddyTimeMono Nerd Font";
-      package = pkgs.nerd-fonts.daddy-time-mono;
+      name = "RecMonoCasual Nerd Font";
+      package = pkgs.nerd-fonts.recursive-mono;
     };
     gtk2 = {
       configLocation = "${config.xdg.configHome}/gtk-2.0/gtkrc";

@@ -53,7 +53,7 @@ lib.mkIf (config.my.hypr.lock.theme == "pink") {
         monitor = "";
         text = ''cmd[update:1000] echo "$(date +"%H:%M")"'';
         font_size = 90;
-        font_family = "DaddyTimeMono Nerd Font Bold";
+        font_family = "RecMonoCasual Nerd Font Bold";
         color = "rgba(${text}ff)";
         position = "0, 100";
         halign = "center";
@@ -66,7 +66,7 @@ lib.mkIf (config.my.hypr.lock.theme == "pink") {
         monitor = "";
         text = ''cmd[update:60000] echo "$(date +"%A, %B %d")"'';
         font_size = 20;
-        font_family = "DaddyTimeMono Nerd Font";
+        font_family = "RecMonoCasual Nerd Font";
         color = "rgba(${subtext}ff)";
         position = "0, 10";
         halign = "center";
