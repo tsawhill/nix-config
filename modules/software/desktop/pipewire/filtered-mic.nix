@@ -6,6 +6,7 @@
 }:
 let
   mics = lib.filterAttrs (_: mic: mic.enable) config.my.desktop.audio.filteredMics;
+  echoCancel = config.my.desktop.audio.echoCancel.enable;
 
   # Defaults were tuned on the MOTU M2; each mic's module overrides what differs.
   stages = [
@@ -158,8 +159,8 @@ let
     };
     "capture.props" = {
       "node.name" = "filtered_mic_capture.${name}";
-      "target.object" = mic.source;
-      "audio.position" = [ mic.channel ];
+      "target.object" = if echoCancel then "echo_cancel_source.${name}" else mic.source;
+      "audio.position" = [ (if echoCancel then "MONO" else mic.channel) ];
       "audio.rate" = 48000;
       "stream.dont-remix" = true;
       "node.passive" = true;
@@ -174,6 +175,34 @@ let
       "audio.position" = [ "MONO" ];
       "audio.rate" = 48000;
       "priority.session" = 2200;
+    };
+  };
+
+  # WebRTC echo canceller on the raw mic, ahead of the chain; filtered-mics.lua loads it first.
+  mkEchoCancel = name: mic: {
+    "library.name" = "aec/libspa-aec-webrtc";
+    # The reference is the default sink's monitor, i.e. everything the speakers play.
+    "monitor.mode" = true;
+    "audio.rate" = 48000;
+    "capture.props" = {
+      "node.name" = "echo_cancel_capture.${name}";
+      "target.object" = mic.source;
+      "audio.position" = [ mic.channel ];
+      "stream.dont-remix" = true;
+      "node.passive" = true;
+      "node.dont-fallback" = true;
+      "node.linger" = true;
+    };
+    "source.props" = {
+      "node.name" = "echo_cancel_source.${name}";
+      "node.description" = "${name} echo canceller";
+      "audio.position" = [ "MONO" ];
+    };
+    "sink.props"."node.name" = "echo_cancel_reference.${name}";
+    # The chain after it does noise removal and gain.
+    "aec.args" = {
+      "webrtc.gain_control" = false;
+      "webrtc.noise_suppression" = false;
     };
   };
 
@@ -221,6 +250,10 @@ let
   };
 in
 {
+  options.my.desktop.audio.echoCancel.enable = lib.mkEnableOption ''
+    WebRTC echo cancellation in front of filtered mics, so speaker audio
+    doesn't reach calls. Only worth it on hosts that use speakers'';
+
   options.my.desktop.audio.filteredMics = lib.mkOption {
     default = { };
     description = ''
@@ -295,7 +328,10 @@ in
           "wireplumber.profiles".main."custom.filtered-mics" = "required";
           "filtered-mics.rules" = lib.mapAttrsToList (name: mic: {
             matches = [ { "node.name" = mic.source; } ];
-            actions.load-filter-chain = mkChain name mic;
+            actions = {
+              load-filter-chain = mkChain name mic;
+            }
+            // lib.optionalAttrs echoCancel { load-echo-cancel = mkEchoCancel name mic; };
           }) mics;
           # Keep processed capture devices awake.
           "monitor.alsa.rules" = [
