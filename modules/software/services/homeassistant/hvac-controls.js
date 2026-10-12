@@ -93,7 +93,7 @@ class HvacControls extends HTMLElement {
     const ready = this.state("input_boolean.hvac_drafts_initialized") === "on" &&
       (this.nap || [temp, fan, airflow].every(x => !["unknown", "unavailable"].includes(x)));
     const signature = JSON.stringify([r,mode,temp,enabled,fan,airflow,timer?.state,timer?.attributes?.finishes_at,
-      ready,this.minutes,this.busy,this.error,this.state("sensor.hvac_nap_target")]);
+      ready,this.minutes,this.busy,this.error,this.state("sensor.hvac_nap_target"),this.state("sensor.hvac_requested_mode")]);
     if (!force && signature === this._signature) return;
     // Do not replace an input/select while the user is editing it due to a
     // background HA state update. Forced renders follow explicit user actions.
@@ -116,7 +116,7 @@ class HvacControls extends HTMLElement {
           <div class="row"><label for="enabled">Room on</label><input id="enabled" class="switch" type="checkbox" role="switch" ${enabled ? "checked" : ""} ${disabled}></div>
           <div class="temperature"><button id="minus" aria-label="Lower temperature" ${disabled}>−</button>
             <div class="reading"><input id="temperature" type="number" min="60" max="86" step="1" aria-label="Room threshold" value="${escapeHtml(Number.isFinite(Number(temp)) ? temp : "")}" ${disabled}><span class="unit">°F</span>
-              <div class="muted">${mode === "heat" ? "Heat below" : mode === "cool" ? "Cool above" : "System is off"}</div></div>
+              <div class="muted">${this.state("sensor.hvac_requested_mode") === "auto" ? "Target" : mode === "heat" ? "Heat below" : mode === "cool" ? "Cool above" : "System is off"}</div></div>
             <button id="plus" aria-label="Raise temperature" ${disabled}>+</button></div>
           <div class="fields"><label>Fan<select id="fan" ${disabled}>${this.options([["schedule","Normal setting"],["auto","Auto"],["quiet","Quiet"],...[1,2,3,4,5].map(n=>[String(n),`Speed ${n}`])],fan)}</select></label>
             <label>Airflow<select id="airflow" ${disabled}>${this.options([["schedule","Normal setting"],["off","Still"],["swing","Swing"],["comfort","Comfort"]],airflow)}</select></label></div>

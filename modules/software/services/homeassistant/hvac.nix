@@ -67,6 +67,11 @@ let
     # Manual max run: extreme setpoint and top fan for a fixed window per press.
     maxMinutes = 20;
     maxPriority = 20;
+    # Auto mode. The gap keeps heat and cool thresholds apart, and switches
+    # need sustained demand plus a guard since the last one.
+    autoGap = 5;
+    autoPersistMinutes = 15;
+    autoGuardMinutes = 90;
   };
 
   minutesOf =
@@ -83,9 +88,8 @@ let
     rooms = blockRooms;
   };
 
-  # heatBelow only applies when the system mode is set to heat. The house does
-  # not drop below 68 in practice, so these are placeholders to be revisited
-  # before winter rather than numbers anyone has lived with.
+  # heatBelow applies in heat and auto. Apart from the bedroom overnight these
+  # are still placeholders to be revisited before winter.
 
   # Fan is a preference, not a throttle. The setpoint already scales output and
   # the unit's own auto varies the fan with information we do not have, so this
@@ -95,7 +99,7 @@ let
   sleeping = {
     bedroom = {
       coolAbove = 73;
-      heatBelow = 66;
+      heatBelow = 65;
       priority = 10;
       fan = "quiet";
       airflow = "comfort";
@@ -147,7 +151,7 @@ let
   preBed = {
     bedroom = {
       coolAbove = 73;
-      heatBelow = 66;
+      heatBelow = 65;
       priority = 10;
       fan = "auto";
       airflow = "comfort";
@@ -204,13 +208,20 @@ let
     };
   };
 
-  scheduleJson = builtins.toJSON schedule;
+  # Without the gap, auto would heat and cool the same room in turn.
+  scheduleJson =
+    assert lib.assertMsg (lib.all (
+      b: lib.all (r: r.coolAbove - r.heatBelow >= tuning.autoGap) (lib.attrValues b.rooms)
+    ) (lib.concatLists (lib.attrValues schedule.patterns))) "hvac: every block needs coolAbove - heatBelow >= ${toString tuning.autoGap}";
+    builtins.toJSON schedule;
 
   tempSensor = room: "sensor.ac_controller_${room}_temperature";
   climateEntity = room: "climate.${room}_ac";
   overrideTimer = room: "timer.hvac_override_${room}";
   shedTimer = room: "timer.hvac_shed_${room}";
+  # The cool side keeps the old entity id so overrides survive the upgrade.
   overrideNumber = room: "input_number.hvac_override_${room}";
+  overrideHeatNumber = room: "input_number.hvac_override_heat_${room}";
   draftNumber = room: "input_number.hvac_draft_${room}";
   draftEnable = room: "input_boolean.hvac_draft_enable_${room}";
   draftFan = room: "input_select.hvac_draft_fan_${room}";
@@ -231,6 +242,11 @@ let
   prioritySensor = room: "sensor.hvac_priority_${room}";
   maxTimer = room: "timer.hvac_max_${room}";
   maxMode = "input_select.hvac_max_mode";
+  needSensor = room: "sensor.hvac_need_${room}";
+  requestedMode = "sensor.hvac_requested_mode";
+  autoSide = "input_select.hvac_auto_side";
+  autoWantSince = "input_number.hvac_auto_want_since";
+  autoSwitchedAt = "input_number.hvac_auto_switched_at";
 
   # One outdoor unit means the heads cannot run opposing modes, so this is a
   # single system-wide choice rather than a per-room one. systemMode is the
@@ -293,13 +309,18 @@ let
     map (room: "is_state('${maxTimer room}', 'active')") roomNames
   );
 
-  # The mode the schedule and overrides ask for, before any max run.
-  baseModeTemplate = ''
+  # What the system and overrides ask for, which may be auto.
+  requestedModeTemplate = ''
     {%- if (${anyOverrideActive}) and not is_state('${overrideMode}', '${followSystem}') -%}
       {{ states('${overrideMode}') }}
     {%- else -%}
       {{ states('${systemMode}') }}
     {%- endif -%}'';
+
+  # The concrete mode before any max run; auto uses the side last picked.
+  baseModeTemplate = ''
+    {%- set requested -%}${requestedModeTemplate}{%- endset -%}
+    {{- states('${autoSide}') if requested | trim == 'auto' else requested | trim -}}'';
 
   # A max run owns the shared outdoor unit for its window.
   effectiveModeTemplate = ''
@@ -337,7 +358,7 @@ let
   heatTargetTemplate = room: ''
     ${currentBlock}
     {%- if is_state('${overrideTimer room}', 'active') -%}
-      {{ states('${overrideNumber room}') | float(68) | round(0) }}
+      {{ states('${overrideHeatNumber room}') | float(68) | round(0) }}
     {%- else -%}
       {{ ns.current.rooms['${room}'].heatBelow }}
     {%- endif -%}'';
@@ -409,6 +430,35 @@ let
       {{ 'heat' if r < ht else ('off' if r >= ht + ${toString tuning.hysteresis} else (cur if cur == 'heat' else 'off')) }}
     {%- else -%}off
     {%- endif -%}'';
+
+  # Which side the room would ask the shared unit for, whatever the mode.
+  needTemplate = room: ''
+    {%- set r = states('${tempSensor room}') -%}
+    {%- if not is_number(r)
+        or (as_timestamp(now()) - as_timestamp(states.sensor.ac_controller_${room}_temperature.last_reported, 0)) > ${
+          toString (tuning.staleMinutes * 60)
+        }
+        or (is_state('${overrideTimer room}', 'active') and is_state('${enableToggle room}', 'off')) -%}none
+    {%- elif r | float > states('${targetSensor room}') | float(999) -%}cool
+    {%- elif r | float < states('${heatTargetSensor room}') | float(-999) -%}heat
+    {%- else -%}none
+    {%- endif -%}'';
+
+  # True when the other side's most important need outranks everything still
+  # needing or running on the current side. Ties stay put.
+  autoSwitchTemplate = ''
+    {%- set side = states('${autoSide}') -%}
+    {%- set ns = namespace(cur = -1, other = -1) -%}
+    {%- for room in ${builtins.toJSON roomNames} -%}
+      {%- set need = states('sensor.hvac_need_' ~ room) -%}
+      {%- set p = states('sensor.hvac_priority_' ~ room) | int(0) -%}
+      {%- if need == side or is_state('climate.' ~ room ~ '_ac', side) -%}
+        {%- set ns.cur = [ns.cur, p] | max -%}
+      {%- elif need in ['cool', 'heat'] -%}
+        {%- set ns.other = [ns.other, p] | max -%}
+      {%- endif -%}
+    {%- endfor -%}
+    {{ ns.other > ns.cur }}'';
 
   # The gap below (cooling) or above (heating) the threshold scales with how
   # far off the room is, because the head treats its own error as a throttle.
@@ -1094,6 +1144,86 @@ let
       }
     ];
   };
+  # Auto only moves the shared unit after the need has lasted and the last
+  # switch is old enough. A max run pauses the clock, since it is deliberate.
+  autoSideAutomation =
+    let
+      stamp = entity: {
+        action = "input_number.set_value";
+        target.entity_id = entity;
+        data.value = "{{ as_timestamp(now()) | int }}";
+      };
+      clear = {
+        action = "input_number.set_value";
+        target.entity_id = autoWantSince;
+        data.value = 0;
+      };
+    in
+    {
+      alias = "HVAC auto side";
+      description = "In auto, hand the shared unit to the side the most important room needs.";
+      mode = "single";
+      triggers = [
+        {
+          trigger = "time_pattern";
+          minutes = "/1";
+        }
+        {
+          trigger = "state";
+          entity_id = systemMode;
+          to = "auto";
+          id = "entered";
+        }
+      ];
+      conditions = [ commitIdle ];
+      actions = [
+        {
+          variables = {
+            requested = "{{ states('${requestedMode}') }}";
+            want = autoSwitchTemplate;
+            since = "{{ states('${autoWantSince}') | float(0) }}";
+            switched = "{{ states('${autoSwitchedAt}') | float(0) }}";
+          };
+        }
+        {
+          choose = [
+            # Start from whatever was running rather than a stale side.
+            {
+              conditions = "{{ trigger.id == 'entered' and trigger.from_state.state in ['cool', 'heat'] }}";
+              sequence = [
+                {
+                  action = "input_select.select_option";
+                  target.entity_id = autoSide;
+                  data.option = "{{ trigger.from_state.state }}";
+                }
+                clear
+              ];
+            }
+            {
+              conditions = "{{ requested != 'auto' or (${anyMaxActive}) or not want }}";
+              sequence = [ clear ];
+            }
+            {
+              conditions = "{{ since <= 0 }}";
+              sequence = [ (stamp autoWantSince) ];
+            }
+            {
+              conditions = "{{ as_timestamp(now()) - since >= ${toString (tuning.autoPersistMinutes * 60)} and as_timestamp(now()) - switched >= ${toString (tuning.autoGuardMinutes * 60)} }}";
+              sequence = [
+                {
+                  action = "input_select.select_option";
+                  target.entity_id = autoSide;
+                  data.option = "{{ 'heat' if is_state('${autoSide}', 'cool') else 'cool' }}";
+                }
+                (stamp autoSwitchedAt)
+                clear
+              ];
+            }
+          ];
+        }
+      ];
+    };
+
   activeTimerCard = entity: name: {
     type = "conditional";
     conditions = [
@@ -1128,6 +1258,7 @@ let
     {%- elif active and is_state('${enableToggle room}', 'off') -%}Paused by override
     {%- elif is_state('${shedTimer room}', 'active') -%}Paused for capacity
     {%- elif preempted -%}Paused for max {{ m }} in another room
+    {%- elif is_state('${requestedMode}', 'auto') and states('${needSensor room}') in ['cool', 'heat'] and states('${needSensor room}') != m -%}Needs {{ states('${needSensor room}') }} · waiting for auto to switch
     {%- elif m == 'off' -%}System off
     {%- elif is_state('${climateEntity room}', 'off') and is_state('${minOffTimer room}', 'active') -%}
       {%- set finish = as_timestamp(state_attr('${minOffTimer room}', 'finishes_at'), 0) -%}
@@ -1152,7 +1283,7 @@ let
     {%- set active = is_state('${overrideTimer room}', 'active') -%}
     {%- set mode = states('${effectiveMode}') -%}
     {%- set enabled = not active or not is_state('${enableToggle room}', 'off') -%}
-    {{ 'Override' if active else 'Following schedule' }}{% if enabled and mode == 'cool' %} · Cool above **{{ states('${targetSensor room}') }}°F**{% elif enabled and mode == 'heat' %} · Heat below **{{ states('${heatTargetSensor room}') }}°F**{% endif %} · {{ states('sensor.hvac_activity_${room}') }}
+    {{ 'Override' if active else 'Following schedule' }}{% if enabled and is_state('${requestedMode}', 'auto') %} · Keep **{{ states('${heatTargetSensor room}') }}–{{ states('${targetSensor room}') }}°F**{% elif enabled and mode == 'cool' %} · Cool above **{{ states('${targetSensor room}') }}°F**{% elif enabled and mode == 'heat' %} · Heat below **{{ states('${heatTargetSensor room}') }}°F**{% endif %} · {{ states('sensor.hvac_activity_${room}') }}
     {% set status = states('sensor.hvac_status_${room}') %}{% if status not in ['Override', 'Following schedule', 'System off', 'Paused by override', 'unknown', 'unavailable'] %}
 
     {{ status }}
@@ -1416,8 +1547,20 @@ in
           {
             name = "hvac_override_${room}";
             value = {
-              name = "${rooms.${room}} override";
+              name = "${rooms.${room}} override cool above";
               min = 60;
+              max = 86 + tuning.autoGap;
+              step = 1;
+              unit_of_measurement = "°F";
+              mode = "slider";
+              icon = "mdi:thermometer";
+            };
+          }
+          {
+            name = "hvac_override_heat_${room}";
+            value = {
+              name = "${rooms.${room}} override heat below";
+              min = 60 - tuning.autoGap;
               max = 86;
               step = 1;
               unit_of_measurement = "°F";
@@ -1510,6 +1653,20 @@ in
           mode = "slider";
           icon = "mdi:power-sleep";
         };
+        hvac_auto_want_since = {
+          name = "Auto switch wanted since";
+          min = 0;
+          max = 4102444800;
+          step = 1;
+          mode = "box";
+        };
+        hvac_auto_switched_at = {
+          name = "Auto last switched";
+          min = 0;
+          max = 4102444800;
+          step = 1;
+          mode = "box";
+        };
       };
 
     # Expiry is the point: when a timer finishes the schedule silently resumes,
@@ -1583,7 +1740,16 @@ in
         options = [
           "cool"
           "heat"
+          "auto"
           "off"
+        ];
+        icon = "mdi:hvac";
+      };
+      hvac_auto_side = {
+        name = "Auto side";
+        options = [
+          "cool"
+          "heat"
         ];
         icon = "mdi:hvac";
       };
@@ -1769,7 +1935,19 @@ in
               icon = "mdi:hvac";
               state = effectiveModeTemplate;
             }
+            {
+              name = "hvac_requested_mode";
+              unique_id = "hvac_requested_mode";
+              icon = "mdi:hvac";
+              state = requestedModeTemplate;
+            }
           ]
+          ++ (map (room: {
+            name = "hvac_need_${room}";
+            unique_id = "hvac_need_${room}";
+            icon = "mdi:thermometer-alert";
+            state = needTemplate room;
+          }) roomNames)
           ++ (map (room: {
             name = "hvac_normal_fan_${room}";
             unique_id = "hvac_normal_fan_${room}";
@@ -1869,7 +2047,6 @@ in
               {
                 variables = {
                   commit_mode = "{{ states('${draftMode}') if selected_room == 'all' and op == 'apply' else (states('${overrideMode}') if (${anyOverrideActive}) else '${followSystem}') }}";
-                  nap_heat = "{{ is_state('${effectiveMode}', 'heat') }}";
                 }
                 // lib.listToAttrs (
                   lib.concatMap (room: [
@@ -1892,6 +2069,16 @@ in
                   ]) roomNames
                 );
               }
+              # "Get me to N": an explicit mode picks the side, auto picks it
+              # from where the room is now. The other side sits autoGap away.
+              {
+                variables = lib.listToAttrs (
+                  map (room: {
+                    name = "side_${room}";
+                    value = "{%- set req = commit_mode if commit_mode != '${followSystem}' else states('${systemMode}') -%}{{ req if req in ['cool', 'heat'] else ('cool' if states('${tempSensor room}') | float(0) > value_${room} else 'heat') }}";
+                  }) roomNames
+                );
+              }
               {
                 action = "input_select.select_option";
                 target.entity_id = overrideMode;
@@ -1906,7 +2093,12 @@ in
                     {
                       action = "input_number.set_value";
                       target.entity_id = overrideNumber room;
-                      data.value = "{{ (${toString sleeping.bedroom.heatBelow} if nap_heat else ${toString sleeping.bedroom.coolAbove}) if op == 'nap' else value_${room} }}";
+                      data.value = "{{ ${toString sleeping.bedroom.coolAbove} if op == 'nap' else value_${room} + (0 if side_${room} == 'cool' else ${toString tuning.autoGap}) }}";
+                    }
+                    {
+                      action = "input_number.set_value";
+                      target.entity_id = overrideHeatNumber room;
+                      data.value = "{{ ${toString sleeping.bedroom.heatBelow} if op == 'nap' else value_${room} - (0 if side_${room} == 'heat' else ${toString tuning.autoGap}) }}";
                     }
                     {
                       action = "{{ 'input_boolean.turn_on' if op == 'nap' or enabled_${room} else 'input_boolean.turn_off' }}";
@@ -2061,6 +2253,7 @@ in
         modeHandoffAutomation
         sliderSyncAutomation
         shedAutomation
+        autoSideAutomation
       ];
   };
 }

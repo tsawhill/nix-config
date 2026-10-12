@@ -43,6 +43,7 @@ class Templates(unittest.TestCase):
                     f"timer.hvac_min_off_{room}": "idle",
                     f"input_boolean.hvac_enable_{room}": "on",
                     f"input_number.hvac_override_{room}": "73",
+                    f"input_number.hvac_override_heat_{room}": "68",
                     f"input_number.hvac_draft_{room}": "64",
                 }
             )
@@ -96,6 +97,13 @@ class Templates(unittest.TestCase):
                 f"is_state('timer.hvac_max_{r}', 'active')" for r in ROOMS
             ),
             "maxMode": "input_select.hvac_max_mode",
+            "autoSide": "input_select.hvac_auto_side",
+            "requestedMode": "sensor.hvac_requested_mode",
+            "requestedModeTemplate": (
+                self.expand(raw_template("requestedModeTemplate"))
+                if "${requestedModeTemplate}" in text
+                else ""
+            ),
             "builtins.toJSON roomNames": json.dumps(ROOMS),
             "currentBlock": (
                 self.expand(raw_template("currentBlock"))
@@ -137,6 +145,8 @@ class Templates(unittest.TestCase):
             "fanSelect": "input_select.hvac_fan_office",
             "airflowSelect": "input_select.hvac_airflow_office",
             "maxTimer": "timer.hvac_max_office",
+            "needSensor": "sensor.hvac_need_office",
+            "overrideHeatNumber": "input_number.hvac_override_heat_office",
             "minRunTimer": "timer.hvac_min_run_office",
         }
         refs.update({k + " room": v for k, v in helpers.items()})
@@ -195,7 +205,7 @@ class Templates(unittest.TestCase):
         self.values["input_number.hvac_draft_office"] = "86"
         self.values["input_select.hvac_draft_mode"] = "cool"
         self.assertEqual(self.render("effectiveModeTemplate"), "heat")
-        self.assertEqual(float(self.render("heatTargetTemplate")), 73)
+        self.assertEqual(float(self.render("heatTargetTemplate")), 68)
 
     def test_expiry_restores_schedule_and_enable(self):
         self.values["input_boolean.hvac_enable_office"] = "off"
@@ -364,27 +374,77 @@ class Templates(unittest.TestCase):
         self.assertIn("input_boolean.hvac_drafts_initialized", sync)
         self.assertNotIn("target.entity_id = overrideNumber", sync)
 
-    def test_nap_uses_mode_and_does_not_edit_draft(self):
-        expr = re.search(
-            r'data.value = "(\{\{ \(\$\{toString sleeping.bedroom.heatBelow\}.*?\}\})"',
-            SOURCE,
-        ).group(1)
+    def test_nap_sets_sleep_band_and_apply_keeps_gap(self):
         sleeping = SOURCE.split("  sleeping =", 1)[1].split("  working =", 1)[0]
         bedroom = sleeping.split("bedroom =", 1)[1].split("};", 1)[0]
-        targets = {}
-        for key in ("heatBelow", "coolAbove"):
+        templates = {}
+        for key, entity in (("coolAbove", "overrideNumber"), ("heatBelow", "overrideHeatNumber")):
+            block = SOURCE.split(f"target.entity_id = {entity} room;", 1)[1]
+            expr = re.search(r'data.value = "(.*?)";', block).group(1)
             value = re.search(rf"{key}\s*=\s*(\d+)", bedroom).group(1)
-            targets[key] = value
             expr = expr.replace("${toString sleeping.bedroom." + key + "}", value)
-        expr = expr.replace("${room}", "office")
-        t = self.env.from_string(expr)
+            expr = expr.replace("${room}", "office").replace("${toString tuning.autoGap}", "5")
+            templates[key] = (self.env.from_string(expr), value)
+        for key, (t, value) in templates.items():
+            self.assertEqual(t.render(op="nap", value_office=80, side_office="cool"), value)
+        cool, heat = templates["coolAbove"][0], templates["heatBelow"][0]
+        args = dict(op="apply", value_office=67.0)
+        self.assertEqual(float(cool.render(**args, side_office="cool")), 67)
+        self.assertEqual(float(heat.render(**args, side_office="cool")), 62)
+        self.assertEqual(float(cool.render(**args, side_office="heat")), 72)
+        self.assertEqual(float(heat.render(**args, side_office="heat")), 67)
+
+    def test_override_side_follows_mode_or_room_temperature_in_auto(self):
+        expr = re.search(r'value = "(\{%- set req = .*?)";', SOURCE).group(1)
+        template = self.env.from_string(self.expand(expr))
+        args = dict(commit_mode="follow system", value_office=67.0)
+        self.assertEqual(template.render(**args), "cool")
+        self.values["input_select.hvac_system_mode"] = "heat"
+        self.assertEqual(template.render(**args), "heat")
+        self.values["input_select.hvac_system_mode"] = "auto"
+        self.assertEqual(template.render(**args), "cool")
+        self.values["sensor.ac_controller_office_temperature"] = "65"
+        self.assertEqual(template.render(**args), "heat")
+        self.assertEqual(template.render(**(args | {"commit_mode": "cool"})), "cool")
+
+    def test_auto_resolves_to_picked_side_and_needs_ignore_mode(self):
+        self.values["input_select.hvac_system_mode"] = "auto"
+        self.values["input_select.hvac_auto_side"] = "heat"
+        self.assertEqual(self.render("effectiveModeTemplate"), "heat")
+        self.assertEqual(self.render("requestedModeTemplate"), "auto")
+        self.assertEqual(self.render("needTemplate"), "cool")
+        self.values["sensor.ac_controller_office_temperature"] = "67"
+        self.assertEqual(self.render("needTemplate"), "heat")
+        self.values["sensor.ac_controller_office_temperature"] = "70"
+        self.assertEqual(self.render("needTemplate"), "none")
+        self.values["sensor.ac_controller_office_temperature"] = "60"
+        self.reported = self.now - timedelta(minutes=16)
+        self.assertEqual(self.render("needTemplate"), "none")
+        self.reported = self.now
+        self.values["sensor.hvac_requested_mode"] = "auto"
+        self.values["sensor.hvac_need_office"] = "heat"
         self.assertEqual(
-            t.render(op="nap", nap_heat=True, value_office=80), targets["heatBelow"]
+            self.render("roomStatus"), "Needs heat · waiting for auto to switch"
         )
-        self.assertEqual(
-            t.render(op="nap", nap_heat=False, value_office=80), targets["coolAbove"]
-        )
-        self.assertEqual(t.render(op="apply", nap_heat=True, value_office=80), "80")
+
+    def test_auto_switch_needs_strictly_higher_priority(self):
+        self.values["input_select.hvac_auto_side"] = "cool"
+        need = {"office": "cool", "bedroom": "heat", "living_room": "none"}
+        priority = {"office": "1", "bedroom": "10", "living_room": "1"}
+        for room in ROOMS:
+            self.values[f"sensor.hvac_need_{room}"] = need[room]
+            self.values[f"sensor.hvac_priority_{room}"] = priority[room]
+        self.assertEqual(self.render("autoSwitchTemplate"), "True")
+        # A room still running on the current side holds it at equal priority.
+        self.values["sensor.hvac_priority_office"] = "10"
+        self.values["sensor.hvac_need_office"] = "none"
+        self.values["climate.office_ac"] = "cool"
+        self.assertEqual(self.render("autoSwitchTemplate"), "False")
+        self.values["climate.office_ac"] = "off"
+        self.assertEqual(self.render("autoSwitchTemplate"), "True")
+        for room in ROOMS:
+            self.values[f"sensor.hvac_need_{room}"] = "none"
+        self.assertEqual(self.render("autoSwitchTemplate"), "False")
 
     def watch(self, **overrides):
         text = raw_template("watchDecision")
