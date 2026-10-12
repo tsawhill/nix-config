@@ -195,6 +195,8 @@ let
     "source.props" = {
       "node.name" = "echo_cancel_source.${name}";
       "node.description" = "${name} echo canceller";
+      # Not a class pulse clients list, so apps don't offer it as an input.
+      "media.class" = "Audio/Source/Internal";
       "audio.position" = [ "MONO" ];
     };
     "sink.props"."node.name" = "echo_cancel_reference.${name}";
