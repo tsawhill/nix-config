@@ -309,10 +309,9 @@ let
       ${baseModeTemplate}
     {%- endif -%}'';
 
-  # Rooms left out of a max run in the other mode cannot run their own.
+  # Rooms left out of a max run stay off so the chosen ones get the whole unit.
   preemptedTemplate = room: ''
-    {%- set base -%}${baseModeTemplate}{%- endset -%}
-    {%- set preempted = (${anyMaxActive}) and not is_state('${maxTimer room}', 'active') and states('${maxMode}') != base | trim -%}'';
+    {%- set preempted = (${anyMaxActive}) and not is_state('${maxTimer room}', 'active') -%}'';
 
   # Resolve today's pattern and the block covering the current minute. Every
   # tag trims its own whitespace: Home Assistant types rendered results

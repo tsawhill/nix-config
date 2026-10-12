@@ -623,7 +623,7 @@ class Templates(unittest.TestCase):
         self.values["climate.office_ac"] = "cool"
         self.assertEqual(self.render("desiredTemplate"), "cool")
 
-    def test_max_runs_chosen_rooms_and_pauses_others_in_opposite_mode(self):
+    def test_max_runs_chosen_rooms_and_pauses_all_others(self):
         self.values["input_select.hvac_max_mode"] = "cool"
         self.values["timer.hvac_max_office"] = "active"
         self.values["timer.hvac_override_office"] = "active"
@@ -646,13 +646,14 @@ class Templates(unittest.TestCase):
         self.assertEqual(
             self.render("roomStatus"), "Paused for max heat in another room"
         )
-        # Max in the scheduled mode leaves the other rooms on their thresholds.
+        # Same mode as the schedule still pauses rooms that were not picked.
         self.values["input_select.hvac_max_mode"] = "cool"
         self.values["sensor.hvac_effective_mode"] = "cool"
         self.values["sensor.ac_controller_office_temperature"] = "78"
-        self.assertEqual(self.render("desiredTemplate"), "cool")
+        self.assertEqual(self.render("desiredTemplate"), "off")
         self.values["timer.hvac_max_bedroom"] = "idle"
         self.assertEqual(self.render("effectiveModeTemplate"), "cool")
+        self.assertEqual(self.render("desiredTemplate"), "cool")
 
     def test_max_script_accepts_room_lists_or_one_room(self):
         expr = re.search(r'selected = "(.*?)";', SOURCE).group(1)

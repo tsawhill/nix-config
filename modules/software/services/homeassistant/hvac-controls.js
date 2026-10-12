@@ -177,10 +177,7 @@ class HvacMax extends HvacControls {
     const length = Number.isFinite(h) && Number.isFinite(m) ? `${h * 60 + m} min` : "a short burst";
     const disabled = this.busy ? "disabled" : "";
     const start = this.busy || !picked.length ? "disabled" : "";
-    const opposite = mode === "cool" ? "heat" : mode === "heat" ? "cool" : "";
-    const note = running.length ? `Max ${maxMode} running.`
-      : opposite ? `Max ${opposite} switches the shared outdoor unit; unselected rooms pause until it ends.`
-      : "Unselected rooms stay off.";
+    const note = running.length ? `Max ${maxMode} running.` : "Rooms you don't pick pause until it ends.";
     this.shadowRoot.innerHTML = `<style>${CSS}</style><ha-card>
       <h2>Max</h2>
       <div class="muted">Full fan at the coldest or hottest setting for ${escapeHtml(length)}, then back to normal.</div>
