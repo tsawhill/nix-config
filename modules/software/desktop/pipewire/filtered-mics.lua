@@ -4,7 +4,8 @@ local rules = Conf.get_section_as_json ("filtered-mics.rules", Json.Array {})
 local active = nil
 
 -- Unlike node-added hooks, this also reports nodes that existed before the script loaded.
-local nodes_om = ObjectManager { Interest { type = "node" } }
+-- Global on purpose: a local would be garbage collected, taking the chain module with it.
+nodes_om = ObjectManager { Interest { type = "node" } }
 
 nodes_om:connect ("object-added", function (_, node)
   if active or node.properties["media.class"] ~= "Audio/Source" then
