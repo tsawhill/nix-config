@@ -1,0 +1,13 @@
+--- a/src/platform/linux/misc.cpp
++++ b/src/platform/linux/misc.cpp
+@@ -1156,7 +1156,9 @@
+     }
+ #endif
+ #ifdef SUNSHINE_BUILD_WAYLAND
+-    if (((config::video.capture.empty() && sources.none()) || config::video.capture == "wlr") && verify_wl()) {
++    // An explicit wlr choice can start before its compositor exists; prep
++    // commands start one per session and capture connects to it then.
++    if ((config::video.capture == "wlr" && window_system == window_system_e::WAYLAND) || (config::video.capture.empty() && sources.none() && verify_wl())) {
+       sources[source::WAYLAND] = true;
+     }
+ #endif

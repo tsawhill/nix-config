@@ -17,6 +17,7 @@ let
   sunshinePackage = (pkgs.sunshine.override { cudaSupport = true; }).overrideAttrs (oldAttrs: {
     patches = (oldAttrs.patches or [ ]) ++ [
       ./patches/sunshine-probe-after-prep.patch
+      ./patches/sunshine-wlr-before-compositor.patch
     ];
 
     # Upstream's cudaSupport wrapper uses --set, dropping the driver mount the unit needs.
@@ -316,10 +317,10 @@ in
   };
 
   services.sunshine = {
-    # Two fixes: nixpkgs builds Sunshine without CUDA, so DMA-BUF capture on a
-    # pure-NVIDIA host falls back to a software converter that fails every
-    # frame. The patch moves encoder probing after the prep commands, which
-    # start the compositor being captured.
+    # nixpkgs builds Sunshine without CUDA, so DMA-BUF capture on a pure-NVIDIA
+    # host falls back to a software converter that fails every frame. The
+    # patches let Sunshine start with no compositor and probe encoders only
+    # after the prep commands have started the one being captured.
     package = sunshinePackage;
 
     # wlr capture does not need CAP_SYS_ADMIN. Avoiding the capability wrapper
