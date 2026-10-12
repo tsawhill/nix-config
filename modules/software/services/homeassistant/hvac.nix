@@ -222,6 +222,7 @@ let
   # The cool side keeps the old entity id so overrides survive the upgrade.
   overrideNumber = room: "input_number.hvac_override_${room}";
   overrideHeatNumber = room: "input_number.hvac_override_heat_${room}";
+  overrideLabel = room: "input_text.hvac_override_label_${room}";
   draftNumber = room: "input_number.hvac_draft_${room}";
   draftEnable = room: "input_boolean.hvac_draft_enable_${room}";
   draftFan = room: "input_select.hvac_draft_fan_${room}";
@@ -1224,22 +1225,6 @@ let
       ];
     };
 
-  activeTimerCard = entity: name: {
-    type = "conditional";
-    conditions = [
-      {
-        condition = "state";
-        inherit entity;
-        state = "active";
-      }
-    ];
-    card = {
-      type = "tile";
-      inherit entity name;
-      icon = "mdi:timer-outline";
-    };
-    grid_options.columns = 12;
-  };
   roomStatus = room: ''
     {%- set m = states('${effectiveMode}') -%}
     {%- set active = is_state('${overrideTimer room}', 'active') -%}
@@ -1279,18 +1264,14 @@ let
     {%- else -%}Off
     {%- endif -%}'';
 
-  roomSummary = room: ''
-    {%- set active = is_state('${overrideTimer room}', 'active') -%}
-    {%- set mode = states('${effectiveMode}') -%}
-    {%- set enabled = not active or not is_state('${enableToggle room}', 'off') -%}
-    {{ 'Override' if active else 'Following schedule' }}{% if enabled and is_state('${requestedMode}', 'auto') %} · Keep **{{ states('${heatTargetSensor room}') }}–{{ states('${targetSensor room}') }}°F**{% elif enabled and mode == 'cool' %} · Cool above **{{ states('${targetSensor room}') }}°F**{% elif enabled and mode == 'heat' %} · Heat below **{{ states('${heatTargetSensor room}') }}°F**{% endif %} · {{ states('sensor.hvac_activity_${room}') }}
-    {% set status = states('sensor.hvac_status_${room}') %}{% if status not in ['Override', 'Following schedule', 'System off', 'Paused by override', 'unknown', 'unavailable'] %}
+  # Each room card carries everything for its room, so nothing needs a
+  # separate room picker. The system card above them owns the shared mode.
+  roomIcons = {
+    office = "mdi:desk";
+    bedroom = "mdi:bed";
+    living_room = "mdi:sofa";
+  };
 
-    {{ status }}
-    {% endif %}'';
-
-  # Native sections reflow whole room panels, rather than squeezing three
-  # thermostat dials onto a phone. The large numbers are always measurements.
   dashboard = {
     title = "Climate";
     views = [
@@ -1300,116 +1281,56 @@ let
         icon = "mdi:home-thermometer";
         type = "sections";
         max_columns = 3;
-        header = {
-          layout = "start";
-          card = {
-            type = "markdown";
-            text_only = true;
-            content = ''
-              ## Climate
-              **{{ states('sensor.hvac_schedule_block') }}** · {{ states('${effectiveMode}') | title }} · Next: {{ states('sensor.hvac_next_block') }}
-            '';
-          };
-        };
-        sections =
-          (map (room: {
+        sections = [
+          {
             type = "grid";
+            column_span = 3;
             cards = [
               {
-                type = "heading";
-                heading = rooms.${room};
-                heading_style = "title";
-                icon =
-                  if room == "bedroom" then
-                    "mdi:bed"
-                  else if room == "office" then
-                    "mdi:desk"
-                  else
-                    "mdi:sofa";
+                type = "custom:hvac-system-card";
+                persist_minutes = tuning.autoPersistMinutes;
+                guard_minutes = tuning.autoGuardMinutes;
+                grid_options.columns = "full";
               }
-              {
-                type = "sensor";
-                entity = tempSensor room;
-                name = "Temperature";
-                graph = "line";
-                hours_to_show = 6;
-                detail = 1;
-                grid_options.columns = 6;
-              }
-              {
-                type = "sensor";
-                entity = "sensor.ac_controller_${room}_humidity";
-                name = "Humidity";
-                graph = "line";
-                hours_to_show = 6;
-                detail = 1;
-                grid_options.columns = 6;
-              }
-              {
-                type = "markdown";
-                grid_options.columns = 12;
-                content = roomSummary room;
-              }
-              (activeTimerCard (shedTimer room) "Capacity pause")
-              (activeTimerCard (maxTimer room) "Max run")
             ];
-          }) roomNames)
-          ++ [
-            {
-              type = "grid";
-              column_span = 2;
-              cards = [
-                {
-                  type = "custom:hvac-override-card";
-                  grid_options.columns = "full";
-                }
-              ];
-            }
-            {
-              type = "grid";
-              cards = [
-                {
-                  type = "custom:hvac-max-card";
-                  grid_options.columns = 12;
-                }
-                {
-                  type = "custom:hvac-nap-card";
-                  grid_options.columns = 12;
-                }
-              ];
-            }
+          }
+        ]
+        ++ map (room: {
+          type = "grid";
+          cards = [
+            (
+              {
+                type = "custom:hvac-room-card";
+                inherit room;
+                icon = roomIcons.${room};
+                gap = tuning.autoGap;
+                max_minutes = tuning.maxMinutes;
+                grid_options.columns = 12;
+              }
+              // lib.optionalAttrs (room == "bedroom") {
+                nap = {
+                  heat = sleeping.bedroom.heatBelow;
+                  cool = sleeping.bedroom.coolAbove;
+                };
+              }
+            )
           ];
+        }) roomNames;
       }
       {
         title = "Settings";
         path = "settings";
         icon = "mdi:tune";
         type = "sections";
-        max_columns = 2;
+        max_columns = 3;
         sections = [
           {
             type = "grid";
+            column_span = 3;
             cards = [
               {
-                type = "heading";
-                heading = "System";
-              }
-              {
-                type = "entities";
-                entities = [
-                  {
-                    entity = systemMode;
-                    name = "Normal mode (whole system)";
-                  }
-                  {
-                    entity = effectiveMode;
-                    name = "Active mode";
-                  }
-                ];
-              }
-              {
                 type = "markdown";
-                content = "Heating/cooling mode is shared by all rooms. Fan and airflow preferences below are the defaults used when no timed override is active.";
+                content = "Normal fan and airflow apply whenever a room isn't on Max, a hold or a nap. Schedule follows each block's own setting.";
               }
             ];
           }
@@ -1434,62 +1355,7 @@ let
           ];
         }) roomNames;
       }
-    ]
-    ++ map (room: {
-      title = rooms.${room};
-      path = room;
-      subview = true;
-      cards = [
-        {
-          type = "entities";
-          title = "${rooms.${room}} preferences";
-          show_header_toggle = false;
-          entities = [
-            {
-              entity = fanSelect room;
-              name = "Fan (applies immediately)";
-            }
-            {
-              entity = airflowSelect room;
-              name = "Airflow (applies immediately)";
-            }
-            {
-              entity = fanSensor room;
-              name = "Active fan";
-            }
-            {
-              entity = airflowSensor room;
-              name = "Active airflow";
-            }
-          ];
-        }
-        {
-          type = "entities";
-          title = "Controller details";
-          entities = [
-            {
-              entity = climateEntity room;
-              name = "Last commanded AC state";
-            }
-            {
-              type = "attribute";
-              entity = climateEntity room;
-              attribute = "temperature";
-              name = "Commanded setpoint";
-              suffix = "°F";
-            }
-            {
-              entity = prioritySensor room;
-              name = "Priority";
-            }
-          ];
-        }
-        {
-          type = "markdown";
-          content = "IR commands have no acknowledgement. The commanded setpoint is adjusted by the controller and is not the room threshold. Direct climate edits are temporary; use the room override controls for lasting changes.";
-        }
-      ];
-    }) roomNames;
+    ];
   };
 
   dashboardFile = (pkgs.formats.yaml { }).generate "hvac-dashboard.yaml" dashboard;
@@ -1853,6 +1719,17 @@ in
       ]) roomNames
     ));
 
+    # What the active override is, in words, for the room card.
+    input_text = lib.listToAttrs (
+      map (room: {
+        name = "hvac_override_label_${room}";
+        value = {
+          name = "${rooms.${room}} override label";
+          max = 40;
+        };
+      }) roomNames
+    );
+
     # No initial values: both applied state and pending edits survive restart.
     input_boolean =
       (lib.listToAttrs (
@@ -2009,6 +1886,23 @@ in
             description = "apply, resume, or nap";
             example = "apply";
           };
+          # The room card passes these directly; without them the drafts apply.
+          temperature = {
+            description = "Temperature to get the room to";
+            example = 72;
+          };
+          enabled = {
+            description = "Whether the room runs during the override";
+            example = true;
+          };
+          fan = {
+            description = "Fan during the override, or schedule";
+            example = "schedule";
+          };
+          airflow = {
+            description = "Airflow during the override, or schedule";
+            example = "schedule";
+          };
         };
         sequence = [
           {
@@ -2024,7 +1918,7 @@ in
           }
           {
             condition = "template";
-            value_template = "{{ op == 'resume' or is_state('input_boolean.hvac_drafts_initialized', 'on') }}";
+            value_template = "{{ op == 'resume' or temperature is defined or is_state('input_boolean.hvac_drafts_initialized', 'on') }}";
           }
           {
             choose = [
@@ -2052,19 +1946,19 @@ in
                   lib.concatMap (room: [
                     {
                       name = "value_${room}";
-                      value = "{{ states('${draftNumber room}') | float(75) }}";
+                      value = "{{ (temperature | default(states('${draftNumber room}'))) | float(75) }}";
                     }
                     {
                       name = "fan_${room}";
-                      value = "{{ states('${draftFan room}') }}";
+                      value = "{{ fan | default(states('${draftFan room}')) }}";
                     }
                     {
                       name = "airflow_${room}";
-                      value = "{{ states('${draftAirflow room}') }}";
+                      value = "{{ airflow | default(states('${draftAirflow room}')) }}";
                     }
                     {
                       name = "enabled_${room}";
-                      value = "{{ is_state('${draftEnable room}', 'on') }}";
+                      value = "{{ enabled if enabled is defined else is_state('${draftEnable room}', 'on') }}";
                     }
                   ]) roomNames
                 );
@@ -2103,6 +1997,11 @@ in
                     {
                       action = "{{ 'input_boolean.turn_on' if op == 'nap' or enabled_${room} else 'input_boolean.turn_off' }}";
                       target.entity_id = enableToggle room;
+                    }
+                    {
+                      action = "input_text.set_value";
+                      target.entity_id = overrideLabel room;
+                      data.value = "{{ 'Nap' if op == 'nap' else (('Hold ' ~ (value_${room} | round(0) | int) ~ '°') if enabled_${room} else 'Room off') }}";
                     }
                     {
                       action = "input_select.select_option";

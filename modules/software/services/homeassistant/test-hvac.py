@@ -332,24 +332,6 @@ class Templates(unittest.TestCase):
         self.values["sensor.hvac_effective_mode"] = "off"
         self.assertEqual(self.render("roomActivity"), "Off")
 
-    def test_room_summary_keeps_source_activity_and_warning_separate(self):
-        self.values["sensor.hvac_activity_office"] = "Cooling"
-        self.values["sensor.hvac_status_office"] = "Following schedule"
-        self.assertEqual(
-            self.render("roomSummary"),
-            "Following schedule · Cool above **76°F** · Cooling",
-        )
-        self.values["timer.hvac_override_office"] = "active"
-        self.values["sensor.hvac_activity_office"] = "Idle"
-        self.assertEqual(
-            self.render("roomSummary"), "Override · Cool above **76°F** · Idle"
-        )
-        self.values["sensor.hvac_status_office"] = "Check unit: shutdown unconfirmed"
-        self.assertIn("Check unit: shutdown unconfirmed", self.render("roomSummary"))
-        self.values["input_boolean.hvac_enable_office"] = "off"
-        self.values["sensor.hvac_activity_office"] = "Off"
-        self.assertTrue(self.render("roomSummary").startswith("Override · Off"))
-
     def test_room_status_reports_missing_stale_and_waiting(self):
         self.assertEqual(self.render("roomStatus"), "Following schedule")
         self.values["sensor.ac_controller_office_temperature"] = "unavailable"

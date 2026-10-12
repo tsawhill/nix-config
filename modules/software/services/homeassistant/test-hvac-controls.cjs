@@ -5,12 +5,7 @@ const registry = {};
 class Element {
   attachShadow() {
     const nodes = {};
-    const tabs = ['office', 'bedroom', 'living_room'].map(room => ({dataset: {room}, focus() {}}));
-    this.shadowRoot = {
-      getElementById: id => nodes[id] ||= {},
-      querySelectorAll: () => tabs,
-      querySelector: selector => tabs.find(t => selector.includes(t.dataset.room)),
-    };
+    this.shadowRoot = {getElementById: id => nodes[id] ||= {}, innerHTML: ''};
   }
 }
 new Function('HTMLElement', 'customElements', 'window',
@@ -18,52 +13,86 @@ new Function('HTMLElement', 'customElements', 'window',
   Element, {define: (name, cls) => registry[name] = cls}, {});
 const calls = [];
 const states = {};
-const state = (id, value) => states[id] = {state: value, attributes: {}};
-state('input_boolean.hvac_drafts_initialized', 'on');
-state('sensor.hvac_effective_mode', 'cool');
-state('sensor.hvac_nap_target', '73');
-state('input_number.hvac_override_minutes', '60');
+let stamp = 0;
+const state = (id, value, attributes = {}) => states[id] = {state: value, attributes, last_updated: String(++stamp)};
+state('input_select.hvac_system_mode', 'cool');
+state('sensor.hvac_requested_mode', 'cool');
+state('input_select.hvac_auto_side', 'cool');
+state('input_select.hvac_max_mode', 'cool');
+state('sensor.hvac_schedule_block', 'Working since 06:00');
+state('sensor.hvac_next_block', 'Wind-down at 22:00');
 state('input_number.hvac_nap_minutes', '30');
 for (const room of ['office', 'bedroom', 'living_room']) {
-  state(`input_number.hvac_draft_${room}`, '74');
-  state(`input_boolean.hvac_draft_enable_${room}`, 'on');
-  state(`input_select.hvac_draft_fan_${room}`, 'schedule');
-  state(`input_select.hvac_draft_airflow_${room}`, 'schedule');
-  state(`timer.hvac_override_${room}`, 'active');
+  state(`sensor.ac_controller_${room}_temperature`, '74.2');
+  state(`sensor.ac_controller_${room}_humidity`, '45');
+  state(`sensor.hvac_target_${room}`, '76');
+  state(`sensor.hvac_heat_target_${room}`, '68');
+  state(`sensor.hvac_activity_${room}`, 'Idle');
+  state(`sensor.hvac_status_${room}`, 'Following schedule');
+  state(`timer.hvac_override_${room}`, 'idle');
+  state(`timer.hvac_max_${room}`, 'idle');
+  state(`input_boolean.hvac_enable_${room}`, 'on');
 }
 const hass = {states, callService: async (...args) => calls.push(args)};
-const card = new registry['hvac-override-card']();
-card.hass = hass;
-const control = id => card.shadowRoot.getElementById(id);
+const el = (card, id) => card.shadowRoot.getElementById(id);
+const office = new registry['hvac-room-card']();
+office.setConfig({room: 'office', gap: 5, max_minutes: 20});
+office.hass = hass;
 (async () => {
   assert.equal(calls.length, 0, 'render must never write helpers');
-  await control('fan').onchange({target: {value: 'quiet'}});
-  assert.deepEqual(calls.pop(), ['input_select', 'select_option', {entity_id:'input_select.hvac_draft_fan_office', option:'quiet'}]);
-  card.shadowRoot.querySelector('[data-room="bedroom"]').onclick();
-  await control('enabled').onchange({target: {checked: false}});
-  assert.deepEqual(calls.pop(), ['input_boolean', 'turn_off', {entity_id:'input_boolean.hvac_draft_enable_bedroom'}]);
-  await control('apply').onclick();
-  assert.deepEqual(calls.pop(), ['script', 'hvac_apply_override', {room:'bedroom', minutes:60}]);
-  await control('resume').onclick();
-  assert.deepEqual(calls.pop(), ['script', 'hvac_apply_override', {room:'bedroom', operation:'resume'}]);
-  const other = new registry['hvac-override-card'](); other.hass = hass;
-  assert.equal(other.room, 'office', 'room tabs must be client-local');
-  const nap = new registry['hvac-nap-card'](); nap.hass = hass;
-  await nap.shadowRoot.getElementById('apply').onclick();
-  assert.deepEqual(calls.pop(), ['script', 'hvac_start_nap', {minutes:30}]);
-  const max = new registry['hvac-max-card'](); max.hass = hass;
-  const maxControl = id => max.shadowRoot.getElementById(id);
-  assert.equal(calls.length, 0, 'max render must never write helpers');
-  maxControl('pick-living_room').onchange({target: {checked: true}});
-  maxControl('pick-office').onchange({target: {checked: true}});
-  await maxControl('max-cool').onclick();
-  assert.deepEqual(calls.pop(), ['script', 'hvac_start_max', {rooms:['office', 'living_room'], hvac_mode:'cool'}]);
-  state('timer.hvac_max_bedroom', 'active'); max.hass = hass;
-  await maxControl('stop').onclick();
-  assert.deepEqual(calls.pop(), ['timer', 'cancel', {entity_id:['timer.hvac_max_bedroom']}]);
-  card._hass = {...hass, callService: async () => {throw new Error('<failed>');}};
-  await control('apply').onclick();
-  assert.match(card.shadowRoot.innerHTML, /&lt;failed&gt;/);
-  assert.equal(card.busy, false);
+  assert.match(office.shadowRoot.innerHTML, /Cools above <b>76°<\/b>/);
+
+  el(office, 'open-adjust').onclick();
+  el(office, 'up').onclick();
+  el(office, 'dur-120').onclick();
+  await el(office, 'apply').onclick();
+  assert.deepEqual(calls.pop(), ['script', 'hvac_apply_override',
+    {room: 'office', minutes: 120, temperature: 77, enabled: true, fan: 'schedule', airflow: 'schedule'}]);
+  assert.equal(office.panel, null, 'a successful apply closes the panel');
+
+  el(office, 'open-max').onclick();
+  await el(office, 'max-cool').onclick();
+  assert.deepEqual(calls.pop(), ['script', 'hvac_start_max', {rooms: ['office'], hvac_mode: 'cool'}]);
+  state('timer.hvac_max_bedroom', 'active');
+  office.hass = hass;
+  assert.match(office.shadowRoot.innerHTML, /Paused while Bedroom runs max cool\./);
+  state('timer.hvac_max_office', 'active');
+  office.hass = hass;
+  await el(office, 'stop').onclick();
+  assert.deepEqual(calls.pop(), ['timer', 'cancel', {entity_id: 'timer.hvac_max_office'}]);
+  state('timer.hvac_max_office', 'idle');
+  state('timer.hvac_max_bedroom', 'idle');
+
+  state('timer.hvac_override_office', 'active');
+  state('input_text.hvac_override_label_office', 'Hold 67°');
+  office.hass = hass;
+  assert.match(office.shadowRoot.innerHTML, /Hold 67°/);
+  await el(office, 'resume').onclick();
+  assert.deepEqual(calls.pop(), ['script', 'hvac_apply_override', {room: 'office', operation: 'resume'}]);
+
+  const bedroom = new registry['hvac-room-card']();
+  bedroom.setConfig({room: 'bedroom', nap: {heat: 65, cool: 73}});
+  bedroom.hass = hass;
+  assert.equal(bedroom.panel, null, 'panels are local to each card');
+  el(bedroom, 'open-nap').onclick();
+  el(bedroom, 'nap-90').onclick();
+  await el(bedroom, 'nap-go').onclick();
+  assert.deepEqual(calls.pop(), ['script', 'hvac_start_nap', {minutes: 90}]);
+
+  const system = new registry['hvac-system-card']();
+  system.setConfig({persist_minutes: 15, guard_minutes: 90});
+  system.hass = hass;
+  assert.match(system.shadowRoot.innerHTML, /Cooling only/);
+  await el(system, 'mode-auto').onclick();
+  assert.deepEqual(calls.pop(), ['input_select', 'select_option', {entity_id: 'input_select.hvac_system_mode', option: 'auto'}]);
+
+  assert.throws(() => new registry['hvac-room-card']().setConfig({room: 'garage'}));
+
+  office._hass = {...hass, callService: async () => { throw new Error('<failed>'); }};
+  el(office, 'open-adjust').onclick();
+  await el(office, 'apply').onclick();
+  assert.match(office.shadowRoot.innerHTML, /&lt;failed&gt;/);
+  assert.equal(office.busy, false);
+  assert.equal(office.panel, 'adjust', 'a failed apply keeps the panel open');
   console.log('HVAC card interaction checks passed.');
 })().catch(error => {console.error(error); process.exitCode = 1;});
