@@ -117,6 +117,7 @@ let
       <labwc_config>
         <keyboard>
           <default />
+          <keybind key="A-f"><action name="ToggleFullscreen" /></keybind>
           <keybind key="W-Return"><action name="Execute" command="foot" /></keybind>
           <keybind key="W-space"><action name="Execute" command="fuzzel" /></keybind>
         </keyboard>
@@ -144,6 +145,10 @@ let
     "rc.xml" = pkgs.writeText "rc.xml" ''
       <?xml version="1.0"?>
       <labwc_config>
+        <keyboard>
+          <default />
+          <keybind key="A-f"><action name="ToggleFullscreen" /></keybind>
+        </keyboard>
         <windowRules>
           <windowRule identifier="*" type="normal" serverDecoration="no" />
           <windowRule identifier="*" type="normal">
