@@ -74,7 +74,8 @@ in
         background-opacity = 0;
         button-variant = "block-prefix";
         button-bg-opacity = 80;
-        button-label-weight = "bold";
+        button-label-weight = "normal";
+        button-label-size = 1.1;
         button-rounding = "sm";
         button-border-location = "all";
       };
