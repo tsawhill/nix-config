@@ -22,6 +22,7 @@
       nerd-fonts.recursive-mono
       nerd-fonts.fantasque-sans-mono
       maple-mono.NF
+      recursive
     ];
   };
 }

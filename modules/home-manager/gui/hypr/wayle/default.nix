@@ -74,15 +74,16 @@ in
         background-opacity = 0;
         button-variant = "block-prefix";
         button-bg-opacity = 80;
-        button-label-weight = "normal";
+        button-label-weight = "semibold";
         button-label-size = 1.1;
         button-rounding = "sm";
         button-border-location = "all";
       };
 
       general = {
-        font-sans = "RecMonoCasual Nerd Font";
-        font-mono = "RecMonoCasual Nerd Font";
+        # Rec Mono Casual with real in-between weights; bar icons are images, not glyphs.
+        font-sans = "Recursive Mono Casual Static";
+        font-mono = "Recursive Mono Casual Static";
         tearing-mode = true;
       };
 
