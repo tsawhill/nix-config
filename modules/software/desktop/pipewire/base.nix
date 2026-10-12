@@ -22,6 +22,14 @@
       };
       "11-bluetooth-policy"."wireplumber.settings"."bluetooth.autoswitch-to-headset-profile" = false;
 
+      # Keep the MOTU M2's output awake.
+      "13-motu-awake"."monitor.alsa.rules" = [
+        {
+          matches = [ { "node.name" = "~alsa_output[.]usb-MOTU_M2_.*"; } ];
+          actions.update-props."session.suspend-timeout-seconds" = 0;
+        }
+      ];
+
       # Device priority: bluetooth > USB > PCIe
       "51-device-priority" = {
         "monitor.bluez.rules" = [

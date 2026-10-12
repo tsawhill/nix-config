@@ -1,5 +1,5 @@
-# Guided level measurement for filteredMic's absolute-dBFS thresholds.
-# filtered-mic.nix prepends MIC_SOURCE, MIC_CHANNEL, GATE_* and COMP_THRESHOLD.
+# Guided mic level measurement that writes a filteredMics module for the repo.
+# filtered-mic.nix prepends MIC_PROFILES, MIC_DEFAULTS and MIC_REFERENCE_PEAK.
 
 takes=(room typing quiet normal loud)
 declare -A cue=(
@@ -14,15 +14,15 @@ usage() {
   cat <<EOF
 Usage: mic-measure [-s SOURCE] [-c CHANNEL] [-d SECONDS] [-k] [-l]
 
-Records ${#takes[@]} guided takes from the raw mic and reports the levels the
-filteredMic gate and compressor thresholds depend on. Rerun after changing the
-hardware gain or input volume.
+Pick a mic, record ${#takes[@]} guided takes from it, and get a filteredMics
+module with gate and compressor levels for it. Rerun after changing the mic's
+gain or input volume.
 
-  -s SOURCE   PipeWire source node.name (default: $MIC_SOURCE)
-  -c CHANNEL  input channel, e.g. MONO or AUX0 (default: $MIC_CHANNEL)
+  -s SOURCE   PipeWire source node.name instead of picking from a list
+  -c CHANNEL  input channel, e.g. MONO or AUX0, instead of picking
   -d SECONDS  length of each take (default: 8)
   -k          keep the recordings
-  -l          list capture sources and exit
+  -l          list capture devices and exit
 EOF
 }
 
@@ -31,14 +31,17 @@ die() {
   exit 1
 }
 
-list_sources() {
-  pw-dump | jq -r '.[]
-    | select((.info.props["media.class"] // "") | startswith("Audio/Source"))
-    | "\(.info.props["node.name"])  [\([.info.params.EnumFormat[]?.position[]?] | unique | join(","))]  \(.info.props["node.description"] // "")"'
+# node.name, description and channels of each hardware capture source.
+devices() {
+  pw-dump | jq -r '.[] | .info.props as $p
+    | select(($p["media.class"] // "") == "Audio/Source" and $p["device.id"] != null)
+    | [$p["node.name"], ($p["node.description"] // $p["node.name"]),
+       ([.info.params.EnumFormat[]?.position[]?] | unique | join(","))]
+    | @tsv'
 }
 
-source=$MIC_SOURCE
-channel=$MIC_CHANNEL
+source=""
+channel=""
 secs=8
 keep=0
 while getopts 's:c:d:klh' opt; do
@@ -48,7 +51,7 @@ while getopts 's:c:d:klh' opt; do
     d) secs=$OPTARG ;;
     k) keep=1 ;;
     l)
-      list_sources
+      devices | awk -F'\t' '{ printf "%s  [%s]  %s\n", $2, $3, $1 }'
       exit 0
       ;;
     h)
@@ -63,16 +66,46 @@ while getopts 's:c:d:klh' opt; do
 done
 if ! [[ $secs =~ ^[0-9]+$ ]] || ((secs < 3)); then die "-d needs whole seconds, at least 3"; fi
 
-# A missing target would silently fall back to the default source.
-positions=$(pw-dump | jq -r --arg n "$source" '
-  [.[] | select(.info.props["node.name"] == $n)]
-  | if length == 0 then "missing"
-    else [.[].info.params.EnumFormat[]?.position[]?] | unique | join(",") end')
-case $positions in
-  missing) die "no PipeWire node named '$source' (list them with: mic-measure -l)" ;;
-  "") ;;
-  *) [[ ,$positions, == *",$channel,"* ]] || die "'$source' has channels $positions, not $channel" ;;
-esac
+mapfile -t rows < <(devices)
+((${#rows[@]})) || die "no capture devices found"
+if [[ -z $source ]]; then
+  echo "Capture devices:"
+  for i in "${!rows[@]}"; do
+    IFS=$'\t' read -r name desc positions <<<"${rows[i]}"
+    known=$(jq -r --arg s "$name" '.[$s].name // empty' <<<"$MIC_PROFILES")
+    printf '  %d) %s [%s]%s\n' "$((i + 1))" "$desc" "${positions:-channels unknown}" "${known:+  (module: $known)}"
+  done
+  read -rp "Device [1-${#rows[@]}]: " pick
+  if ! [[ $pick =~ ^[0-9]+$ ]] || ((pick < 1 || pick > ${#rows[@]})); then die "no device $pick"; fi
+  IFS=$'\t' read -r source desc positions <<<"${rows[pick - 1]}"
+else
+  row=$(printf '%s\n' "${rows[@]}" | awk -F'\t' -v s="$source" '$1 == s')
+  [[ -n $row ]] || die "no capture device named '$source' (list them with: mic-measure -l)"
+  IFS=$'\t' read -r source desc positions <<<"$row"
+fi
+
+# This mic's current settings if it already has a module, else the defaults.
+settings=$(jq -c --arg s "$source" '.[$s] // empty' <<<"$MIC_PROFILES")
+known=${settings:+1}
+settings=${settings:-$MIC_DEFAULTS}
+
+if [[ -z $channel ]]; then
+  IFS=, read -ra chans <<<"$positions"
+  current=$(jq -r '.channel // empty' <<<"$settings")
+  if ((${#chans[@]} == 1)); then
+    channel=${chans[0]}
+  else
+    fallback=${current:-${chans[0]:-MONO}}
+    read -rp "Channel${positions:+ ($positions)} [$fallback]: " channel
+    channel=${channel:-$fallback}
+  fi
+fi
+if [[ -n $positions && ,$positions, != *",$channel,"* ]]; then
+  die "'$desc' has channels $positions, not $channel"
+fi
+
+read -r hpf_mode hpf_hz preamp < <(jq -r '.gate | [(.["High-pass filter mode"] | floor),
+  .["High-pass filter frequency (Hz)"], .["Sidechain preamp (G)"]] | @tsv' <<<"$settings")
 
 dir=$(mktemp -d "${XDG_RUNTIME_DIR:-/tmp}/mic-measure.XXXXXX")
 cleanup() {
@@ -94,12 +127,12 @@ record() {
 # Prints: raw mean, raw peak, gate-envelope p50, p90, max (dBFS, -200 = digital silence).
 analyze() {
   local hpf="" i
-  for ((i = 0; i < GATE_HPF_MODE; i++)); do hpf+="highpass=f=$GATE_HPF_HZ:p=2,"; done
+  for ((i = 0; i < hpf_mode; i++)); do hpf+="highpass=f=$hpf_hz:p=2,"; done
   # 480 samples = 10 ms, the gate's default RMS reactivity; skip the Enter keypress.
-  ffmpeg -hide_banner -nostats -loglevel error -ss 0.5 -i "$dir/$1.wav" -filter_complex \
+  ffmpeg -nostdin -hide_banner -nostats -loglevel error -ss 0.5 -i "$dir/$1.wav" -filter_complex \
     "[0:a]asetnsamples=n=480:p=0,asplit[raw][side];[raw]astats=metadata=1:reset=1:measure_perchannel=none,ametadata=mode=print:file=$dir/$1.raw[r];[side]${hpf}astats=metadata=1:reset=1:measure_perchannel=none,ametadata=mode=print:key=lavfi.astats.Overall.RMS_level:file=$dir/$1.side[s]" \
     -map '[r]' -f null - -map '[s]' -f null - || die "ffmpeg could not analyze the $1 take"
-  awk -F= -v pre="$GATE_PREAMP" '
+  awk -F= -v pre="$preamp" '
     function db(v) { return v ~ /inf|nan/ ? -200 : v + 0 }
     BEGIN { off = 20 * log(pre) / log(10); pk = -200 }
     FILENAME ~ /raw$/ && $1 == "lavfi.astats.Overall.RMS_level" { v = db($2); if (v > -200) pw += 10 ^ (v / 10); n++ }
@@ -113,7 +146,8 @@ analyze() {
     }' "$dir/$1.raw" "$dir/$1.side" || die "no audio decoded from the $1 take"
 }
 
-echo "Measuring $source ($channel), ${secs}s per take."
+echo
+echo "Measuring $desc ($channel), ${secs}s per take."
 echo "Set the gain and input volume where they will stay before starting."
 for i in "${!takes[@]}"; do
   take=${takes[i]}
@@ -128,10 +162,30 @@ for take in "${takes[@]}"; do
   results+="$take $(analyze "$take")"$'\n'
 done
 
-awk -v hpf_mode="$GATE_HPF_MODE" -v hpf_hz="$GATE_HPF_HZ" -v pre="$GATE_PREAMP" \
-  -v gate="$GATE_THRESHOLD" -v comp="$COMP_THRESHOLD" '
+name_default=$(jq -r '.name // empty' <<<"$settings")
+if [[ -z $name_default ]]; then
+  name_default=$(awk '{ s = tolower($0); gsub(/[^a-z0-9]+/, "-", s); gsub(/^-+|-+$/, "", s); print s }' <<<"$desc")
+fi
+read -rp $'\n'"Module name [$name_default]: " name
+name=${name:-$name_default}
+[[ $name =~ ^[a-z0-9][a-z0-9-]*$ ]] || die "module name must be lowercase letters, digits and dashes"
+description=$(jq -r '.description // empty' <<<"$settings")
+description=${description:-$desc (Processed)}
+description=${description//[\"\\\$]/}
+
+module=$dir/module.nix
+awk -v pre="$preamp" -v hpf_mode="$hpf_mode" -v hpf_hz="$hpf_hz" -v known="$known" \
+  -v gate_now="$(jq -r '.gate["Curve threshold (G)"]' <<<"$settings")" \
+  -v comp_now="$(jq -r '.compressor["Attack threshold (G)"]' <<<"$settings")" \
+  -v makeup_now="$(jq -r '.compressor["Makeup gain (G)"]' <<<"$settings")" \
+  -v comp_ref="$(jq -r '.compressor["Attack threshold (G)"]' <<<"$MIC_DEFAULTS")" \
+  -v makeup_ref="$(jq -r '.compressor["Makeup gain (G)"]' <<<"$MIC_DEFAULTS")" \
+  -v ref_peak="$MIC_REFERENCE_PEAK" -v module="$module" -v name="$name" -v source="$source" \
+  -v channel="$channel" -v description="$description" -v host="$(uname -n)" -v date="$(date +%F)" '
   function lg(g) { return 20 * log(g) / log(10) }
   function f(v) { return v <= -199 ? "-inf" : sprintf("%.1f", v) }
+  function g(db) { return sprintf("%.4g", 10 ^ (db / 20)) }
+  function half(v) { return int(v * 2 + (v < 0 ? -0.5 : 0.5)) / 2 }
   NF == 6 { mean[$1] = $2; peak[$1] = $3; p50[$1] = $4; p90[$1] = $5; max[$1] = $6; order[++n] = $1 }
   END {
     printf "\nLevels in dBFS. raw = whole take, full band. gate = the 10 ms RMS the gate\n"
@@ -143,32 +197,56 @@ awk -v hpf_mode="$GATE_HPF_MODE" -v hpf_hz="$GATE_HPF_HZ" -v pre="$GATE_PREAMP" 
       printf "%-8s %9s %7s %10s %7s %7s\n", t, f(mean[t]), f(peak[t]), f(p50[t]), f(p90[t]), f(max[t])
     }
     print ""
-
     for (i = 1; i <= n; i++)
-      if (peak[order[i]] > -0.5) printf "WARNING: the %s take clipped; lower the hardware gain and rerun.\n", order[i]
+      if (peak[order[i]] > -0.5) printf "WARNING: the %s take clipped; lower the gain and rerun.\n", order[i]
 
     # p90 sits inside syllables even when half the take is pauses.
     room = max["room"]; quiet = p90["quiet"]
-    if (quiet <= -199) { print "Quiet speech was silent: wrong source or channel, or the mic is muted."; exit }
-    if (room <= -199) {
-      t = quiet - 20
-      why = "The room take was digital silence (the device gates itself), so this sits 20 dB under quiet speech."
-    } else if (room + 6 <= quiet - 10) {
-      t = room + 6
-      why = sprintf("6 dB above the loudest room noise (%.1f), %.1f dB under quiet speech (p90 %.1f).", room, quiet - t, quiet)
-    } else {
-      t = (room + quiet) / 2
-      why = sprintf("Room noise (max %.1f) and quiet speech (p90 %.1f) are only %.1f dB apart, so this splits\n  the difference. Move the mic closer or raise the gain if word onsets get cut, and lean on RNNoise.", room, quiet, quiet - room)
+    if (quiet <= -199 || peak["normal"] <= -199) {
+      print "Speech was silent: wrong device or channel, or the mic is muted."
+      exit 1
     }
-    t = int(t * 2 + (t < 0 ? -0.5 : 0.5)) / 2
-    printf "Suggested starting values:\n"
-    printf "  gate.\"Curve threshold (G)\" = %.4g; # %.1f dBFS\n", 10 ^ (t / 20), t
-    printf "  %s\n  Configured now: %.4g (%.1f dBFS).\n", why, gate, lg(gate)
-    if (max["typing"] > t)
-      printf "  Typing reaches %.1f, above the threshold: the gate cannot reject it by level, so its\n  attack time and RNNoise have to.\n", max["typing"]
-    else
-      printf "  Typing stays under the threshold (max %.1f), so the gate rejects it by level.\n", max["typing"]
-    printf "\nThe compressor threshold is %.4g (%.1f dBFS); speech peaks are normal %s, loud %s.\n", comp, lg(comp), f(peak["normal"]), f(peak["loud"])
-    printf "Like the gate it is absolute: if only the gain changed, shift it by the same number of dB\n"
-    printf "that these levels moved.\n"
+    if (room <= -199) {
+      gt = half(quiet - 20)
+      why = sprintf("Room is digital silence; 20 dB under quiet speech (%.1f).", quiet)
+    } else if (room + 6 <= quiet - 10) {
+      gt = half(room + 6)
+      why = sprintf("6 dB over room noise (%.1f), %.1f under quiet speech (%.1f).", room, quiet - gt, quiet)
+    } else {
+      gt = half((room + quiet) / 2)
+      why = sprintf("Room noise (%.1f) and quiet speech (%.1f) are only %.1f dB apart.", room, quiet, quiet - room)
+    }
+    # Shift the M2-tuned compressor by how far this mic sits from the M2.
+    d = peak["normal"] - ref_peak
+    ct = half(lg(comp_ref) + d); if (ct > -1) ct = -1
+    mk = half(lg(makeup_ref) - d); if (mk < 0) mk = 0; if (mk > 24) mk = 24
+
+    printf "Gate threshold      %6.1f dBFS  %s\n", gt, why
+    printf "Compressor          %6.1f dBFS  normal speech peaks %+.1f dB from the M2\n", ct, d
+    printf "Makeup gain         %+6.1f dB\n", mk
+    if (known)
+      printf "Configured now: gate %.1f, compressor %.1f, makeup %+.1f\n", lg(gate_now), lg(comp_now), lg(makeup_now)
+    if (max["typing"] > gt)
+      printf "Typing reaches %.1f in the gate, so its attack time and RNNoise must reject it.\n", max["typing"]
+    if (room > -199 && quiet - room < 16)
+      print "Little room between noise and quiet speech: move the mic closer or raise the gain."
+
+    printf "# Generated by mic-measure on %s, %s; rerun it after changing gain.\n", host, date > module
+    printf "{\n  my.desktop.audio.filteredMics.%s = {\n", name > module
+    printf "    source = \"%s\";\n    channel = \"%s\";\n    description = \"%s\";\n", source, channel, description > module
+    printf "    controls = {\n      # %s\n", why > module
+    printf "      gate.\"Curve threshold (G)\" = %s; # %.1f dBFS\n", g(gt), gt > module
+    printf "      # Speech peaks %+.1f dB from the M2 reference; shifted to match.\n", d > module
+    printf "      compressor.\"Attack threshold (G)\" = %s; # %.1f dBFS\n", g(ct), ct > module
+    printf "      compressor.\"Makeup gain (G)\" = %s; # %+.1f dB\n", g(mk), mk > module
+    printf "    };\n  };\n}\n" > module
   }' <<<"$results"
+
+target=modules/software/desktop/pipewire/filtered-mics/$name.nix
+printf '\n----- %s -----\n' "$target"
+cat "$module"
+read -rp $'\n'"Save as ./$name.nix? [Y/n] " save
+if [[ ! $save =~ ^[Nn] ]]; then
+  cp "$module" "./$name.nix"
+  echo "Saved ./$name.nix; copy it to $target in the repo."
+fi

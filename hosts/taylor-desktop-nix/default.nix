@@ -78,7 +78,6 @@
     })
   ];
   desktop.plymouth.enable = true;
-  my.desktop.audio.motuMic.enable = true;
   my.desktop.audio.lowLatency = {
     enable = true;
     quantum = 128;

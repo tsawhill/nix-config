@@ -5,6 +5,6 @@
     ./sinks.nix
     ./mics.nix
     ./filtered-mic.nix
-    ./motumic.nix
+    ./filtered-mics
   ];
 }
