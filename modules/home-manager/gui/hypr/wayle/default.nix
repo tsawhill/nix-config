@@ -74,7 +74,7 @@ in
         background-opacity = 0;
         button-variant = "block-prefix";
         button-bg-opacity = 80;
-        button-label-weight = "semibold";
+        button-label-weight = "medium";
         button-label-size = 1.1;
         button-rounding = "sm";
         button-border-location = "all";
