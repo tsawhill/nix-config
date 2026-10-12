@@ -6,7 +6,6 @@
 }:
 let
   mics = lib.filterAttrs (_: mic: mic.enable) config.my.desktop.audio.filteredMics;
-  echoCancel = config.my.desktop.audio.echoCancel.enable;
 
   # Defaults were tuned on the MOTU M2; each mic's module overrides what differs.
   stages = [
@@ -159,8 +158,8 @@ let
     };
     "capture.props" = {
       "node.name" = "filtered_mic_capture.${name}";
-      "target.object" = if echoCancel then "echo_cancel_source.${name}" else mic.source;
-      "audio.position" = [ (if echoCancel then "MONO" else mic.channel) ];
+      "target.object" = if mic.echoCancel then "echo_cancel_source.${name}" else mic.source;
+      "audio.position" = [ (if mic.echoCancel then "MONO" else mic.channel) ];
       "audio.rate" = 48000;
       "stream.dont-remix" = true;
       "node.passive" = true;
@@ -234,7 +233,12 @@ let
               lib.nameValuePair mic.source (
                 {
                   inherit name;
-                  inherit (mic) channel description controls;
+                  inherit (mic)
+                    channel
+                    description
+                    controls
+                    echoCancel
+                    ;
                 }
                 // levelControls (micStages mic)
               )
@@ -250,10 +254,6 @@ let
   };
 in
 {
-  options.my.desktop.audio.echoCancel.enable = lib.mkEnableOption ''
-    WebRTC echo cancellation in front of filtered mics, so speaker audio
-    doesn't reach calls. Only worth it on hosts that use speakers'';
-
   options.my.desktop.audio.filteredMics = lib.mkOption {
     default = { };
     description = ''
@@ -270,6 +270,9 @@ in
               default = true;
               description = "Process this mic on this host.";
             };
+            echoCancel = lib.mkEnableOption ''
+              WebRTC echo cancellation ahead of this mic's chain, using whatever the
+              default sink plays as the reference. For mics used with speakers'';
             source = lib.mkOption {
               type = lib.types.str;
               description = "Physical PipeWire source node name to process.";
@@ -331,7 +334,7 @@ in
             actions = {
               load-filter-chain = mkChain name mic;
             }
-            // lib.optionalAttrs echoCancel { load-echo-cancel = mkEchoCancel name mic; };
+            // lib.optionalAttrs mic.echoCancel { load-echo-cancel = mkEchoCancel name mic; };
           }) mics;
           # Keep processed capture devices awake.
           "monitor.alsa.rules" = [

@@ -167,8 +167,6 @@
   # spawns another, which is how the user manager collected 130k failed units.
   systemd.services."drkonqi-coredump-processor@".wantedBy = lib.mkForce [ ];
 
-  # Speakers, not headphones: keep them out of the mic.
-  my.desktop.audio.echoCancel.enable = true;
   my.desktop.audio.lowLatency = {
     enable = true;
     quantum = 128;

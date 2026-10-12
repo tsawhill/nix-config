@@ -4,6 +4,8 @@
     source = "alsa_input.usb-MOTU_M2_M2MA072BWT-00.pro-input-0";
     channel = "AUX0";
     description = "MOTU M2 Mic (Processed)";
+    # Speakers hang off the M2; with headphones (same outputs) it has nothing to cancel.
+    echoCancel = true;
     controls = {
       # 6 dB over room noise (-65.6), 17.5 under quiet speech (-42.0).
       gate."Curve threshold (G)" = 0.001059; # -59.5 dBFS
