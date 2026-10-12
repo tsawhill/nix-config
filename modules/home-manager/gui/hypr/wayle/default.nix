@@ -7,6 +7,15 @@
 let
   cfg = config.my.hypr;
   palette = config.services.wayle.settings.styling.palette;
+  toggleMusic = pkgs.writeShellScript "wayle-toggle-music" ''
+    export PATH=${
+      lib.makeBinPath [
+        pkgs.hyprland
+        pkgs.uwsm
+      ]
+    }:$PATH
+    exec ${pkgs.python3}/bin/python3 ${./toggle-music.py}
+  '';
 
   # Custom modules get no per-module theme, so give them the pink split-button look.
   themed =
@@ -108,6 +117,7 @@ let
     monitor = "*";
     left = [
       "hyprland-workspaces"
+      "custom-feishin"
       "custom-media"
     ];
     center = [ "window-title" ];
@@ -128,6 +138,7 @@ let
     monitor = "*";
     left = [
       "hyprland-workspaces"
+      "custom-feishin"
       "custom-media"
       "systray"
       "idle-inhibit"
@@ -187,6 +198,14 @@ in
         # Bluetooth, network and media replace the built-ins, whose labels
         # cannot be formatted; they still open the built-in dropdowns.
         custom = map themed [
+          {
+            id = "feishin";
+            command = "${pkgs.coreutils}/bin/printf Music";
+            interval-ms = 60000;
+            icon-name = "ld-music-symbolic";
+            label-show = false;
+            left-click = "${toggleMusic}";
+          }
           {
             id = "mchose-m7";
             command = "${pkgs.python3}/bin/python3 ${./mchose-m7-battery.py}";

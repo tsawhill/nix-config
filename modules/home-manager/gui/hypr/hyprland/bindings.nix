@@ -70,11 +70,23 @@ in
     hl.bind("XF86MonBrightnessUp",   hl.dsp.exec_cmd("brightnessctl set +5%"))
     hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("brightnessctl set 5%-"))
 
-    -- Repeated resize (binde)
-    hl.bind(mainMod .. " + SHIFT + right", hl.dsp.window.resize({ x = 30,  y = 0 }),   { repeating = true })
-    hl.bind(mainMod .. " + SHIFT + left",  hl.dsp.window.resize({ x = -30, y = 0 }),   { repeating = true })
-    hl.bind(mainMod .. " + SHIFT + up",    hl.dsp.window.resize({ x = 0,   y = -30 }), { repeating = true })
-    hl.bind(mainMod .. " + SHIFT + down",  hl.dsp.window.resize({ x = 0,   y = 30 }),  { repeating = true })
+    -- Preserve the RuneLite stream's requested size when using resize binds.
+    local function resizeAllowed()
+      local w = hl.get_active_window()
+      return not (w and w.class == "com.moonlight_stream.Moonlight"
+        and w.title:lower():match("runelite.* %- moonlight$")
+        and w.workspace and w.workspace.id == 6)
+    end
+    local function guardedResize(args)
+      return function()
+        if resizeAllowed() then hl.dispatch(hl.dsp.window.resize(args)) end
+      end
+    end
+    -- These are deltas; Lua's resize dispatcher defaults to absolute sizes.
+    hl.bind(mainMod .. " + SHIFT + right", guardedResize({ x = 30,  y = 0, relative = true }),   { repeating = true })
+    hl.bind(mainMod .. " + SHIFT + left",  guardedResize({ x = -30, y = 0, relative = true }),   { repeating = true })
+    hl.bind(mainMod .. " + SHIFT + up",    guardedResize({ x = 0,   y = -30, relative = true }), { repeating = true })
+    hl.bind(mainMod .. " + SHIFT + down",  guardedResize({ x = 0,   y = 30, relative = true }),  { repeating = true })
 
     -- Locked binds (bindl): fire even when a game has grabbed the keyboard
     hl.bind(mainMod .. " + SHIFT + Q", hl.dsp.window.close(), { locked = true })
@@ -85,6 +97,6 @@ in
 
     -- Mouse binds (bindm): move/resize with mainMod + LMB/RMB drag
     hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(),   { mouse = true })
-    hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
+    hl.bind(mainMod .. " + mouse:273", guardedResize(), { mouse = true })
   '';
 }

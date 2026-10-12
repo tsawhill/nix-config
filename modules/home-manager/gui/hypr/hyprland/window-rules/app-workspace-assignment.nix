@@ -22,7 +22,7 @@
 
       # --- Secondary monitor apps (ws 6) ---
       { match = { class = "vesktop"; }; workspace = "6 silent"; }
-      { match = { class = "feishin"; }; workspace = "6 silent"; }
+      { match = { class = "feishin"; }; workspace = "special:music silent"; }
       { match = { class = "com.obsproject.Studio"; }; workspace = "6 silent"; }
     ];
   };

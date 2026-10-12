@@ -4,17 +4,22 @@
 
   config = lib.mkIf config.my.hypr.windowRules.secondaryMonitor.enable {
     wayland.windowManager.hyprland.settings.window_rule = [
-      # vesktop — master window on workspace 6
+      # Keep Vesktop's preferred content size inside the remaining tile.
       {
         match = { class = "vesktop"; };
         pseudo = true;
         size = "2123 1209";
       }
-      # feishin — slave window on workspace 6
       {
-        match = { class = "feishin"; };
+        match = {
+          class = "^com\\.moonlight_stream\\.Moonlight$";
+          title = "(?i).*runelite.* - Moonlight$";
+        };
+        workspace = "6 silent";
+        float = false;
         pseudo = true;
-        size = "907 921";
+        size = "1180 820";
+        suppress_event = "fullscreen maximize";
       }
     ];
   };
