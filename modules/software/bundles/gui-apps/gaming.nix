@@ -110,7 +110,6 @@ in
         mesa
         mesa-demos
         # Launchers
-        heroic
         faugus-launcher
         (pkgs.bolt-launcher.override { jdk17 = pkgs.openjdk; })
         boilr
