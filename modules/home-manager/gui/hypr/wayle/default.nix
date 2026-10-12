@@ -238,6 +238,8 @@ in
           }
         ];
 
+        systray.blacklist = [ "feishin_*" ];
+
         hyprland-workspaces = {
           min-workspace-count = 0;
           monitor-specific = true;

@@ -8,10 +8,19 @@
 
       -- App launches (vesktop managed as systemd service below for portal ordering)
       hl.exec_cmd("steam")
-      hl.exec_cmd("sleep 15; uwsm app -- heroic")
       hl.exec_cmd("sleep 15; uwsm app -- feishin")
     end)
   '';
+
+  # Their packages ship XDG autostart entries; the bar's right-click opens the managers.
+  xdg.configFile =
+    lib.genAttrs [ "autostart/nm-applet.desktop" "autostart/blueman.desktop" ]
+      (_: {
+        text = ''
+          [Desktop Entry]
+          Hidden=true
+        '';
+      });
 
   # Persistent background processes managed as systemd user services
   systemd.user.services = {
