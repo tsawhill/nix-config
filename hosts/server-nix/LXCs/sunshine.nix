@@ -3,13 +3,16 @@
   lib,
   self,
   pkgs,
+  networkTopology,
   ...
 }:
 
 let
   user = "taylor";
+  uid = 1000;
+  # Only one stream compositor runs at a time, so it always gets this socket.
   waylandDisplay = "wayland-0";
-  streamOutput = "HDMI-A-1";
+  streamOutput = "HEADLESS-1";
   boltLauncher = pkgs.bolt-launcher.override { jdk17 = pkgs.openjdk; };
   sunshinePackage = (pkgs.sunshine.override { cudaSupport = true; }).overrideAttrs (oldAttrs: {
     patches = (oldAttrs.patches or [ ]) ++ [
@@ -28,27 +31,11 @@ let
     __EGL_VENDOR_LIBRARY_FILENAMES = "/run/opengl-driver/share/glvnd/egl_vendor.d/10_nvidia.json";
   };
 
-  sessionEnvironment = {
-    # Xwayland does not inherit KDE's cursorSize, so X11 clients fall back to 24px.
-    XCURSOR_SIZE = "24";
-    DBUS_SESSION_BUS_ADDRESS = "unix:path=%t/bus";
-    KDE_FULL_SESSION = "true";
-    KDE_SESSION_VERSION = "6";
-    QT_QPA_PLATFORM = "wayland";
-    WAYLAND_DISPLAY = waylandDisplay;
-    XDG_CURRENT_DESKTOP = "KDE";
-    XDG_SESSION_DESKTOP = "KDE";
-    XDG_SESSION_TYPE = "wayland";
-  };
-
   # Keep the version-independent GLVND dispatcher in the guest while loading
   # the driver-version-specific NVIDIA EGL implementation from server-nix.
   nvidiaGraphicsEnvironment = nvidiaClientEnvironment // {
     GBM_BACKEND = "nvidia-drm";
-    # Xwayland's mesa-libgbm ships no backends, so glamor cannot find
-    # nvidia-drm_gbm.so and Xwayland then offers no GLX fbconfigs.
     GBM_BACKENDS_PATH = "/run/opengl-driver/lib/gbm";
-    KWIN_DRM_DEVICES = "/dev/dri/card1";
     LD_PRELOAD = "${pkgs.libglvnd}/lib/libEGL.so.1";
     __GLX_VENDOR_LIBRARY_NAME = "nvidia";
   };
@@ -70,259 +57,237 @@ let
     ]
   );
 
-  runRuneLite = pkgs.writeShellScript "sunshine-run-runelite" ''
-    # Sunshine needs this preload for capture and encoding, but passing it to
-    # Qt/Java clients prevents them from selecting the mounted NVIDIA driver.
-    unset LD_PRELOAD GBM_BACKEND KWIN_DRM_DEVICES
-    exec ${boltLauncher}/bin/bolt-launcher "$@"
+  # A display-less output on the GPU's render node; input comes only from
+  # Sunshine's devices, which libinput sees once their udev records exist.
+  compositorEnvironment = nvidiaClientEnvironment // {
+    DBUS_SESSION_BUS_ADDRESS = "unix:path=%t/bus";
+    # Xwayland's libgbm ships no backends of its own.
+    GBM_BACKENDS_PATH = "/run/opengl-driver/lib/gbm";
+    LABWC_UPDATE_ACTIVATION_ENV = "1";
+    LIBSEAT_BACKEND = "noop";
+    QT_QPA_PLATFORM = "wayland;xcb";
+    WLR_BACKENDS = "headless,libinput";
+    WLR_HEADLESS_OUTPUTS = "1";
+    WLR_LIBINPUT_NO_DEVICES = "1";
+    XCURSOR_PATH = "/run/current-system/sw/share/icons";
+    XCURSOR_SIZE = "24";
+    XCURSOR_THEME = "Adwaita";
+    XDG_CURRENT_DESKTOP = "labwc:wlroots";
+    XDG_SESSION_TYPE = "wayland";
+    __GLX_VENDOR_LIBRARY_NAME = "nvidia";
+  };
+
+  waybarConfig = pkgs.writeText "waybar.json" (
+    builtins.toJSON {
+      layer = "top";
+      position = "bottom";
+      modules-left = [
+        "custom/apps"
+        "wlr/taskbar"
+      ];
+      modules-right = [
+        "tray"
+        "clock"
+      ];
+      "custom/apps" = {
+        format = "Apps";
+        on-click = "fuzzel";
+        tooltip = false;
+      };
+      "wlr/taskbar" = {
+        on-click = "activate";
+        on-click-middle = "close";
+      };
+      clock.format = "{:%a %d %b  %H:%M}";
+    }
+  );
+
+  waybarStyle = pkgs.writeText "waybar.css" ''
+    * { font-family: sans-serif; font-size: 14px; }
+    window#waybar { background: #1e1e2e; color: #cdd6f4; }
+    #taskbar button { padding: 0 6px; color: #cdd6f4; }
+    #taskbar button.active { background: #45475a; }
+    #custom-apps, #tray, #clock { padding: 0 10px; }
   '';
 
-  waitForKWin = pkgs.writeShellScript "sunshine-wait-for-kwin" ''
+  desktopConfig = pkgs.linkFarm "labwc-stream-desktop" {
+    "rc.xml" = pkgs.writeText "rc.xml" ''
+      <?xml version="1.0"?>
+      <labwc_config>
+        <keyboard>
+          <default />
+          <keybind key="W-Return"><action name="Execute" command="foot" /></keybind>
+          <keybind key="W-space"><action name="Execute" command="fuzzel" /></keybind>
+        </keyboard>
+      </labwc_config>
+    '';
+    "menu.xml" = pkgs.writeText "menu.xml" ''
+      <?xml version="1.0" encoding="UTF-8"?>
+      <openbox_menu>
+        <menu id="root-menu" label="">
+          <item label="Applications"><action name="Execute" command="fuzzel" /></item>
+          <item label="Terminal"><action name="Execute" command="foot" /></item>
+          <item label="Firefox"><action name="Execute" command="firefox" /></item>
+          <item label="Steam"><action name="Execute" command="steam" /></item>
+          <item label="RuneLite"><action name="Execute" command="bolt-launcher" /></item>
+        </menu>
+      </openbox_menu>
+    '';
+    "autostart" = pkgs.writeText "autostart" ''
+      ${lib.getExe pkgs.waybar} -c ${waybarConfig} -s ${waybarStyle} >/dev/null 2>&1 &
+    '';
+  };
+
+  # Games get the whole output: every normal window maximized, undecorated.
+  kioskConfig = pkgs.linkFarm "labwc-stream-kiosk" {
+    "rc.xml" = pkgs.writeText "rc.xml" ''
+      <?xml version="1.0"?>
+      <labwc_config>
+        <windowRules>
+          <windowRule identifier="*" type="normal" serverDecoration="no" />
+          <windowRule identifier="*" type="normal">
+            <action name="Maximize" />
+          </windowRule>
+        </windowRules>
+      </labwc_config>
+    '';
+  };
+
+  labwc = "${pkgs.labwc}/bin/labwc";
+
+  # One compositor per Moonlight app. Game sessions exit with their game.
+  streamSessions = {
+    desktop = "${labwc} -C ${desktopConfig}";
+    runelite = "${labwc} -C ${kioskConfig} -S ${lib.getExe' boltLauncher "bolt-launcher"}";
+  };
+  streamUnits = lib.concatMapStringsSep " " (name: "stream-${name}.service") (
+    lib.attrNames streamSessions
+  );
+
+  # Sunshine prep/app commands: start a session at the client's resolution,
+  # stop it, or block until it exits so Sunshine ends the stream with it.
+  streamSession = pkgs.writeShellScript "stream-session" ''
     set -eu
+    shopt -s nullglob
+    PATH=${
+      lib.makeBinPath [
+        pkgs.coreutils
+        pkgs.gnugrep
+        pkgs.systemd
+        pkgs.util-linux
+        pkgs.wlr-randr
+      ]
+    }
 
-    # kwin_wayland_wrapper creates the socket before the compositor is ready.
-    # Wait for the compositor's D-Bus name so clients do not connect to a
-    # socket that no process is servicing yet.
-    for _ in $(seq 1 1800); do
-      if ${pkgs.systemd}/bin/busctl --user --no-pager list 2>/dev/null \
-        | ${pkgs.gnugrep}/bin/grep -q '^org\.kde\.KWin '; then
-        break
-      fi
-      sleep 0.1
-    done
-
-    if ! ${pkgs.systemd}/bin/busctl --user --no-pager list 2>/dev/null \
-      | ${pkgs.gnugrep}/bin/grep -q '^org\.kde\.KWin '; then
-      echo "KWin did not become ready" >&2
-      exit 1
-    fi
-  '';
-
-  # libglvnd reads the vendor list once, so starting before the bind mount
-  # leaves Sunshine without EGL until it restarts.
-  waitForNvidiaRuntime = pkgs.writeShellScript "sunshine-wait-for-nvidia-runtime" ''
-    for _ in $(seq 1 600); do
-      [ -e ${nvidiaClientEnvironment.__EGL_VENDOR_LIBRARY_FILENAMES} ] && exit 0
-      sleep 0.1
-    done
-
-    echo "NVIDIA runtime did not appear under /run/opengl-driver" >&2
-    exit 1
-  '';
-
-  waitForOutput = pkgs.writeShellScript "sunshine-wait-for-output" ''
-    set -eu
-
-    for _ in $(seq 1 600); do
-      outputs="$(${pkgs.coreutils}/bin/timeout --kill-after=0.2s 0.5s \
-        ${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} -o 2>/dev/null || true)"
-      if printf '%s\n' "$outputs" \
-        | ${pkgs.gnugrep}/bin/grep -q '${streamOutput}'; then
-        exit 0
-      fi
-      sleep 0.1
-    done
-
-    echo "${streamOutput} did not become ready" >&2
-    exit 1
-  '';
-
-  # nvidia-drm rejects any mode outside its EDID-derived pool, so the client
-  # resolutions come from server-nix's hardware/sunshine-edid.nix instead.
-  setClientStreamMode = pkgs.writeShellScript "sunshine-set-client-stream-mode" ''
-    set -eu
-
-    # Sunshine swallows a prep command's stderr, so a rejected mode otherwise
-    # shows up only as "exited with code [1]" with no reason anywhere.
+    # Sunshine swallows a prep command's stderr, so log failures to the journal.
     fail() {
-      ${pkgs.util-linux}/bin/logger -t sunshine-stream-mode -p user.err -- "$@"
-      echo "$@" >&2
+      logger -t stream-session -p user.err -- "$*"
+      echo "$*" >&2
       exit 1
     }
 
-    width=''${SUNSHINE_CLIENT_WIDTH:-}
-    height=''${SUNSHINE_CLIENT_HEIGHT:-}
-    fps=''${SUNSHINE_CLIENT_FPS:-}
+    userctl() {
+      systemctl --user "$@"
+    }
 
-    if ! ${lib.getExe pkgs.jq} -en \
-      --arg width "$width" --arg height "$height" --arg fps "$fps" \
-      '($width | tonumber) > 0 and ($height | tonumber) > 0 and ($fps | tonumber) > 0' \
-      >/dev/null 2>&1; then
-      fail "Invalid Moonlight display mode: ''${width}x''${height}@''${fps}"
-    fi
-
-    # Only the resolution has to match, because it sets the capture geometry.
-    # Clients pick all sorts of frame rates (24, 30, 48, 50, 90), so fall back
-    # to the cheapest refresh that still covers the request rather than
-    # refusing the stream outright.
-    mode_id="$(${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} -j \
-      | ${lib.getExe pkgs.jq} -r \
-        --arg output ${lib.escapeShellArg streamOutput} \
-        --argjson width "$width" --argjson height "$height" --argjson fps "$fps" '
-          [
-            .outputs[]
-            | select(.name == $output)
-            | .modes[]
-            | select(.size.width == $width and .size.height == $height)
-          ]
-          | (
-              ([ .[] | select((.refreshRate - $fps) < 1 and (.refreshRate - $fps) > -1) ] | first)
-              // ([ .[] | select(.refreshRate >= $fps) ] | sort_by(.refreshRate) | first)
-              // (sort_by(.refreshRate) | last)
-            )
-          | .id // empty
-        ')"
-
-    if [ -z "$mode_id" ]; then
-      available="$(${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} -j \
-        | ${lib.getExe pkgs.jq} -r \
-          --arg output ${lib.escapeShellArg streamOutput} \
-          '[.outputs[] | select(.name == $output) | .modes[].name] | join(" ")')"
-      fail "Moonlight requested unavailable resolution ''${width}x''${height}; available: $available"
-    fi
-
-    exec ${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} \
-      "output.${streamOutput}.mode.$mode_id"
-  '';
-
-  userctl = "${pkgs.systemd}/bin/systemctl --user --machine=${user}@";
-
-  # KWin alone paints a bare cursor on an empty screen, so a usable session
-  # needs both the compositor's output and the shell.
-  sessionReady = pkgs.writeShellScript "sunshine-session-ready" ''
-    set -u
-
-    ${pkgs.util-linux}/bin/runuser -u ${user} -- \
-      env XDG_RUNTIME_DIR=/run/user/1000 \
-        DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus \
-        WAYLAND_DISPLAY=${waylandDisplay} \
-        ${pkgs.coreutils}/bin/timeout --kill-after=0.2s 1s \
-          ${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} -j 2>/dev/null \
-      | ${lib.getExe pkgs.jq} -e \
-        --arg output ${lib.escapeShellArg streamOutput} \
-        '[.outputs[] | select(.name == $output and .enabled)] | length > 0' \
-        >/dev/null 2>&1 || exit 1
-
-    ${userctl} is-active --quiet plasma-plasmashell.service
-  '';
-
-  # plasma-workspace-wayland.target has BindsTo on the compositor unit, so
-  # restarting KWin on its own stops that target, which cascades through the
-  # StopWhenUnneeded plasma targets and stops plasmashell. startplasma-wayland
-  # then exits successfully and unsets the session environment, leaving KWin
-  # alive with no shell and no way back. Restart the session unit instead so
-  # the compositor and the shell come back together.
-  # A replacement compositor races the outgoing one for DRM master. Losing it
-  # refuses the atomic modeset and leaves the output disabled, so verify the
-  # session returned and restart again when it did not.
-  restartPlasmaSession = pkgs.writeShellScript "sunshine-restart-plasma-session" ''
-    set -u
-
-    for attempt in 1 2 3; do
-      ${userctl} stop plasma-headless.service || true
-      # KWin has its own unit, so the teardown can leave it running and holding
-      # the Wayland socket the replacement session needs.
-      ${userctl} stop plasma-kwin_wayland.service || true
-      ${userctl} start plasma-headless.service || true
-
-      for _ in $(seq 1 60); do
-        if ${sessionReady}; then
-          exit 0
-        fi
-        sleep 0.5
+    # libinput only picks up devices whose udev records exist when it starts.
+    wait_for_input_records() {
+      for _ in $(seq 1 50); do
+        missing=0
+        for node in /dev/input/event*; do
+          sys=/sys/class/input/''${node##*/}
+          [ ${sunshineInputId} = beef:dead ] || continue
+          [ -e "/run/udev/data/c$(cat "$sys/dev" 2>/dev/null)" ] || missing=1
+        done
+        [ "$missing" -eq 0 ] && return
+        sleep 0.1
       done
+      logger -t stream-session -p user.warning -- "Starting without every Sunshine input device"
+    }
 
-      echo "Plasma session unusable after restart $attempt" >&2
-    done
+    case "''${1:-}" in
+      start)
+        session="''${2:?session name required}"
+        unit="stream-$session.service"
+        width=''${SUNSHINE_CLIENT_WIDTH:-}
+        height=''${SUNSHINE_CLIENT_HEIGHT:-}
+        fps=''${SUNSHINE_CLIENT_FPS:-}
+        number='^[1-9][0-9]*$'
+        if ! [[ $width =~ $number && $height =~ $number && $fps =~ $number ]]; then
+          fail "Invalid Moonlight display mode: ''${width}x''${height}@''${fps}"
+        fi
 
-    echo "Plasma session did not recover after being restarted" >&2
-    exit 1
+        wait_for_input_records
+        # Free the socket before the new compositor claims it.
+        userctl stop ${streamUnits}
+        userctl start "$unit"
+
+        for _ in $(seq 1 100); do
+          userctl is-active --quiet "$unit" || fail "$unit exited during startup"
+          if timeout 1 wlr-randr 2>/dev/null | grep -q '^${streamOutput} '; then
+            break
+          fi
+          sleep 0.1
+        done
+
+        timeout 5 wlr-randr --output ${streamOutput} --custom-mode "''${width}x''${height}@''${fps}Hz" \
+          || fail "Could not set ${streamOutput} to ''${width}x''${height}@''${fps}"
+        ;;
+      stop)
+        userctl stop ${streamUnits}
+        ;;
+      wait)
+        while userctl is-active --quiet "stream-''${2:?session name required}.service"; do
+          sleep 1
+        done
+        ;;
+      *)
+        fail "usage: stream-session start <session> | stop | wait <session>"
+        ;;
+    esac
   '';
 
-  # The first KWin process after an LXC cold boot can wedge in the NVIDIA DRM
-  # driver before it registers org.kde.KWin. systemd considers the wrapper
-  # active immediately, so the user units waiting for a usable compositor do
-  # not trigger a restart themselves. A second session start succeeds.
-  recoverKWinAtBoot = pkgs.writeShellScript "sunshine-recover-kwin-at-boot" ''
-    set -u
-
-    # startplasma-wayland generates and starts this unit at runtime. On a cold
-    # boot that currently takes about a minute, so wait for the unit rather
-    # than racing Plasma's systemd reload.
-    for _ in $(seq 1 180); do
-      if ${userctl} is-active --quiet plasma-kwin_wayland.service; then
-        break
-      fi
-      sleep 0.5
-    done
-
-    if ! ${userctl} is-active --quiet plasma-kwin_wayland.service; then
-      echo "KWin did not start during Plasma cold boot" >&2
-      exit 1
-    fi
-
-    for _ in $(seq 1 40); do
-      if ${sessionReady}; then
-        exit 0
-      fi
-      sleep 0.5
-    done
-
-    echo "Plasma session unusable after cold boot; restarting it" >&2
-    exec ${restartPlasmaSession}
-  '';
+  sunshineInputId = ''"$(cat "$sys/device/id/vendor" 2>/dev/null):$(cat "$sys/device/id/product" 2>/dev/null)"'';
 
   # Incus hotplugs Sunshine's uinput event nodes, but an unprivileged LXC
   # cannot synthesize the corresponding udev events. Mirror the host's udev
-  # records so libinput can classify the passed keyboard and mouse.
+  # records so libinput can classify the passed devices.
   syncInputMetadata = pkgs.writeShellScript "sunshine-sync-input-metadata" ''
     set -eu
     shopt -s nullglob
+    PATH=${lib.makeBinPath [ pkgs.coreutils ]}
 
-    ${pkgs.coreutils}/bin/install -d -m 0755 /run/udev/data
-    changed=0
-
-    for device in /dev/input/event*; do
-      event="''${device##*/}"
-      id_path="/sys/class/input/$event/device/id"
-      [ -r "$id_path/vendor" ] || continue
-      [ -r "$id_path/product" ] || continue
-      [ "$(<"$id_path/vendor")" = beef ] || continue
-      [ "$(<"$id_path/product")" = dead ] || continue
-
-      # Sunshine's keyboard and two mouse devices live for the lifetime of
-      # the daemon, while its touch and pen devices are recreated for every
-      # client connection. Restarting the session for those per-client devices
-      # kills open applications on every resume.
-      # Keep native touch/pen unavailable in this LXC so reconnecting only
-      # resumes the existing desktop.
-      device_name="$(<"/sys/class/input/$event/device/name")"
-      case "$device_name" in
-        "Keyboard passthrough" | "Mouse passthrough" | "Mouse passthrough (absolute)") ;;
-        *) continue ;;
-      esac
-
-      device_number="$(${pkgs.coreutils}/bin/stat -c '%t:%T' "$device")"
-      major_hex="''${device_number%%:*}"
-      minor_hex="''${device_number##*:}"
-      record="c$((16#$major_hex)):$((16#$minor_hex))"
-      source="/opt/host-udev-data/$record"
-      target="/run/udev/data/$record"
-
-      [ -r "$source" ] || continue
-      if [ "$(${pkgs.coreutils}/bin/readlink "$target" 2>/dev/null || true)" != "$source" ]; then
-        ${pkgs.coreutils}/bin/ln -sfnT "$source" "$target"
-        changed=1
-      fi
+    install -d -m 0755 /run/udev/data
+    for node in /dev/input/event*; do
+      sys=/sys/class/input/''${node##*/}
+      [ ${sunshineInputId} = beef:dead ] || continue
+      record=c$(cat "$sys/dev" 2>/dev/null) || continue
+      [ -r "/opt/host-udev-data/$record" ] || continue
+      ln -sfnT "/opt/host-udev-data/$record" "/run/udev/data/$record"
     done
+  '';
 
-    if [ "$changed" -eq 1 ]; then
-      # KWin's DRM backend discovers input through libinput at startup. The
-      # restart occurs only when a new udev record is linked. Keep Sunshine
-      # running so its uinput devices remain present while the session
-      # restarts; Sunshine is not part of that session's units.
-      ${restartPlasmaSession}
-    fi
+  # Incus has hung stopping this container when Sunshine's devices vanished as
+  # init exited, so wait for it to remove their nodes first (at most 10s).
+  drainInputNodes = pkgs.writeShellScript "sunshine-drain-input-nodes" ''
+    shopt -s nullglob
+    PATH=${lib.makeBinPath [ pkgs.coreutils ]}
+
+    pending() {
+      for node in /dev/input/event*; do
+        sys=/sys/class/input/''${node##*/}
+        # Device gone, node not yet removed by Incus.
+        [ -e "$sys" ] || return 0
+        [ ${sunshineInputId} = beef:dead ] && return 0
+      done
+      return 1
+    }
+
+    for _ in $(seq 1 100); do
+      pending || exit 0
+      sleep 0.1
+    done
+    echo "Sunshine input nodes still present after 10s" >&2
   '';
 in
 {
@@ -334,9 +299,10 @@ in
   ];
 
   networking.hostName = "sunshine-nix";
-  services.xserver.enable = true;
-  services.desktopManager.plasma6.enable = true;
-  services.displayManager.sddm.enable = false;
+
+  # Also brings the PipeWire, fonts, portals and Xwayland the session needs.
+  programs.labwc.enable = true;
+  programs.firefox.enable = true;
 
   software.apps.gaming.enable = true;
 
@@ -350,54 +316,62 @@ in
   };
 
   services.sunshine = {
-    # Two fixes: nixpkgs builds Sunshine without CUDA, but the pipewire capture
-    # still negotiates DMA-BUF on a pure-NVIDIA host, so the encoder falls back
-    # to the software converter and every frame fails to scale. The patch also
-    # moves encoder probing after the prep commands change the KWin output mode.
+    # Two fixes: nixpkgs builds Sunshine without CUDA, so DMA-BUF capture on a
+    # pure-NVIDIA host falls back to a software converter that fails every
+    # frame. The patch moves encoder probing after the prep commands, which
+    # start the compositor being captured.
     package = sunshinePackage;
 
-    # KWin capture does not need CAP_SYS_ADMIN. Avoiding the capability wrapper
+    # wlr capture does not need CAP_SYS_ADMIN. Avoiding the capability wrapper
     # also preserves the EGL loader environment for Sunshine.
     capSysAdmin = lib.mkForce false;
 
     settings = {
       sunshine_name = "sunshine-nix";
-      capture = "kwin";
+      capture = "wlr";
       output_name = streamOutput;
-      csrf_allowed_origins = "https://sunshine-nix.lan:47990,https://10.73.73.140:47990";
-      system_tray = "disabled";
-      global_prep_cmd = builtins.toJSON [
-        {
-          do = "${setClientStreamMode}";
-          undo = "${lib.getExe' pkgs.kdePackages.libkscreen "kscreen-doctor"} output.${streamOutput}.mode.1920x1080@120";
-          elevated = false;
-        }
+      csrf_allowed_origins = lib.concatMapStringsSep "," (host: "https://${host}:47990") [
+        "${config.networking.hostName}.lan"
+        (networkTopology.lib.lanIp config.networking.hostName)
       ];
+      system_tray = "disabled";
     };
 
     applications.apps = [
       {
         name = "Desktop";
-        auto-detach = "true";
+        prep-cmd = [
+          {
+            do = "${streamSession} start desktop";
+            undo = "${streamSession} stop";
+          }
+        ];
       }
       {
         name = "RuneLite";
-        cmd = "${runRuneLite}";
-        auto-detach = "true";
+        prep-cmd = [
+          {
+            do = "${streamSession} start runelite";
+            undo = "${streamSession} stop";
+          }
+        ];
+        cmd = "${streamSession} wait runelite";
+        auto-detach = "false";
       }
     ];
   };
 
   environment.systemPackages = with pkgs; [
+    adwaita-icon-theme
     boltLauncher
-    kdePackages.libkscreen
-    kdePackages.qtwayland
+    foot
+    fuzzel
+    wlr-randr
     xorg.xcbutilcursor
   ];
 
-  boot.kernelModules = [ "uinput" ];
-
-  users.users.taylor = {
+  users.users.${user} = {
+    inherit uid;
     isNormalUser = true;
     extraGroups = [
       "download"
@@ -411,24 +385,18 @@ in
   users.groups.download.gid = 1001;
   users.groups.games.gid = 1005;
 
-  # No display manager runs here, so nothing supplies the session environment
-  # and a lingering systemd --user never sources /etc/profile. Plasma starts
-  # plasmashell from its own units, which inherit the manager, not the units
-  # above. Kickoff resolves $XDG_MENU_PREFIX + applications.menu, and only
-  # plasma-applications.menu exists, so without the prefix the menu is empty.
+  # No display manager or login shell sets up this lingering user manager.
   # RuneLite runs sandboxed, where /etc/localtime resolves to a dangling
   # symlink and Java silently falls back to GMT, so TZ has to be explicit.
-  # LD_LIBRARY_PATH is set here rather than per-application because the GLX
-  # vendor libraries are unloadable for every X11 client in the session, not
-  # just the ones Sunshine launches.
+  # LD_LIBRARY_PATH is session-wide because the GLX vendor libraries are
+  # unloadable for every X11 client without it.
   systemd.user.extraConfig = ''
-    DefaultEnvironment=XDG_DATA_DIRS=/etc/profiles/per-user/${user}/share:/run/current-system/sw/share XDG_MENU_PREFIX=plasma- XDG_CURRENT_DESKTOP=KDE TZ=${config.time.timeZone} TZDIR=${pkgs.tzdata}/share/zoneinfo LD_LIBRARY_PATH=${glxClientLibraries}:/run/opengl-driver/lib
+    DefaultEnvironment=XDG_DATA_DIRS=/etc/profiles/per-user/${user}/share:/run/current-system/sw/share TZ=${config.time.timeZone} TZDIR=${pkgs.tzdata}/share/zoneinfo LD_LIBRARY_PATH=${glxClientLibraries}:/run/opengl-driver/lib
   '';
 
   # Without linger, user services never start on this headless container.
   systemd.tmpfiles.rules = [
     "f /var/lib/systemd/linger/${user} 0644 root root -"
-    "z /dev/uinput 0660 root input -"
   ];
 
   systemd.paths.sunshine-input-metadata = {
@@ -440,34 +408,27 @@ in
     };
   };
 
-  # Cold-boot readiness belongs to its own system unit. Input metadata is not
-  # guaranteed to change at boot, so its hotplug recovery path cannot be used
-  # to make compositor startup reliable.
-  systemd.services.sunshine-session-recovery = {
-    description = "Recover the Sunshine KWin session after cold boot";
-    wantedBy = [ "multi-user.target" ];
-    wants = [ "user@1000.service" ];
-    after = [ "user@1000.service" ];
-    serviceConfig = {
-      Type = "oneshot";
-      ExecStart = "${recoverKWinAtBoot}";
-      TimeoutStartSec = "5min";
-    };
-  };
-
   systemd.services.sunshine-input-metadata = {
     description = "Expose Sunshine input udev metadata to libinput";
     wantedBy = [ "multi-user.target" ];
     serviceConfig = {
       Type = "oneshot";
-      # A session restart with its retries outlasts the default start timeout.
-      TimeoutStartSec = "5min";
+      ExecStart = "${syncInputMetadata}";
     };
-    script = ''
-      # Coalesce the keyboard and both mouse hotplug events.
-      ${pkgs.coreutils}/bin/sleep 1
-      ${syncInputMetadata}
-    '';
+  };
+
+  systemd.services.sunshine-input-drain = {
+    description = "Wait for Incus to remove Sunshine's input devices";
+    wantedBy = [ "multi-user.target" ];
+    # Stops after the user manager, so after Sunshine has exited.
+    before = [ "user@${toString uid}.service" ];
+    restartIfChanged = false;
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      ExecStart = "${pkgs.coreutils}/bin/true";
+      ExecStop = "${drainInputNodes}";
+    };
   };
 
   # Keep the mutable RuneLite profile on the shared gamesaves dataset. Never
@@ -509,113 +470,42 @@ in
     '';
   };
 
-  systemd.user.services.plasma-headless = {
-    description = "Headless KDE Plasma Wayland Session";
-    wantedBy = [ "default.target" ];
-    after = [ "dbus.socket" ];
-    unitConfig.ConditionUser = user;
-
-    # Re-running startplasma-wayland during a switch races the session teardown,
-    # which drops plasmashell's start job and leaves the desktop with no panel.
-    restartIfChanged = false;
-
-    path = with pkgs; [
-      kdePackages.kwin
-      kdePackages.plasma-workspace
-      xwayland
-    ];
-
-    environment = sessionEnvironment;
-
-    serviceConfig = {
-      Type = "simple";
-      ExecStart = "${pkgs.kdePackages.plasma-workspace}/bin/startplasma-wayland";
-      # startplasma-wayland exits successfully whenever the session ends, so
-      # on-failure would leave a torn-down session dead with no shell.
-      Restart = "always";
-      RestartSec = "5";
-    };
-  };
-
-  # The virtual backend does not initialize libinput, so Sunshine's synthetic
-  # keyboard and mouse are invisible to Plasma. Use the passed NVIDIA DRM
-  # device and its connected HDMI output instead.
-  systemd.user.services.plasma-kwin_wayland = {
-    # A restart races the outgoing compositor for DRM master. When it loses,
-    # the atomic modeset is refused, the output stays disabled and Sunshine
-    # then finds no wl_output to capture.
-    restartIfChanged = false;
-
-    # The wrapper starts kwin_wayland and Xwayland by name. This unit otherwise
-    # receives only systemd's basic PATH and silently remains as a socket-owning
-    # wrapper with no compositor behind it.
-    path = [
-      pkgs.kdePackages.kwin
-      pkgs.xwayland
-    ];
-    environment =
-      sessionEnvironment
-      // nvidiaGraphicsEnvironment
-      // {
-        # This is a dedicated, single-user streaming LXC. Without the override,
-        # a cold KWin start hides its screencast protocol from systemd-launched
-        # Sunshine because there is no desktop-file security context.
-        KWIN_WAYLAND_NO_PERMISSION_CHECKS = "1";
+  systemd.user.services =
+    lib.mapAttrs' (
+      name: command:
+      lib.nameValuePair "stream-${name}" {
+        description = "Streamed ${name} session";
+        unitConfig.ConditionUser = user;
+        # A switch must not kill the apps in a live stream.
+        restartIfChanged = false;
+        path = [
+          "/run/wrappers"
+          config.system.path
+        ];
+        environment = compositorEnvironment;
+        serviceConfig = {
+          ExecStart = command;
+          TimeoutStopSec = "10s";
+        };
+      }
+    ) streamSessions
+    // {
+      # Starts with no compositor; each app's prep command brings one up.
+      sunshine = {
+        wantedBy = lib.mkForce [ "default.target" ];
+        unitConfig.ConditionUser = user;
+        partOf = lib.mkForce [ ];
+        wants = lib.mkForce [ ];
+        after = lib.mkForce [ ];
+        environment = nvidiaGraphicsEnvironment // {
+          WAYLAND_DISPLAY = waylandDisplay;
+          XDG_SESSION_TYPE = "wayland";
+          # FFmpeg dlopens libcuda.so.1, which ships only in the Incus driver
+          # mount and is missing from the guest loader cache, so NVENC probing
+          # fails without it. A unit's Environment= replaces DefaultEnvironment.
+          LD_LIBRARY_PATH = "${glxClientLibraries}:/run/opengl-driver/lib";
+        };
+        serviceConfig.Restart = lib.mkForce "always";
       };
-
-    serviceConfig.ExecStart = lib.mkForce (
-      "${lib.getExe' pkgs.kdePackages.kwin "kwin_wayland_wrapper"} " + "--xwayland --drm --no-lockscreen"
-    );
-  };
-
-  # Extend Plasma's packaged service instead of replacing it. It must survive
-  # the intentional KWin restart used to discover Sunshine's virtual input.
-  systemd.user.services.plasma-plasmashell = {
-    overrideStrategy = "asDropin";
-    after = [ "plasma-kwin_wayland.service" ];
-    # No display manager relaunches plasmashell, so a switch must not stop it.
-    restartIfChanged = false;
-    # NixOS gives a declaratively extended user service a minimal PATH. Since
-    # plasmashell launches desktop entries such as `Exec=dolphin %u`, it also
-    # needs the full system profile rather than only systemd's helper tools.
-    path = [ config.system.path ];
-    environment = nvidiaClientEnvironment;
-    unitConfig.StartLimitIntervalSec = 0;
-    serviceConfig.RestartSec = "2s";
-  };
-
-  # Sunshine connects to the plasma Wayland session
-  systemd.user.services.sunshine = {
-    wantedBy = lib.mkForce [ "default.target" ];
-    unitConfig.ConditionUser = user;
-    partOf = lib.mkForce [ ];
-    wants = lib.mkForce [ "plasma-headless.service" ];
-    after = lib.mkForce [ "plasma-headless.service" ];
-    environment =
-      sessionEnvironment
-      // nvidiaGraphicsEnvironment
-      // {
-        DISPLAY = ":0";
-        # FFmpeg dlopens libcuda.so.1, which ships only in the Incus driver mount
-        # and is missing from the guest loader cache, so NVENC probing fails and
-        # Sunshine falls back to the Vulkan encoder. This directory carries no
-        # GLVND dispatchers, so it cannot shadow the preloaded libglvnd libEGL.
-        # A unit's own Environment= replaces DefaultEnvironment for a variable,
-        # so the GLX libraries have to be repeated here to reach launched apps.
-        LD_LIBRARY_PATH = "${glxClientLibraries}:/run/opengl-driver/lib";
-      };
-    serviceConfig = {
-      ExecStartPre = [
-        "${waitForNvidiaRuntime}"
-        "${waitForKWin}"
-        "${waitForOutput}"
-      ];
-      Restart = lib.mkForce "always";
     };
-  };
-
-  warnings = lib.optional (lib.versionOlder pkgs.sunshine.version "2026.516.143833") ''
-    sunshine-nix is configured for KDE/Wayland capture = "kwin", but the selected Sunshine package is ${pkgs.sunshine.version}.
-    Use Sunshine >= 2026.516.143833 for KWin capture support.
-  '';
 }
