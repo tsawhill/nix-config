@@ -46,7 +46,8 @@
 
       my.hypr.wallpapers = {
         enable = true;
-        # e.g. monitors."eDP-1".videos = [ "name.mp4" ]; (after wallpapers-sync on build-nix)
+        # Each listed monitor rotates through every synced video (see hypr/wallpapers.nix).
+        monitors."eDP-1" = { };
       };
       wayland.windowManager.hyprland.settings.device = {
         name = "pixa3854:00-093a:0274-touchpad";

@@ -79,7 +79,9 @@
         };
         wallpapers = {
           enable = true;
-          # e.g. monitors."DP-1".videos = [ "name.mp4" ]; (after wallpapers-sync on build-nix)
+          # Each listed monitor rotates through every synced video (see hypr/wallpapers.nix).
+          monitors."DP-1" = { };
+          monitors."HDMI-A-1" = { };
         };
       };
 

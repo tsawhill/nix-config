@@ -1,3 +1,21 @@
+# Video wallpapers played by mpvpaper, looped or rotated per monitor.
+#
+# Where to find videos (free MP4 loops):
+#   - MotionBGs           https://motionbgs.com/           (best: lots of 4K, sane file sizes)
+#   - MoeWalls            https://moewalls.com/
+#   - Wallpaper Waifu     https://wallpaperwaifu.com/
+#   - DesktopHut          https://www.desktophut.com/
+#   - MyLiveWallpapers    https://mylivewallpapers.com/
+#   - Pexels Videos       https://www.pexels.com/videos/   (stock footage: rain, cities, nature)
+#   - Pixabay Videos      https://pixabay.com/videos/
+#
+# Adding videos:
+#   1. Copy the MP4s into wallpapers/ in the repo on build-nix. That directory is
+#      git-ignored; names may only use letters, digits and - _ . + = ? (no spaces).
+#   2. Run `wallpapers-sync` on build-nix. It adds them to the Nix store, keeps
+#      them from being garbage collected, and updates wallpapers/manifest.json.
+#   3. Deploy the hosts. Monitors without a `videos` list rotate through every
+#      synced video; list names in `videos` to pick specific ones.
 {
   lib,
   config,
@@ -11,6 +29,9 @@ let
   # and records their hashes here, and requireFile picks them up from there.
   manifestFile = ../../../../wallpapers/manifest.json;
   manifest = if builtins.pathExists manifestFile then lib.importJSON manifestFile else { };
+
+  videosFor = monCfg: if monCfg.videos == null then lib.attrNames manifest else monCfg.videos;
+  activeMonitors = lib.filterAttrs (_: monCfg: videosFor monCfg != [ ]) cfg.monitors;
 
   video =
     name:
@@ -34,7 +55,7 @@ let
   mkWallpaperService =
     monitor: monCfg:
     let
-      videos = map video monCfg.videos;
+      videos = map video (videosFor monCfg);
       # A single video just loops; restarting it every interval would only flicker.
       interval = if lib.length videos == 1 then "infinity" else monCfg.rotateInterval;
 
@@ -152,8 +173,9 @@ in
         lib.types.submodule {
           options = {
             videos = lib.mkOption {
-              type = lib.types.nonEmptyListOf lib.types.str;
-              description = "File names in the repo's wallpapers/ directory (run wallpapers-sync on build-nix after adding them). More than one rotates.";
+              type = lib.types.nullOr (lib.types.nonEmptyListOf lib.types.str);
+              default = null;
+              description = "File names in the repo's wallpapers/ directory; more than one rotates. Null (the default) rotates every video in wallpapers/manifest.json.";
             };
 
             rotateInterval = lib.mkOption {
@@ -190,19 +212,24 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    warnings = lib.mapAttrsToList (
+      monitor: _:
+      "my.hypr.wallpapers: ${monitor} has no videos to play; add some to wallpapers/ on build-nix and run wallpapers-sync."
+    ) (lib.removeAttrs cfg.monitors (lib.attrNames activeMonitors));
+
     systemd.user.services = lib.mapAttrs' (
       monitor: monCfg: lib.nameValuePair "wallpaper-${monitor}" (mkWallpaperService monitor monCfg)
-    ) cfg.monitors;
+    ) activeMonitors;
 
     # Restart a monitor's wallpaper after its mode changes or it reconnects, so
     # it gets a fresh surface and any video marked failed meanwhile is retried.
-    wayland.windowManager.hyprland.extraConfig = lib.mkIf (cfg.monitors != { }) ''
+    wayland.windowManager.hyprland.extraConfig = lib.mkIf (activeMonitors != { }) ''
       dofile("${./wallpaper-monitor.lua}")({
         ${lib.concatStringsSep "\n" (
           lib.mapAttrsToList (
             monitor: _:
             "[${builtins.toJSON monitor}] = ${builtins.toJSON "${pkgs.systemd}/bin/systemctl --user --no-block try-restart ${lib.escapeShellArg "wallpaper-${monitor}.service"}"},"
-          ) cfg.monitors
+          ) activeMonitors
         )}
       })
     '';
