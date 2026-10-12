@@ -70,6 +70,8 @@ let
         done < <(grep -rl /nix/store "$out/etc" "$out/share")
 
         echo ${driver.version} > "$out/driver-version"
+        # Lets the refresh unit tell which guests mounted an older runtime.
+        echo "$out" > "$out/runtime-id"
       '';
 in
 {
@@ -140,9 +142,17 @@ in
       failed=0
       while IFS= read -r guest; do
         [ -n "$guest" ] || continue
+        # Guests started after the mount (e.g. at boot) already have it.
+        mounted=$(incus file pull "local:$guest/opt/host-nvidia-runtime/runtime-id" - --project default 2>/dev/null || true)
+        [ "$mounted" != "${nvidiaRuntime}" ] || continue
         echo "Restarting $guest to refresh its host NVIDIA runtime"
-        if ! incus restart "local:$guest" --project default --timeout 60; then
-          echo "Failed to restart $guest" >&2
+        # A timed-out restart stops the guest without starting it again.
+        if ! incus stop "local:$guest" --project default --timeout 60; then
+          echo "Clean shutdown of $guest timed out; forcing it" >&2
+          incus stop "local:$guest" --project default --force || true
+        fi
+        if ! incus start "local:$guest" --project default; then
+          echo "Failed to start $guest" >&2
           failed=1
         fi
       done <<< "$guests"
