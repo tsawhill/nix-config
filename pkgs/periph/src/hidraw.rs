@@ -3,6 +3,7 @@
 
 use std::fs::{self, File};
 use std::io;
+use std::os::unix::fs::MetadataExt;
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::thread::sleep;
@@ -54,6 +55,8 @@ impl HidRaw {
 
 pub struct Node {
     pub dev: PathBuf,
+    /// Inode and ctime of the /dev node: a replug recreates it, even under the same name.
+    pub stamp: (u64, i64, i64),
     pub vid: u16,
     pub pid: u16,
     pub descriptor: Vec<u8>,
@@ -74,8 +77,11 @@ pub fn nodes() -> Vec<Node> {
             // HID_ID=bus:vendor:product, hex, zero-padded to 8
             let id = uevent.lines().find_map(|l| l.strip_prefix("HID_ID="))?;
             let mut parts = id.split(':').skip(1).map(|v| u32::from_str_radix(v, 16).unwrap_or(0) as u16);
+            let dev = PathBuf::from("/dev").join(entry.file_name());
+            let stamp = fs::metadata(&dev).map(|m| (m.ino(), m.ctime(), m.ctime_nsec())).unwrap_or_default();
             Some(Node {
-                dev: PathBuf::from("/dev").join(entry.file_name()),
+                dev,
+                stamp,
                 vid: parts.next()?,
                 pid: parts.next()?,
                 descriptor: fs::read(sys.join("device/report_descriptor")).unwrap_or_default(),

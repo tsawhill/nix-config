@@ -1,6 +1,7 @@
 //! MCHOSE mice on the 0x11/0x12 feature-report protocol (L7, M7, A7 families).
 //! Frames and firmware quirks: https://github.com/alexfrih/mchose-linux/blob/main/PROTOCOL.md
-//! Lift-off list, factory defaults and button codes: MCHOSE's M HUB web driver.
+//! Lift-off list, factory defaults, button codes and the `0x11 0x42` value
+//! encoding (0 = unchanged, flags 1 on / 2 off, mode 1-3): MCHOSE's M HUB web driver.
 
 use crate::hidraw::{HidRaw, Node};
 use serde::Deserialize;
@@ -111,33 +112,30 @@ pub struct Identity {
     pub charging: bool,
 }
 
-/// `0x11 0x06`. The first query after idle can come back zeroed, so ask again.
-pub fn identity(dev: &HidRaw) -> io::Result<Identity> {
-    for _ in 0..4 {
+/// `0x11 0x06`, or None while the mouse is idle, asleep or off: the dongle then
+/// answers with zeroed fields. The first query after idle can also come back zeroed.
+pub fn identity(dev: &HidRaw) -> io::Result<Option<Identity>> {
+    for attempt in 1..=4u64 {
         let d = request(dev, SHORT, &[0x06])?;
         if d.len() < 11 {
             return Err(invalid("short identity reply"));
         }
         if u16le(&d, 0) == 0 {
-            sleep(Duration::from_millis(120));
+            if attempt < 4 {
+                sleep(Duration::from_millis(120 * attempt));
+            }
             continue;
         }
-        return Ok(Identity {
+        return Ok(Some(Identity {
             vid: u16le(&d, 0),
             id: u16le(&d, 2),
             firmware: u32::from_le_bytes([d[4], d[5], d[6], d[7]]),
             connected: d[8] & 0x08 != 0,
             battery: d[9],
             charging: d[10] != 0,
-        });
+        }));
     }
-    Err(invalid("the mouse keeps answering an empty identity"))
-}
-
-/// The performance-mode byte from `0x11 0x03`.
-fn mode(dev: &HidRaw) -> io::Result<u8> {
-    let d = request(dev, SHORT, &[0x03])?;
-    d.get(6).copied().ok_or_else(|| invalid("short basics reply"))
+    Ok(None)
 }
 
 /// The 15 lighting fields from `0x11 0x1b`; byte 0 is on/off.
@@ -207,6 +205,10 @@ impl Block {
         let s = self.0[17];
         (s & 0x04 != 0, s & 0x08 != 0, s & 0x10 != 0)
     }
+    /// The top two bits of the sensor byte.
+    pub fn mode(&self) -> Option<Mode> {
+        Mode::from_bits(self.0[17] >> 6)
+    }
     pub fn debounce(&self) -> u8 {
         self.0[18]
     }
@@ -247,12 +249,18 @@ pub enum Mode {
 }
 
 impl Mode {
-    // Assumed from M HUB's list order; `periph show` on a mouse confirms it.
-    fn byte(self) -> u8 {
-        self as u8
+    /// Sensor byte bits 7-6, as read from an M7 Ultra in each mode.
+    fn from_bits(bits: u8) -> Option<Self> {
+        match bits {
+            0b00 => Some(Self::Performance),
+            0b10 => Some(Self::Gaming),
+            0b11 => Some(Self::Extreme),
+            _ => None,
+        }
     }
-    fn from_byte(b: u8) -> Option<Self> {
-        [Self::Performance, Self::Gaming, Self::Extreme].get(b as usize).copied()
+    /// The `gameMode` value M HUB sends in `0x11 0x42`.
+    fn code(self) -> u8 {
+        self as u8 + 1
     }
     fn name(self) -> &'static str {
         match self {
@@ -263,8 +271,17 @@ impl Mode {
     }
 }
 
-fn mode_name(b: u8) -> String {
-    Mode::from_byte(b).map(|m| m.name().to_string()).unwrap_or_else(|| format!("byte {b}"))
+fn mode_name(b: &Block) -> String {
+    b.mode().map(|m| m.name().to_string()).unwrap_or_else(|| format!("unknown (sensor byte {:02x})", b.0[17]))
+}
+
+/// `0x11 0x42` flag value: 0 would mean "leave unchanged".
+fn flag(on: bool) -> u8 {
+    if on {
+        1
+    } else {
+        2
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
@@ -385,10 +402,6 @@ impl Settings {
         b
     }
 
-    fn flag_bits(&self) -> u8 {
-        (self.ripple as u8) << 2 | (self.angle_snap as u8) << 3 | (self.motion_sync as u8) << 4
-    }
-
     fn dpi_button(&self) -> [u8; 4] {
         match self.buttons.dpi {
             ButtonAction::Default => DPI_DEFAULT,
@@ -399,15 +412,13 @@ impl Settings {
 
 pub struct Observed {
     pub id: Identity,
-    pub mode: u8,
     pub block: Block,
     pub rgb: Option<[u8; 15]>,
 }
 
 pub fn observe(dev: &HidRaw) -> io::Result<Observed> {
     Ok(Observed {
-        id: identity(dev)?,
-        mode: mode(dev)?,
+        id: identity(dev)?.ok_or_else(|| invalid("the mouse stopped answering"))?,
         block: Block::read(dev)?,
         rgb: rgb(dev).ok(),
     })
@@ -422,7 +433,6 @@ pub struct Plan {
     block: bool,
     perf: Option<[u8; 10]>,
     button: Option<[u8; 4]>,
-    mode: Option<u8>,
     rgb: Option<[u8; 15]>,
 }
 
@@ -433,7 +443,6 @@ impl Plan {
             && !self.block
             && self.perf.is_none()
             && self.button.is_none()
-            && self.mode.is_none()
             && self.rgb.is_none()
     }
 }
@@ -501,12 +510,26 @@ pub fn plan(s: &Settings, obs: &Observed, lod_known: bool) -> Plan {
     if angle_differs {
         p.changes.push(format!("angle correction {} -> {} degrees", b.angle(), s.angle_correction));
     }
-    if !lod_known {
-        p.changes.push(format!("lift-off {} (can't be read back, written once per start)", s.lift_off.name()));
+    let mode_differs = b.mode() != Some(s.performance_mode);
+    if mode_differs {
+        p.changes.push(format!("performance mode {} -> {}", mode_name(b), s.performance_mode.name()));
     }
-    if flags_differ || angle_differs || !lod_known {
-        let (r, a, m) = (s.ripple as u8, s.angle_snap as u8, s.motion_sync as u8);
-        p.perf = Some([0x42, s.lift_off.index(), r, a, m, 0, 0, 0, 1, s.angle_correction as u8]);
+    if !lod_known {
+        p.changes.push(format!("lift-off {} (can't be read back, written once per plug)", s.lift_off.name()));
+    }
+    if flags_differ || angle_differs || mode_differs || !lod_known {
+        p.perf = Some([
+            0x42,
+            s.lift_off.index(),
+            flag(s.ripple),
+            flag(s.angle_snap),
+            flag(s.motion_sync),
+            0,
+            0,
+            s.performance_mode.code(),
+            1,
+            s.angle_correction as u8,
+        ]);
     }
 
     let have = b.button(DPI_SLOT);
@@ -516,12 +539,6 @@ pub fn plan(s: &Settings, obs: &Observed, lod_known: bool) -> Plan {
     } else if have != want_button {
         p.button = Some(want_button);
         p.changes.push(format!("DPI button {} -> {}", hex(&have), hex(&want_button)));
-    }
-
-    let m = s.performance_mode.byte();
-    if obs.mode != m {
-        p.mode = Some(m);
-        p.changes.push(format!("performance mode {} -> {}", mode_name(obs.mode), s.performance_mode.name()));
     }
 
     match obs.rgb {
@@ -557,22 +574,10 @@ fn execute(dev: &HidRaw, s: &Settings, p: &Plan) -> io::Result<()> {
     if let Some(perf) = p.perf {
         send(dev, SHORT, &perf)?;
         sleep(Duration::from_millis(120));
-        // 0x11 0x42 sets these flags but won't clear them; a block write does.
-        let mut block = Block::read(dev)?;
-        let wanted = (block.0[17] & !0x1C) | s.flag_bits();
-        if block.0[17] != wanted {
-            block.0[17] = wanted;
-            block.write(dev)?;
-            confirm(dev, &block)?;
-        }
     }
     if let Some(button) = p.button {
         let body = [0x52, DPI_SLOT as u8, 0, button[0] & 0x0F, button[1], button[2], button[3]];
         send(dev, LONG, &body)?;
-        sleep(Duration::from_millis(120));
-    }
-    if let Some(m) = p.mode {
-        send(dev, SHORT, &[0x02, m])?;
         sleep(Duration::from_millis(120));
     }
     if let Some(rgb) = p.rgb {
@@ -629,7 +634,7 @@ pub fn summary(obs: &Observed) -> Vec<String> {
         format!("angle correction  {} degrees", b.angle()),
         format!("debounce          {} ms", b.debounce()),
         format!("sleep             {} min", b.sleep_minutes()),
-        format!("performance mode  {} (byte {})", mode_name(obs.mode), obs.mode),
+        format!("performance mode  {}", mode_name(b)),
         format!("lighting          {}", obs.rgb.map(|r| hex(&r)).unwrap_or_else(|| "no reply".into())),
         format!("buttons           {buttons}"),
         format!("config block      {}", hex(&b.0)),
@@ -642,9 +647,9 @@ pub fn nix(obs: &Observed) -> String {
     let n = (b.stages() as usize).clamp(1, 6);
     let stages = (0..n).map(|i| b.dpi(i).to_string()).collect::<Vec<_>>().join(" ");
     let (ripple, snap, sync) = b.flags();
-    let (mode, mode_note) = match Mode::from_byte(obs.mode) {
+    let (mode, mode_note) = match b.mode() {
         Some(m) => (m.name(), None),
-        None => ("performance", Some(format!("unknown byte {}", obs.mode))),
+        None => ("performance", Some(format!("unknown sensor byte {:02x}", b.0[17]))),
     };
     let (lighting, lighting_note) = match obs.rgb {
         Some(r) => (r[0] != 0, None),
@@ -724,7 +729,7 @@ mod tests {
             b.0[51 + i * 2..53 + i * 2].copy_from_slice(&d.to_le_bytes());
         }
         b.0[16] = 6;
-        b.0[17] = 0x03;
+        b.0[17] = 0x02;
         b.0[18] = 8;
         b.0[19] = 3;
         for slot in 0..6 {
@@ -733,10 +738,9 @@ mod tests {
         b
     }
 
-    fn observed(block: Block, mode: u8) -> Observed {
+    fn observed(block: Block) -> Observed {
         Observed {
             id: Identity { vid: 0x5253, id: M7_ULTRA, firmware: 0, connected: true, battery: 80, charging: false },
-            mode,
             block,
             rgb: Some([1; 15]),
         }
@@ -753,10 +757,21 @@ mod tests {
 
     #[test]
     fn factory_mouse_needs_only_lift_off() {
-        let p = plan(&settings(), &observed(factory_block(), 0), true);
+        let p = plan(&settings(), &observed(factory_block()), true);
         assert!(p.is_empty(), "{:?}", p.changes);
-        let p = plan(&settings(), &observed(factory_block(), 0), false);
-        assert_eq!(p.perf, Some([0x42, 0, 0, 0, 0, 0, 0, 0, 1, 0]));
+        let p = plan(&settings(), &observed(factory_block()), false);
+        assert_eq!(p.perf, Some([0x42, 0, 2, 2, 2, 0, 0, 1, 1, 0]));
+    }
+
+    #[test]
+    fn modes_read_from_the_sensor_byte() {
+        let mut b = factory_block();
+        for (sensor, mode) in [(0x02, Mode::Performance), (0x82, Mode::Gaming), (0xc2, Mode::Extreme)] {
+            b.0[17] = sensor;
+            assert_eq!(b.mode(), Some(mode));
+        }
+        b.0[17] = 0x42;
+        assert_eq!(b.mode(), None);
     }
 
     #[test]
@@ -774,12 +789,11 @@ mod tests {
         s.buttons.dpi = ButtonAction::Disabled;
         s.validate().unwrap();
 
-        let p = plan(&s, &observed(factory_block(), 0), true);
+        let p = plan(&s, &observed(factory_block()), true);
         assert_eq!(p.rate, Some((5, 5)));
         assert!(p.block);
-        assert_eq!(p.perf, Some([0x42, 1, 0, 0, 1, 0, 0, 0, 1, 253]));
+        assert_eq!(p.perf, Some([0x42, 1, 2, 2, 1, 0, 0, 2, 1, 253]));
         assert_eq!(p.button, Some(DPI_DISABLED));
-        assert_eq!(p.mode, Some(1));
         assert_eq!(p.rgb.map(|r| r[0]), Some(0));
 
         let want = s.edit(&factory_block());
@@ -797,11 +811,12 @@ mod tests {
         let mut s = settings();
         s.motion_sync = true;
         s.angle_correction = -3;
+        s.performance_mode = Mode::Gaming;
         let mut b = factory_block();
-        b.0[17] = 0x13;
+        b.0[17] = 0x92;
         b.0[49] = (-3i8) as u8;
         b.0[3] = 0x02; // mouse-owned byte
-        let p = plan(&s, &observed(b, 0), true);
+        let p = plan(&s, &observed(b), true);
         assert!(p.is_empty(), "{:?}", p.changes);
     }
 
@@ -811,7 +826,7 @@ mod tests {
         s.buttons.dpi = ButtonAction::Disabled;
         let mut b = factory_block();
         b.0[20 + DPI_SLOT * 4] = 0x05;
-        let p = plan(&s, &observed(b, 0), true);
+        let p = plan(&s, &observed(b), true);
         assert!(p.button.is_none());
         assert_eq!(p.notes.len(), 1);
     }
@@ -833,7 +848,8 @@ mod tests {
     fn nix_snippet_round_trips_the_readable_fields() {
         let mut b = factory_block();
         b.0[49] = (-3i8) as u8;
-        let text = nix(&observed(b, 1));
+        b.0[17] = 0x82;
+        let text = nix(&observed(b));
         assert!(text.contains("angleCorrection = -3;"));
         assert!(text.contains("performanceMode = \"gaming\";"));
         assert!(text.contains("dpiStages = [ 400 800 1600 3200 6400 42000 ];"));

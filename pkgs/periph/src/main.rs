@@ -28,7 +28,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Apply the config whenever a device comes online.
+    /// Apply the config to each device once it answers after being plugged in.
     Daemon {
         #[arg(long)]
         config: PathBuf,
@@ -85,10 +85,14 @@ fn print_plan(dev: &Path, plan: &mchose::Plan, verb: &str) {
     }
 }
 
+/// The mouse's identity once it's online, or None while it's idle, asleep or off.
+fn online(dev: &HidRaw) -> io::Result<Option<mchose::Identity>> {
+    Ok(mchose::identity(dev)?.filter(|id| id.connected))
+}
+
 /// Bring one online mouse to the config, or just report in a dry run.
-fn reconcile(node: &Node, dev: &HidRaw, config: &Config, dry_run: bool, lod_known: bool) -> io::Result<()> {
-    let id = mchose::identity(dev)?;
-    let path = &node.dev;
+/// Runs once per plug, so lift-off (which can't be read back) is always written.
+fn reconcile(path: &Path, dev: &HidRaw, id: &mchose::Identity, config: &Config, dry_run: bool) -> io::Result<()> {
     if id.id != mchose::M7_ULTRA {
         eprintln!("{}: MCHOSE device id {} has no driver yet, leaving it alone", path.display(), id.id);
         return Ok(());
@@ -102,66 +106,58 @@ fn reconcile(node: &Node, dev: &HidRaw, config: &Config, dry_run: bool, lod_know
         for line in mchose::summary(&obs) {
             eprintln!("{}: {line}", path.display());
         }
-        print_plan(path, &mchose::plan(settings, &obs, lod_known), "would change");
+        print_plan(path, &mchose::plan(settings, &obs, false), "would change");
     } else {
-        print_plan(path, &mchose::apply(dev, settings, lod_known)?, "changed");
+        print_plan(path, &mchose::apply(dev, settings, false)?, "changed");
     }
     Ok(())
 }
 
+/// Per plugged-in node: poll until the mouse answers, apply once, then leave it
+/// alone so an idle mouse isn't kept awake.
 #[derive(Default)]
 struct Seen {
-    online: bool,
-    lod_known: bool,
+    done: bool,
     failures: u32,
     next: Option<Instant>,
 }
 
-fn poll(node: &Node, seen: &mut Seen, config: &Config) -> io::Result<()> {
+/// True once the mouse answered and the config was applied.
+fn poll(node: &Node, config: &Config) -> io::Result<bool> {
     let dev = HidRaw::open_locked(&node.dev, LOCK_WAIT)?;
-    let id = mchose::identity(&dev)?;
-    if !id.connected {
-        if seen.online {
-            eprintln!("{}: mouse went offline", node.dev.display());
-        }
-        seen.online = false;
-        return Ok(());
-    }
-    if seen.online {
-        return Ok(());
-    }
+    let Some(id) = online(&dev)? else {
+        return Ok(false);
+    };
     eprintln!("{}: mouse online ({}% battery)", node.dev.display(), id.battery);
-    reconcile(node, &dev, config, config.dry_run, seen.lod_known)?;
-    seen.online = true;
-    seen.lod_known |= !config.dry_run;
-    Ok(())
+    reconcile(&node.dev, &dev, &id, config, config.dry_run)?;
+    Ok(true)
 }
 
 fn daemon(config: &Config) -> ExitCode {
     let mode = if config.dry_run { " (dry run: nothing is written)" } else { "" };
     eprintln!("periph: watching for devices{mode}");
-    let mut seen: HashMap<PathBuf, Seen> = HashMap::new();
+    let mut seen: HashMap<(PathBuf, (u64, i64, i64)), Seen> = HashMap::new();
     loop {
         let nodes = mice();
-        seen.retain(|dev, _| nodes.iter().any(|n| &n.dev == dev));
+        seen.retain(|(dev, stamp), _| nodes.iter().any(|n| &n.dev == dev && &n.stamp == stamp));
         let now = Instant::now();
         for node in &nodes {
-            let state = seen.entry(node.dev.clone()).or_default();
-            if state.next.is_some_and(|t| now < t) {
+            let state = seen.entry((node.dev.clone(), node.stamp)).or_default();
+            if state.done || state.next.is_some_and(|t| now < t) {
                 continue;
             }
             state.next = Some(now + POLL);
-            if let Err(e) = poll(node, state, config) {
-                state.failures += 1;
-                eprintln!("{}: {e}", node.dev.display());
-                // Don't keep rewriting a mouse that won't settle.
-                if state.failures >= 3 {
-                    eprintln!("{}: giving up until the mouse reconnects", node.dev.display());
-                    state.online = true;
-                    state.failures = 0;
+            match poll(node, config) {
+                Ok(done) => state.done = done,
+                Err(e) => {
+                    state.failures += 1;
+                    eprintln!("{}: {e}", node.dev.display());
+                    // Don't keep rewriting a mouse that won't settle.
+                    if state.failures >= 3 {
+                        eprintln!("{}: giving up until it's plugged in again", node.dev.display());
+                        state.done = true;
+                    }
                 }
-            } else {
-                state.failures = 0;
             }
         }
         sleep(SCAN);
@@ -171,11 +167,10 @@ fn daemon(config: &Config) -> ExitCode {
 fn apply_once(config: &Config, dry_run: bool) -> ExitCode {
     let mut ok = true;
     for node in mice() {
-        let result = HidRaw::open_locked(&node.dev, LOCK_WAIT).and_then(|dev| {
-            if mchose::identity(&dev)?.connected {
-                reconcile(&node, &dev, config, dry_run, false)
-            } else {
-                eprintln!("{}: mouse offline", node.dev.display());
+        let result = HidRaw::open_locked(&node.dev, LOCK_WAIT).and_then(|dev| match online(&dev)? {
+            Some(id) => reconcile(&node.dev, &dev, &id, config, dry_run),
+            None => {
+                eprintln!("{}: mouse offline or asleep; move it and try again", node.dev.display());
                 Ok(())
             }
         });
@@ -199,8 +194,8 @@ fn show() -> ExitCode {
     for node in nodes {
         println!("{} ({:04x}:{:04x})", node.dev.display(), node.vid, node.pid);
         let result = HidRaw::open_locked(&node.dev, LOCK_WAIT).and_then(|dev| {
-            if !mchose::identity(&dev)?.connected {
-                println!("  mouse offline\n");
+            if online(&dev)?.is_none() {
+                println!("  mouse offline or asleep; move it and try again\n");
                 return Ok(());
             }
             let obs = mchose::observe(&dev)?;
@@ -219,9 +214,9 @@ fn show() -> ExitCode {
 
 fn battery() -> ExitCode {
     for node in mice() {
-        let result = HidRaw::open_locked(&node.dev, LOCK_WAIT).and_then(|dev| mchose::identity(&dev));
+        let result = HidRaw::open_locked(&node.dev, LOCK_WAIT).and_then(|dev| online(&dev));
         match result {
-            Ok(id) if id.connected && id.vid == 0x5253 && id.battery <= 100 => {
+            Ok(Some(id)) if id.vid == 0x5253 && id.battery <= 100 => {
                 println!("{}", mchose::battery_json(&id));
                 return ExitCode::SUCCESS;
             }
