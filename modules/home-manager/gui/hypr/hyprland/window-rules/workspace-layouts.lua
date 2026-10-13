@@ -16,33 +16,6 @@ end
 
 local M = {}
 
-function M.steam()
-    hl.layout.register("steam-dashboard", {
-        recalculate = function(ctx)
-            local library, friends, chats = {}, {}, {}
-            for _, target in ipairs(ctx.targets) do
-                local w = target.window
-                if w and w.class:lower() == "steam" and w.title == "Steam" then
-                    table.insert(library, target)
-                elseif w and w.class:lower() == "steam" and w.title == "Friends List" then
-                    table.insert(friends, target)
-                else
-                    table.insert(chats, target)
-                end
-            end
-            local a = ctx.area
-            local left = (#library > 0 and (#friends + #chats > 0)) and math.floor(a.w * 0.60)
-                or (#library > 0 and a.w or 0)
-            rows(library, { x = a.x, y = a.y, w = left, h = a.h })
-            local top = (#chats > 0 and #friends > 0) and math.floor(a.h * 0.52)
-                or (#chats > 0 and a.h or 0)
-            rows(chats, { x = a.x + left, y = a.y, w = a.w - left, h = top })
-            rows(friends, { x = a.x + left, y = a.y + top, w = a.w - left, h = a.h - top })
-        end,
-    })
-    hl.workspace_rule({ workspace = "4", layout = "lua:steam-dashboard" })
-end
-
 function M.secondary(streamWidth)
     hl.layout.register("secondary-apps", {
         recalculate = function(ctx)

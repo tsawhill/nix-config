@@ -21,11 +21,38 @@
         suppress_event = "activatefocus";
         no_initial_focus = true;
       }
-    ];
 
-    # Library, friends and chats tile on their own; menus stay floating.
-    wayland.windowManager.hyprland.extraConfig = ''
-      dofile("${./workspace-layouts.lua}").steam()
-    '';
+      # Float titled windows (untitled ones are menus) at the chat spot, top right.
+      # Sizes are monitor fractions; rules take muParser expressions, not "%".
+      {
+        match = {
+          class = "steam";
+          title = "negative:(|notificationtoasts.*)";
+        };
+        float = true;
+        move = "(monitor_w*0.612) (monitor_h*0.04)";
+        size = "(monitor_w*0.286) (monitor_h*0.43)";
+      }
+
+      # Library lower left; width stays above Steam's 1515px minimum on 2560.
+      {
+        match = {
+          class = "steam";
+          title = "Steam";
+        };
+        move = "15 (monitor_h*0.28)";
+        size = "(monitor_w*0.595) (monitor_h*0.66)";
+      }
+
+      # Friends list lower right, flush with the screen edge margin.
+      {
+        match = {
+          class = "steam";
+          title = "Friends List";
+        };
+        move = "(monitor_w*0.785-15) (monitor_h*0.49)";
+        size = "(monitor_w*0.215) (monitor_h*0.51-15)";
+      }
+    ];
   };
 }
