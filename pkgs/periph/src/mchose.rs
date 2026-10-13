@@ -4,6 +4,7 @@
 //! encoding (0 = unchanged, flags 1 on / 2 off, mode 1-3): MCHOSE's M HUB web driver.
 
 use crate::hidraw::{HidRaw, Node};
+use crate::mchose_buttons as buttons;
 use serde::Deserialize;
 use std::io;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -24,11 +25,6 @@ pub const M7_ULTRA: u16 = 49;
 
 pub const RATES: [u32; 6] = [125, 500, 1000, 2000, 4000, 8000];
 const FACTORY_DPI: [u16; 6] = [400, 800, 1600, 3200, 6400, 42000];
-// The bottom DPI button is the sixth slot; the other five are the clicks and side buttons.
-const DPI_SLOT: usize = 5;
-// Slot byte is index << 4 | type; type 0 is the slot's own function, 9 is "disabled".
-const DPI_DEFAULT: [u8; 4] = [0x50, 0x00, 0x00, 0x00];
-const DPI_DISABLED: [u8; 4] = [0x59, 0xFF, 0xFF, 0xFF];
 
 pub fn is_config_node(n: &Node) -> bool {
     VENDORS.contains(&n.vid) && n.descriptor.windows(3).any(|w| w == [0x06, 0x01, 0xFF])
@@ -312,13 +308,6 @@ impl LiftOff {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum ButtonAction {
-    Default,
-    Disabled,
-}
-
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Links {
@@ -326,10 +315,35 @@ pub struct Links {
     pub wireless: u32,
 }
 
+/// One action per button, as `mchose_buttons` names them ("default", "disabled", "key:ctrl+c", ...).
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Buttons {
-    pub dpi: ButtonAction,
+    pub left: String,
+    pub middle: String,
+    pub right: String,
+    pub forward: String,
+    pub back: String,
+    pub dpi: String,
+}
+
+impl Buttons {
+    /// In slot order, matching `mchose_buttons::SLOTS`.
+    pub fn slots(&self) -> [&String; 6] {
+        [&self.left, &self.middle, &self.right, &self.forward, &self.back, &self.dpi]
+    }
+    pub fn slots_mut(&mut self) -> [&mut String; 6] {
+        [&mut self.left, &mut self.middle, &mut self.right, &mut self.forward, &mut self.back, &mut self.dpi]
+    }
+    fn from_slots([left, middle, right, forward, back, dpi]: [String; 6]) -> Self {
+        Self { left, middle, right, forward, back, dpi }
+    }
+}
+
+impl Default for Buttons {
+    fn default() -> Self {
+        Self::from_slots(std::array::from_fn(|_| "default".to_string()))
+    }
 }
 
 /// Every setting the driver manages. The Nix module fills unset ones with factory values.
@@ -387,6 +401,11 @@ impl Settings {
         if !(-30..=30).contains(&self.angle_correction) {
             return Err(format!("angleCorrection {} is outside -30..30", self.angle_correction));
         }
+        for (name, action) in buttons::SLOTS.iter().zip(self.buttons.slots()) {
+            if buttons::encode(action, 0).is_none() {
+                return Err(format!("buttons.{name}: unknown action {action:?}"));
+            }
+        }
         Ok(())
     }
 
@@ -405,13 +424,6 @@ impl Settings {
         b.0[18] = self.debounce_ms;
         b.0[19] = self.sleep_minutes;
         b
-    }
-
-    fn dpi_button(&self) -> [u8; 4] {
-        match self.buttons.dpi {
-            ButtonAction::Default => DPI_DEFAULT,
-            ButtonAction::Disabled => DPI_DISABLED,
-        }
     }
 }
 
@@ -442,7 +454,7 @@ pub struct Plan {
     rate: Option<(u8, u8)>,
     block: bool,
     perf: Option<[u8; 10]>,
-    button: Option<[u8; 4]>,
+    buttons: Vec<[u8; 4]>,
     rgb: Option<[u8; 15]>,
 }
 
@@ -452,7 +464,7 @@ impl Plan {
             && self.rate.is_none()
             && !self.block
             && self.perf.is_none()
-            && self.button.is_none()
+            && self.buttons.is_empty()
             && self.rgb.is_none()
     }
 }
@@ -543,13 +555,15 @@ pub fn plan(s: &Settings, obs: &Observed, lod_known: bool) -> Plan {
         ]);
     }
 
-    let have = b.button(DPI_SLOT);
-    let want_button = s.dpi_button();
-    if have[0] >> 4 != DPI_SLOT as u8 {
-        p.notes.push(format!("DPI button slot reads {}, not the expected layout; leaving it alone", hex(&have)));
-    } else if have != want_button {
-        p.button = Some(want_button);
-        p.changes.push(format!("DPI button {} -> {}", hex(&have), hex(&want_button)));
+    for (slot, (name, action)) in buttons::SLOTS.iter().zip(s.buttons.slots()).enumerate() {
+        let have = b.button(slot);
+        let Some(want) = buttons::encode(action, slot) else { continue };
+        if have[0] >> 4 != slot as u8 {
+            p.notes.push(format!("{name} button slot reads {}, not the expected layout; leaving it alone", hex(&have)));
+        } else if have != want {
+            p.buttons.push(want);
+            p.changes.push(format!("{name} button {} -> {action}", buttons::decode(have)));
+        }
     }
 
     match obs.rgb {
@@ -586,8 +600,8 @@ fn execute(dev: &HidRaw, s: &Settings, p: &Plan) -> io::Result<()> {
         send(dev, SHORT, &perf)?;
         sleep(Duration::from_millis(120));
     }
-    if let Some(button) = p.button {
-        let body = [0x52, DPI_SLOT as u8, 0, button[0] & 0x0F, button[1], button[2], button[3]];
+    for button in &p.buttons {
+        let body = [0x52, button[0] >> 4, 0, button[0] & 0x0F, button[1], button[2], button[3]];
         send(dev, LONG, &body)?;
         sleep(Duration::from_millis(120));
     }
@@ -658,7 +672,7 @@ pub fn settings_from(obs: &Observed, lift_off: LiftOff) -> Settings {
     let n = (b.stages() as usize).clamp(1, 6);
     let (ripple, angle_snap, motion_sync) = b.flags();
     let hz = |i: u8| RATES.get(i as usize).copied().unwrap_or(1000);
-    let dpi = if b.button(DPI_SLOT) == DPI_DISABLED { ButtonAction::Disabled } else { ButtonAction::Default };
+    let buttons = Buttons::from_slots(std::array::from_fn(|slot| buttons::decode(b.button(slot))));
     Settings {
         dpi_stages: (0..n).map(|i| b.dpi(i)).collect(),
         active_stage: (b.active().0 + 1).min(n as u8),
@@ -672,18 +686,14 @@ pub fn settings_from(obs: &Observed, lift_off: LiftOff) -> Settings {
         debounce_ms: b.debounce(),
         sleep_minutes: b.sleep_minutes(),
         lighting: obs.rgb.is_some_and(|r| r[0] != 0),
-        buttons: Buttons { dpi },
+        buttons,
     }
 }
 
 /// Settings as a Nix snippet for the home-manager module.
 pub fn to_nix(s: &Settings, lift_off_known: bool) -> String {
     let stages = s.dpi_stages.iter().map(u16::to_string).collect::<Vec<_>>().join(" ");
-    let button = match s.buttons.dpi {
-        ButtonAction::Default => "default",
-        ButtonAction::Disabled => "disabled",
-    };
-    let lines = [
+    let mut lines = vec![
         format!("dpiStages = [ {stages} ];"),
         format!("activeStage = {};", s.active_stage),
         format!("pollingRate = {{ wired = {}; wireless = {}; }};", s.polling_rate.wired, s.polling_rate.wireless),
@@ -700,8 +710,13 @@ pub fn to_nix(s: &Settings, lift_off_known: bool) -> String {
         format!("debounceMs = {};", s.debounce_ms),
         format!("sleepMinutes = {};", s.sleep_minutes),
         format!("lighting = {};", s.lighting),
-        format!("buttons.dpi = \"{button}\";"),
     ];
+    // Buttons default to "default", so only list the rebound ones.
+    for (name, action) in buttons::SLOTS.iter().zip(s.buttons.slots()) {
+        if action != "default" {
+            lines.push(format!("buttons.{name} = \"{action}\";"));
+        }
+    }
     let body: String = lines.iter().map(|l| format!("  {l}\n")).collect();
     format!("my.peripherals.mchose-m7-ultra = {{\n{body}}};")
 }
@@ -740,9 +755,12 @@ mod tests {
             debounce_ms: 8,
             sleep_minutes: 3,
             lighting: true,
-            buttons: Buttons { dpi: ButtonAction::Default },
+            buttons: Buttons::default(),
         }
     }
+
+    const DPI: usize = 5;
+    const DISABLED: [u8; 4] = [0x59, 0xFF, 0xFF, 0xFF];
 
     // A factory-fresh block: 1000 Hz, stage 3 of 6, the M HUB defaults.
     fn factory_block() -> Block {
@@ -777,10 +795,12 @@ mod tests {
         let mut b = factory_block();
         b.0[17] = 0x92;
         b.0[49] = (-4i8) as u8;
-        b.0[20 + DPI_SLOT * 4..24 + DPI_SLOT * 4].copy_from_slice(&DPI_DISABLED);
+        b.0[20 + DPI * 4..24 + DPI * 4].copy_from_slice(&DISABLED);
+        b.0[20 + 3 * 4..24 + 3 * 4].copy_from_slice(&[0x32, 0x01, 0x06, 0x00]);
         let obs = observed(b);
         let s = settings_from(&obs, LiftOff::Mid);
         assert_eq!((s.performance_mode, s.angle_correction, s.motion_sync), (Mode::Gaming, -4, true));
+        assert_eq!((s.buttons.dpi.as_str(), s.buttons.forward.as_str()), ("disabled", "key:ctrl+c"));
         let p = plan(&s, &obs, true);
         assert!(p.is_empty(), "{:?}", p.changes);
         assert!(to_nix(&s, true).contains("  liftOff = \"1mm\";\n"));
@@ -838,14 +858,15 @@ mod tests {
         s.performance_mode = Mode::Gaming;
         s.sleep_minutes = 10;
         s.lighting = false;
-        s.buttons.dpi = ButtonAction::Disabled;
+        s.buttons.dpi = "disabled".into();
+        s.buttons.back = "key:alt+left".into();
         s.validate().unwrap();
 
         let p = plan(&s, &observed(factory_block()), true);
         assert_eq!(p.rate, Some((2, 5)), "through the dongle only the wireless rate moves");
         assert!(p.block);
         assert_eq!(p.perf, Some([0x42, 1, 2, 2, 1, 0, 0, 2, 1, 253]));
-        assert_eq!(p.button, Some(DPI_DISABLED));
+        assert_eq!(p.buttons, vec![[0x42, 0x04, 0x50, 0x00], DISABLED]);
         assert_eq!(p.rgb.map(|r| r[0]), Some(0));
 
         let want = s.edit(&factory_block());
@@ -875,11 +896,11 @@ mod tests {
     #[test]
     fn unexpected_button_layout_is_left_alone() {
         let mut s = settings();
-        s.buttons.dpi = ButtonAction::Disabled;
+        s.buttons.dpi = "disabled".into();
         let mut b = factory_block();
-        b.0[20 + DPI_SLOT * 4] = 0x05;
+        b.0[20 + DPI * 4] = 0x05;
         let p = plan(&s, &observed(b), true);
-        assert!(p.button.is_none());
+        assert!(p.buttons.is_empty());
         assert_eq!(p.notes.len(), 1);
     }
 
@@ -887,6 +908,9 @@ mod tests {
     fn validation_rejects_bad_values() {
         let mut s = settings();
         s.active_stage = 7;
+        assert!(s.validate().is_err());
+        let mut s = settings();
+        s.buttons.left = "key:ctrl+nothing".into();
         assert!(s.validate().is_err());
         let mut s = settings();
         s.polling_rate.wired = 300;
@@ -905,7 +929,7 @@ mod tests {
         assert!(text.contains("angleCorrection = -3;"));
         assert!(text.contains("performanceMode = \"gaming\";"));
         assert!(text.contains("dpiStages = [ 400 800 1600 3200 6400 42000 ];"));
-        assert!(text.contains("buttons.dpi = \"default\";"));
+        assert!(!text.contains("buttons."), "default bindings stay out of the snippet");
     }
 
     #[test]

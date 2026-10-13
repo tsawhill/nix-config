@@ -173,14 +173,28 @@ in
         description = "Idle minutes before the mouse sleeps; 0 never sleeps.";
       };
       lighting = bool true "Mouse lighting on or off.";
-      buttons.dpi = mkOption {
-        type = types.enum [
-          "default"
-          "disabled"
-        ];
-        default = "default";
-        description = "The bottom DPI button.";
-      };
+      # Actions: default (the button's own function), disabled, left-click, right-click,
+      # middle-click, back, forward, scroll-up, scroll-down, dpi-cycle, dpi-up, dpi-down,
+      # volume-up, volume-down, mute, play-pause, next-track, previous-track, stop,
+      # brightness-up, brightness-down, or a key combo like "key:ctrl+c" / "key:f13".
+      buttons =
+        lib.genAttrs
+          [
+            "left"
+            "middle"
+            "right"
+            "forward"
+            "back"
+            "dpi"
+          ]
+          (
+            name:
+            mkOption {
+              type = types.str;
+              default = "default";
+              description = "What the ${name} button does.";
+            }
+          );
     };
 
     # Defaults are factory values where known; polling rate, debounce, lighting and the

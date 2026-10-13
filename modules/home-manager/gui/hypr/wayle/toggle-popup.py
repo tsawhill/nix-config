@@ -1,4 +1,4 @@
-"""Toggle a Wayle app in a special workspace positioned near the click."""
+"""Toggle an app's popup in a special workspace positioned near the click."""
 
 import fcntl
 import json
@@ -9,11 +9,13 @@ import time
 from pathlib import Path
 
 
+# name: (command, window classes, max width, max height, close instead of hiding)
 APPS = {
-    "music": ("feishin", {"feishin"}, 1100, 900),
-    "volume": ("pavucontrol", {"org.pulseaudio.pavucontrol", "pavucontrol"}, 700, 700),
-    "network": ("nm-connection-editor", {"nm-connection-editor"}, 700, 700),
-    "bluetooth": ("blueman-manager", {".blueman-manager-wrapped", "blueman-manager"}, 700, 700),
+    "music": (["feishin"], {"feishin"}, 1100, 900, False),
+    "volume": (["pavucontrol"], {"org.pulseaudio.pavucontrol", "pavucontrol"}, 700, 700, False),
+    "network": (["nm-connection-editor"], {"nm-connection-editor"}, 700, 700, False),
+    "bluetooth": (["blueman-manager"], {".blueman-manager-wrapped", "blueman-manager"}, 700, 700, False),
+    "mouse": (["periph-gui", "mchose-m7-ultra"], {"periph-mchose-m7-ultra"}, 760, 1000, True),
 }
 
 
@@ -43,7 +45,7 @@ def monitor_bounds(monitor):
 
 def main():
     app = sys.argv[1] if len(sys.argv) > 1 else "music"
-    command, classes, max_width, max_height = APPS[app]
+    command, classes, max_width, max_height, close = APPS[app]
     workspace = "music" if app == "music" else "wayle-" + app
     # Ignore repeated clicks while waiting for a cold app launch.
     with (Path(os.environ["XDG_RUNTIME_DIR"]) / f"wayle-{app}.lock").open("w") as lock:
@@ -61,24 +63,28 @@ def main():
                 monitor = candidate
                 break
         dispatch(f"hl.dsp.focus({{ monitor = {lua(monitor['name'])} }})")
-        if monitor.get("specialWorkspace", {}).get("name") == "special:" + workspace:
-            dispatch(f'hl.dsp.workspace.toggle_special({lua(workspace)})')
-            return
 
         def app_windows():
             return [w for w in query("clients") if w["class"].lower() in classes]
 
+        if monitor.get("specialWorkspace", {}).get("name") == "special:" + workspace:
+            if close:
+                for window in app_windows():
+                    dispatch(f'hl.dsp.window.close({{ window = {lua("address:" + window["address"])} }})')
+            dispatch(f'hl.dsp.workspace.toggle_special({lua(workspace)})')
+            return
+
         windows = app_windows()
         cold_launch = not windows
         if cold_launch:
-            subprocess.Popen(["uwsm", "app", "--", command], start_new_session=True)
+            subprocess.Popen(["uwsm", "app", "--", *command], start_new_session=True)
             for _ in range(80):
                 time.sleep(0.1)
                 windows = app_windows()
                 if windows:
                     break
         if not windows:
-            raise RuntimeError(f"{command} did not open within eight seconds")
+            raise RuntimeError(f"{' '.join(command)} did not open within eight seconds")
 
         # Also handles an already-running window from before these rules loaded.
         window = max(windows, key=lambda w: w["size"][0] * w["size"][1])

@@ -3,6 +3,7 @@
 pub mod config;
 pub mod hidraw;
 pub mod mchose;
+pub mod mchose_buttons;
 pub mod rongyuan;
 
 use hidraw::Node;

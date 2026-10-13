@@ -4,7 +4,7 @@
 use eframe::egui::{self, Button, Color32, ComboBox, DragValue, RichText, Slider};
 use periph::config::{self, Config};
 use periph::hidraw::{HidRaw, Node};
-use periph::{devices, mchose, rongyuan};
+use periph::{devices, mchose, mchose_buttons, rongyuan};
 use std::io;
 use std::io::Write;
 use std::path::PathBuf;
@@ -129,9 +129,21 @@ enum Action {
     Copy(String),
 }
 
+/// Device names `periph-gui <device>` accepts, as the Nix options call them.
+const DEVICE_NAMES: [&str; 2] = ["mchose-m7-ultra", "boyi-h60pro"];
+
+fn wanted(node: &Node, only: Option<&str>) -> bool {
+    match only {
+        None => true,
+        Some("boyi-h60pro") => rongyuan::is_config_node(node),
+        Some(_) => mchose::is_config_node(node),
+    }
+}
+
 struct App {
     declared: Option<Config>,
     config_error: Option<String>,
+    only: Option<String>,
     devices: Vec<Device>,
     job: Option<Receiver<Msg>>,
     status: String,
@@ -139,8 +151,16 @@ struct App {
 }
 
 impl App {
-    fn new(ctx: &egui::Context, declared: Option<Config>, config_error: Option<String>) -> Self {
-        let mut app = Self { declared, config_error, devices: Vec::new(), job: None, status: String::new(), log: Vec::new() };
+    fn new(ctx: &egui::Context, declared: Option<Config>, config_error: Option<String>, only: Option<String>) -> Self {
+        let mut app = Self {
+            declared,
+            config_error,
+            only,
+            devices: Vec::new(),
+            job: None,
+            status: String::new(),
+            log: Vec::new(),
+        };
         app.run(Action::Reload, ctx);
         app
     }
@@ -164,7 +184,11 @@ impl App {
             Action::Reload => {
                 self.status = "Reading devices…".into();
                 let lift_off = self.declared_lift_off();
-                self.spawn(ctx, move || Msg::Scanned(devices().iter().map(|n| read(n, lift_off)).collect()));
+                let only = self.only.clone();
+                self.spawn(ctx, move || {
+                    let nodes = devices().into_iter().filter(|n| wanted(n, only.as_deref()));
+                    Msg::Scanned(nodes.map(|n| read(&n, lift_off)).collect())
+                });
             }
             Action::ResetToNix(index) => {
                 let Some(declared) = &self.declared else { return };
@@ -423,17 +447,159 @@ fn mouse_ui(ui: &mut egui::Ui, s: &mut mchose::Settings, nix: Option<&mchose::Se
             .on_hover_text("0 never sleeps");
         mark(ui, nix.is_some_and(|n| n.sleep_minutes != s.sleep_minutes));
 
-        ui.label("DPI button");
-        let actions = [
-            (mchose::ButtonAction::Default, "default".to_string()),
-            (mchose::ButtonAction::Disabled, "disabled".to_string()),
-        ];
-        combo(ui, "dpi-button", &mut s.buttons.dpi, &actions);
-        mark(ui, nix.is_some_and(|n| n.buttons.dpi != s.buttons.dpi));
-
         ui.label("Lighting");
         ui.checkbox(&mut s.lighting, "");
         mark(ui, nix.is_some_and(|n| n.lighting != s.lighting));
+
+    });
+    ui.add_space(8.0);
+    mouse_diagram(ui, &mut s.buttons, nix.map(|n| &n.buttons));
+}
+
+const BUTTON_LABELS: [&str; 6] = ["Left", "Middle", "Right", "Forward", "Back", "DPI"];
+
+/// One button's action: free text (for key combos) plus the named actions.
+fn button_editor(ui: &mut egui::Ui, slot: usize, action: &mut String) {
+    ui.add(egui::TextEdit::singleline(action).desired_width(170.0).hint_text("default"));
+    ComboBox::from_id_salt(("button", slot)).selected_text("").width(24.0).show_ui(ui, |ui| {
+        for (name, ..) in mchose_buttons::ACTIONS {
+            if ui.selectable_label(action == name, name).clicked() {
+                *action = name.to_string();
+            }
+        }
+    });
+    if mchose_buttons::encode(action, slot).is_none() {
+        ui.colored_label(Color32::LIGHT_RED, "unknown")
+            .on_hover_text("Pick from the list, or type key:ctrl+c style combos");
+    }
+}
+
+/// A top-down mouse with a label per button; click a button or label to edit it below.
+fn mouse_diagram(ui: &mut egui::Ui, buttons: &mut mchose::Buttons, declared: Option<&mchose::Buttons>) {
+    use egui::{pos2, vec2, Align2, CornerRadius, FontId, Pos2, Rect, Sense, Shape, Stroke, StrokeKind};
+
+    let size = vec2(ui.available_width().max(420.0), 330.0);
+    let (rect, response) = ui.allocate_exact_size(size, Sense::click());
+    let painter = ui.painter_at(rect);
+    let v = ui.visuals().clone();
+    let id = ui.id().with("selected-button");
+    let mut selected = ui.data(|d| d.get_temp::<usize>(id)).unwrap_or(5);
+
+    // Body: a rounded superellipse, a touch wider toward the palm.
+    let (cx, top, bw, bh) = (rect.center().x, rect.top() + 18.0, 120.0, 290.0);
+    let half = |y: f32| {
+        let t = ((y - top) / bh).clamp(0.0, 1.0);
+        let p = 2.4;
+        bw / 2.0 * (1.0 - (2.0 * t - 1.0).abs().powf(p)).max(0.0).powf(1.0 / p) * (0.9 + 0.1 * t)
+    };
+    let steps = 48;
+    let ys = (0..=steps).map(|i| top + bh * i as f32 / steps as f32);
+    let outline: Vec<Pos2> = ys.clone().map(|y| pos2(cx - half(y), y)).chain(ys.rev().map(|y| pos2(cx + half(y), y))).collect();
+    let split = top + bh * 0.42;
+    let wheel = Rect::from_center_size(pos2(cx, top + bh * 0.17), vec2(16.0, 46.0));
+    let side = |frac: f32| {
+        let y = top + bh * frac;
+        let x = cx - half(y);
+        Rect::from_min_max(pos2(x - 6.0, y - 16.0), pos2(x + 6.0, y + 16.0))
+    };
+    let (forward, back) = (side(0.40), side(0.56));
+    let dpi = pos2(cx, top + bh * 0.76);
+
+    // Per slot: the point on the mouse, where its label goes, and which side.
+    let (lx, rx) = (cx - bw / 2.0 - 28.0, cx + bw / 2.0 + 28.0);
+    let spots: [(Pos2, Pos2, bool); 6] = [
+        (pos2(cx - bw * 0.22, top + bh * 0.22), pos2(lx, top + bh * 0.12), false),
+        (wheel.center_top() + vec2(0.0, 8.0), pos2(rx, top + bh * 0.06), true),
+        (pos2(cx + bw * 0.22, top + bh * 0.24), pos2(rx, top + bh * 0.24), true),
+        (forward.left_center(), pos2(lx, top + bh * 0.40), false),
+        (back.left_center(), pos2(lx, top + bh * 0.58), false),
+        (dpi + vec2(9.0, 0.0), pos2(rx, top + bh * 0.76), true),
+    ];
+    let label_rect = |pos: Pos2, right: bool| {
+        let min = if right { pos - vec2(0.0, 20.0) } else { pos - vec2(120.0, 20.0) };
+        Rect::from_min_size(min, vec2(120.0, 40.0))
+    };
+    let hit = |p: Pos2| -> Option<usize> {
+        if wheel.expand(3.0).contains(p) {
+            return Some(1);
+        }
+        if forward.expand(3.0).contains(p) {
+            return Some(3);
+        }
+        if back.expand(3.0).contains(p) {
+            return Some(4);
+        }
+        if p.distance(dpi) <= 13.0 {
+            return Some(5);
+        }
+        if p.y >= top && p.y <= split && (p.x - cx).abs() <= half(p.y) {
+            return Some(if p.x < cx { 0 } else { 2 });
+        }
+        (0..6).find(|&slot| label_rect(spots[slot].1, spots[slot].2).contains(p))
+    };
+
+    let hovered = response.hover_pos().and_then(hit);
+    if hovered.is_some() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    if let Some(slot) = response.clicked().then(|| response.interact_pointer_pos()).flatten().and_then(hit) {
+        selected = slot;
+        ui.data_mut(|d| d.insert_temp(id, slot));
+    }
+
+    let differs = |slot: usize| declared.is_some_and(|d| d.slots()[slot] != buttons.slots()[slot]);
+    let fill = |slot: usize| {
+        if slot == selected {
+            v.selection.bg_fill
+        } else if hovered == Some(slot) {
+            v.widgets.hovered.bg_fill
+        } else {
+            v.widgets.inactive.bg_fill
+        }
+    };
+    let line = v.widgets.noninteractive.fg_stroke;
+    let stroke = |slot: usize| if differs(slot) { Stroke::new(2.0, CHANGED) } else { line };
+
+    painter.add(Shape::convex_polygon(outline.clone(), v.faint_bg_color, Stroke::new(1.5, line.color)));
+    for (slot, clip) in [
+        (0, Rect::from_min_max(pos2(rect.left(), top), pos2(cx - 1.0, split))),
+        (2, Rect::from_min_max(pos2(cx + 1.0, top), pos2(rect.right(), split))),
+    ] {
+        painter.with_clip_rect(clip).add(Shape::convex_polygon(outline.clone(), fill(slot), stroke(slot)));
+    }
+    painter.line_segment([pos2(cx - half(split), split), pos2(cx + half(split), split)], line);
+    painter.line_segment([pos2(cx, top), pos2(cx, split)], line);
+    painter.rect(wheel, CornerRadius::same(7), fill(1), stroke(1), StrokeKind::Middle);
+    for i in 1..5 {
+        let y = wheel.top() + wheel.height() * i as f32 / 5.0;
+        painter.line_segment([pos2(wheel.left() + 4.0, y), pos2(wheel.right() - 4.0, y)], Stroke::new(1.0, line.color));
+    }
+    for (slot, r) in [(3, forward), (4, back)] {
+        painter.rect(r, CornerRadius::same(4), fill(slot), stroke(slot), StrokeKind::Middle);
+    }
+    painter.circle(dpi, 9.0, fill(5), stroke(5));
+    painter.text(dpi + vec2(0.0, 14.0), Align2::CENTER_TOP, "underside", FontId::proportional(10.0), v.weak_text_color());
+
+    let actions = buttons.slots();
+    for (slot, &(anchor, pos, right)) in spots.iter().enumerate() {
+        let edge = if right { pos - vec2(6.0, 0.0) } else { pos + vec2(6.0, 0.0) };
+        let color = if differs(slot) { CHANGED } else { v.weak_text_color() };
+        painter.line_segment([anchor, edge], Stroke::new(1.0, color));
+        painter.circle_filled(anchor, 2.5, color);
+        let (name_align, action_align) =
+            if right { (Align2::LEFT_BOTTOM, Align2::LEFT_TOP) } else { (Align2::RIGHT_BOTTOM, Align2::RIGHT_TOP) };
+        let name_color = if slot == selected { v.selection.stroke.color } else { v.strong_text_color() };
+        painter.text(pos, name_align, BUTTON_LABELS[slot], FontId::proportional(14.0), name_color);
+        painter.text(pos + vec2(0.0, 2.0), action_align, actions[slot].as_str(), FontId::proportional(12.0), color);
+    }
+
+    let changed = differs(selected);
+    ui.horizontal(|ui| {
+        ui.label(RichText::new(format!("{} button", BUTTON_LABELS[selected])).strong());
+        button_editor(ui, selected, buttons.slots_mut()[selected]);
+        if changed {
+            ui.label(RichText::new("≠ nix").color(CHANGED));
+        }
     });
 }
 
@@ -601,34 +767,52 @@ fn keyboard_ui(ui: &mut egui::Ui, model: &rongyuan::Model, s: &mut rongyuan::Set
     }
 }
 
-/// `--config <path>`, else the copy home-manager puts in ~/.config/periph.
-fn config_path() -> Option<PathBuf> {
-    if let Some(path) = std::env::args().skip_while(|a| a != "--config").nth(1) {
-        return Some(PathBuf::from(path));
+/// `periph-gui [--config <path>] [device]`; without --config, the copy home-manager
+/// puts in ~/.config/periph.
+fn parse_args() -> (Option<PathBuf>, Option<String>) {
+    let mut args = std::env::args().skip(1);
+    let (mut path, mut only) = (None, None);
+    while let Some(arg) = args.next() {
+        if arg == "--config" {
+            path = args.next().map(PathBuf::from);
+        } else if DEVICE_NAMES.contains(&arg.as_str()) {
+            only = Some(arg);
+        } else {
+            eprintln!("usage: periph-gui [--config <path>] [{}]", DEVICE_NAMES.join("|"));
+            std::process::exit(2);
+        }
     }
-    let base = std::env::var_os("XDG_CONFIG_HOME")
-        .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".config")))?;
-    Some(base.join("periph/config.json")).filter(|p| p.exists())
+    let default = || {
+        let base = std::env::var_os("XDG_CONFIG_HOME")
+            .map(PathBuf::from)
+            .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".config")))?;
+        Some(base.join("periph/config.json")).filter(|p| p.exists())
+    };
+    (path.or_else(default), only)
 }
 
 fn main() -> eframe::Result {
-    let path = config_path();
+    let (path, only) = parse_args();
     let (declared, config_error) = match path.as_deref().map(config::load) {
         Some(Ok(c)) => (Some(c), None),
         Some(Err(e)) => (None, Some(e)),
         None => (None, None),
     };
+    // A per-device class lets window rules and popup toggles tell the windows apart.
+    let app_id = only.as_ref().map_or("periph".to_string(), |d| format!("periph-{d}"));
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([600.0, 900.0])
+            .with_inner_size([720.0, 1000.0])
             .with_title("Peripherals")
-            .with_app_id("periph"),
+            .with_app_id(app_id),
         ..Default::default()
     };
     eframe::run_native(
         "periph",
         options,
-        Box::new(move |cc| Ok(Box::new(App::new(&cc.egui_ctx, declared, config_error)))),
+        Box::new(move |cc| {
+            cc.egui_ctx.set_zoom_factor(1.25);
+            Ok(Box::new(App::new(&cc.egui_ctx, declared, config_error, only)))
+        }),
     )
 }

@@ -7,14 +7,18 @@
 let
   cfg = config.my.hypr;
   palette = config.services.wayle.settings.styling.palette;
+  peripherals = config.my.peripherals;
   togglePopup = pkgs.writeShellScript "wayle-toggle-popup" ''
     export PATH=${
-      lib.makeBinPath [
-        pkgs.hyprland
-        pkgs.uwsm
-      ]
+      lib.makeBinPath (
+        [
+          pkgs.hyprland
+          pkgs.uwsm
+        ]
+        ++ lib.optional peripherals.enable peripherals.package
+      )
     }:$PATH
-    exec ${pkgs.python3}/bin/python3 ${./toggle-music.py} "$@"
+    exec ${pkgs.python3}/bin/python3 ${./toggle-popup.py} "$@"
   '';
 
   # Custom modules get no per-module theme, so give them the pink split-button look.
@@ -230,20 +234,25 @@ in
             left-click = "${togglePopup} music";
             right-click = "dropdown:media";
           }
-          {
-            id = "mchose-m7";
-            # periph waits for the device lock its daemon holds; the script would give up.
-            command =
-              if config.my.peripherals.enable then
-                "${lib.getExe config.my.peripherals.package} battery"
-              else
-                "${pkgs.python3}/bin/python3 ${./mchose-m7-battery.py}";
-            interval-ms = 15000;
-            hide-if-empty = true;
-            icon-name = "ld-mouse-symbolic";
-            format = "{{ output }}";
-            label-show = true;
-          }
+          (
+            {
+              id = "mchose-m7";
+              # periph waits for the device lock its daemon holds; the script would give up.
+              command =
+                if peripherals.enable then
+                  "${lib.getExe peripherals.package} battery"
+                else
+                  "${pkgs.python3}/bin/python3 ${./mchose-m7-battery.py}";
+              interval-ms = 15000;
+              hide-if-empty = true;
+              icon-name = "ld-mouse-symbolic";
+              format = "{{ output }}";
+              label-show = true;
+            }
+            // lib.optionalAttrs peripherals.enable {
+              right-click = "${togglePopup} mouse";
+            }
+          )
           {
             id = "bluetooth";
             command = "${bluetoothStatus}";
