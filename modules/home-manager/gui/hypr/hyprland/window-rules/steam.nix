@@ -15,25 +15,15 @@
       {
         match = {
           class = "steam";
-          title = "^notificationtoasts";
+          title = "notificationtoasts.*";
         };
         idle_inhibit = "none";
         suppress_event = "activatefocus";
         no_initial_focus = true;
       }
-
-      # Workspace 4's Lua layout places library/chat/friends in proportional
-      # cells and recalculates when the workspace changes monitors.
-      {
-        match = {
-          class = "steam";
-          title = "negative:^notificationtoasts";
-        };
-        float = false;
-        pseudo = false;
-      }
     ];
 
+    # Library, friends and chats tile on their own; menus stay floating.
     wayland.windowManager.hyprland.extraConfig = ''
       dofile("${./workspace-layouts.lua}").steam()
     '';

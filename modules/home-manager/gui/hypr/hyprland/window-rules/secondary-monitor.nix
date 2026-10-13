@@ -11,7 +11,6 @@ in
       # Keep Vesktop's preferred content size inside the remaining tile.
       {
         match = { class = "vesktop"; };
-        float = false;
         pseudo = true;
         size = "2123 1209";
       }
