@@ -69,7 +69,8 @@ def main():
             return [w for w in query("clients") if w["class"].lower() in classes]
 
         windows = app_windows()
-        if not windows:
+        cold_launch = not windows
+        if cold_launch:
             subprocess.Popen(["uwsm", "app", "--", command], start_new_session=True)
             for _ in range(80):
                 time.sleep(0.1)
@@ -97,6 +98,11 @@ def main():
         # Prepare the hidden window before starting the workspace reveal animation.
         dispatch(f"hl.dsp.window.resize({{ x = {width}, y = {height}, window = {address} }})")
         dispatch(f"hl.dsp.window.move({{ x = {int(x)}, y = {int(y)}, window = {address} }})")
+        if cold_launch:
+            # Client registration precedes completion of windowsIn (500 ms) and
+            # geometry animations (450 ms). Let both settle while hidden so the
+            # workspace reveal does not overlap a partially finished entrance.
+            time.sleep(0.6)
         dispatch(f'hl.dsp.workspace.toggle_special({lua(workspace)})')
 
 
