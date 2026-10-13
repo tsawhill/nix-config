@@ -94,9 +94,10 @@ def main():
         height = min(max_height, int((y1 - y0) * 0.85))
         x = min(max(cursor["x"] - 24, x0), x1 - width)
         y = min(max(cursor["y"] + margin, y0), y1 - height)
-        dispatch(f'hl.dsp.workspace.toggle_special({lua(workspace)})')
+        # Prepare the hidden window before starting the workspace reveal animation.
         dispatch(f"hl.dsp.window.resize({{ x = {width}, y = {height}, window = {address} }})")
         dispatch(f"hl.dsp.window.move({{ x = {int(x)}, y = {int(y)}, window = {address} }})")
+        dispatch(f'hl.dsp.workspace.toggle_special({lua(workspace)})')
 
 
 if __name__ == "__main__":

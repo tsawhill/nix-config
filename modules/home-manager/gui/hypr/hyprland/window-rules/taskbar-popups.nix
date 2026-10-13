@@ -24,12 +24,20 @@ in
   config = lib.mkIf config.my.hypr.windowRules.taskbarPopups.enable {
     my.hypr.taskbarPopups = [
       ".blueman-manager-wrapped"
+      "blueman-manager"
       "org.pulseaudio.pavucontrol"
+      "pavucontrol"
       "nm-connection-editor"
     ];
 
 
     wayland.windowManager.hyprland.settings.window_rule =
-      lib.concatMap mkPopupRules config.my.hypr.taskbarPopups;
+      lib.concatMap mkPopupRules config.my.hypr.taskbarPopups
+      ++ [
+        # Start hidden so the helper can size and position each window before revealing it.
+        { match.class = "(org\\.pulseaudio\\.pavucontrol|pavucontrol)"; workspace = "special:wayle-volume silent"; }
+        { match.class = "nm-connection-editor"; workspace = "special:wayle-network silent"; }
+        { match.class = "(\\.blueman-manager-wrapped|blueman-manager)"; workspace = "special:wayle-bluetooth silent"; }
+      ];
   };
 }
