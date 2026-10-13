@@ -15,18 +15,28 @@
         no_initial_focus = true;
       }
 
-      # Keep notification toasts above the bottom Wayle bar, with 80 logical
-      # pixels of clearance for the bar and its inset. Block focus grabs too.
+      # Block idle inhibition and focus grabs from notification toasts.
       {
         match = {
           class = "steam";
           title = "notificationtoasts.*";
         };
-        float = true;
-        move = "(monitor_w-window_w-15) (monitor_h-window_h-80)";
         idle_inhibit = "none";
         suppress_event = "activatefocus";
         no_initial_focus = true;
+      }
+
+      # Only reposition new toasts on workspaces without a fullscreen window.
+      # Leave 80 logical pixels for the bottom Wayle bar and its inset;
+      # fullscreen games keep Steam's own toast placement.
+      {
+        match = {
+          class = "steam";
+          title = "notificationtoasts.*";
+          workspace = "f[-1]";
+        };
+        float = true;
+        move = "(monitor_w-window_w-15) (monitor_h-window_h-80)";
       }
 
       # Float titled windows (untitled ones are menus) at the chat spot, top right.
