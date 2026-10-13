@@ -1,11 +1,20 @@
-"""Toggle Feishin's special workspace beneath a Wayle button click."""
+"""Toggle a Wayle app in a special workspace positioned near the click."""
 
 import fcntl
 import json
 import os
 import subprocess
+import sys
 import time
 from pathlib import Path
+
+
+APPS = {
+    "music": ("feishin", {"feishin"}, 1100, 900),
+    "volume": ("pavucontrol", {"org.pulseaudio.pavucontrol", "pavucontrol"}, 700, 700),
+    "network": ("nm-connection-editor", {"nm-connection-editor"}, 700, 700),
+    "bluetooth": ("blueman-manager", {".blueman-manager-wrapped", "blueman-manager"}, 700, 700),
+}
 
 
 def query(kind):
@@ -33,8 +42,11 @@ def monitor_bounds(monitor):
 
 
 def main():
+    app = sys.argv[1] if len(sys.argv) > 1 else "music"
+    command, classes, max_width, max_height = APPS[app]
+    workspace = "music" if app == "music" else "wayle-" + app
     # Ignore repeated clicks while waiting for a cold app launch.
-    with (Path(os.environ["XDG_RUNTIME_DIR"]) / "wayle-music.lock").open("w") as lock:
+    with (Path(os.environ["XDG_RUNTIME_DIR"]) / f"wayle-{app}.lock").open("w") as lock:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
@@ -49,28 +61,28 @@ def main():
                 monitor = candidate
                 break
         dispatch(f"hl.dsp.focus({{ monitor = {lua(monitor['name'])} }})")
-        if monitor.get("specialWorkspace", {}).get("name") == "special:music":
-            dispatch('hl.dsp.workspace.toggle_special("music")')
+        if monitor.get("specialWorkspace", {}).get("name") == "special:" + workspace:
+            dispatch(f'hl.dsp.workspace.toggle_special({lua(workspace)})')
             return
 
-        def music_windows():
-            return [w for w in query("clients") if w["class"].lower() == "feishin"]
+        def app_windows():
+            return [w for w in query("clients") if w["class"].lower() in classes]
 
-        windows = music_windows()
+        windows = app_windows()
         if not windows:
-            subprocess.Popen(["uwsm", "app", "--", "feishin"], start_new_session=True)
+            subprocess.Popen(["uwsm", "app", "--", command], start_new_session=True)
             for _ in range(80):
                 time.sleep(0.1)
-                windows = music_windows()
+                windows = app_windows()
                 if windows:
                     break
         if not windows:
-            raise RuntimeError("Feishin did not open within eight seconds")
+            raise RuntimeError(f"{command} did not open within eight seconds")
 
         # Also handles an already-running window from before these rules loaded.
         window = max(windows, key=lambda w: w["size"][0] * w["size"][1])
         address = lua("address:" + window["address"])
-        dispatch(f'hl.dsp.window.move({{ workspace = "special:music", follow = false, window = {address} }})')
+        dispatch(f'hl.dsp.window.move({{ workspace = {lua("special:" + workspace)}, follow = false, window = {address} }})')
         dispatch(f'hl.dsp.window.float({{ action = "enable", window = {address} }})')
 
         mx, my, mw, mh = monitor_bounds(monitor)
@@ -78,11 +90,11 @@ def main():
         margin = 12
         x0, y0 = mx + left + margin, my + top + margin
         x1, y1 = mx + mw - right - margin, my + mh - bottom - margin
-        width = min(1100, int((x1 - x0) * 0.8))
-        height = min(900, int((y1 - y0) * 0.85))
+        width = min(max_width, int((x1 - x0) * 0.8))
+        height = min(max_height, int((y1 - y0) * 0.85))
         x = min(max(cursor["x"] - 24, x0), x1 - width)
         y = min(max(cursor["y"] + margin, y0), y1 - height)
-        dispatch('hl.dsp.workspace.toggle_special("music")')
+        dispatch(f'hl.dsp.workspace.toggle_special({lua(workspace)})')
         dispatch(f"hl.dsp.window.resize({{ x = {width}, y = {height}, window = {address} }})")
         dispatch(f"hl.dsp.window.move({{ x = {int(x)}, y = {int(y)}, window = {address} }})")
 

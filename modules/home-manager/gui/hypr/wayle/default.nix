@@ -7,14 +7,14 @@
 let
   cfg = config.my.hypr;
   palette = config.services.wayle.settings.styling.palette;
-  toggleMusic = pkgs.writeShellScript "wayle-toggle-music" ''
+  togglePopup = pkgs.writeShellScript "wayle-toggle-popup" ''
     export PATH=${
       lib.makeBinPath [
         pkgs.hyprland
         pkgs.uwsm
       ]
     }:$PATH
-    exec ${pkgs.python3}/bin/python3 ${./toggle-music.py}
+    exec ${pkgs.python3}/bin/python3 ${./toggle-music.py} "$@"
   '';
 
   # Custom modules get no per-module theme, so give them the pink split-button look.
@@ -204,7 +204,7 @@ in
             icon-name = "ld-music-symbolic";
             label-show = true;
             label-max-length = 35;
-            left-click = "${toggleMusic}";
+            left-click = "${togglePopup} music";
             right-click = "dropdown:media";
           }
           {
@@ -226,7 +226,7 @@ in
               connected = "ld-bluetooth-connected-symbolic";
             };
             left-click = "dropdown:bluetooth";
-            right-click = "if pgrep 'blueman-manager*' > /dev/null; then pkill -9 'blueman-manager*'; else blueman-manager; fi";
+            right-click = "${togglePopup} bluetooth";
           }
           {
             id = "network";
@@ -245,7 +245,7 @@ in
               wired = "cm-wired-symbolic";
             };
             left-click = "dropdown:network";
-            right-click = "if pgrep 'nm-connection*' > /dev/null; then pkill -9 'nm-connection*'; else nm-connection-editor; fi";
+            right-click = "${togglePopup} network";
           }
         ];
 
@@ -269,7 +269,7 @@ in
 
         volume = {
           label-show = true;
-          right-click = "if pgrep pavucontrol > /dev/null; then pkill -9 pavucontrol; else pavucontrol; fi";
+          right-click = "${togglePopup} volume";
           scroll-down = "wayle audio output-volume -3";
           scroll-up = "wayle audio output-volume +3";
         };
