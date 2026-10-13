@@ -2,7 +2,7 @@
 {
   # Decoration settings -> hl.config({ decoration = { ... } })
   wayland.windowManager.hyprland.settings.config.decoration = {
-    rounding = 8;
+    rounding = 12;
     blur = {
       enabled = true;
       size = 6;
@@ -11,9 +11,9 @@
     };
     shadow = {
       enabled = true;
-      range = 20; # Increased range for a wider glow
+      range = 26; # Broad, soft shadow
       render_power = 3; # Softer falloff
-      color = "rgba(00000066)"; # Darker, more transparent shadow for better contrast
+      color = "rgba(100d2066)"; # Subtle purple tint
     };
   };
 
@@ -24,31 +24,35 @@
   wayland.windowManager.hyprland.settings.config.general = {
     gaps_in = 6;
     gaps_out = 14;
-    border_size = 3;
+    border_size = 2;
     col = {
       # Gradient: hyprlang "rgba(a) rgba(b) 45deg" -> { colors = {..}, angle = 45 }
       active_border = {
         colors = [
           "rgba(ffcce6ff)"
-          "rgba(9778D0ff)"
+          "rgba(c4a7e7ff)"
+          "rgba(9ccfd8ff)"
         ];
         angle = 45;
       };
-      inactive_border = "rgba(595959aa)";
+      inactive_border = "rgba(63639466)";
     };
   };
 
   # Curves + animations must be hand-written Lua (hl.curve / hl.animation).
   # Curves are declared before the animations that reference them.
   wayland.windowManager.hyprland.extraConfig = ''
-    hl.curve("linear",    { type = "bezier", points = { {0.5, 0.5}, {0.5, 0.5} } })
-    hl.curve("overshoot", { type = "bezier", points = { {0.05, 0.9}, {0.1, 1.1} } })
-    hl.curve("goofy",     { type = "bezier", points = { {0.2, 1.6}, {0.4, 1.5} } })
+    hl.curve("smooth",    { type = "bezier", points = { {0.16, 1}, {0.3, 1} } })
+    hl.curve("pop",       { type = "bezier", points = { {0.18, 1.35}, {0.3, 1} } })
+    hl.curve("sweep",     { type = "bezier", points = { {0.22, 1}, {0.36, 1} } })
 
-    hl.animation({ leaf = "windows",    enabled = true, speed = 6, bezier = "goofy",   style = "popin" })
-    hl.animation({ leaf = "windowsOut", enabled = true, speed = 5, bezier = "goofy",   style = "popin" })
-    hl.animation({ leaf = "fade",       enabled = true, speed = 5, bezier = "default" })
-    hl.animation({ leaf = "workspaces", enabled = true, speed = 6, bezier = "default", style = "slidefade 20%" })
+    -- Smooth layout changes, with a more playful overshoot on window entrances.
+    hl.animation({ leaf = "windows",    enabled = true, speed = 4.5, bezier = "smooth" })
+    hl.animation({ leaf = "windowsIn",  enabled = true, speed = 5,   bezier = "pop",    style = "popin 80%" })
+    hl.animation({ leaf = "windowsOut", enabled = true, speed = 2.5, bezier = "smooth", style = "popin 90%" })
+    hl.animation({ leaf = "fade",       enabled = true, speed = 3,   bezier = "smooth" })
+    hl.animation({ leaf = "border",     enabled = true, speed = 3,   bezier = "smooth" })
+    hl.animation({ leaf = "workspaces", enabled = true, speed = 4.5, bezier = "sweep",  style = "slidefade 25%" })
   '';
 
   # Cursor

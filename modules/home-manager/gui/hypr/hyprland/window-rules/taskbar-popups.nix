@@ -8,10 +8,10 @@ let
       float = true;
       size = "700 700";
       move = "(monitor_w-705) 60";
-      rounding = 16; # Rounder than global default (8)
+      rounding = 16; # Rounder than global default (12)
       opacity = "0.88 0.88"; # Frosted glass — pairs with global blur
-      border_color = "rgba(ffcce6ff) rgba(9778D0ff) 45deg"; # Pink/purple gradient border
-      animation = "slide right"; # Slide in from right using global overshoot bezier
+      border_color = "rgba(ffcce6ff) rgba(c4a7e7ff) rgba(9ccfd8ff) 45deg"; # Match the active window gradient
+      animation = "slide right"; # Slide in from right using the window entrance curve
     }
   ];
 in
