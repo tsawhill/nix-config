@@ -7,11 +7,24 @@ license = "GPL-3.0-or-later"
 
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
+eframe = { version = "0.36", optional = true, default-features = false, features = ["default_fonts", "glow", "wayland", "x11"] }
 libc = "0.2"
 monsgeek-keyboard = { git = "https://github.com/echtzeit-solutions/monsgeek-akko-linux", rev = "79c45f11dcc0fdd24d6075a0f30f5dabbc748c9b" }
 monsgeek-transport = { git = "https://github.com/echtzeit-solutions/monsgeek-akko-linux", rev = "79c45f11dcc0fdd24d6075a0f30f5dabbc748c9b" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+
+[features]
+gui = ["dep:eframe"]
+
+[[bin]]
+name = "periph"
+path = "src/main.rs"
+
+[[bin]]
+name = "periph-gui"
+path = "src/bin/periph-gui.rs"
+required-features = ["gui"]
 
 [profile.release]
 lto = "thin"

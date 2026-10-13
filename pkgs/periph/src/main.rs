@@ -1,10 +1,7 @@
-mod hidraw;
-mod mchose;
-mod rongyuan;
-
 use clap::{Parser, Subcommand};
-use hidraw::{HidRaw, Node};
-use serde::Deserialize;
+use periph::config::{Config, load};
+use periph::hidraw::{self, HidRaw, Node};
+use periph::{devices, mchose, rongyuan};
 use std::collections::HashMap;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -53,33 +50,8 @@ enum Command {
     Battery,
 }
 
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct Config {
-    #[serde(default)]
-    dry_run: bool,
-    mchose_m7_ultra: Option<mchose::Settings>,
-    boyi_h60pro: Option<rongyuan::Settings>,
-}
-
-fn load(path: &Path) -> Result<Config, String> {
-    let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
-    let config: Config = serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
-    if let Some(s) = &config.mchose_m7_ultra {
-        s.validate().map_err(|e| format!("mchose-m7-ultra: {e}"))?;
-    }
-    if let Some(s) = &config.boyi_h60pro {
-        s.validate().map_err(|e| format!("boyi-h60pro: {e}"))?;
-    }
-    Ok(config)
-}
-
 fn mice() -> Vec<Node> {
     hidraw::nodes().into_iter().filter(mchose::is_config_node).collect()
-}
-
-fn devices() -> Vec<Node> {
-    hidraw::nodes().into_iter().filter(|n| mchose::is_config_node(n) || rongyuan::is_config_node(n)).collect()
 }
 
 /// Bring one keyboard to the config, or just report in a dry run.

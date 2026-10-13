@@ -4,13 +4,14 @@
 
 use crate::hidraw::Node;
 use monsgeek_keyboard::led::SPEED_MAX;
-use monsgeek_transport::protocol::cmd::SET_LEDPARAM;
-use monsgeek_transport::ChecksumType;
 use monsgeek_keyboard::{
     KeyMode, KeyTriggerSettings, KeyboardError, KeyboardInterface, KeyboardOptions, LedMode, LedParams,
-    ModeByte, PollingRate, Precision, ProtocolFamily, RgbColor, TravelDepth, TriggerSettings,
+    ModeByte, PollingRate, ProtocolFamily, RgbColor, TravelDepth, TriggerSettings,
 };
+pub use monsgeek_keyboard::Precision;
+use monsgeek_transport::ChecksumType;
 use monsgeek_transport::protocol::Profile;
+use monsgeek_transport::protocol::cmd::SET_LEDPARAM;
 use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::fmt::Display;
@@ -38,6 +39,9 @@ pub struct Model {
 impl Model {
     fn positions(&self) -> impl Iterator<Item = u8> + '_ {
         self.keys.iter().map(|&(k, _)| k)
+    }
+    pub fn key_names(&self) -> impl Iterator<Item = &'static str> + '_ {
+        self.keys.iter().map(|&(_, n)| n)
     }
 }
 
@@ -68,7 +72,7 @@ pub const MODELS: [Model; 2] = [
 
 /// Lighting effects as qmk.top names them for the H60Pro, by mode number (its
 /// LIGHT_LIST order). The custom-picture, music and screen-sync modes are left out.
-const EFFECTS: [(&str, u8); 19] = [
+pub const EFFECTS: [(&str, u8); 19] = [
     ("off", 0),
     ("always-on", 1),
     ("dynamic-breathing", 2),
@@ -105,7 +109,7 @@ pub fn is_config_node(n: &Node) -> bool {
     n.vid == VENDOR && n.pid & 0xFF00 != 0x4000 && n.descriptor.windows(5).any(|w| w == [0x06, 0xFF, 0xFF, 0x09, 0x02])
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Lighting {
     pub effect: Option<String>,
@@ -117,7 +121,7 @@ pub struct Lighting {
     pub rainbow: Option<bool>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RapidTrigger {
     pub enable: bool,
@@ -125,7 +129,7 @@ pub struct RapidTrigger {
     pub release: Option<f64>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct KeyOverride {
     pub actuation: Option<f64>,
@@ -133,7 +137,7 @@ pub struct KeyOverride {
 }
 
 /// `None` leaves a setting as the keyboard has it.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Settings {
     /// Only log what would change on this keyboard.
@@ -157,7 +161,7 @@ pub struct Settings {
     pub bottom_deadzone: Option<f64>,
 }
 
-fn parse_color(s: &str) -> Option<RgbColor> {
+pub fn parse_color(s: &str) -> Option<RgbColor> {
     let hex = s.strip_prefix('#')?;
     if hex.len() != 6 {
         return None;
@@ -303,7 +307,7 @@ fn rate_name(rate: Option<PollingRate>) -> String {
     rate.map(|r| format!("{} Hz", r.to_hz())).unwrap_or_else(|| "unknown".into())
 }
 
-fn color_name(c: RgbColor) -> String {
+pub fn color_name(c: RgbColor) -> String {
     format!("#{:02x}{:02x}{:02x}", c.r, c.g, c.b)
 }
 
@@ -589,65 +593,109 @@ impl Layout {
 }
 
 impl Layout {
-    /// The keyboard's current state as a Nix snippet for the home-manager module.
-    pub fn nix(&self, obs: &Observed) -> String {
+    pub fn precision(&self) -> Precision {
+        self.precision
+    }
+
+    /// The settings the keyboard holds now: the most common per-key value becomes the
+    /// global one, and keys that differ become overrides.
+    pub fn settings_from(&self, obs: &Observed) -> Settings {
         let t = &obs.triggers;
-        let mm = |values: &[u16]| -> (String, Option<String>) {
-            let v = self.model.keys.first().and_then(|&(k, _)| values.get(k as usize)).copied().unwrap_or(0);
-            let note = (!self.uniform(values, v)).then(|| format!("varies per key: {}", self.spread(values)));
-            (TravelDepth::from_raw(v).format_mm(self.precision), note)
-        };
-        let code = obs.led.mode as u8;
-        let effect = EFFECTS.iter().find(|(_, c)| *c == code);
-        let o = &obs.options;
-        let fmt = |v: u16| TravelDepth::from_raw(v).format_mm(self.precision);
         let at = |values: &[u16], k: u8| values.get(k as usize).copied().unwrap_or(0);
-        let rt = obs.triggers.key_modes.get(self.model.keys[0].0 as usize).is_some_and(|m| m & ModeByte::RT_FLAG != 0);
+        let mm = |raw: u16| self.precision.raw_to_mm(raw);
+        let common = |values: &[u16]| mm(self.groups(|k| at(values, k)).0);
         let (press, press_others) = self.groups(|k| at(&t.press_travel, k));
+        let (lift, lift_others) = self.groups(|k| at(&t.lift_travel, k));
         let release_follows = self.model.positions().all(|k| at(&t.lift_travel, k) == at(&t.press_travel, k));
-        let (release, release_note) = mm(&t.lift_travel);
-        let (rt_press, rt_press_note) = mm(&t.rt_press);
-        let (rt_lift, rt_lift_note) = mm(&t.rt_lift);
-        let (bottom, bottom_note) = mm(&t.bottom_deadzone);
-        let lines: Vec<(&str, String, Option<String>)> = vec![
-            (
-                "pollingRate",
-                obs.rate.map(|r| r.to_hz().to_string()).unwrap_or_else(|| "8000".into()),
-                obs.rate.is_none().then(|| "unreadable".to_string()),
-            ),
-            ("debounceMs", obs.debounce.to_string(), None),
-            ("lighting.effect", format!("\"{}\"", effect.map_or("always-on", |(n, _)| n)), effect.is_none().then(|| format!("mode {code}"))),
-            ("lighting.brightness", obs.led.brightness.to_string(), None),
-            ("lighting.speed", obs.led.speed.to_string(), None),
-            ("lighting.color", format!("\"{}\"", color_name(obs.led.color)), None),
-            ("lighting.rainbow", (obs.led.direction & 0x0F == LIGHT_RAINBOW).to_string(), None),
-            ("fnLayer", o.fn_layer.to_string(), None),
-            ("antiMistouch", o.anti_mistouch.to_string(), None),
-            ("rtStabilityMs", o.rt_stability_ms().to_string(), None),
-            ("wasdSwap", o.wasd_swap.to_string(), None),
-            ("actuation", fmt(press), None),
-            ("rapidTrigger.enable", rt.to_string(), None),
-            ("rapidTrigger.press", rt_press, rt_press_note),
-            ("rapidTrigger.release", rt_lift, rt_lift_note),
-            ("bottomDeadzone", bottom, bottom_note),
-        ];
-        let mut body = String::new();
-        for (key, value, note) in lines {
-            let note = note.map(|n| format!(" # {n}")).unwrap_or_default();
-            body.push_str(&format!("  {key} = {value};{note}\n"));
-        }
-        if !release_follows {
-            let note = release_note.map(|n| format!(" # {n}")).unwrap_or_default();
-            body.push_str(&format!("  release = {release};{note}\n"));
-        }
+
+        let mut keys: BTreeMap<String, KeyOverride> = BTreeMap::new();
+        let blank = || KeyOverride { actuation: None, release: None };
         for (v, names) in press_others {
             for name in names {
-                let quoted = name.replace('\\', "\\\\").replace('"', "\\\"");
-                body.push_str(&format!("  keys.\"{quoted}\".actuation = {};\n", fmt(v)));
+                keys.entry(name.to_string()).or_insert_with(blank).actuation = Some(mm(v));
             }
         }
-        format!("my.peripherals.boyi-h60pro = {{\n{body}}};")
+        if !release_follows {
+            for (v, names) in lift_others {
+                for name in names {
+                    keys.entry(name.to_string()).or_insert_with(blank).release = Some(mm(v));
+                }
+            }
+        }
+
+        let code = obs.led.mode as u8;
+        let o = &obs.options;
+        let first = self.model.keys.first().map_or(0, |&(k, _)| k as usize);
+        let rt = t.key_modes.get(first).is_some_and(|m| m & ModeByte::RT_FLAG != 0);
+        Settings {
+            dry_run: false,
+            polling_rate: obs.rate.map(|r| r.to_hz()),
+            debounce_ms: Some(obs.debounce),
+            lighting: Lighting {
+                effect: EFFECTS.iter().find(|(_, c)| *c == code).map(|(n, _)| n.to_string()),
+                brightness: Some(obs.led.brightness),
+                speed: Some(obs.led.speed),
+                color: Some(color_name(obs.led.color)),
+                rainbow: match obs.led.direction & 0x0F {
+                    LIGHT_RAINBOW => Some(true),
+                    LIGHT_NORMAL => Some(false),
+                    _ => None,
+                },
+            },
+            fn_layer: Some(o.fn_layer),
+            anti_mistouch: Some(o.anti_mistouch),
+            rt_stability_ms: Some(o.rt_stability_ms()),
+            wasd_swap: o.wasd_swap,
+            actuation: mm(press),
+            release: (!release_follows).then(|| mm(lift)),
+            keys,
+            rapid_trigger: RapidTrigger { enable: rt, press: Some(common(&t.rt_press)), release: Some(common(&t.rt_lift)) },
+            bottom_deadzone: Some(common(&t.bottom_deadzone)),
+        }
     }
+
+    /// The keyboard's current state as a Nix snippet.
+    pub fn nix(&self, obs: &Observed) -> String {
+        to_nix(&self.settings_from(obs), self.precision)
+    }
+}
+
+/// Settings as a Nix snippet for the home-manager module; unset (None) values are left out.
+pub fn to_nix(s: &Settings, precision: Precision) -> String {
+    let mm = |v: f64| TravelDepth::from_mm(v as f32, precision).format_mm(precision);
+    let quote = |s: &str| format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""));
+    let l = &s.lighting;
+    let rt = &s.rapid_trigger;
+    let lines: Vec<(String, Option<String>)> = vec![
+        ("pollingRate".into(), s.polling_rate.map(|v| v.to_string())),
+        ("debounceMs".into(), s.debounce_ms.map(|v| v.to_string())),
+        ("lighting.effect".into(), l.effect.as_deref().map(quote)),
+        ("lighting.brightness".into(), l.brightness.map(|v| v.to_string())),
+        ("lighting.speed".into(), l.speed.map(|v| v.to_string())),
+        ("lighting.color".into(), l.color.as_deref().map(quote)),
+        ("lighting.rainbow".into(), l.rainbow.map(|v| v.to_string())),
+        ("fnLayer".into(), s.fn_layer.map(|v| v.to_string())),
+        ("antiMistouch".into(), s.anti_mistouch.map(|v| v.to_string())),
+        ("rtStabilityMs".into(), s.rt_stability_ms.map(|v| v.to_string())),
+        ("wasdSwap".into(), Some(s.wasd_swap.to_string())),
+        ("actuation".into(), Some(mm(s.actuation))),
+        ("release".into(), s.release.map(mm)),
+        ("rapidTrigger.enable".into(), Some(rt.enable.to_string())),
+        ("rapidTrigger.press".into(), rt.press.map(mm)),
+        ("rapidTrigger.release".into(), rt.release.map(mm)),
+        ("bottomDeadzone".into(), s.bottom_deadzone.map(mm)),
+    ];
+    let overrides = s.keys.iter().flat_map(|(name, o)| {
+        [("actuation", o.actuation), ("release", o.release)]
+            .into_iter()
+            .map(move |(field, v)| (format!("keys.{}.{field}", quote(name)), v.map(mm)))
+    });
+    let body: String = lines
+        .into_iter()
+        .chain(overrides)
+        .filter_map(|(key, value)| value.map(|v| format!("  {key} = {v};\n")))
+        .collect();
+    format!("my.peripherals.boyi-h60pro = {{\n{body}}};")
 }
 
 #[cfg(test)]
@@ -738,6 +786,23 @@ mod tests {
             (t.press_travel[k], t.lift_travel[k], t.key_modes[k]) = (100, 100, 0x80);
             (t.rt_press[k], t.rt_lift[k]) = (20, 20);
         }
+        let p = l.plan(&s, &obs);
+        assert!(p.is_empty(), "{:?}", p.changes);
+    }
+
+    #[test]
+    fn settings_read_back_plan_nothing() {
+        let l = layout();
+        let mut obs = observed(84);
+        obs.led.direction = 0x38;
+        for k in MODELS[0].positions() {
+            let v = if [9, 14, 15, 21].contains(&k) { 50 } else { 100 };
+            let t = &mut obs.triggers;
+            (t.press_travel[k as usize], t.lift_travel[k as usize], t.key_modes[k as usize]) = (v, v, 0x80);
+        }
+        let s = l.settings_from(&obs);
+        assert_eq!(s.keys.len(), 4, "A W S D become overrides");
+        assert_eq!((s.actuation, s.release, s.lighting.rainbow), (1.0, None, Some(true)));
         let p = l.plan(&s, &obs);
         assert!(p.is_empty(), "{:?}", p.changes);
     }

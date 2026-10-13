@@ -271,5 +271,18 @@ in
       };
       Install.WantedBy = [ "default.target" ];
     };
+
+    # periph-gui reads this to mark settings that differ from the Nix config.
+    xdg.configFile."periph/config.json".source = checked;
+    xdg.desktopEntries.periph = {
+      name = "Peripherals";
+      genericName = "Mouse and keyboard settings";
+      exec = lib.getExe' cfg.package "periph-gui";
+      icon = "input-mouse";
+      categories = [
+        "Settings"
+        "HardwareSettings"
+      ];
+    };
   };
 }

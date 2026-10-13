@@ -53,6 +53,7 @@ impl HidRaw {
     }
 }
 
+#[derive(Clone)]
 pub struct Node {
     pub dev: PathBuf,
     /// Inode and ctime of the /dev node: a replug recreates it, even under the same name.

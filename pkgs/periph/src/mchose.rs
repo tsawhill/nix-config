@@ -22,7 +22,7 @@ const VENDORS: [u16; 2] = [0x5253, 0x3837];
 /// Device ID the M7 Ultra reports in `0x11 0x06`.
 pub const M7_ULTRA: u16 = 49;
 
-const RATES: [u32; 6] = [125, 500, 1000, 2000, 4000, 8000];
+pub const RATES: [u32; 6] = [125, 500, 1000, 2000, 4000, 8000];
 const FACTORY_DPI: [u16; 6] = [400, 800, 1600, 3200, 6400, 42000];
 // The bottom DPI button is the sixth slot; the other five are the clicks and side buttons.
 const DPI_SLOT: usize = 5;
@@ -250,6 +250,8 @@ pub enum Mode {
 }
 
 impl Mode {
+    pub const ALL: [Self; 3] = [Self::Performance, Self::Gaming, Self::Extreme];
+
     /// Sensor byte bits 7-6, as read from an M7 Ultra in each mode.
     fn from_bits(bits: u8) -> Option<Self> {
         match bits {
@@ -263,7 +265,7 @@ impl Mode {
     fn code(self) -> u8 {
         self as u8 + 1
     }
-    fn name(self) -> &'static str {
+    pub fn name(self) -> &'static str {
         match self {
             Self::Performance => "performance",
             Self::Gaming => "gaming",
@@ -296,10 +298,12 @@ pub enum LiftOff {
 }
 
 impl LiftOff {
+    pub const ALL: [Self; 3] = [Self::Low, Self::Mid, Self::High];
+
     fn index(self) -> u8 {
         self as u8
     }
-    fn name(self) -> &'static str {
+    pub fn name(self) -> &'static str {
         match self {
             Self::Low => "0.7mm",
             Self::Mid => "1mm",
@@ -315,21 +319,21 @@ pub enum ButtonAction {
     Disabled,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Links {
     pub wired: u32,
     pub wireless: u32,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Buttons {
     pub dpi: ButtonAction,
 }
 
 /// Every setting the driver manages. The Nix module fills unset ones with factory values.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Settings {
     pub dpi_stages: Vec<u16>,
@@ -648,49 +652,63 @@ pub fn summary(obs: &Observed) -> Vec<String> {
     ]
 }
 
-/// The mouse's current state as a Nix snippet for the home-manager module.
-pub fn nix(obs: &Observed) -> String {
+/// The settings the mouse holds now. Lift-off can't be read back, so the caller supplies it.
+pub fn settings_from(obs: &Observed, lift_off: LiftOff) -> Settings {
     let b = &obs.block;
     let n = (b.stages() as usize).clamp(1, 6);
-    let stages = (0..n).map(|i| b.dpi(i).to_string()).collect::<Vec<_>>().join(" ");
-    let (ripple, snap, sync) = b.flags();
-    let (mode, mode_note) = match b.mode() {
-        Some(m) => (m.name(), None),
-        None => ("performance", Some(format!("unknown sensor byte {:02x}", b.0[17]))),
-    };
-    let (lighting, lighting_note) = match obs.rgb {
-        Some(r) => (r[0] != 0, None),
-        None => (true, Some("no reply".to_string())),
-    };
-    let (button, button_note) = match b.button(DPI_SLOT) {
-        DPI_DEFAULT => ("default", None),
-        DPI_DISABLED => ("disabled", None),
-        other => ("default", Some(format!("unknown {}", hex(&other)))),
-    };
-    let lines: [(&str, String, Option<String>); 12] = [
-        ("dpiStages", format!("[ {stages} ]"), None),
-        ("activeStage", (b.active().0 + 1).to_string(), None),
-        (
-            "pollingRate",
-            format!("{{ wired = {}; wireless = {}; }}", rate_name(b.rates().0), rate_name(b.rates().1)),
-            None,
-        ),
-        ("ripple", ripple.to_string(), None),
-        ("angleSnap", snap.to_string(), None),
-        ("motionSync", sync.to_string(), None),
-        ("angleCorrection", b.angle().to_string(), None),
-        ("performanceMode", format!("\"{mode}\""), mode_note),
-        ("debounceMs", b.debounce().to_string(), None),
-        ("sleepMinutes", b.sleep_minutes().to_string(), None),
-        ("lighting", lighting.to_string(), lighting_note),
-        ("buttons.dpi", format!("\"{button}\""), button_note),
-    ];
-    let mut body = String::from("  # liftOff can't be read back from the mouse\n");
-    for (key, value, note) in lines {
-        let note = note.map(|n| format!(" # {n}")).unwrap_or_default();
-        body.push_str(&format!("  {key} = {value};{note}\n"));
+    let (ripple, angle_snap, motion_sync) = b.flags();
+    let hz = |i: u8| RATES.get(i as usize).copied().unwrap_or(1000);
+    let dpi = if b.button(DPI_SLOT) == DPI_DISABLED { ButtonAction::Disabled } else { ButtonAction::Default };
+    Settings {
+        dpi_stages: (0..n).map(|i| b.dpi(i)).collect(),
+        active_stage: (b.active().0 + 1).min(n as u8),
+        polling_rate: Links { wired: hz(b.rates().0), wireless: hz(b.rates().1) },
+        lift_off,
+        ripple,
+        angle_snap,
+        motion_sync,
+        angle_correction: b.angle(),
+        performance_mode: b.mode().unwrap_or(Mode::Performance),
+        debounce_ms: b.debounce(),
+        sleep_minutes: b.sleep_minutes(),
+        lighting: obs.rgb.is_some_and(|r| r[0] != 0),
+        buttons: Buttons { dpi },
     }
+}
+
+/// Settings as a Nix snippet for the home-manager module.
+pub fn to_nix(s: &Settings, lift_off_known: bool) -> String {
+    let stages = s.dpi_stages.iter().map(u16::to_string).collect::<Vec<_>>().join(" ");
+    let button = match s.buttons.dpi {
+        ButtonAction::Default => "default",
+        ButtonAction::Disabled => "disabled",
+    };
+    let lines = [
+        format!("dpiStages = [ {stages} ];"),
+        format!("activeStage = {};", s.active_stage),
+        format!("pollingRate = {{ wired = {}; wireless = {}; }};", s.polling_rate.wired, s.polling_rate.wireless),
+        if lift_off_known {
+            format!("liftOff = \"{}\";", s.lift_off.name())
+        } else {
+            "# liftOff can't be read back from the mouse".into()
+        },
+        format!("ripple = {};", s.ripple),
+        format!("angleSnap = {};", s.angle_snap),
+        format!("motionSync = {};", s.motion_sync),
+        format!("angleCorrection = {};", s.angle_correction),
+        format!("performanceMode = \"{}\";", s.performance_mode.name()),
+        format!("debounceMs = {};", s.debounce_ms),
+        format!("sleepMinutes = {};", s.sleep_minutes),
+        format!("lighting = {};", s.lighting),
+        format!("buttons.dpi = \"{button}\";"),
+    ];
+    let body: String = lines.iter().map(|l| format!("  {l}\n")).collect();
     format!("my.peripherals.mchose-m7-ultra = {{\n{body}}};")
+}
+
+/// The mouse's current state as a Nix snippet.
+pub fn nix(obs: &Observed) -> String {
+    to_nix(&settings_from(obs, LiftOff::Low), false)
 }
 
 /// Wayle's custom-module JSON, matching the old Python battery script.
@@ -752,6 +770,20 @@ mod tests {
             block,
             rgb: Some([1; 15]),
         }
+    }
+
+    #[test]
+    fn settings_read_back_plan_nothing() {
+        let mut b = factory_block();
+        b.0[17] = 0x92;
+        b.0[49] = (-4i8) as u8;
+        b.0[20 + DPI_SLOT * 4..24 + DPI_SLOT * 4].copy_from_slice(&DPI_DISABLED);
+        let obs = observed(b);
+        let s = settings_from(&obs, LiftOff::Mid);
+        assert_eq!((s.performance_mode, s.angle_correction, s.motion_sync), (Mode::Gaming, -4, true));
+        let p = plan(&s, &obs, true);
+        assert!(p.is_empty(), "{:?}", p.changes);
+        assert!(to_nix(&s, true).contains("  liftOff = \"1mm\";\n"));
     }
 
     #[test]
