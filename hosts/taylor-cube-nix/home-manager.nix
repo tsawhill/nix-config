@@ -54,7 +54,7 @@
           };
           liftOff = "1mm";
           motionSync = true;
-          angleCorrection = -3;
+          angleCorrection = -4;
           performanceMode = "gaming";
           sleepMinutes = 10;
           lighting = false;
