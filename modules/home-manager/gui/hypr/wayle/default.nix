@@ -110,6 +110,14 @@ let
       label=""
     fi
 
+    # The idle variant uses a visibility marker but never renders a label.
+    if [ "''${1:-}" = idle ]; then
+      if [ -z "$label" ]; then
+        label="Music"
+      else
+        label=""
+      fi
+    fi
     jq -cn --arg text "$label" '{text: $text}'
   '';
 
@@ -118,6 +126,7 @@ let
     left = [
       "hyprland-workspaces"
       "custom-feishin"
+      "custom-feishin-idle"
       "systray"
     ];
     center = [ "window-title" ];
@@ -138,6 +147,7 @@ let
     left = [
       "hyprland-workspaces"
       "custom-feishin"
+      "custom-feishin-idle"
       "systray"
       "idle-inhibit"
     ];
@@ -200,10 +210,20 @@ in
             id = "feishin";
             command = "${mediaStatus}";
             interval-ms = 2000;
-            hide-if-empty = false;
+            hide-if-empty = true;
             icon-name = "ld-music-symbolic";
             label-show = true;
             label-max-length = 35;
+            left-click = "${togglePopup} music";
+            right-click = "dropdown:media";
+          }
+          {
+            id = "feishin-idle";
+            command = "${mediaStatus} idle";
+            interval-ms = 2000;
+            hide-if-empty = true;
+            icon-name = "ld-music-symbolic";
+            label-show = false;
             left-click = "${togglePopup} music";
             right-click = "dropdown:media";
           }

@@ -166,6 +166,8 @@ in
       settings = {
         options.relaysEnabled = false;
         options.globalAnnounceEnabled = false;
+        # Default 20s redial hammers DNS while peers are powered off.
+        options.reconnectionIntervalS = 300;
         devices = lib.genAttrs peerNames mkDevice;
         folders = lib.genAttrs myShareNames mkFolder;
       };
