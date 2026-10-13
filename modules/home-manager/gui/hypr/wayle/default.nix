@@ -119,6 +119,7 @@ let
       "hyprland-workspaces"
       "custom-feishin"
       "custom-media"
+      "systray"
     ];
     center = [ "window-title" ];
     right = [
@@ -127,7 +128,6 @@ let
       "custom-network"
       "custom-bluetooth"
       "custom-mchose-m7"
-      "systray"
       "clock"
       "notifications"
       "dashboard"
@@ -176,7 +176,7 @@ in
         layout = [
           (if cfg.layout == "desktop" then desktopLayout else laptopLayout)
         ];
-        location = "top";
+        location = "bottom";
         inset-edge = 0.6;
         inset-ends = lib.mkDefault 0;
         background-opacity = 0;

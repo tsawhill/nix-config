@@ -70,7 +70,7 @@ lib.mkIf (config.my.hypr.panel.theme == "pink") {
 
       systray = {
         border-show = true;
-        border-color = faint;
+        border-color = primary;
         button-bg-color = primary;
       };
 
