@@ -1,22 +1,29 @@
 { config, lib, ... }:
 {
-  options.my.hypr.windowRules.steam.enable = lib.mkEnableOption "steam window rules" // { default = true; };
+  options.my.hypr.windowRules.steam.enable = lib.mkEnableOption "steam window rules" // {
+    default = true;
+  };
 
   config = lib.mkIf config.my.hypr.windowRules.steam.enable {
     wayland.windowManager.hyprland.settings.window_rule = [
       # Suppress steam from stealing focus
       {
-        match = { class = "steam"; };
+        match = {
+          class = "steam";
+        };
         suppress_event = "activatefocus";
         no_initial_focus = true;
       }
 
-      # Notification toasts — block idle inhibition and focus grabs
+      # Keep notification toasts above the bottom Wayle bar, with 80 logical
+      # pixels of clearance for the bar and its inset. Block focus grabs too.
       {
         match = {
           class = "steam";
           title = "notificationtoasts.*";
         };
+        float = true;
+        move = "(monitor_w-window_w-15) (monitor_h-window_h-80)";
         idle_inhibit = "none";
         suppress_event = "activatefocus";
         no_initial_focus = true;

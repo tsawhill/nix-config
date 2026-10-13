@@ -3,7 +3,9 @@
 //! Key grids come from that project's device database.
 
 use crate::hidraw::Node;
-use monsgeek_keyboard::led::{DAZZLE_OFF, DAZZLE_ON};
+use monsgeek_keyboard::led::SPEED_MAX;
+use monsgeek_transport::protocol::cmd::SET_LEDPARAM;
+use monsgeek_transport::ChecksumType;
 use monsgeek_keyboard::{
     KeyMode, KeyTriggerSettings, KeyboardError, KeyboardInterface, KeyboardOptions, LedMode, LedParams,
     ModeByte, PollingRate, Precision, ProtocolFamily, RgbColor, TravelDepth, TriggerSettings,
@@ -19,6 +21,10 @@ use std::time::Duration;
 const VENDOR: u16 = 0x3151;
 // A bulk magnetism write needs this long before reads come back right.
 const SETTLE: Duration = Duration::from_millis(300);
+// Low nibble of the lighting option byte, as qmk.top writes it and an H60Pro confirmed
+// (the library has them swapped).
+const LIGHT_NORMAL: u8 = 7;
+const LIGHT_RAINBOW: u8 = 8;
 
 pub struct Model {
     pub id: u32,
@@ -60,29 +66,28 @@ pub const MODELS: [Model; 2] = [
     Model { id: 2875, name: "BOYI H60Pro (UK)", grid: 84, keys: H60PRO_UK },
 ];
 
-/// Lighting effects by name; the picture, music and screen-sync modes are left out.
-const EFFECTS: [(&str, u8); 21] = [
+/// Lighting effects as qmk.top names them for the H60Pro, by mode number (its
+/// LIGHT_LIST order). The custom-picture, music and screen-sync modes are left out.
+const EFFECTS: [(&str, u8); 19] = [
     ("off", 0),
-    ("constant", 1),
-    ("breathing", 2),
-    ("neon", 3),
+    ("always-on", 1),
+    ("dynamic-breathing", 2),
+    ("spectrum-cycle", 3),
     ("wave", 4),
     ("ripple", 5),
-    ("raindrop", 6),
-    ("snake", 7),
-    ("reactive", 8),
-    ("converge", 9),
+    ("starlight", 6),
+    ("stream", 7),
+    ("shadow", 8),
+    ("mountain-wave", 9),
     ("sine-wave", 10),
-    ("kaleidoscope", 11),
-    ("line-wave", 12),
-    ("laser", 14),
+    ("color-spring", 11),
+    ("flower-wave", 12),
+    ("kill-two-birds", 14),
     ("circle-wave", 15),
-    ("starry", 16),
-    ("aurora", 17),
-    ("flash-away", 18),
-    ("layered", 19),
-    ("train", 23),
-    ("fireworks", 24),
+    ("colorful-cross", 16),
+    ("snow-fall", 17),
+    ("meteor", 18),
+    ("snow-trace", 19),
 ];
 
 fn effect_name(mode: LedMode) -> String {
@@ -336,7 +341,9 @@ impl Keyboard {
             kb.set_kb_options(o).map_err(other)?;
         }
         if let Some(l) = &p.led {
-            kb.set_led_params(l).map_err(other)?;
+            // Sent raw: the library's setter rewrites the option byte, dropping the direction.
+            let data = [l.mode as u8, SPEED_MAX - l.speed.min(SPEED_MAX), l.brightness, l.direction, l.color.r, l.color.g, l.color.b];
+            kb.transport().send_command(SET_LEDPARAM, &data, ChecksumType::Bit8).map_err(other)?;
         }
         for key in &p.keys {
             kb.set_key_trigger(key).map_err(other)?;
@@ -468,7 +475,7 @@ impl Layout {
             led.color = c;
         }
         if let Some(rainbow) = l.rainbow {
-            led.direction = (led.direction & 0xF0) | if rainbow { DAZZLE_ON } else { DAZZLE_OFF };
+            led.direction = (led.direction & 0xF0) | if rainbow { LIGHT_RAINBOW } else { LIGHT_NORMAL };
         }
         let o = &obs.led;
         if (led.mode, led.brightness, led.speed, led.color, led.direction)
@@ -561,7 +568,7 @@ impl Layout {
                 obs.led.brightness,
                 obs.led.speed,
                 color_name(obs.led.color),
-                if obs.led.direction & 0x0F == DAZZLE_ON { " rainbow" } else { "" },
+                if obs.led.direction & 0x0F == LIGHT_RAINBOW { " rainbow" } else { "" },
                 obs.led.direction
             ),
             format!(
@@ -609,11 +616,11 @@ impl Layout {
                 obs.rate.is_none().then(|| "unreadable".to_string()),
             ),
             ("debounceMs", obs.debounce.to_string(), None),
-            ("lighting.effect", format!("\"{}\"", effect.map_or("constant", |(n, _)| n)), effect.is_none().then(|| format!("mode {code}"))),
+            ("lighting.effect", format!("\"{}\"", effect.map_or("always-on", |(n, _)| n)), effect.is_none().then(|| format!("mode {code}"))),
             ("lighting.brightness", obs.led.brightness.to_string(), None),
             ("lighting.speed", obs.led.speed.to_string(), None),
             ("lighting.color", format!("\"{}\"", color_name(obs.led.color)), None),
-            ("lighting.rainbow", (obs.led.direction & 0x0F == DAZZLE_ON).to_string(), None),
+            ("lighting.rainbow", (obs.led.direction & 0x0F == LIGHT_RAINBOW).to_string(), None),
             ("fnLayer", o.fn_layer.to_string(), None),
             ("antiMistouch", o.anti_mistouch.to_string(), None),
             ("rtStabilityMs", o.rt_stability_ms().to_string(), None),
@@ -736,6 +743,20 @@ mod tests {
     }
 
     #[test]
+    fn rainbow_flag_keeps_the_direction() {
+        let l = layout();
+        let mut s = settings();
+        let mut obs = observed(84);
+        obs.led.direction = 0x30;
+        s.lighting.rainbow = Some(true);
+        assert_eq!(l.plan(&s, &obs).led.map(|led| led.direction), Some(0x38));
+        s.lighting.rainbow = Some(false);
+        assert_eq!(l.plan(&s, &obs).led.map(|led| led.direction), Some(0x37));
+        s.lighting.rainbow = None;
+        assert_eq!(l.plan(&s, &obs).led.map(|led| led.direction), Some(0x30), "unset leaves the byte alone");
+    }
+
+    #[test]
     fn per_key_actuation_overrides() {
         let l = layout();
         let mut s = settings();
@@ -763,6 +784,7 @@ mod tests {
     fn validation() {
         settings().validate().unwrap();
         let mut s = settings();
+        assert_eq!(effect_name(LedMode::from_u8(9).unwrap()), "mountain-wave", "read off a board set in qmk.top");
         s.lighting.effect = Some("rainbow".into());
         assert!(s.validate().is_err());
         let mut s = settings();
