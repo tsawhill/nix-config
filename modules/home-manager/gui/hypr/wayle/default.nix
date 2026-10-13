@@ -118,6 +118,9 @@ let
         label=""
       fi
     fi
+    # hide-if-empty checks command output, not the JSON text field.
+    # Emit no bytes for the inactive variant, rather than {"text":""}.
+    [ -n "$label" ] || exit 0
     jq -cn --arg text "$label" '{text: $text}'
   '';
 
