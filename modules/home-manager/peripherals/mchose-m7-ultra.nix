@@ -12,8 +12,8 @@
     // lib.mapAttrsRecursive (_: lib.mkDefault) {
       dpiStages = [ 1600 ];
       pollingRate = {
-        wired = 8000;
-        wireless = 8000;
+        wired = 2000;
+        wireless = 2000;
       };
       liftOff = "1mm";
       motionSync = true;
