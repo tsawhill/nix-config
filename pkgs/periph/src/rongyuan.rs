@@ -10,6 +10,7 @@ use monsgeek_keyboard::{
 };
 use monsgeek_transport::protocol::Profile;
 use serde::Deserialize;
+use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::io;
 use std::thread::sleep;
@@ -24,18 +25,33 @@ pub struct Model {
     pub name: &'static str,
     /// Positions in the firmware's per-key tables, empty slots included.
     grid: u8,
-    /// Grid positions that hold a magnetic switch.
-    keys: &'static [u8],
+    /// Grid positions that hold a magnetic switch, with the key's name.
+    keys: &'static [(u8, &'static str)],
 }
 
-const H60PRO_US: &[u8] = &[
-    1, 2, 3, 4, 5, 7, 8, 9, 11, 13, 14, 15, 16, 17, 19, 20, 21, 22, 25, 26, 27, 28, 31, 32, 33, 34, 37, 38, 39, 40, 41,
-    43, 44, 45, 46, 49, 50, 51, 52, 55, 56, 57, 58, 61, 62, 63, 64, 65, 67, 68, 69, 70, 73, 74, 76, 77, 79, 80, 81, 83,
+impl Model {
+    fn positions(&self) -> impl Iterator<Item = u8> + '_ {
+        self.keys.iter().map(|&(k, _)| k)
+    }
+}
+
+const H60PRO_US: &[(u8, &str)] = &[
+    (1, "Esc"), (2, "Tab"), (3, "CapsLock"), (4, "LShift"), (5, "LCtrl"), (7, "1"), (8, "Q"), (9, "A"), (11, "LMeta"),
+    (13, "2"), (14, "W"), (15, "S"), (16, "Z"), (17, "LAlt"), (19, "3"), (20, "E"), (21, "D"), (22, "X"), (25, "4"),
+    (26, "R"), (27, "F"), (28, "C"), (31, "5"), (32, "T"), (33, "G"), (34, "V"), (37, "6"), (38, "Y"), (39, "H"),
+    (40, "B"), (41, "Space"), (43, "7"), (44, "U"), (45, "J"), (46, "N"), (49, "8"), (50, "I"), (51, "K"), (52, "M"),
+    (55, "9"), (56, "O"), (57, "L"), (58, ","), (61, "0"), (62, "P"), (63, ";"), (64, "."), (65, "RAlt"), (67, "-"),
+    (68, "["), (69, "'"), (70, "/"), (73, "="), (74, "]"), (76, "RShift"), (77, "Application"), (79, "Backspace"),
+    (80, "\\"), (81, "Enter"), (83, "RCtrl"),
 ];
-const H60PRO_UK: &[u8] = &[
-    1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 19, 20, 21, 22, 25, 26, 27, 28, 31, 32, 33, 34, 37, 38, 39, 40,
-    41, 43, 44, 45, 46, 49, 50, 51, 52, 55, 56, 57, 58, 61, 62, 63, 64, 65, 67, 68, 69, 70, 73, 74, 75, 76, 77, 79, 81,
-    83,
+const H60PRO_UK: &[(u8, &str)] = &[
+    (1, "Esc"), (2, "Tab"), (3, "CapsLock"), (4, "LShift"), (5, "LCtrl"), (7, "1"), (8, "Q"), (9, "A"),
+    (10, "IntlBackslash"), (11, "LMeta"), (13, "2"), (14, "W"), (15, "S"), (16, "Z"), (17, "LAlt"), (19, "3"), (20, "E"),
+    (21, "D"), (22, "X"), (25, "4"), (26, "R"), (27, "F"), (28, "C"), (31, "5"), (32, "T"), (33, "G"), (34, "V"),
+    (37, "6"), (38, "Y"), (39, "H"), (40, "B"), (41, "Space"), (43, "7"), (44, "U"), (45, "J"), (46, "N"), (49, "8"),
+    (50, "I"), (51, "K"), (52, "M"), (55, "9"), (56, "O"), (57, "L"), (58, ","), (61, "0"), (62, "P"), (63, ";"),
+    (64, "."), (65, "RAlt"), (67, "-"), (68, "["), (69, "'"), (70, "/"), (73, "="), (74, "]"), (75, "IntlHash"),
+    (76, "RShift"), (77, "Application"), (79, "Backspace"), (81, "Enter"), (83, "RCtrl"),
 ];
 
 /// Models keyed by the device ID the firmware reports (`GET_USB_VERSION`).
@@ -104,6 +120,13 @@ pub struct RapidTrigger {
     pub release: Option<f64>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct KeyOverride {
+    pub actuation: Option<f64>,
+    pub release: Option<f64>,
+}
+
 /// `None` leaves a setting as the keyboard has it.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -121,8 +144,11 @@ pub struct Settings {
     pub actuation: f64,
     /// Defaults to the actuation point.
     pub release: Option<f64>,
+    /// Per-key overrides by key name.
+    #[serde(default)]
+    pub keys: BTreeMap<String, KeyOverride>,
     pub rapid_trigger: RapidTrigger,
-    pub top_deadzone: Option<f64>,
+    // No top dead zone: the H60Pro answers that table with values that change between reads.
     pub bottom_deadzone: Option<f64>,
 }
 
@@ -161,19 +187,31 @@ impl Settings {
         if self.fn_layer.is_some_and(|f| f > 1) {
             return Err("fnLayer is 0 or 1".into());
         }
-        let travels = [Some(self.actuation), self.release];
-        if travels.into_iter().flatten().any(|mm| !(0.1..=3.3).contains(&mm)) {
+        let overrides = self.keys.values().flat_map(|o| [o.actuation, o.release]);
+        let travels = [Some(self.actuation), self.release].into_iter().chain(overrides);
+        if travels.flatten().any(|mm| !(0.1..=3.3).contains(&mm)) {
             return Err("actuation and release must be 0.1-3.3 mm".into());
+        }
+        let known = |name: &str| MODELS.iter().any(|m| m.keys.iter().any(|&(_, n)| n == name));
+        if let Some(name) = self.keys.keys().find(|n| !known(n)) {
+            let names: Vec<&str> = MODELS[0].keys.iter().map(|&(_, n)| n).collect();
+            return Err(format!("no key named {name:?}; keys are named {}", names.join(" ")));
         }
         let rt = &self.rapid_trigger;
         if [rt.press, rt.release].into_iter().flatten().any(|mm| !(0.01..=2.0).contains(&mm)) {
             return Err("rapid trigger sensitivity must be 0.01-2.0 mm".into());
         }
-        if [self.top_deadzone, self.bottom_deadzone].into_iter().flatten().any(|mm| !(0.0..=1.0).contains(&mm)) {
-            return Err("dead zones must be 0-1 mm".into());
+        if self.bottom_deadzone.is_some_and(|mm| !(0.0..=1.0).contains(&mm)) {
+            return Err("bottomDeadzone must be 0-1 mm".into());
         }
         Ok(())
     }
+}
+
+struct Target {
+    key: u8,
+    press: u16,
+    lift: u16,
 }
 
 /// What planning needs to know about a board, apart from the live connection.
@@ -239,7 +277,6 @@ pub struct Plan {
     keys: Vec<KeyTriggerSettings>,
     rt_press: Option<u16>,
     rt_lift: Option<u16>,
-    top: Option<u16>,
     bottom: Option<u16>,
 }
 
@@ -253,7 +290,6 @@ impl Plan {
             && self.keys.is_empty()
             && self.rt_press.is_none()
             && self.rt_lift.is_none()
-            && self.top.is_none()
             && self.bottom.is_none()
     }
 }
@@ -306,10 +342,9 @@ impl Keyboard {
             kb.set_key_trigger(key).map_err(other)?;
         }
         type Bulk = fn(&KeyboardInterface, TravelDepth) -> Result<(), KeyboardError>;
-        let bulk: [(Option<u16>, Bulk); 4] = [
+        let bulk: [(Option<u16>, Bulk); 3] = [
             (p.rt_press, KeyboardInterface::set_rt_press_all),
             (p.rt_lift, KeyboardInterface::set_rt_lift_all),
-            (p.top, KeyboardInterface::set_top_deadzone_all),
             (p.bottom, KeyboardInterface::set_bottom_deadzone_all),
         ];
         for (value, set) in bulk {
@@ -348,16 +383,46 @@ impl Layout {
         TravelDepth::from_mm(mm as f32, self.precision).raw()
     }
 
-    /// The distinct values a per-key table holds across the real keys, for the log.
+    /// Group keys by value: the most common value, then the keys that differ.
+    fn groups(&self, value_of: impl Fn(u8) -> u16) -> (u16, Vec<(u16, Vec<&'static str>)>) {
+        let mut groups: BTreeMap<u16, Vec<&'static str>> = BTreeMap::new();
+        for &(k, name) in self.model.keys {
+            groups.entry(value_of(k)).or_default().push(name);
+        }
+        let base = groups.iter().max_by_key(|(_, names)| names.len()).map_or(0, |(v, _)| *v);
+        (base, groups.into_iter().filter(|(v, _)| *v != base).collect())
+    }
+
+    /// Per-key values for the log, e.g. "1.000 mm, W A S D 0.500 mm".
+    fn describe(&self, value_of: impl Fn(u8) -> u16) -> String {
+        let (base, others) = self.groups(value_of);
+        let mut out = self.mm(base);
+        for (v, names) in others {
+            out.push_str(&format!(", {} {}", names.join(" "), self.mm(v)));
+        }
+        out
+    }
+
     fn spread(&self, values: &[u16]) -> String {
-        let mut seen: Vec<u16> = self.model.keys.iter().map(|&k| values.get(k as usize).copied().unwrap_or(0)).collect();
-        seen.sort_unstable();
-        seen.dedup();
-        seen.iter().map(|v| self.mm(*v)).collect::<Vec<_>>().join(", ")
+        self.describe(|k| values.get(k as usize).copied().unwrap_or(0))
     }
 
     fn uniform(&self, values: &[u16], want: u16) -> bool {
-        self.model.keys.iter().all(|&k| values.get(k as usize) == Some(&want))
+        self.model.positions().all(|k| values.get(k as usize) == Some(&want))
+    }
+
+    /// Each key's actuation and release: the global value or that key's override.
+    fn targets(&self, s: &Settings) -> Vec<Target> {
+        self.model
+            .keys
+            .iter()
+            .map(|&(key, name)| {
+                let o = s.keys.get(name);
+                let press = self.raw(o.and_then(|o| o.actuation).unwrap_or(s.actuation));
+                let lift = o.and_then(|o| o.release).or(s.release).map_or(press, |mm| self.raw(mm));
+                Target { key, press, lift }
+            })
+            .collect()
     }
 
     pub fn plan(&self, s: &Settings, obs: &Observed) -> Plan {
@@ -425,35 +490,35 @@ impl Layout {
 
         // Actuation, release and mode go per key: the bulk mode write is cut off at 63 bytes.
         let t = &obs.triggers;
-        let press = self.raw(s.actuation);
-        let lift = self.raw(s.release.unwrap_or(s.actuation));
+        let targets = self.targets(s);
+        let target = |k: u8, pick: fn(&Target) -> u16| targets.iter().find(|x| x.key == k).map_or(0, pick);
         let mode = ModeByte::new(KeyMode::Normal, s.rapid_trigger.enable).to_u8();
-        if !self.uniform(&t.press_travel, press) {
-            p.changes.push(format!("actuation {} -> {}", self.spread(&t.press_travel), self.mm(press)));
+        if targets.iter().any(|x| t.press_travel.get(x.key as usize) != Some(&x.press)) {
+            let want = self.describe(|k| target(k, |x| x.press));
+            p.changes.push(format!("actuation {} -> {want}", self.spread(&t.press_travel)));
         }
-        if !self.uniform(&t.lift_travel, lift) {
-            p.changes.push(format!("release {} -> {}", self.spread(&t.lift_travel), self.mm(lift)));
+        if targets.iter().any(|x| t.lift_travel.get(x.key as usize) != Some(&x.lift)) {
+            let want = self.describe(|k| target(k, |x| x.lift));
+            p.changes.push(format!("release {} -> {want}", self.spread(&t.lift_travel)));
         }
-        let modes_differ = self.model.keys.iter().any(|&k| t.key_modes.get(k as usize) != Some(&mode));
-        if modes_differ {
+        if self.model.positions().any(|k| t.key_modes.get(k as usize) != Some(&mode)) {
             let mut have: Vec<String> = self
                 .model
-                .keys
-                .iter()
-                .map(|&k| ModeByte::from_u8(t.key_modes.get(k as usize).copied().unwrap_or(0)).to_string())
+                .positions()
+                .map(|k| ModeByte::from_u8(t.key_modes.get(k as usize).copied().unwrap_or(0)).to_string())
                 .collect();
             have.sort();
             have.dedup();
             p.changes.push(format!("key mode {} -> {}", have.join(", "), ModeByte::from_u8(mode)));
         }
-        for &k in self.model.keys {
-            let i = k as usize;
-            if t.press_travel.get(i) != Some(&press) || t.lift_travel.get(i) != Some(&lift) || t.key_modes.get(i) != Some(&mode)
+        for x in &targets {
+            let i = x.key as usize;
+            if t.press_travel.get(i) != Some(&x.press) || t.lift_travel.get(i) != Some(&x.lift) || t.key_modes.get(i) != Some(&mode)
             {
                 p.keys.push(KeyTriggerSettings {
-                    key_index: k,
-                    actuation: press,
-                    deactuation: lift,
+                    key_index: x.key,
+                    actuation: x.press,
+                    deactuation: x.lift,
                     mode: KeyMode::Normal,
                     rapid_trigger: s.rapid_trigger.enable,
                 });
@@ -470,9 +535,8 @@ impl Layout {
         };
         let rt_press = bulk("rapid trigger press", &t.rt_press, s.rapid_trigger.press.map(|mm| self.raw(mm)));
         let rt_lift = bulk("rapid trigger release", &t.rt_lift, s.rapid_trigger.release.map(|mm| self.raw(mm)));
-        let top = bulk("top dead zone", &t.top_deadzone, s.top_deadzone.map(|mm| self.raw(mm)));
         let bottom = bulk("bottom dead zone", &t.bottom_deadzone, s.bottom_deadzone.map(|mm| self.raw(mm)));
-        (p.rt_press, p.rt_lift, p.top, p.bottom) = (rt_press, rt_lift, top, bottom);
+        (p.rt_press, p.rt_lift, p.bottom) = (rt_press, rt_lift, bottom);
         p
     }
 
@@ -481,9 +545,8 @@ impl Layout {
         let o = &obs.options;
         let mut modes: Vec<String> = self
             .model
-            .keys
-            .iter()
-            .map(|&k| ModeByte::from_u8(t.key_modes.get(k as usize).copied().unwrap_or(0)).to_string())
+            .positions()
+            .map(|k| ModeByte::from_u8(t.key_modes.get(k as usize).copied().unwrap_or(0)).to_string())
             .collect();
         modes.sort();
         modes.dedup();
@@ -513,7 +576,7 @@ impl Layout {
             format!("actuation         {}", self.spread(&t.press_travel)),
             format!("release           {}", self.spread(&t.lift_travel)),
             format!("RT press/release  {} / {}", self.spread(&t.rt_press), self.spread(&t.rt_lift)),
-            format!("dead zones        top {} / bottom {}", self.spread(&t.top_deadzone), self.spread(&t.bottom_deadzone)),
+            format!("bottom dead zone  {}", self.spread(&t.bottom_deadzone)),
         ]
     }
 }
@@ -523,19 +586,21 @@ impl Layout {
     pub fn nix(&self, obs: &Observed) -> String {
         let t = &obs.triggers;
         let mm = |values: &[u16]| -> (String, Option<String>) {
-            let v = self.model.keys.first().and_then(|&k| values.get(k as usize)).copied().unwrap_or(0);
+            let v = self.model.keys.first().and_then(|&(k, _)| values.get(k as usize)).copied().unwrap_or(0);
             let note = (!self.uniform(values, v)).then(|| format!("varies per key: {}", self.spread(values)));
             (TravelDepth::from_raw(v).format_mm(self.precision), note)
         };
         let code = obs.led.mode as u8;
         let effect = EFFECTS.iter().find(|(_, c)| *c == code);
         let o = &obs.options;
-        let rt = obs.triggers.key_modes.get(self.model.keys[0] as usize).is_some_and(|m| m & ModeByte::RT_FLAG != 0);
-        let (actuation, actuation_note) = mm(&t.press_travel);
+        let fmt = |v: u16| TravelDepth::from_raw(v).format_mm(self.precision);
+        let at = |values: &[u16], k: u8| values.get(k as usize).copied().unwrap_or(0);
+        let rt = obs.triggers.key_modes.get(self.model.keys[0].0 as usize).is_some_and(|m| m & ModeByte::RT_FLAG != 0);
+        let (press, press_others) = self.groups(|k| at(&t.press_travel, k));
+        let release_follows = self.model.positions().all(|k| at(&t.lift_travel, k) == at(&t.press_travel, k));
         let (release, release_note) = mm(&t.lift_travel);
         let (rt_press, rt_press_note) = mm(&t.rt_press);
         let (rt_lift, rt_lift_note) = mm(&t.rt_lift);
-        let (top, top_note) = mm(&t.top_deadzone);
         let (bottom, bottom_note) = mm(&t.bottom_deadzone);
         let lines: Vec<(&str, String, Option<String>)> = vec![
             (
@@ -553,18 +618,26 @@ impl Layout {
             ("antiMistouch", o.anti_mistouch.to_string(), None),
             ("rtStabilityMs", o.rt_stability_ms().to_string(), None),
             ("wasdSwap", o.wasd_swap.to_string(), None),
-            ("actuation", actuation, actuation_note),
-            ("release", release, release_note),
+            ("actuation", fmt(press), None),
             ("rapidTrigger.enable", rt.to_string(), None),
             ("rapidTrigger.press", rt_press, rt_press_note),
             ("rapidTrigger.release", rt_lift, rt_lift_note),
-            ("topDeadzone", top, top_note),
             ("bottomDeadzone", bottom, bottom_note),
         ];
         let mut body = String::new();
         for (key, value, note) in lines {
             let note = note.map(|n| format!(" # {n}")).unwrap_or_default();
             body.push_str(&format!("  {key} = {value};{note}\n"));
+        }
+        if !release_follows {
+            let note = release_note.map(|n| format!(" # {n}")).unwrap_or_default();
+            body.push_str(&format!("  release = {release};{note}\n"));
+        }
+        for (v, names) in press_others {
+            for name in names {
+                let quoted = name.replace('\\', "\\\\").replace('"', "\\\"");
+                body.push_str(&format!("  keys.\"{quoted}\".actuation = {};\n", fmt(v)));
+            }
         }
         format!("my.peripherals.boyi-h60pro = {{\n{body}}};")
     }
@@ -590,9 +663,15 @@ mod tests {
             wasd_swap: false,
             actuation: 1.0,
             release: None,
+            keys: BTreeMap::new(),
             rapid_trigger: RapidTrigger { enable: true, press: Some(0.2), release: Some(0.2) },
-            top_deadzone: None,
             bottom_deadzone: None,
+        }
+    }
+
+    fn wasd(s: &mut Settings, mm: f64) {
+        for name in ["W", "A", "S", "D"] {
+            s.keys.insert(name.into(), KeyOverride { actuation: Some(mm), release: None });
         }
     }
 
@@ -633,7 +712,7 @@ mod tests {
         assert_eq!(p.keys.len(), MODELS[0].keys.len(), "every real key gets the new mode");
         assert!(p.keys.iter().all(|k| k.actuation == 100 && k.deactuation == 100 && k.rapid_trigger));
         assert_eq!((p.rt_press, p.rt_lift), (Some(20), Some(20)));
-        assert_eq!((p.top, p.bottom), (None, None), "unset dead zones stay");
+        assert_eq!(p.bottom, None, "unset dead zone stays");
         assert!(p.options.is_none());
     }
 
@@ -647,13 +726,37 @@ mod tests {
         obs.led.brightness = 4;
         obs.led.speed = 1;
         let t = &mut obs.triggers;
-        for &k in MODELS[0].keys {
+        for k in MODELS[0].positions() {
             let k = k as usize;
             (t.press_travel[k], t.lift_travel[k], t.key_modes[k]) = (100, 100, 0x80);
             (t.rt_press[k], t.rt_lift[k]) = (20, 20);
         }
         let p = l.plan(&s, &obs);
         assert!(p.is_empty(), "{:?}", p.changes);
+    }
+
+    #[test]
+    fn per_key_actuation_overrides() {
+        let l = layout();
+        let mut s = settings();
+        wasd(&mut s, 0.5);
+        let p = l.plan(&s, &observed(84));
+        let at = |pos: u8| p.keys.iter().find(|k| k.key_index == pos).map(|k| (k.actuation, k.deactuation));
+        assert_eq!(at(14), Some((50, 50)), "W, release follows its own actuation");
+        assert_eq!(at(21), Some((50, 50)), "D");
+        assert_eq!(at(8), Some((100, 100)), "Q keeps the global value");
+        assert!(p.changes.iter().any(|c| c.ends_with("-> 1.00 mm, A W S D 0.50 mm")), "{:?}", p.changes);
+
+        // The Nix snippet gives the same overrides back.
+        let mut obs = observed(84);
+        for k in MODELS[0].positions() {
+            let v = if [9, 14, 15, 21].contains(&k) { 50 } else { 100 };
+            (obs.triggers.press_travel[k as usize], obs.triggers.lift_travel[k as usize]) = (v, v);
+        }
+        let text = l.nix(&obs);
+        assert!(text.contains("  actuation = 1.00;\n"), "{text}");
+        assert!(text.contains("  keys.\"W\".actuation = 0.50;\n"), "{text}");
+        assert!(!text.contains("\n  release ="), "release follows actuation: {text}");
     }
 
     #[test]
@@ -668,13 +771,19 @@ mod tests {
         let mut s = settings();
         s.rt_stability_ms = Some(30);
         assert!(s.validate().is_err());
+        let mut s = settings();
+        s.keys.insert("Fn".into(), KeyOverride { actuation: Some(0.5), release: None });
+        assert!(s.validate().is_err(), "unknown key name");
+        let mut s = settings();
+        wasd(&mut s, 0.05);
+        assert!(s.validate().is_err(), "override out of range");
         assert_eq!(parse_color("#ff8000"), Some(RgbColor::new(255, 128, 0)));
     }
 
     #[test]
     fn grids_cover_their_keys() {
         for m in &MODELS {
-            assert!(m.keys.iter().all(|&k| k < m.grid));
+            assert!(m.positions().all(|k| k < m.grid));
         }
     }
 }

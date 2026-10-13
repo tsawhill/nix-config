@@ -103,6 +103,7 @@ fn request(dev: &HidRaw, report: u8, body: &[u8]) -> io::Result<Vec<u8>> {
     Err(invalid(format!("no reply to {report:02x} {:02x}", body[0])))
 }
 
+#[derive(Clone)]
 pub struct Identity {
     pub vid: u16,
     pub id: u16,
@@ -412,13 +413,18 @@ impl Settings {
 
 pub struct Observed {
     pub id: Identity,
+    pub wired: bool,
     pub block: Block,
     pub rgb: Option<[u8; 15]>,
 }
 
-pub fn observe(dev: &HidRaw) -> io::Result<Observed> {
+/// Read the settings. Takes the identity the caller already has: an idle mouse
+/// can answer a second identity query empty while config reads still work.
+/// `wired` is true over the cable, false through the dongle.
+pub fn observe(dev: &HidRaw, id: &Identity, wired: bool) -> io::Result<Observed> {
     Ok(Observed {
-        id: identity(dev)?.ok_or_else(|| invalid("the mouse stopped answering"))?,
+        id: id.clone(),
+        wired,
         block: Block::read(dev)?,
         rgb: rgb(dev).ok(),
     })
@@ -459,16 +465,17 @@ pub fn plan(s: &Settings, obs: &Observed, lod_known: bool) -> Plan {
         p.changes.push(format!("onboard profile {} -> 1", b.profile() + 1));
     }
 
-    let rates = (rate_index(s.polling_rate.wired).unwrap_or(2), rate_index(s.polling_rate.wireless).unwrap_or(2));
-    if b.rates() != rates {
-        p.rate = Some(rates);
-        p.changes.push(format!(
-            "polling rate {}/{} -> {}/{} Hz (wired/wireless)",
-            rate_name(b.rates().0),
-            rate_name(b.rates().1),
-            s.polling_rate.wired,
-            s.polling_rate.wireless
-        ));
+    // The mouse only takes the rate of the link it's on; the other waits for that link.
+    let (wired, wireless) = b.rates();
+    let (link, have, hz) = if obs.wired {
+        ("wired", wired, s.polling_rate.wired)
+    } else {
+        ("wireless", wireless, s.polling_rate.wireless)
+    };
+    let want = rate_index(hz).unwrap_or(2);
+    if have != want {
+        p.rate = Some(if obs.wired { (want, wireless) } else { (wired, want) });
+        p.changes.push(format!("{link} polling rate {} -> {hz} Hz", rate_name(have)));
     }
 
     let want = s.edit(b);
@@ -590,10 +597,10 @@ fn execute(dev: &HidRaw, s: &Settings, p: &Plan) -> io::Result<()> {
 }
 
 /// Bring the mouse to `s`, then read it back until nothing is left to change.
-pub fn apply(dev: &HidRaw, s: &Settings, mut lod_known: bool) -> io::Result<Plan> {
+pub fn apply(dev: &HidRaw, s: &Settings, id: &Identity, wired: bool, mut lod_known: bool) -> io::Result<Plan> {
     let mut done = Plan::default();
     for round in 0..4 {
-        let obs = observe(dev)?;
+        let obs = observe(dev, id, wired)?;
         let p = plan(s, &obs, lod_known);
         if round == 0 {
             done.notes = p.notes.clone();
@@ -741,9 +748,22 @@ mod tests {
     fn observed(block: Block) -> Observed {
         Observed {
             id: Identity { vid: 0x5253, id: M7_ULTRA, firmware: 0, connected: true, battery: 80, charging: false },
+            wired: false,
             block,
             rgb: Some([1; 15]),
         }
+    }
+
+    #[test]
+    fn only_the_current_links_rate_is_planned() {
+        let mut s = settings();
+        s.polling_rate = Links { wired: 8000, wireless: 4000 };
+        let mut obs = observed(factory_block());
+        assert_eq!(plan(&s, &obs, true).rate, Some((2, 4)), "dongle leaves the wired rate");
+        obs.wired = true;
+        assert_eq!(plan(&s, &obs, true).rate, Some((5, 2)), "cable leaves the wireless rate");
+        obs.block.0[1] = 0x52;
+        assert_eq!(plan(&s, &obs, true).rate, None, "wired rate already right");
     }
 
     #[test]
@@ -790,7 +810,7 @@ mod tests {
         s.validate().unwrap();
 
         let p = plan(&s, &observed(factory_block()), true);
-        assert_eq!(p.rate, Some((5, 5)));
+        assert_eq!(p.rate, Some((2, 5)), "through the dongle only the wireless rate moves");
         assert!(p.block);
         assert_eq!(p.perf, Some([0x42, 1, 2, 2, 1, 0, 0, 2, 1, 253]));
         assert_eq!(p.button, Some(DPI_DISABLED));

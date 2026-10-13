@@ -47,8 +47,8 @@ let
             wasdSwap
             actuation
             release
+            keys
             rapidTrigger
-            topDeadzone
             bottomDeadzone
             ;
         }
@@ -93,8 +93,15 @@ let
   travel = min: max: types.numbers.between min max;
 in
 {
+  # Device modules next to this one (mchose-m7-ultra.nix, ...) turn a device on with
+  # personal defaults; everything here defaults to off and factory values.
   options.my.peripherals = {
-    enable = lib.mkEnableOption "applying declared mouse and keyboard settings whenever a device connects";
+    enable = mkOption {
+      type = types.bool;
+      default = m7.enable || kb.enable;
+      defaultText = lib.literalExpression "any device enabled";
+      description = "Run the service that applies device settings whenever a device connects.";
+    };
 
     package = mkOption {
       type = types.package;
@@ -106,7 +113,7 @@ in
 
     # Defaults are the factory values from MCHOSE's driver, so anything unset is reset to factory.
     mchose-m7-ultra = {
-      enable = bool true "Enforce these settings on the MCHOSE M7 Ultra.";
+      enable = bool false "Enforce these settings on the MCHOSE M7 Ultra.";
       dpiStages = mkOption {
         type = types.addCheck (types.listOf (types.ints.between 50 42000)) (
           l: l != [ ] && builtins.length l <= 6
@@ -176,10 +183,10 @@ in
       };
     };
 
-    # Factory values are only known for actuation, rapid trigger and WASD swap so far;
-    # the rest default to null until a dry run has read them off an untouched board.
+    # Defaults are factory values where known; polling rate, debounce, lighting and the
+    # rapid trigger sensitivities aren't, so they default to null (left as the board has them).
     boyi-h60pro = {
-      enable = bool true "Enforce these settings on the BOYI H60Pro.";
+      enable = bool false "Enforce these settings on the BOYI H60Pro.";
       dryRun = mkOption {
         type = types.bool;
         default = cfg.dryRun;
@@ -203,16 +210,24 @@ in
         color = maybe (types.strMatching "#[0-9a-fA-F]{6}") "Effect colour as #rrggbb.";
         rainbow = maybe types.bool "Cycle rainbow colours instead of one colour.";
       };
-      fnLayer = maybe (types.ints.between 0 1) "Which of the two Fn layouts is active.";
-      antiMistouch = maybe types.bool "The vendor's anti-mistouch toggle.";
-      rtStabilityMs = maybe (types.enum [
-        0
-        25
-        50
-        75
-        100
-        125
-      ]) "Rapid trigger chatter filter in milliseconds.";
+      fnLayer = maybe (types.ints.between 0 1) "Which of the two Fn layouts is active." // {
+        default = 0;
+      };
+      antiMistouch = maybe types.bool "The vendor's anti-mistouch toggle." // {
+        default = false;
+      };
+      rtStabilityMs =
+        maybe (types.enum [
+          0
+          25
+          50
+          75
+          100
+          125
+        ]) "Rapid trigger chatter filter in milliseconds."
+        // {
+          default = 0;
+        };
       wasdSwap = bool false "Swap WASD and the arrow keys (the Fn+W toggle).";
       actuation = mkOption {
         type = travel 0.1 3.3;
@@ -220,13 +235,27 @@ in
         description = "Actuation point in mm, for every key.";
       };
       release = maybe (travel 0.1 3.3) "Release point in mm; null matches the actuation point.";
+      keys = mkOption {
+        type = types.attrsOf (
+          types.submodule {
+            options = {
+              actuation = maybe (travel 0.1 3.3) "This key's actuation point in mm.";
+              release = maybe (travel 0.1 3.3) "This key's release point in mm.";
+            };
+          }
+        );
+        default = { };
+        example = lib.literalExpression "{ W.actuation = 0.5; }";
+        description = "Per-key overrides by key name, as the database names them (W, Space, LShift, ...).";
+      };
       rapidTrigger = {
         enable = bool false "Rapid trigger on every key.";
         press = maybe (travel 0.01 2.0) "Rapid trigger press sensitivity in mm.";
         release = maybe (travel 0.01 2.0) "Rapid trigger release sensitivity in mm.";
       };
-      topDeadzone = maybe (travel 0.0 1.0) "Top dead zone in mm.";
-      bottomDeadzone = maybe (travel 0.0 1.0) "Bottom dead zone in mm.";
+      bottomDeadzone = maybe (travel 0.0 1.0) "Bottom dead zone in mm." // {
+        default = 0.3;
+      };
     };
   };
 

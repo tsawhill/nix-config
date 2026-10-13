@@ -29,48 +29,14 @@
         "${self}/modules/home-manager/gui/hypr"
         "${self}/modules/home-manager/gui/mangohud.nix"
         "${self}/modules/home-manager/gui/vesktop.nix"
+        "${self}/modules/home-manager/peripherals/mchose-m7-ultra.nix"
+        "${self}/modules/home-manager/peripherals/boyi-h60pro.nix"
         (import "${self}/pkgs/hyprcrosshair/hm-module.nix" self)
       ];
       home.stateVersion = "26.05";
       my.nixvim.full = true;
       my.shell.starshipTheme = "personal";
       my.yarg.enable = true;
-
-      # Logs what it changes: journalctl --user -u periphd
-      my.peripherals = {
-        enable = true;
-        dryRun = false;
-        mchose-m7-ultra = {
-          dpiStages = [ 1600 ];
-          pollingRate = {
-            wired = 8000;
-            wireless = 8000;
-          };
-          liftOff = "1mm";
-          motionSync = true;
-          angleCorrection = -3;
-          performanceMode = "gaming";
-          sleepMinutes = 10;
-          lighting = false;
-          buttons.dpi = "disabled";
-        };
-        boyi-h60pro = {
-          dryRun = true;
-          pollingRate = 8000;
-          debounceMs = 1;
-          lighting = {
-            brightness = 4;
-            speed = 1;
-          };
-          rtStabilityMs = 0;
-          actuation = 1.0;
-          rapidTrigger = {
-            enable = true;
-            press = 0.2;
-            release = 0.2;
-          };
-        };
-      };
 
       my.hypr = {
         monitors.primary = "DP-1";

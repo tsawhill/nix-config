@@ -135,7 +135,10 @@ fn online(dev: &HidRaw) -> io::Result<Option<mchose::Identity>> {
 
 /// Bring one online mouse to the config, or just report in a dry run.
 /// Runs once per plug, so lift-off (which can't be read back) is always written.
-fn reconcile(path: &Path, dev: &HidRaw, id: &mchose::Identity, config: &Config, dry_run: bool) -> io::Result<()> {
+fn reconcile(node: &Node, dev: &HidRaw, id: &mchose::Identity, config: &Config, dry_run: bool) -> io::Result<()> {
+    let path = node.dev.as_path();
+    // Over the cable the node carries the mouse's own ID; a dongle has its own.
+    let wired = node.pid == id.id;
     if id.id != mchose::M7_ULTRA {
         eprintln!("{}: MCHOSE device id {} has no driver yet, leaving it alone", path.display(), id.id);
         return Ok(());
@@ -145,13 +148,13 @@ fn reconcile(path: &Path, dev: &HidRaw, id: &mchose::Identity, config: &Config, 
         return Ok(());
     };
     if dry_run {
-        let obs = mchose::observe(dev)?;
+        let obs = mchose::observe(dev, id, wired)?;
         for line in mchose::summary(&obs) {
             eprintln!("{}: {line}", path.display());
         }
         print_plan(path, &mchose::plan(settings, &obs, false), "would change");
     } else {
-        print_plan(path, &mchose::apply(dev, settings, false)?, "changed");
+        print_plan(path, &mchose::apply(dev, settings, id, wired, false)?, "changed");
     }
     Ok(())
 }
@@ -176,7 +179,7 @@ fn poll(node: &Node, config: &Config) -> io::Result<bool> {
         return Ok(false);
     };
     eprintln!("{}: mouse online ({}% battery)", node.dev.display(), id.battery);
-    reconcile(&node.dev, &dev, &id, config, config.dry_run)?;
+    reconcile(node, &dev, &id, config, config.dry_run)?;
     Ok(true)
 }
 
@@ -222,7 +225,7 @@ fn apply_once(config: &Config, dry_run: bool) -> ExitCode {
             continue;
         }
         let result = HidRaw::open_locked(&node.dev, LOCK_WAIT).and_then(|dev| match online(&dev)? {
-            Some(id) => reconcile(&node.dev, &dev, &id, config, dry_run),
+            Some(id) => reconcile(&node, &dev, &id, config, dry_run),
             None => {
                 eprintln!("{}: mouse offline or asleep; move it and try again", node.dev.display());
                 Ok(())
@@ -268,11 +271,11 @@ fn show() -> ExitCode {
             continue;
         }
         let result = HidRaw::open_locked(&node.dev, LOCK_WAIT).and_then(|dev| {
-            if online(&dev)?.is_none() {
+            let Some(id) = online(&dev)? else {
                 println!("  mouse offline or asleep; move it and try again\n");
                 return Ok(());
-            }
-            let obs = mchose::observe(&dev)?;
+            };
+            let obs = mchose::observe(&dev, &id, node.pid == id.id)?;
             for line in mchose::summary(&obs) {
                 println!("  {line}");
             }
