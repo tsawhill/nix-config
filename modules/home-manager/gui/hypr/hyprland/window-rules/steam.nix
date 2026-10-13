@@ -33,5 +33,9 @@
         pseudo = false;
       }
     ];
+
+    wayland.windowManager.hyprland.extraConfig = ''
+      dofile("${./workspace-layouts.lua}").steam()
+    '';
   };
 }

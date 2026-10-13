@@ -70,12 +70,10 @@ in
     hl.bind("XF86MonBrightnessUp",   hl.dsp.exec_cmd("brightnessctl set +5%"))
     hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("brightnessctl set 5%-"))
 
-    -- Preserve the RuneLite stream's requested size when using resize binds.
+    -- Resizing a pseudotile changes its size for good, so skip Moonlight streams.
     local function resizeAllowed()
       local w = hl.get_active_window()
-      return not (w and w.class == "com.moonlight_stream.Moonlight"
-        and w.title:lower():match("runelite.* %- moonlight$")
-        and w.workspace and w.workspace.id == 6)
+      return not (w and w.class == "com.moonlight_stream.Moonlight" and w.title:match(" %- Moonlight$"))
     end
     local function guardedResize(args)
       return function()

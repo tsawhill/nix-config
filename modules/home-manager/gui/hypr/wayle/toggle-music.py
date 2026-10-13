@@ -12,8 +12,16 @@ def query(kind):
     return json.loads(subprocess.check_output(["hyprctl", "-j", kind], text=True))
 
 
-def dispatch(name, argument):
-    subprocess.run(["hyprctl", "dispatch", name, str(argument)], check=True)
+def lua(value):
+    # JSON strings are valid Lua literals for these ASCII names and addresses.
+    return json.dumps(value)
+
+
+def dispatch(expression):
+    # The Lua config evaluates dispatch arguments as hl.dispatch(<expression>).
+    result = subprocess.run(["hyprctl", "dispatch", expression], capture_output=True, text=True)
+    if result.returncode or not result.stdout.startswith("ok"):
+        raise RuntimeError(f"{expression}: {result.stdout.strip()}")
 
 
 def monitor_bounds(monitor):
@@ -40,9 +48,9 @@ def main():
             if x <= cursor["x"] < x + width and y <= cursor["y"] < y + height:
                 monitor = candidate
                 break
-        dispatch("focusmonitor", monitor["id"])
+        dispatch(f"hl.dsp.focus({{ monitor = {lua(monitor['name'])} }})")
         if monitor.get("specialWorkspace", {}).get("name") == "special:music":
-            dispatch("togglespecialworkspace", "music")
+            dispatch('hl.dsp.workspace.toggle_special("music")')
             return
 
         def music_windows():
@@ -61,9 +69,9 @@ def main():
 
         # Also handles an already-running window from before these rules loaded.
         window = max(windows, key=lambda w: w["size"][0] * w["size"][1])
-        address = "address:" + window["address"]
-        dispatch("movetoworkspacesilent", "special:music," + address)
-        dispatch("setfloating", address)
+        address = lua("address:" + window["address"])
+        dispatch(f'hl.dsp.window.move({{ workspace = "special:music", follow = false, window = {address} }})')
+        dispatch(f'hl.dsp.window.float({{ action = "enable", window = {address} }})')
 
         mx, my, mw, mh = monitor_bounds(monitor)
         left, top, right, bottom = monitor.get("reserved", [0, 0, 0, 0])
@@ -74,9 +82,9 @@ def main():
         height = min(900, int((y1 - y0) * 0.85))
         x = min(max(cursor["x"] - 24, x0), x1 - width)
         y = min(max(cursor["y"] + margin, y0), y1 - height)
-        dispatch("togglespecialworkspace", "music")
-        dispatch("resizewindowpixel", f"exact {width} {height},{address}")
-        dispatch("movewindowpixel", f"exact {int(x)} {int(y)},{address}")
+        dispatch('hl.dsp.workspace.toggle_special("music")')
+        dispatch(f"hl.dsp.window.resize({{ x = {width}, y = {height}, window = {address} }})")
+        dispatch(f"hl.dsp.window.move({{ x = {int(x)}, y = {int(y)}, window = {address} }})")
 
 
 if __name__ == "__main__":
