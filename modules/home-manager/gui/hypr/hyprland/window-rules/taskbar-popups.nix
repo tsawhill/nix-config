@@ -28,6 +28,7 @@ in
       "org.pulseaudio.pavucontrol"
       "pavucontrol"
       "nm-connection-editor"
+      "periph-mchose-m7-ultra"
     ];
 
 
@@ -38,6 +39,7 @@ in
         { match.class = "(org\\.pulseaudio\\.pavucontrol|pavucontrol)"; workspace = "special:wayle-volume silent"; }
         { match.class = "nm-connection-editor"; workspace = "special:wayle-network silent"; }
         { match.class = "(\\.blueman-manager-wrapped|blueman-manager)"; workspace = "special:wayle-bluetooth silent"; }
+        { match.class = "periph-mchose-m7-ultra"; workspace = "special:wayle-mouse silent"; }
       ];
   };
 }

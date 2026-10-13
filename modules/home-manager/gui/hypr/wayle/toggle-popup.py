@@ -68,10 +68,12 @@ def main():
             return [w for w in query("clients") if w["class"].lower() in classes]
 
         if monitor.get("specialWorkspace", {}).get("name") == "special:" + workspace:
+            # Hide first: Hyprland hides a special workspace whose last window closes,
+            # so toggling after a close would bring it back empty.
+            dispatch(f'hl.dsp.workspace.toggle_special({lua(workspace)})')
             if close:
                 for window in app_windows():
                     dispatch(f'hl.dsp.window.close({{ window = {lua("address:" + window["address"])} }})')
-            dispatch(f'hl.dsp.workspace.toggle_special({lua(workspace)})')
             return
 
         windows = app_windows()
