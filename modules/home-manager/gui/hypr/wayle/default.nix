@@ -105,9 +105,9 @@ let
       printf '%s\n%s\n' "$now" "$label" > "$state"
     elif [ -r "$state" ]; then
       { read -r last; read -r label; } < "$state"
-      [ $((now - last)) -lt 300 ] || exit 0
+      [ $((now - last)) -lt 300 ] || label=""
     else
-      exit 0
+      label=""
     fi
 
     jq -cn --arg text "$label" '{text: $text}'
@@ -118,7 +118,6 @@ let
     left = [
       "hyprland-workspaces"
       "custom-feishin"
-      "custom-media"
       "systray"
     ];
     center = [ "window-title" ];
@@ -139,7 +138,6 @@ let
     left = [
       "hyprland-workspaces"
       "custom-feishin"
-      "custom-media"
       "systray"
       "idle-inhibit"
     ];
@@ -200,11 +198,14 @@ in
         custom = map themed [
           {
             id = "feishin";
-            command = "${pkgs.coreutils}/bin/printf Music";
-            interval-ms = 60000;
+            command = "${mediaStatus}";
+            interval-ms = 2000;
+            hide-if-empty = false;
             icon-name = "ld-music-symbolic";
-            label-show = false;
+            label-show = true;
+            label-max-length = 35;
             left-click = "${toggleMusic}";
+            right-click = "dropdown:media";
           }
           {
             id = "mchose-m7";
@@ -245,15 +246,6 @@ in
             };
             left-click = "dropdown:network";
             right-click = "if pgrep 'nm-connection*' > /dev/null; then pkill -9 'nm-connection*'; else nm-connection-editor; fi";
-          }
-          {
-            id = "media";
-            command = "${mediaStatus}";
-            interval-ms = 2000;
-            hide-if-empty = true;
-            label-max-length = 35;
-            icon-name = "ld-music-symbolic";
-            left-click = "dropdown:media";
           }
         ];
 
