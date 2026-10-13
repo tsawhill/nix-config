@@ -232,7 +232,12 @@ in
           }
           {
             id = "mchose-m7";
-            command = "${pkgs.python3}/bin/python3 ${./mchose-m7-battery.py}";
+            # periph waits for the device lock its daemon holds; the script would give up.
+            command =
+              if config.my.peripherals.enable then
+                "${lib.getExe config.my.peripherals.package} battery"
+              else
+                "${pkgs.python3}/bin/python3 ${./mchose-m7-battery.py}";
             interval-ms = 15000;
             hide-if-empty = true;
             icon-name = "ld-mouse-symbolic";

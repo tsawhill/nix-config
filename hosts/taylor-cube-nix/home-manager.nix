@@ -42,6 +42,25 @@
       my.shell.starshipTheme = "personal";
       my.yarg.enable = true;
 
+      # dryRun defaults on: the first deploy only logs (journalctl --user -u periphd).
+      my.peripherals = {
+        enable = true;
+        mchose-m7-ultra = {
+          dpiStages = [ 1600 ];
+          pollingRate = {
+            wired = 8000;
+            wireless = 8000;
+          };
+          liftOff = "1mm";
+          motionSync = true;
+          angleCorrection = -3;
+          performanceMode = "gaming";
+          sleepMinutes = 10;
+          lighting = false;
+          buttons.dpi = "disabled";
+        };
+      };
+
       my.hypr = {
         # The cube has exactly one DisplayPort and one HDMI, so the desktop's
         # DP-1/DP-2 pair becomes DP-1/HDMI-A-1: AW2725DF (360 Hz) on DP-1 as

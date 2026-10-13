@@ -6,6 +6,7 @@
     ../gui/foot.nix
     ../gui/games-frontends.nix
     ../gui/mpv.nix
+    ../gui/peripherals.nix
     ../gui/web-apps.nix
     ../games/save-links.nix
   ];
