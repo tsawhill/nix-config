@@ -179,7 +179,7 @@ in
         inset-ends = lib.mkDefault 0;
         background-opacity = 0;
         button-variant = "block-prefix";
-        button-bg-opacity = 80;
+        button-bg-opacity = 75;
         button-label-weight = "medium";
         button-rounding = "md";
         button-border-location = "all";
