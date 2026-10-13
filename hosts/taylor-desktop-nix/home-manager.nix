@@ -54,6 +54,22 @@
           lighting = false;
           buttons.dpi = "disabled";
         };
+        boyi-h60pro = {
+          dryRun = true;
+          pollingRate = 8000;
+          debounceMs = 1;
+          lighting = {
+            brightness = 4;
+            speed = 1;
+          };
+          rtStabilityMs = 0;
+          actuation = 1.0;
+          rapidTrigger = {
+            enable = true;
+            press = 0.2;
+            release = 0.2;
+          };
+        };
       };
 
       my.hypr = {

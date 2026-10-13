@@ -1,5 +1,6 @@
 mod hidraw;
 mod mchose;
+mod rongyuan;
 
 use clap::{Parser, Subcommand};
 use hidraw::{HidRaw, Node};
@@ -58,6 +59,7 @@ struct Config {
     #[serde(default)]
     dry_run: bool,
     mchose_m7_ultra: Option<mchose::Settings>,
+    boyi_h60pro: Option<rongyuan::Settings>,
 }
 
 fn load(path: &Path) -> Result<Config, String> {
@@ -66,11 +68,52 @@ fn load(path: &Path) -> Result<Config, String> {
     if let Some(s) = &config.mchose_m7_ultra {
         s.validate().map_err(|e| format!("mchose-m7-ultra: {e}"))?;
     }
+    if let Some(s) = &config.boyi_h60pro {
+        s.validate().map_err(|e| format!("boyi-h60pro: {e}"))?;
+    }
     Ok(config)
 }
 
 fn mice() -> Vec<Node> {
     hidraw::nodes().into_iter().filter(mchose::is_config_node).collect()
+}
+
+fn devices() -> Vec<Node> {
+    hidraw::nodes().into_iter().filter(|n| mchose::is_config_node(n) || rongyuan::is_config_node(n)).collect()
+}
+
+/// Bring one keyboard to the config, or just report in a dry run.
+fn reconcile_keyboard(node: &Node, config: &Config, dry_run: bool) -> io::Result<()> {
+    let path = node.dev.display();
+    let kb = match rongyuan::open(node)? {
+        rongyuan::Opened::Known(kb) => kb,
+        rongyuan::Opened::Unknown(id) => {
+            eprintln!("{path}: RongYuan device id {id} has no key grid yet, leaving it alone");
+            return Ok(());
+        }
+    };
+    let Some(settings) = &config.boyi_h60pro else {
+        eprintln!("{path}: {} online, nothing declared for it", kb.model.name);
+        return Ok(());
+    };
+    let dry_run = dry_run || settings.dry_run;
+    let changes = if dry_run {
+        let obs = kb.observe()?;
+        for line in kb.summary(&obs) {
+            eprintln!("{path}: {line}");
+        }
+        kb.plan(settings, &obs).changes
+    } else {
+        kb.apply(settings)?
+    };
+    if changes.is_empty() {
+        eprintln!("{path}: already matches the config");
+    }
+    let verb = if dry_run { "would change" } else { "changed" };
+    for change in changes {
+        eprintln!("{path}: {verb} {change}");
+    }
+    Ok(())
 }
 
 fn print_plan(dev: &Path, plan: &mchose::Plan, verb: &str) {
@@ -122,8 +165,12 @@ struct Seen {
     next: Option<Instant>,
 }
 
-/// True once the mouse answered and the config was applied.
+/// True once the device answered and the config was applied.
 fn poll(node: &Node, config: &Config) -> io::Result<bool> {
+    if rongyuan::is_config_node(node) {
+        reconcile_keyboard(node, config, config.dry_run)?;
+        return Ok(true);
+    }
     let dev = HidRaw::open_locked(&node.dev, LOCK_WAIT)?;
     let Some(id) = online(&dev)? else {
         return Ok(false);
@@ -138,7 +185,7 @@ fn daemon(config: &Config) -> ExitCode {
     eprintln!("periph: watching for devices{mode}");
     let mut seen: HashMap<(PathBuf, (u64, i64, i64)), Seen> = HashMap::new();
     loop {
-        let nodes = mice();
+        let nodes = devices();
         seen.retain(|(dev, stamp), _| nodes.iter().any(|n| &n.dev == dev && &n.stamp == stamp));
         let now = Instant::now();
         for node in &nodes {
@@ -166,7 +213,14 @@ fn daemon(config: &Config) -> ExitCode {
 
 fn apply_once(config: &Config, dry_run: bool) -> ExitCode {
     let mut ok = true;
-    for node in mice() {
+    for node in devices() {
+        if rongyuan::is_config_node(&node) {
+            if let Err(e) = reconcile_keyboard(&node, config, dry_run) {
+                eprintln!("{}: {e}", node.dev.display());
+                ok = false;
+            }
+            continue;
+        }
         let result = HidRaw::open_locked(&node.dev, LOCK_WAIT).and_then(|dev| match online(&dev)? {
             Some(id) => reconcile(&node.dev, &dev, &id, config, dry_run),
             None => {
@@ -186,13 +240,33 @@ fn apply_once(config: &Config, dry_run: bool) -> ExitCode {
     }
 }
 
+fn show_keyboard(node: &Node) -> io::Result<()> {
+    match rongyuan::open(node)? {
+        rongyuan::Opened::Unknown(id) => println!("  RongYuan device id {id}: no key grid for it yet\n"),
+        rongyuan::Opened::Known(kb) => {
+            let obs = kb.observe()?;
+            for line in kb.summary(&obs) {
+                println!("  {line}");
+            }
+            println!("\n{}\n", kb.nix(&obs));
+        }
+    }
+    Ok(())
+}
+
 fn show() -> ExitCode {
-    let nodes = mice();
+    let nodes = devices();
     if nodes.is_empty() {
         eprintln!("no supported devices found");
     }
     for node in nodes {
         println!("{} ({:04x}:{:04x})", node.dev.display(), node.vid, node.pid);
+        if rongyuan::is_config_node(&node) {
+            if let Err(e) = show_keyboard(&node) {
+                println!("  error: {e}\n");
+            }
+            continue;
+        }
         let result = HidRaw::open_locked(&node.dev, LOCK_WAIT).and_then(|dev| {
             if online(&dev)?.is_none() {
                 println!("  mouse offline or asleep; move it and try again\n");

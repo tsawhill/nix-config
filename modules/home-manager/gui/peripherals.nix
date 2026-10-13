@@ -7,6 +7,7 @@
 let
   cfg = config.my.peripherals;
   m7 = cfg.mchose-m7-ultra;
+  kb = cfg.boyi-h60pro;
   inherit (lib) mkOption types;
 
   settings = (pkgs.formats.json { }).generate "periph.json" {
@@ -28,6 +29,27 @@ let
             sleepMinutes
             lighting
             buttons
+            ;
+        }
+      else
+        null;
+    boyiH60pro =
+      if kb.enable then
+        {
+          inherit (kb)
+            dryRun
+            pollingRate
+            debounceMs
+            lighting
+            fnLayer
+            antiMistouch
+            rtStabilityMs
+            wasdSwap
+            actuation
+            release
+            rapidTrigger
+            topDeadzone
+            bottomDeadzone
             ;
         }
       else
@@ -60,6 +82,15 @@ let
       default = 1000;
       inherit description;
     };
+  # null leaves the keyboard's current value.
+  maybe =
+    type: description:
+    mkOption {
+      type = types.nullOr type;
+      default = null;
+      inherit description;
+    };
+  travel = min: max: types.numbers.between min max;
 in
 {
   options.my.peripherals = {
@@ -143,6 +174,59 @@ in
         default = "default";
         description = "The bottom DPI button.";
       };
+    };
+
+    # Factory values are only known for actuation, rapid trigger and WASD swap so far;
+    # the rest default to null until a dry run has read them off an untouched board.
+    boyi-h60pro = {
+      enable = bool true "Enforce these settings on the BOYI H60Pro.";
+      dryRun = mkOption {
+        type = types.bool;
+        default = cfg.dryRun;
+        defaultText = lib.literalExpression "config.my.peripherals.dryRun";
+        description = "Only log what would change on this keyboard.";
+      };
+      pollingRate = maybe (types.enum [
+        125
+        250
+        500
+        1000
+        2000
+        4000
+        8000
+      ]) "Polling rate in Hz.";
+      debounceMs = maybe (types.ints.between 0 50) "Key debounce in milliseconds.";
+      lighting = {
+        effect = maybe types.str "Lighting effect name, as `periph show` prints it.";
+        brightness = maybe (types.ints.between 0 4) "Lighting brightness, 0-4.";
+        speed = maybe (types.ints.between 0 4) "Effect speed, 0 (slow) to 4 (fast).";
+        color = maybe (types.strMatching "#[0-9a-fA-F]{6}") "Effect colour as #rrggbb.";
+        rainbow = maybe types.bool "Cycle rainbow colours instead of one colour.";
+      };
+      fnLayer = maybe (types.ints.between 0 1) "Which of the two Fn layouts is active.";
+      antiMistouch = maybe types.bool "The vendor's anti-mistouch toggle.";
+      rtStabilityMs = maybe (types.enum [
+        0
+        25
+        50
+        75
+        100
+        125
+      ]) "Rapid trigger chatter filter in milliseconds.";
+      wasdSwap = bool false "Swap WASD and the arrow keys (the Fn+W toggle).";
+      actuation = mkOption {
+        type = travel 0.1 3.3;
+        default = 2.0;
+        description = "Actuation point in mm, for every key.";
+      };
+      release = maybe (travel 0.1 3.3) "Release point in mm; null matches the actuation point.";
+      rapidTrigger = {
+        enable = bool false "Rapid trigger on every key.";
+        press = maybe (travel 0.01 2.0) "Rapid trigger press sensitivity in mm.";
+        release = maybe (travel 0.01 2.0) "Rapid trigger release sensitivity in mm.";
+      };
+      topDeadzone = maybe (travel 0.0 1.0) "Top dead zone in mm.";
+      bottomDeadzone = maybe (travel 0.0 1.0) "Bottom dead zone in mm.";
     };
   };
 
