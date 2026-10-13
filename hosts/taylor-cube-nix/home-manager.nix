@@ -42,9 +42,10 @@
       my.shell.starshipTheme = "personal";
       my.yarg.enable = true;
 
-      # dryRun defaults on: the first deploy only logs (journalctl --user -u periphd).
+      # Logs what it changes: journalctl --user -u periphd
       my.peripherals = {
         enable = true;
+        dryRun = false;
         mchose-m7-ultra = {
           dpiStages = [ 1600 ];
           pollingRate = {
