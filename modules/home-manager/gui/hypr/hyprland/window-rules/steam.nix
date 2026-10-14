@@ -1,10 +1,42 @@
-{ config, lib, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+let
+  python = pkgs.python3.withPackages (ps: [ ps.python-xlib ]);
+  toastPositioner = pkgs.writeShellScript "steam-toast-positioner" ''
+    export PATH=${
+      lib.makeBinPath [
+        config.wayland.windowManager.hyprland.package
+        pkgs.xrandr
+      ]
+    }:$PATH
+    exec ${python}/bin/python ${./steam-toasts.py}
+  '';
+  session = "wayland-session@hyprland.desktop.target";
+in
 {
   options.my.hypr.windowRules.steam.enable = lib.mkEnableOption "steam window rules" // {
     default = true;
   };
 
   config = lib.mkIf config.my.hypr.windowRules.steam.enable {
+    # Steam's override-redirect toasts bypass compositor placement rules.
+    systemd.user.services.steam-toast-positioner = {
+      Unit = {
+        Description = "Keep Steam desktop toasts clear of reserved bar space";
+        After = [ session ];
+        PartOf = [ session ];
+      };
+      Service = {
+        ExecStart = "${toastPositioner}";
+        Restart = "on-failure";
+        RestartSec = 3;
+      };
+      Install.WantedBy = [ session ];
+    };
     wayland.windowManager.hyprland.settings.window_rule = [
       # Suppress steam from stealing focus
       {
@@ -24,22 +56,6 @@
         idle_inhibit = "none";
         suppress_event = "activatefocus";
         no_initial_focus = true;
-      }
-
-      # Only reposition new toasts on workspaces without a fullscreen window.
-      # Leave 80 logical pixels for the bottom Wayle bar and its inset;
-      # fullscreen games keep Steam's own toast placement.
-      {
-        match = {
-          class = "steam";
-          title = "notificationtoasts.*";
-          workspace = "f[-1]";
-        };
-        float = true;
-        move = "(monitor_w-window_w-15) (monitor_h-window_h-80)";
-        # Steam can request its screen-edge geometry again after the initial
-        # move rule. Keep desktop toasts at the compositor-assigned geometry.
-        suppress_event = "activatefocus x11configurerequest";
       }
 
       # Float titled windows (untitled ones are menus) at the chat spot, top right.
