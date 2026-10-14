@@ -24,7 +24,7 @@
 
     users.taylor = {
       # TEMPORARY (desktop rebuild): taylor-desktop-nix's Hyprland session moved
-      # here, so the hypr dir, mangohud, vesktop settings and hyprcrosshair are
+      # here, so the hypr dir (crosshair included), mangohud and vesktop settings are
       # imported on top of the shared bundles. bundles/gui.nix still brings
       # games-frontends.nix (Steam non-Steam shortcuts + Pegasus) and game save
       # links. Revert with the rest of the stand-in commit.
@@ -37,7 +37,6 @@
         "${self}/modules/home-manager/gui/vesktop.nix"
         "${self}/modules/home-manager/peripherals/mchose-m7-ultra.nix"
         "${self}/modules/home-manager/peripherals/boyi-h60pro.nix"
-        (import "${self}/pkgs/hyprcrosshair/hm-module.nix" self)
       ];
       home.stateVersion = "26.05";
       my.nixvim.full = true;

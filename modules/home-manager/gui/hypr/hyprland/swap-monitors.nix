@@ -50,9 +50,8 @@ let
 
     ''
     + lib.optionalString (cfg.crosshair.enable && cfg.crosshair.monitor == "primary") ''
-    # The crosshair reads its output at startup, so move it onto the new primary.
-    # No-ops when hyprcrosshair is not running.
-    hyprcrosshair-apply-monitor --restart || true
+    # Move the crosshair onto the new primary; no-ops when tcross isn't running.
+    ${lib.getExe config.programs.tcross.package} output "$A" >/dev/null 2>&1 || true
 
     ''
     + ''

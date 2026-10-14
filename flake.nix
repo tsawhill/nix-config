@@ -15,6 +15,12 @@
 
     kopuz.url = "github:temidaradev/kopuz";
 
+    # Local checkout until it's published; picks up new commits on `nix flake update`.
+    tcross = {
+      url = "git+file:///mnt/zpool/code/tCross";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
+
     nixpkgs-stable.url = "github:NixOS/nixpkgs/nixos-26.05";
     home-manager-stable = {
       url = "github:nix-community/home-manager/release-26.05";

@@ -34,7 +34,6 @@
         "${self}/modules/home-manager/gui/hypr"
         "${self}/modules/home-manager/gui/mangohud.nix"
         "${self}/modules/home-manager/gui/vesktop.nix"
-        (import "${self}/pkgs/hyprcrosshair/hm-module.nix" self)
       ];
       home.stateVersion = "26.05";
       my.nixvim.full = true;

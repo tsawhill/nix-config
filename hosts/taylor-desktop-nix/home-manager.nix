@@ -31,7 +31,6 @@
         "${self}/modules/home-manager/gui/vesktop.nix"
         "${self}/modules/home-manager/peripherals/mchose-m7-ultra.nix"
         "${self}/modules/home-manager/peripherals/boyi-h60pro.nix"
-        (import "${self}/pkgs/hyprcrosshair/hm-module.nix" self)
       ];
       home.stateVersion = "26.05";
       my.nixvim.full = true;

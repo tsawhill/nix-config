@@ -789,6 +789,7 @@
         "nixvim-unstable": "nixvim-unstable",
         "sops-nix-stable": "sops-nix-stable",
         "sops-nix-unstable": "sops-nix-unstable",
+        "tcross": "tcross",
         "zen-browser-stable": "zen-browser-stable",
         "zen-browser-unstable": "zen-browser-unstable"
       }
@@ -914,6 +915,26 @@
         "ref": "future-26.11",
         "repo": "default",
         "type": "github"
+      }
+    },
+    "tcross": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs-unstable"
+        ]
+      },
+      "locked": {
+        "lastModified": 1792012696,
+        "narHash": "sha256-6aykBj1SFA0aqf4ScKYbgHQX7cVEmK0D4G3xG/qRR6c=",
+        "ref": "refs/heads/main",
+        "rev": "5d52906ad16e105e967b1dc30b294c67027d27ee",
+        "revCount": 1,
+        "type": "git",
+        "url": "file:///mnt/zpool/code/tCross"
+      },
+      "original": {
+        "type": "git",
+        "url": "file:///mnt/zpool/code/tCross"
       }
     },
     "uv2nix": {
