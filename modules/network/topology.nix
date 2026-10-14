@@ -60,8 +60,9 @@ let
       };
       dns.enable = false;
       ports = {
+        "1" = "taylor-cube-nix (via wall jack)";
+        "2" = "UniFi AP for zone SSIDs (trunk)";
         "6" = "ISP modem (wan, untagged)";
-        "7" = "UniFi AP for zone SSIDs (trunk)";
         "10" = "server-nix lan0 (trunk)";
       };
     };
@@ -405,9 +406,8 @@ let
     taylor-cube-nix = {
       lan = {
         ip = "10.73.73.74";
-        # Wi-Fi NIC (wlp6s0). Ethernet (enp5s0, 90:82:c3:6b:8e:69) is currently
-        # unplugged; swap this MAC if the cube moves to a wired link.
-        mac = "ec:b5:0a:e7:24:7c";
+        # Ethernet (enp5s0); the Wi-Fi NIC (wlp6s0) is ec:b5:0a:e7:24:7c.
+        mac = "90:82:c3:6b:8e:69";
       };
       wgRemote.ip = "10.50.50.6";
       dns = {
