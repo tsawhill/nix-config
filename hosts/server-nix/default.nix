@@ -63,14 +63,17 @@
   # its unprivileged container namespace.
   boot.kernelModules = [
     "wireguard"
-    # networking-router-nix port shaping
+    # networking-router-nix port shaping and WAN QoS
     "ifb"
     "sch_htb"
     "sch_fq_codel"
+    "sch_cake"
     "sch_ingress"
     "cls_flower"
+    "cls_matchall"
     "act_mirred"
     "act_skbedit"
+    "act_ctinfo"
   ];
   software.headless.enable = true;
   my.secrets = {
