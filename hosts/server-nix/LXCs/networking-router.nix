@@ -27,7 +27,7 @@
     # Plan is 2300 down / 357 up.
     wanQos = {
       enable = true;
-      downloadMbit = 2150;
+      downloadMbit = 2250;
       uploadMbit = 340;
       priorityHosts = [
         "taylor-desktop-nix"
