@@ -181,6 +181,12 @@ creation_rules:
         - *build-nix
         - *pi-backup-nix
         - *networking-ddns-nix
+  # Switch SNMPv3 credentials for the router's port shaping
+  - path_regex: modules/secrets/server/LXCs/networking-router-nix\.yaml$
+    key_groups:
+      - age:
+        - *build-nix
+        - *networking-router-nix
   - path_regex: modules/secrets/server/LXCs/mtls-ca\.yaml$
     key_groups:
       - age:

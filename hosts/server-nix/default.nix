@@ -61,7 +61,17 @@
   # Incus guests use the server's kernel. The dedicated VPN egress container
   # therefore needs WireGuard loaded here rather than trying to load it inside
   # its unprivileged container namespace.
-  boot.kernelModules = [ "wireguard" ];
+  boot.kernelModules = [
+    "wireguard"
+    # networking-router-nix port shaping
+    "ifb"
+    "sch_htb"
+    "sch_fq_codel"
+    "sch_ingress"
+    "cls_flower"
+    "act_mirred"
+    "act_skbedit"
+  ];
   software.headless.enable = true;
   my.secrets = {
     gotify_token_zfs.enable = true;

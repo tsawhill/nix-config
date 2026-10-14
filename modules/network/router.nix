@@ -69,6 +69,8 @@ let
   // lib.optionalAttrs (!cfg.takeover) { ActivationPolicy = "down"; };
 in
 {
+  imports = [ ./router-port-shaping.nix ];
+
   options.my.network.router = {
     enable = lib.mkEnableOption "the router, NAT and inter-zone firewall that replaces OPNsense";
 
