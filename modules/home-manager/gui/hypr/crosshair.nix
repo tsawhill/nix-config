@@ -62,7 +62,7 @@ let
     '';
   };
 
-  # Centres each crosshair on the pixel games treat as the middle, half a pixel
+  # Centres the crosshair on the pixel games treat as the middle, half a pixel
   # down-right of the exact screen centre.
   halfPixel = {
     x = 0.5;
@@ -127,6 +127,7 @@ in
       enable = true;
       # Empty means no fixed primary; let Hyprland place it.
       output = if fallbackMonitor == "" then null else fallbackMonitor;
+      offset = halfPixel;
       profiles = [
         # {
         #   name = "White Ring";
@@ -136,19 +137,16 @@ in
         #     thickness = 1.2;
         #   };
         #   outline.enable = true;
-        #   offset = halfPixel;
         # }
         {
-          name = "Yellow Dot";
+          name = "Cyan Dot";
           shape = "dot";
-          color = "#ffff00";
-          dot.size = 2.5;
+          color = "#6bdfff";
+          dot.size = 3.0;
           outline = {
             enable = true;
-            size = 1.2;
             feather = 1.0;
           };
-          offset = halfPixel;
         }
         {
           name = "Yellow Cross";
@@ -160,7 +158,6 @@ in
             gap = 5.0;
           };
           outline.enable = true;
-          offset = halfPixel;
         }
         {
           name = "Chevron";
@@ -170,7 +167,6 @@ in
             length = 3.0;
           };
           outline.enable = true;
-          offset = halfPixel;
         }
       ];
     };
