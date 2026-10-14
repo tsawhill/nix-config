@@ -133,6 +133,8 @@ in
       config = {
         misc = {
           disable_hyprland_logo = true;
+          disable_splash_rendering = true;
+          background_color = "rgb(000000)"; # Pure black behind wallpaper swaps (OLED)
           enable_swallow = false;
           swallow_regex = "^(foot)$";
           enable_anr_dialog = false;

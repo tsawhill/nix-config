@@ -44,12 +44,16 @@ let
     else
       throw "Wallpaper ${name} is not in wallpapers/manifest.json; put it in wallpapers/ on build-nix and run wallpapers-sync.";
 
+  # Match argv[0] only: Steam's runtime helpers carry gamescope's Vulkan layer path in their args.
   disableAppsCheck =
     if cfg.disableApps == [ ] then
       "false"
     else
       lib.concatStringsSep " || " (
-        map (app: "${pkgs.procps}/bin/pgrep -f ${lib.escapeShellArg app} > /dev/null 2>&1") cfg.disableApps
+        map (
+          app:
+          "${pkgs.procps}/bin/pgrep -f ${lib.escapeShellArg "^([^ ]*/)?${lib.escapeRegex app}( |$)"} > /dev/null 2>&1"
+        ) cfg.disableApps
       );
 
   mkWallpaperService =
@@ -63,6 +67,7 @@ let
         [
           "loop-file=inf"
           "hwdec=auto-safe"
+          "quiet" # No status line spamming the journal
         ]
         ++ {
           fill = [ "panscan=1.0" ];
@@ -163,7 +168,7 @@ in
     disableApps = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [ "gamescope" ];
-      description = "Patterns (matched via pgrep -f against the full command line) that stop all wallpapers while any match is running.";
+      description = "Program names that stop all wallpapers while running, matched against the basename of each process's argv[0].";
     };
 
     monitors = lib.mkOption {
