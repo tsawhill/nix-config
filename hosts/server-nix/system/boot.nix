@@ -1,6 +1,11 @@
-{ pkgs, ... }:
+{ pkgs, self, ... }:
 
 {
+  imports = [ "${self}/modules/hardware/zfs-latest-kernel.nix" ];
+
+  # cake_mq (Linux 7.0+) lets networking-router-nix shape the full download rate.
+  my.boot.zfsLatestKernel.enable = true;
+
   boot.loader.systemd-boot.enable = true;
   # Full-resolution text mode, so entry titles (and their build dates) fit.
   boot.loader.systemd-boot.consoleMode = "max";
