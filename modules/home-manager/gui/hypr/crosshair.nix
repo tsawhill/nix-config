@@ -160,13 +160,13 @@ in
           outline.enable = true;
         }
         {
-          name = "Chevron";
-          shape = "chevron";
-          cross = {
-            thickness = 1.7;
-            length = 3.0;
+          name = "Cyan Diamond";
+          shape = "diamond";
+          ring.size = 3.0;
+          outline = {
+            enable = true;
+            feather = 1.0;
           };
-          outline.enable = true;
         }
       ];
     };

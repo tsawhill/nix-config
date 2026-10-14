@@ -924,11 +924,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1792015376,
-        "narHash": "sha256-wI6h8N4tblO2HjJkYeO0Vj306NONMu9c2Tuh0VYhjkY=",
+        "lastModified": 1792016398,
+        "narHash": "sha256-WW8A0g1Q2NK72K+lFUI5HALKXGq3yGd16qDHWDlxhmk=",
         "ref": "refs/heads/main",
-        "rev": "c59768ee0014ee1fc88900dbde3c80c894daf183",
-        "revCount": 3,
+        "rev": "aafded240d9151d479cfb47c1d75a8383791ff01",
+        "revCount": 4,
         "type": "git",
         "url": "file:///mnt/zpool/code/tCross"
       },
