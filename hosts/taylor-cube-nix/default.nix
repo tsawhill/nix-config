@@ -152,6 +152,14 @@
   # the HDR Alienware panels, which are now cabled here. XWayland keeps the
   # brightness stable.
   nixpkgs.overlays = [
+    (final: prev: {
+      # Jovian's forced Deck mode leaves desktop Store/Community disabled when
+      # device setup is incomplete. Keep those flags confined to Game Mode.
+      steam = prev.steam.override { platformArgs = ""; };
+      gamescope-session = prev.gamescope-session.override {
+        steam = final.steam.override { platformArgs = "-steamdeck -pipewire"; };
+      };
+    })
     (_final: prev: {
       moonlight-qt = prev.moonlight-qt.overrideAttrs (old: {
         qtWrapperArgs = (old.qtWrapperArgs or [ ]) ++ [ "--set QT_QPA_PLATFORM xcb" ];
