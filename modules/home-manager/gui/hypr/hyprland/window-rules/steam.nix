@@ -37,6 +37,9 @@
         };
         float = true;
         move = "(monitor_w-window_w-15) (monitor_h-window_h-80)";
+        # Steam can request its screen-edge geometry again after the initial
+        # move rule. Keep desktop toasts at the compositor-assigned geometry.
+        suppress_event = "activatefocus x11configurerequest";
       }
 
       # Float titled windows (untitled ones are menus) at the chat spot, top right.
