@@ -4,7 +4,7 @@ use crate::{mchose, rongyuan};
 use serde::Deserialize;
 use std::path::Path;
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Config {
     #[serde(default)]

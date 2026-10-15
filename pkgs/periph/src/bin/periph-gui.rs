@@ -1,22 +1,25 @@
-//! periph-gui: change device settings live. Changes are runtime only; the service
-//! puts the Nix config back the next time a device is plugged in.
+//! Native GTK editor for live peripheral settings. Changes are temporary; the
+//! service restores the declared Nix configuration when a device reconnects.
 
-use eframe::egui::{self, Button, Color32, ComboBox, DragValue, RichText, Slider};
+use gtk::gdk;
+use gtk::glib::{self, ControlFlow};
+use gtk::prelude::*;
+use gtk::{Align, Orientation};
 use periph::config::{self, Config};
 use periph::hidraw::{HidRaw, Node};
 use periph::{devices, mchose, mchose_buttons, rongyuan};
+use std::cell::RefCell;
 use std::io;
-use std::io::Write;
 use std::path::PathBuf;
-use std::process::{Command, Stdio};
+use std::rc::Rc;
 use std::sync::mpsc::{self, Receiver};
 use std::time::Duration;
 
 const LOCK_WAIT: Duration = Duration::from_secs(3);
-const CHANGED: Color32 = Color32::from_rgb(230, 160, 60);
 const KB_RATES: [u16; 7] = [125, 250, 500, 1000, 2000, 4000, 8000];
+const BUTTON_LABELS: [&str; 6] = ["Left", "Middle", "Right", "Forward", "Back", "DPI"];
+const DEVICE_NAMES: [&str; 2] = ["mchose-m7-ultra", "boyi-h60pro"];
 
-// A short list of these, so the size difference between variants doesn't matter.
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone)]
 enum Device {
@@ -43,7 +46,9 @@ enum Device {
 impl Device {
     fn node(&self) -> &Node {
         match self {
-            Self::Mouse { node, .. } | Self::Keyboard { node, .. } | Self::Unavailable { node, .. } => node,
+            Self::Mouse { node, .. }
+            | Self::Keyboard { node, .. }
+            | Self::Unavailable { node, .. } => node,
         }
     }
 
@@ -51,6 +56,14 @@ impl Device {
         match self {
             Self::Mouse { edit, .. } => Some(edit.lift_off),
             _ => None,
+        }
+    }
+
+    fn dirty(&self) -> bool {
+        match self {
+            Self::Mouse { read, edit, .. } => read != edit,
+            Self::Keyboard { read, edit, .. } => read != edit,
+            Self::Unavailable { .. } => false,
         }
     }
 }
@@ -65,26 +78,50 @@ fn read_mouse(node: &Node, lift_off: mchose::LiftOff) -> io::Result<Device> {
     let dev = HidRaw::open_locked(&node.dev, LOCK_WAIT)?;
     let id = online(&dev)?;
     if id.id != mchose::M7_ULTRA {
-        return Err(io::Error::other(format!("MCHOSE device id {} isn't supported yet", id.id)));
+        return Err(io::Error::other(format!(
+            "MCHOSE device id {} isn't supported yet",
+            id.id
+        )));
     }
     let wired = node.pid == id.id;
     let read = mchose::settings_from(&mchose::observe(&dev, &id, wired)?, lift_off);
-    Ok(Device::Mouse { node: node.clone(), id, wired, edit: read.clone(), read })
+    Ok(Device::Mouse {
+        node: node.clone(),
+        id,
+        wired,
+        edit: read.clone(),
+        read,
+    })
 }
 
 fn read_keyboard(node: &Node) -> io::Result<Device> {
     match rongyuan::open(node)? {
-        rongyuan::Opened::Unknown(id) => Err(io::Error::other(format!("RongYuan device id {id} isn't supported yet"))),
+        rongyuan::Opened::Unknown(id) => Err(io::Error::other(format!(
+            "RongYuan device id {id} isn't supported yet"
+        ))),
         rongyuan::Opened::Known(kb) => {
             let read = kb.settings_from(&kb.observe()?);
-            Ok(Device::Keyboard { node: node.clone(), model: kb.model, precision: kb.precision(), edit: read.clone(), read })
+            Ok(Device::Keyboard {
+                node: node.clone(),
+                model: kb.model,
+                precision: kb.precision(),
+                edit: read.clone(),
+                read,
+            })
         }
     }
 }
 
 fn read(node: &Node, lift_off: mchose::LiftOff) -> Device {
-    let result = if rongyuan::is_config_node(node) { read_keyboard(node) } else { read_mouse(node, lift_off) };
-    result.unwrap_or_else(|e| Device::Unavailable { node: node.clone(), why: e.to_string() })
+    let result = if rongyuan::is_config_node(node) {
+        read_keyboard(node)
+    } else {
+        read_mouse(node, lift_off)
+    };
+    result.unwrap_or_else(|error| Device::Unavailable {
+        node: node.clone(),
+        why: error.to_string(),
+    })
 }
 
 fn apply(device: &Device) -> io::Result<Vec<String>> {
@@ -99,48 +136,25 @@ fn apply(device: &Device) -> io::Result<Vec<String>> {
             edit.validate().map_err(io::Error::other)?;
             match rongyuan::open(node)? {
                 rongyuan::Opened::Known(kb) => kb.apply(edit),
-                rongyuan::Opened::Unknown(id) => Err(io::Error::other(format!("device id {id} isn't supported"))),
+                rongyuan::Opened::Unknown(id) => {
+                    Err(io::Error::other(format!("device id {id} isn't supported")))
+                }
             }
         }
         Device::Unavailable { .. } => Ok(Vec::new()),
     }
 }
 
-/// Copy through wl-copy (this is a Wayland desktop), falling back to egui's clipboard.
-fn copy(ctx: &egui::Context, text: String) {
-    let piped = Command::new("wl-copy").stdin(Stdio::piped()).spawn().and_then(|mut child| {
-        child.stdin.take().expect("piped stdin").write_all(text.as_bytes())?;
-        child.wait()
-    });
-    if !piped.is_ok_and(|status| status.success()) {
-        ctx.copy_text(text);
-    }
-}
-
 enum Msg {
     Scanned(Vec<Device>),
-    Applied { index: usize, device: Box<Device>, result: Result<Vec<String>, String> },
+    Applied {
+        index: usize,
+        device: Box<Device>,
+        result: Result<Vec<String>, String>,
+    },
 }
 
-enum Action {
-    Reload,
-    Apply(usize),
-    ResetToNix(usize),
-    Copy(String),
-}
-
-/// Device names `periph-gui <device>` accepts, as the Nix options call them.
-const DEVICE_NAMES: [&str; 2] = ["mchose-m7-ultra", "boyi-h60pro"];
-
-fn wanted(node: &Node, only: Option<&str>) -> bool {
-    match only {
-        None => true,
-        Some("boyi-h60pro") => rongyuan::is_config_node(node),
-        Some(_) => mchose::is_config_node(node),
-    }
-}
-
-struct App {
+struct State {
     declared: Option<Config>,
     config_error: Option<String>,
     only: Option<String>,
@@ -150,692 +164,1446 @@ struct App {
     log: Vec<String>,
 }
 
-impl App {
-    fn new(ctx: &egui::Context, declared: Option<Config>, config_error: Option<String>, only: Option<String>) -> Self {
-        ctx.all_styles_mut(|style| {
-            style.spacing.item_spacing = egui::vec2(10.0, 8.0);
-            style.spacing.button_padding = egui::vec2(12.0, 7.0);
-            style.spacing.interact_size.y = 30.0;
-            style.spacing.combo_width = 160.0;
-            style.spacing.slider_width = 180.0;
-        });
-        let mut app = Self {
-            declared,
-            config_error,
-            only,
-            devices: Vec::new(),
-            job: None,
-            status: String::new(),
-            log: Vec::new(),
-        };
-        app.run(Action::Reload, ctx);
-        app
-    }
-
+impl State {
     fn declared_lift_off(&self) -> mchose::LiftOff {
-        self.declared.as_ref().and_then(|c| c.mchose_m7_ultra.as_ref()).map_or(mchose::LiftOff::Low, |s| s.lift_off)
+        self.declared
+            .as_ref()
+            .and_then(|c| c.mchose_m7_ultra.as_ref())
+            .map_or(mchose::LiftOff::Low, |s| s.lift_off)
     }
 
-    fn spawn(&mut self, ctx: &egui::Context, job: impl FnOnce() -> Msg + Send + 'static) {
+    fn reload(&mut self) {
+        self.status = "Reading devices…".into();
+        let lift_off = self.declared_lift_off();
+        let only = self.only.clone();
+        self.spawn(move || {
+            let nodes = devices()
+                .into_iter()
+                .filter(|node| wanted(node, only.as_deref()));
+            Msg::Scanned(nodes.map(|node| read(&node, lift_off)).collect())
+        });
+    }
+
+    fn apply(&mut self, index: usize) {
+        let Some(device) = self.devices.get(index).cloned() else {
+            return;
+        };
+        self.status = "Applying… (the keyboard can take about 20 seconds)".into();
+        let lift_off = device.lift_off().unwrap_or(self.declared_lift_off());
+        self.spawn(move || {
+            let result = apply(&device).map_err(|error| error.to_string());
+            Msg::Applied {
+                index,
+                device: Box::new(read(device.node(), lift_off)),
+                result,
+            }
+        });
+    }
+
+    fn reset_to_nix(&mut self, index: usize) {
+        let Some(declared) = &self.declared else {
+            return;
+        };
+        match self.devices.get_mut(index) {
+            Some(Device::Mouse { edit, .. }) => {
+                if let Some(settings) = &declared.mchose_m7_ultra {
+                    *edit = settings.clone();
+                }
+            }
+            Some(Device::Keyboard { edit, .. }) => {
+                if let Some(settings) = &declared.boyi_h60pro {
+                    *edit = settings.clone();
+                }
+            }
+            _ => return,
+        }
+        self.apply(index);
+    }
+
+    fn spawn(&mut self, job: impl FnOnce() -> Msg + Send + 'static) {
         let (tx, rx) = mpsc::channel();
-        let ctx = ctx.clone();
         std::thread::spawn(move || {
             let _ = tx.send(job());
-            ctx.request_repaint();
         });
         self.job = Some(rx);
     }
 
-    fn run(&mut self, action: Action, ctx: &egui::Context) {
-        match action {
-            Action::Reload => {
-                self.status = "Reading devices…".into();
-                let lift_off = self.declared_lift_off();
-                let only = self.only.clone();
-                self.spawn(ctx, move || {
-                    let nodes = devices().into_iter().filter(|n| wanted(n, only.as_deref()));
-                    Msg::Scanned(nodes.map(|n| read(&n, lift_off)).collect())
-                });
-            }
-            Action::ResetToNix(index) => {
-                let Some(declared) = &self.declared else { return };
-                match self.devices.get_mut(index) {
-                    Some(Device::Mouse { edit, .. }) => {
-                        if let Some(s) = &declared.mchose_m7_ultra {
-                            *edit = s.clone();
-                        }
-                    }
-                    Some(Device::Keyboard { edit, .. }) => {
-                        if let Some(s) = &declared.boyi_h60pro {
-                            *edit = s.clone();
-                        }
-                    }
-                    _ => return,
-                }
-                self.run(Action::Apply(index), ctx);
-            }
-            Action::Apply(index) => {
-                let Some(device) = self.devices.get(index).cloned() else { return };
-                self.status = "Applying… (the keyboard can take ~20 s)".into();
-                let lift_off = device.lift_off().unwrap_or(self.declared_lift_off());
-                self.spawn(ctx, move || {
-                    let result = apply(&device).map_err(|e| e.to_string());
-                    Msg::Applied { index, device: Box::new(read(device.node(), lift_off)), result }
-                });
-            }
-            Action::Copy(text) => {
-                copy(ctx, text);
-                self.status = "Copied as Nix".into();
-            }
-        }
-    }
-
-    fn poll(&mut self) {
-        let Some(msg) = self.job.as_ref().and_then(|rx| rx.try_recv().ok()) else { return };
+    fn poll(&mut self) -> bool {
+        let Some(message) = self
+            .job
+            .as_ref()
+            .and_then(|receiver| receiver.try_recv().ok())
+        else {
+            return false;
+        };
         self.job = None;
-        match msg {
+        match message {
             Msg::Scanned(devices) => {
                 self.status = match devices.len() {
                     0 => "No supported devices found".into(),
-                    n => format!("{n} device(s)"),
+                    count => format!("{count} device(s)"),
                 };
                 self.devices = devices;
             }
-            Msg::Applied { index, device, result } => {
+            Msg::Applied {
+                index,
+                device,
+                result,
+            } => {
                 match result {
                     Ok(changes) if changes.is_empty() => self.status = "Nothing to change".into(),
                     Ok(changes) => {
                         self.status = format!("Applied {} change(s)", changes.len());
                         self.log.extend(changes);
                     }
-                    Err(e) => self.status = format!("Apply failed: {e}"),
+                    Err(error) => self.status = format!("Apply failed: {error}"),
                 }
                 if let Some(slot) = self.devices.get_mut(index) {
                     *slot = *device;
                 }
             }
         }
+        true
     }
 }
 
-impl eframe::App for App {
-    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        self.poll();
-        let ctx = ui.ctx().clone();
-        let busy = self.job.is_some();
-        let mut action = None;
-        egui::CentralPanel::default().frame(egui::Frame::central_panel(ui.style()).inner_margin(20)).show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.heading(RichText::new("Peripherals").size(26.0));
-                if ui.add_enabled(!busy, Button::new("Reload")).clicked() {
-                    action = Some(Action::Reload);
-                }
-                if busy {
-                    ui.spinner();
-                }
-            });
-            ui.label(RichText::new(&self.status).weak());
-            ui.add_space(4.0);
-            ui.label(
-                RichText::new("Temporary settings · Reconnecting restores your Nix configuration.")
-                    .small()
-                    .weak(),
-            );
-            if let Some(e) = &self.config_error {
-                ui.colored_label(Color32::LIGHT_RED, format!("Nix config not loaded: {e}"));
-            }
-            ui.add_space(16.0);
-            egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
-                for (index, device) in self.devices.iter_mut().enumerate() {
-                    let available = ui.available_width();
-                    let card_width = available.min(1200.0);
-                    ui.horizontal(|ui| {
-                        ui.add_space((available - card_width) / 2.0);
-                        ui.vertical(|ui| {
-                            ui.set_width(card_width);
-                            ui.push_id(index, |ui| {
-                                egui::Frame::group(ui.style()).inner_margin(16).corner_radius(10).show(ui, |ui| {
-                                    ui.set_min_width(ui.available_width());
-                                    if let Some(a) = device_ui(ui, index, device, self.declared.as_ref(), busy) {
-                                        action = Some(a);
-                                    }
-                                });
-                            });
-                        });
-                    });
-                    ui.add_space(12.0);
-                }
-                if self.devices.is_empty() && !busy {
-                    ui.add_space(24.0);
-                    ui.strong("Connect a supported mouse or keyboard");
-                    ui.label(RichText::new("Wake your device, then select Reload to try again.").weak());
-                }
-                if !self.log.is_empty() {
-                    ui.separator();
-                    egui::CollapsingHeader::new("Changes applied").show(ui, |ui| {
-                        for line in &self.log {
-                            ui.label(RichText::new(line).small());
-                        }
-                    });
-                }
-            });
-        });
-        if let Some(a) = action {
-            self.run(a, &ctx);
-        }
+type Shared = Rc<RefCell<State>>;
+type UiSlot = Rc<RefCell<Option<Ui>>>;
+
+#[derive(Clone)]
+struct DeviceActions {
+    index: usize,
+    apply: gtk::Button,
+    revert: gtk::Button,
+    reset: gtk::Button,
+}
+
+#[derive(Clone)]
+struct Ui {
+    window: gtk::ApplicationWindow,
+    status: gtk::Label,
+    spinner: gtk::Spinner,
+    reload: gtk::Button,
+    devices: gtk::Box,
+    actions: Rc<RefCell<Vec<DeviceActions>>>,
+}
+
+fn wanted(node: &Node, only: Option<&str>) -> bool {
+    match only {
+        None => true,
+        Some("boyi-h60pro") => rongyuan::is_config_node(node),
+        Some(_) => mchose::is_config_node(node),
     }
 }
 
-/// One device's panel. Returns what the buttons asked for.
-fn device_ui(ui: &mut egui::Ui, index: usize, device: &mut Device, declared: Option<&Config>, busy: bool) -> Option<Action> {
-    let (dirty, has_nix, nix_text) = match device {
-        Device::Unavailable { node, why } => {
-            ui.strong(format!("{} ({:04x}:{:04x})", node.dev.display(), node.vid, node.pid));
-            ui.colored_label(CHANGED, why.as_str());
-            return None;
-        }
-        Device::Mouse { id, wired, read, edit, .. } => {
-            let link = if *wired { "cable" } else { "dongle" };
-            let charging = if id.charging { ", charging" } else { "" };
-            ui.heading("MCHOSE M7 Ultra");
-            ui.label(RichText::new(format!("Connected via {link} · Battery {}%{charging}", id.battery)).weak());
-            ui.add_space(12.0);
-            let nix = declared.and_then(|c| c.mchose_m7_ultra.as_ref());
-            mouse_ui(ui, edit, nix, *wired);
-            (read != edit, nix.is_some(), mchose::to_nix(edit, true))
-        }
-        Device::Keyboard { model, precision, read, edit, .. } => {
-            ui.heading(model.name);
-            ui.add_space(12.0);
-            let nix = declared.and_then(|c| c.boyi_h60pro.as_ref());
-            keyboard_ui(ui, model, edit, nix);
-            (read != edit, nix.is_some(), rongyuan::to_nix(edit, *precision))
-        }
-    };
-    let mut action = None;
-    ui.add_space(16.0);
-    ui.separator();
-    ui.horizontal_wrapped(|ui| {
-        if ui.add_enabled(dirty && !busy, Button::new("Apply changes").fill(ui.visuals().selection.bg_fill)).clicked() {
-            action = Some(Action::Apply(index));
-        }
-        if ui.add_enabled(dirty && !busy, Button::new("Revert")).clicked() {
-            match device {
-                Device::Mouse { read, edit, .. } => *edit = read.clone(),
-                Device::Keyboard { read, edit, .. } => *edit = read.clone(),
-                Device::Unavailable { .. } => {}
-            }
-        }
-        let reset = ui.add_enabled(has_nix && !busy, Button::new("Reset to Nix"));
-        if reset.on_hover_text("Apply your declared Nix config now").clicked() {
-            action = Some(Action::ResetToNix(index));
-        }
-        if ui.button("Copy as Nix").on_hover_text("Copy these settings as a Nix snippet").clicked() {
-            action = Some(Action::Copy(nix_text));
-        }
-    });
-    action
+fn clear_box(container: &gtk::Box) {
+    while let Some(child) = container.first_child() {
+        container.remove(&child);
+    }
 }
 
-/// A full-width visual break within a three-column settings grid.
-fn section_row(ui: &mut egui::Ui, title: &str) {
-    ui.vertical(|ui| {
-        ui.add_space(8.0);
-        ui.strong(title);
-    });
-    ui.label("");
-    ui.label("");
-    ui.end_row();
+fn clipboard(text: String) {
+    if let Some(display) = gdk::Display::default() {
+        display.clipboard().set_text(&text);
+    }
 }
 
-/// Finish a grid row: flag values that differ from the Nix config.
-fn mark(ui: &mut egui::Ui, differs: bool) {
-    if differs {
-        ui.label(RichText::new("Modified").small().color(CHANGED))
-            .on_hover_text("Differs from your Nix config; the next plug-in restores the Nix value");
+fn marker(modified: bool) -> gtk::Label {
+    let label = gtk::Label::new(modified.then_some("Modified"));
+    label.set_halign(Align::Start);
+    if modified {
+        label.add_css_class("warning");
+        label.set_tooltip_text(Some(
+            "Differs from Nix; reconnecting restores the declared value",
+        ));
+    }
+    label
+}
+
+fn section(grid: &gtk::Grid, row: i32, title: &str) -> i32 {
+    let label = gtk::Label::new(Some(title));
+    label.add_css_class("heading");
+    label.set_halign(Align::Start);
+    label.set_margin_top(if row == 0 { 0 } else { 12 });
+    grid.attach(&label, 0, row, 3, 1);
+    row + 1
+}
+
+fn add_row(
+    grid: &gtk::Grid,
+    row: i32,
+    name: &str,
+    widget: &impl IsA<gtk::Widget>,
+    modified: bool,
+) -> i32 {
+    let label = gtk::Label::new(Some(name));
+    label.set_halign(Align::Start);
+    grid.attach(&label, 0, row, 1, 1);
+    grid.attach(widget, 1, row, 1, 1);
+    grid.attach(&marker(modified), 2, row, 1, 1);
+    row + 1
+}
+
+fn spin(
+    value: f64,
+    min: f64,
+    max: f64,
+    step: f64,
+    digits: u32,
+    suffix: &str,
+) -> (gtk::Box, gtk::SpinButton) {
+    let button = gtk::SpinButton::with_range(min, max, step);
+    button.set_value(value);
+    button.set_digits(digits);
+    button.set_width_chars(7);
+    let row = gtk::Box::new(Orientation::Horizontal, 6);
+    row.append(&button);
+    if !suffix.is_empty() {
+        row.append(&gtk::Label::new(Some(suffix)));
+    }
+    (row, button)
+}
+
+fn dropdown(labels: &[String], selected: usize) -> gtk::DropDown {
+    let names: Vec<&str> = labels.iter().map(String::as_str).collect();
+    let dropdown = gtk::DropDown::from_strings(&names);
+    dropdown.set_selected(selected as u32);
+    dropdown
+}
+
+fn refresh(state: &Shared, ui: &Ui) {
+    let state = state.borrow();
+    let busy = state.job.is_some();
+    ui.status.set_label(&state.status);
+    ui.reload.set_sensitive(!busy);
+    if busy {
+        ui.spinner.start();
     } else {
-        ui.label("");
+        ui.spinner.stop();
     }
-    ui.end_row();
+    for actions in ui.actions.borrow().iter() {
+        let dirty = state.devices.get(actions.index).is_some_and(Device::dirty);
+        let has_nix = match state.devices.get(actions.index) {
+            Some(Device::Mouse { .. }) => state
+                .declared
+                .as_ref()
+                .is_some_and(|config| config.mchose_m7_ultra.is_some()),
+            Some(Device::Keyboard { .. }) => state
+                .declared
+                .as_ref()
+                .is_some_and(|config| config.boyi_h60pro.is_some()),
+            _ => false,
+        };
+        actions.apply.set_sensitive(dirty && !busy);
+        actions.revert.set_sensitive(dirty && !busy);
+        actions.reset.set_sensitive(has_nix && !busy);
+    }
 }
 
-fn combo<T: PartialEq + Copy>(ui: &mut egui::Ui, id: &str, value: &mut T, options: &[(T, String)]) {
-    let selected = options.iter().find(|(v, _)| v == value).map_or("?", |(_, l)| l.as_str()).to_string();
-    ComboBox::from_id_salt(id).selected_text(selected).show_ui(ui, |ui| {
-        for (v, label) in options {
-            ui.selectable_value(value, *v, label.as_str());
-        }
-    });
+fn changed(state: &Shared, slot: &UiSlot) {
+    if let Some(ui) = slot.borrow().as_ref() {
+        refresh(state, ui);
+    }
 }
 
-fn mouse_ui(ui: &mut egui::Ui, s: &mut mchose::Settings, nix: Option<&mchose::Settings>, wired: bool) {
-    if ui.available_width() >= 900.0 {
-        ui.columns(2, |columns| {
-            mouse_settings_ui(&mut columns[0], s, nix, wired);
-            button_assignments_ui(&mut columns[1], &mut s.buttons, nix.map(|n| &n.buttons));
+fn mutate_mouse(state: &Shared, index: usize, change: impl FnOnce(&mut mchose::Settings)) {
+    if let Some(Device::Mouse { edit, .. }) = state.borrow_mut().devices.get_mut(index) {
+        change(edit);
+    }
+}
+
+fn mutate_keyboard(state: &Shared, index: usize, change: impl FnOnce(&mut rongyuan::Settings)) {
+    if let Some(Device::Keyboard { edit, .. }) = state.borrow_mut().devices.get_mut(index) {
+        change(edit);
+    }
+}
+
+fn mouse_settings(
+    index: usize,
+    current: &mchose::Settings,
+    declared: Option<&mchose::Settings>,
+    wired: bool,
+    state: &Shared,
+    slot: &UiSlot,
+) -> gtk::Grid {
+    let grid = gtk::Grid::builder()
+        .column_spacing(18)
+        .row_spacing(10)
+        .hexpand(true)
+        .build();
+    let mut row = section(&grid, 0, "Sensitivity");
+
+    let stages = gtk::Box::new(Orientation::Horizontal, 6);
+    for (stage, value) in current.dpi_stages.iter().copied().enumerate() {
+        let (widget, input) = spin(value.into(), 50.0, 42000.0, 50.0, 0, "");
+        input.set_width_chars(5);
+        let state_clone = state.clone();
+        let slot_clone = slot.clone();
+        input.connect_value_changed(move |input| {
+            mutate_mouse(&state_clone, index, |settings| {
+                settings.dpi_stages[stage] = input.value() as u16
+            });
+            changed(&state_clone, &slot_clone);
         });
-    } else {
-        mouse_settings_ui(ui, s, nix, wired);
-        ui.add_space(12.0);
-        button_assignments_ui(ui, &mut s.buttons, nix.map(|n| &n.buttons));
+        stages.append(&widget);
+        if current.dpi_stages.len() > 1 {
+            let remove = gtk::Button::with_label("−");
+            remove.add_css_class("flat");
+            let state_clone = state.clone();
+            let slot_clone = slot.clone();
+            remove.connect_clicked(move |_| {
+                mutate_mouse(&state_clone, index, |settings| {
+                    settings.dpi_stages.remove(stage);
+                    settings.active_stage =
+                        settings.active_stage.min(settings.dpi_stages.len() as u8);
+                });
+                rebuild_devices(&state_clone, &slot_clone);
+            });
+            stages.append(&remove);
+        }
     }
-}
-
-fn mouse_settings_ui(ui: &mut egui::Ui, s: &mut mchose::Settings, nix: Option<&mchose::Settings>, wired: bool) {
-    let rates: Vec<(u32, String)> = mchose::RATES.iter().map(|&hz| (hz, format!("{hz} Hz"))).collect();
-    egui::Grid::new("mouse").num_columns(3).spacing([20.0, 10.0]).show(ui, |ui| {
-        section_row(ui, "Sensitivity");
-        ui.label("DPI stages");
-        ui.horizontal(|ui| {
-            let count = s.dpi_stages.len();
-            let mut remove = None;
-            for (i, dpi) in s.dpi_stages.iter_mut().enumerate() {
-                ui.add(DragValue::new(dpi).range(50..=42000).speed(10));
-                if count > 1 && ui.small_button("✕").clicked() {
-                    remove = Some(i);
-                }
-            }
-            if let Some(i) = remove {
-                s.dpi_stages.remove(i);
-            }
-            if s.dpi_stages.len() < 6 && ui.small_button("+").clicked() {
-                let last = *s.dpi_stages.last().unwrap_or(&1600);
-                s.dpi_stages.push(last);
-            }
-            s.active_stage = s.active_stage.clamp(1, s.dpi_stages.len() as u8);
+    if current.dpi_stages.len() < 6 {
+        let add = gtk::Button::with_label("+");
+        let state_clone = state.clone();
+        let slot_clone = slot.clone();
+        add.connect_clicked(move |_| {
+            mutate_mouse(&state_clone, index, |settings| {
+                let value = *settings.dpi_stages.last().unwrap_or(&1600);
+                settings.dpi_stages.push(value);
+            });
+            rebuild_devices(&state_clone, &slot_clone);
         });
-        mark(ui, nix.is_some_and(|n| n.dpi_stages != s.dpi_stages));
+        stages.append(&add);
+    }
+    row = add_row(
+        &grid,
+        row,
+        "DPI stages",
+        &stages,
+        declared.is_some_and(|nix| nix.dpi_stages != current.dpi_stages),
+    );
 
-        ui.label("Active stage");
-        let stages: Vec<(u8, String)> = (1..=s.dpi_stages.len() as u8).map(|i| (i, i.to_string())).collect();
-        combo(ui, "stage", &mut s.active_stage, &stages);
-        mark(ui, nix.is_some_and(|n| n.active_stage != s.active_stage));
-
-        section_row(ui, "Tracking & performance");
-        ui.label("Polling rate (cable)");
-        ui.horizontal(|ui| {
-            combo(ui, "wired", &mut s.polling_rate.wired, &rates);
-            if !wired {
-                ui.label(RichText::new("applies over the cable").small().weak());
-            }
+    let stage_labels: Vec<String> = (1..=current.dpi_stages.len())
+        .map(|value| value.to_string())
+        .collect();
+    let stage = dropdown(
+        &stage_labels,
+        current.active_stage.saturating_sub(1) as usize,
+    );
+    {
+        let state = state.clone();
+        let slot = slot.clone();
+        stage.connect_selected_notify(move |input| {
+            mutate_mouse(&state, index, |settings| {
+                settings.active_stage = input.selected() as u8 + 1
+            });
+            changed(&state, &slot);
         });
-        mark(ui, nix.is_some_and(|n| n.polling_rate.wired != s.polling_rate.wired));
-
-        ui.label("Polling rate (dongle)");
-        ui.horizontal(|ui| {
-            combo(ui, "wireless", &mut s.polling_rate.wireless, &rates);
-            if wired {
-                ui.label(RichText::new("applies over the dongle").small().weak());
-            }
-        });
-        mark(ui, nix.is_some_and(|n| n.polling_rate.wireless != s.polling_rate.wireless));
-
-        ui.label("Lift-off distance");
-        let lifts: Vec<_> = mchose::LiftOff::ALL.iter().map(|&l| (l, l.name().to_string())).collect();
-        combo(ui, "lift", &mut s.lift_off, &lifts);
-        mark(ui, nix.is_some_and(|n| n.lift_off != s.lift_off));
-
-        ui.label("Motion sync");
-        ui.checkbox(&mut s.motion_sync, "");
-        mark(ui, nix.is_some_and(|n| n.motion_sync != s.motion_sync));
-
-        ui.label("Ripple control");
-        ui.checkbox(&mut s.ripple, "");
-        mark(ui, nix.is_some_and(|n| n.ripple != s.ripple));
-
-        ui.label("Angle snapping");
-        ui.checkbox(&mut s.angle_snap, "");
-        mark(ui, nix.is_some_and(|n| n.angle_snap != s.angle_snap));
-
-        ui.label("Angle correction");
-        ui.add(Slider::new(&mut s.angle_correction, -30..=30).suffix("°"));
-        mark(ui, nix.is_some_and(|n| n.angle_correction != s.angle_correction));
-
-        ui.label("Performance mode");
-        let modes: Vec<_> = mchose::Mode::ALL.iter().map(|&m| (m, m.name().to_string())).collect();
-        combo(ui, "mode", &mut s.performance_mode, &modes);
-        mark(ui, nix.is_some_and(|n| n.performance_mode != s.performance_mode));
-
-        ui.label("Debounce");
-        ui.add(DragValue::new(&mut s.debounce_ms).range(0..=50).suffix(" ms"));
-        mark(ui, nix.is_some_and(|n| n.debounce_ms != s.debounce_ms));
-
-        section_row(ui, "Power & lighting");
-        ui.label("Sleep after");
-        ui.add(DragValue::new(&mut s.sleep_minutes).range(0..=255).suffix(" min"))
-            .on_hover_text("0 never sleeps");
-        mark(ui, nix.is_some_and(|n| n.sleep_minutes != s.sleep_minutes));
-
-        ui.label("Lighting");
-        ui.checkbox(&mut s.lighting, "");
-        mark(ui, nix.is_some_and(|n| n.lighting != s.lighting));
-
-    });
-}
-
-fn button_assignments_ui(ui: &mut egui::Ui, buttons: &mut mchose::Buttons, declared: Option<&mchose::Buttons>) {
-    ui.strong("Button assignments");
-    ui.label(RichText::new("Select a button on the mouse to change its action.").small().weak());
-    mouse_diagram(ui, buttons, declared);
-}
-
-const BUTTON_LABELS: [&str; 6] = ["Left", "Middle", "Right", "Forward", "Back", "DPI"];
-
-/// One button's action: free text (for key combos) plus the named actions.
-fn button_editor(ui: &mut egui::Ui, slot: usize, action: &mut String) {
-    ui.add(egui::TextEdit::singleline(action).desired_width(170.0).hint_text("default"));
-    ComboBox::from_id_salt(("button", slot)).selected_text("").width(24.0).show_ui(ui, |ui| {
-        for (name, ..) in mchose_buttons::ACTIONS {
-            if ui.selectable_label(action == name, name).clicked() {
-                *action = name.to_string();
-            }
-        }
-    });
-    if mchose_buttons::encode(action, slot).is_none() {
-        ui.colored_label(Color32::LIGHT_RED, "unknown")
-            .on_hover_text("Pick from the list, or type key:ctrl+c style combos");
     }
-}
+    row = add_row(
+        &grid,
+        row,
+        "Active stage",
+        &stage,
+        declared.is_some_and(|nix| nix.active_stage != current.active_stage),
+    );
+    row = section(&grid, row, "Tracking & performance");
 
-/// A top-down mouse with a label per button; click a button or label to edit it below.
-fn mouse_diagram(ui: &mut egui::Ui, buttons: &mut mchose::Buttons, declared: Option<&mchose::Buttons>) {
-    use egui::{pos2, vec2, Align2, CornerRadius, FontId, Pos2, Rect, Sense, Shape, Stroke, StrokeKind};
-
-    let size = vec2(ui.available_width(), 330.0);
-    let (rect, response) = ui.allocate_exact_size(size, Sense::click());
-    let painter = ui.painter_at(rect);
-    let v = ui.visuals().clone();
-    let id = ui.id().with("selected-button");
-    let mut selected = ui.data(|d| d.get_temp::<usize>(id)).unwrap_or(5);
-
-    // Body: a rounded superellipse, a touch wider toward the palm.
-    let (cx, top, bw, bh) = (rect.center().x, rect.top() + 18.0, 120.0, 290.0);
-    let half = |y: f32| {
-        let t = ((y - top) / bh).clamp(0.0, 1.0);
-        let p = 2.4;
-        bw / 2.0 * (1.0 - (2.0 * t - 1.0).abs().powf(p)).max(0.0).powf(1.0 / p) * (0.9 + 0.1 * t)
-    };
-    let steps = 48;
-    let ys = (0..=steps).map(|i| top + bh * i as f32 / steps as f32);
-    let outline: Vec<Pos2> = ys.clone().map(|y| pos2(cx - half(y), y)).chain(ys.rev().map(|y| pos2(cx + half(y), y))).collect();
-    let split = top + bh * 0.42;
-    let wheel = Rect::from_center_size(pos2(cx, top + bh * 0.17), vec2(16.0, 46.0));
-    let side = |frac: f32| {
-        let y = top + bh * frac;
-        let x = cx - half(y);
-        Rect::from_min_max(pos2(x - 6.0, y - 16.0), pos2(x + 6.0, y + 16.0))
-    };
-    let (forward, back) = (side(0.40), side(0.56));
-    let dpi = pos2(cx, top + bh * 0.76);
-
-    // Per slot: the point on the mouse, where its label goes, and which side.
-    let (lx, rx) = (cx - bw / 2.0 - 28.0, cx + bw / 2.0 + 28.0);
-    let spots: [(Pos2, Pos2, bool); 6] = [
-        (pos2(cx - bw * 0.22, top + bh * 0.22), pos2(lx, top + bh * 0.12), false),
-        (wheel.center_top() + vec2(0.0, 8.0), pos2(rx, top + bh * 0.06), true),
-        (pos2(cx + bw * 0.22, top + bh * 0.24), pos2(rx, top + bh * 0.24), true),
-        (forward.left_center(), pos2(lx, top + bh * 0.40), false),
-        (back.left_center(), pos2(lx, top + bh * 0.58), false),
-        (dpi + vec2(9.0, 0.0), pos2(rx, top + bh * 0.76), true),
-    ];
-    let label_rect = |pos: Pos2, right: bool| {
-        let min = if right { pos - vec2(0.0, 20.0) } else { pos - vec2(120.0, 20.0) };
-        Rect::from_min_size(min, vec2(120.0, 40.0))
-    };
-    let hit = |p: Pos2| -> Option<usize> {
-        if wheel.expand(3.0).contains(p) {
-            return Some(1);
-        }
-        if forward.expand(3.0).contains(p) {
-            return Some(3);
-        }
-        if back.expand(3.0).contains(p) {
-            return Some(4);
-        }
-        if p.distance(dpi) <= 13.0 {
-            return Some(5);
-        }
-        if p.y >= top && p.y <= split && (p.x - cx).abs() <= half(p.y) {
-            return Some(if p.x < cx { 0 } else { 2 });
-        }
-        (0..6).find(|&slot| label_rect(spots[slot].1, spots[slot].2).contains(p))
-    };
-
-    let hovered = response.hover_pos().and_then(hit);
-    if hovered.is_some() {
-        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
-    }
-    if let Some(slot) = response.clicked().then(|| response.interact_pointer_pos()).flatten().and_then(hit) {
-        selected = slot;
-        ui.data_mut(|d| d.insert_temp(id, slot));
-    }
-
-    let differs = |slot: usize| declared.is_some_and(|d| d.slots()[slot] != buttons.slots()[slot]);
-    let fill = |slot: usize| {
-        if slot == selected {
-            v.selection.bg_fill
-        } else if hovered == Some(slot) {
-            v.widgets.hovered.bg_fill
-        } else {
-            v.widgets.inactive.bg_fill
-        }
-    };
-    let line = v.widgets.noninteractive.fg_stroke;
-    let stroke = |slot: usize| if differs(slot) { Stroke::new(2.0, CHANGED) } else { line };
-
-    painter.add(Shape::convex_polygon(outline.clone(), v.faint_bg_color, Stroke::new(1.5, line.color)));
-    for (slot, clip) in [
-        (0, Rect::from_min_max(pos2(rect.left(), top), pos2(cx - 1.0, split))),
-        (2, Rect::from_min_max(pos2(cx + 1.0, top), pos2(rect.right(), split))),
+    for (name, value, cable) in [
+        ("Polling rate (cable)", current.polling_rate.wired, true),
+        (
+            "Polling rate (dongle)",
+            current.polling_rate.wireless,
+            false,
+        ),
     ] {
-        painter.with_clip_rect(clip).add(Shape::convex_polygon(outline.clone(), fill(slot), stroke(slot)));
-    }
-    painter.line_segment([pos2(cx - half(split), split), pos2(cx + half(split), split)], line);
-    painter.line_segment([pos2(cx, top), pos2(cx, split)], line);
-    painter.rect(wheel, CornerRadius::same(7), fill(1), stroke(1), StrokeKind::Middle);
-    for i in 1..5 {
-        let y = wheel.top() + wheel.height() * i as f32 / 5.0;
-        painter.line_segment([pos2(wheel.left() + 4.0, y), pos2(wheel.right() - 4.0, y)], Stroke::new(1.0, line.color));
-    }
-    for (slot, r) in [(3, forward), (4, back)] {
-        painter.rect(r, CornerRadius::same(4), fill(slot), stroke(slot), StrokeKind::Middle);
-    }
-    painter.circle(dpi, 9.0, fill(5), stroke(5));
-    painter.text(dpi + vec2(0.0, 14.0), Align2::CENTER_TOP, "underside", FontId::proportional(10.0), v.weak_text_color());
-
-    let actions = buttons.slots();
-    for (slot, &(anchor, pos, right)) in spots.iter().enumerate() {
-        let edge = if right { pos - vec2(6.0, 0.0) } else { pos + vec2(6.0, 0.0) };
-        let color = if differs(slot) { CHANGED } else { v.weak_text_color() };
-        painter.line_segment([anchor, edge], Stroke::new(1.0, color));
-        painter.circle_filled(anchor, 2.5, color);
-        let (name_align, action_align) =
-            if right { (Align2::LEFT_BOTTOM, Align2::LEFT_TOP) } else { (Align2::RIGHT_BOTTOM, Align2::RIGHT_TOP) };
-        let name_color = if slot == selected { v.selection.stroke.color } else { v.strong_text_color() };
-        painter.text(pos, name_align, BUTTON_LABELS[slot], FontId::proportional(14.0), name_color);
-        painter.text(pos + vec2(0.0, 2.0), action_align, actions[slot].as_str(), FontId::proportional(12.0), color);
-    }
-
-    let changed = differs(selected);
-    ui.horizontal(|ui| {
-        ui.label(RichText::new(format!("{} button", BUTTON_LABELS[selected])).strong());
-        button_editor(ui, selected, buttons.slots_mut()[selected]);
-        if changed {
-            ui.label(RichText::new("Modified").small().color(CHANGED));
-        }
-    });
-}
-
-/// Show an optional value's editor, or "unknown" when the keyboard didn't report it.
-fn opt<T>(ui: &mut egui::Ui, value: &mut Option<T>, add: impl FnOnce(&mut egui::Ui, &mut T)) {
-    match value {
-        Some(v) => add(ui, v),
-        None => {
-            ui.label(RichText::new("unknown").weak());
-        }
-    }
-}
-
-/// A Nix value of None means "leave it", so only a set value can differ.
-fn differs<T: PartialEq>(nix: Option<&Option<T>>, value: &Option<T>) -> bool {
-    nix.is_some_and(|n| n.is_some() && n != value)
-}
-
-fn mm(ui: &mut egui::Ui, value: &mut f64, max: f64) {
-    ui.add(DragValue::new(value).range(0.0..=max).speed(0.01).fixed_decimals(2).suffix(" mm"));
-}
-
-fn keyboard_ui(ui: &mut egui::Ui, model: &rongyuan::Model, s: &mut rongyuan::Settings, nix: Option<&rongyuan::Settings>) {
-    egui::Grid::new("keyboard").num_columns(3).spacing([20.0, 10.0]).show(ui, |ui| {
-        section_row(ui, "Performance");
-        ui.label("Polling rate");
-        let rates: Vec<(u16, String)> = KB_RATES.iter().map(|&hz| (hz, format!("{hz} Hz"))).collect();
-        opt(ui, &mut s.polling_rate, |ui, v| combo(ui, "kb-rate", v, &rates));
-        mark(ui, differs(nix.map(|n| &n.polling_rate), &s.polling_rate));
-
-        ui.label("Debounce");
-        opt(ui, &mut s.debounce_ms, |ui, v| {
-            ui.add(DragValue::new(v).range(0..=50).suffix(" ms"));
-        });
-        mark(ui, differs(nix.map(|n| &n.debounce_ms), &s.debounce_ms));
-
-        let l = &mut s.lighting;
-        let nl = nix.map(|n| &n.lighting);
-        section_row(ui, "Lighting");
-        ui.label("Lighting effect");
-        opt(ui, &mut l.effect, |ui, v| {
-            ComboBox::from_id_salt("effect").selected_text(v.as_str()).show_ui(ui, |ui| {
-                for (name, _) in rongyuan::EFFECTS {
-                    ui.selectable_value(v, name.to_string(), name);
+        let labels: Vec<String> = mchose::RATES
+            .iter()
+            .map(|rate| format!("{rate} Hz"))
+            .collect();
+        let selected = mchose::RATES
+            .iter()
+            .position(|rate| *rate == value)
+            .unwrap_or(0);
+        let input = dropdown(&labels, selected);
+        let state_clone = state.clone();
+        let slot_clone = slot.clone();
+        input.connect_selected_notify(move |input| {
+            let rate = mchose::RATES[input.selected() as usize];
+            mutate_mouse(&state_clone, index, |settings| {
+                if cable {
+                    settings.polling_rate.wired = rate
+                } else {
+                    settings.polling_rate.wireless = rate
                 }
             });
+            changed(&state_clone, &slot_clone);
         });
-        mark(ui, differs(nl.map(|n| &n.effect), &l.effect));
-
-        ui.label("Brightness");
-        opt(ui, &mut l.brightness, |ui, v| {
-            ui.add(Slider::new(v, 0..=4));
-        });
-        mark(ui, differs(nl.map(|n| &n.brightness), &l.brightness));
-
-        ui.label("Effect speed");
-        opt(ui, &mut l.speed, |ui, v| {
-            ui.add(Slider::new(v, 0..=4));
-        });
-        mark(ui, differs(nl.map(|n| &n.speed), &l.speed));
-
-        ui.label("Rainbow");
-        opt(ui, &mut l.rainbow, |ui, v| {
-            ui.checkbox(v, "").on_hover_text("qmk.top's \"Dazzling\": cycle colours instead of one");
-        });
-        mark(ui, differs(nl.map(|n| &n.rainbow), &l.rainbow));
-
-        ui.label("Colour");
-        opt(ui, &mut l.color, |ui, v| {
-            let mut rgb = rongyuan::parse_color(v).map_or([255, 255, 255], |c| [c.r, c.g, c.b]);
-            if ui.color_edit_button_srgb(&mut rgb).changed() {
-                *v = format!("#{:02x}{:02x}{:02x}", rgb[0], rgb[1], rgb[2]);
-            }
-        });
-        mark(ui, differs(nl.map(|n| &n.color), &l.color));
-
-        section_row(ui, "Key behavior");
-        ui.label("Fn layer");
-        let layers = [(0u8, "0".to_string()), (1, "1".to_string())];
-        opt(ui, &mut s.fn_layer, |ui, v| combo(ui, "fn-layer", v, &layers));
-        mark(ui, differs(nix.map(|n| &n.fn_layer), &s.fn_layer));
-
-        ui.label("Anti-mistouch");
-        opt(ui, &mut s.anti_mistouch, |ui, v| {
-            ui.checkbox(v, "");
-        });
-        mark(ui, differs(nix.map(|n| &n.anti_mistouch), &s.anti_mistouch));
-
-        ui.label("RT stability");
-        let steps: Vec<(u16, String)> = (0..=5).map(|i| (i * 25, format!("{} ms", i * 25))).collect();
-        opt(ui, &mut s.rt_stability_ms, |ui, v| combo(ui, "rt-stability", v, &steps));
-        mark(ui, differs(nix.map(|n| &n.rt_stability_ms), &s.rt_stability_ms));
-
-        ui.label("WASD/arrow swap");
-        ui.checkbox(&mut s.wasd_swap, "");
-        mark(ui, nix.is_some_and(|n| n.wasd_swap != s.wasd_swap));
-
-        section_row(ui, "Actuation & rapid trigger");
-        ui.label("Actuation");
-        mm(ui, &mut s.actuation, 3.3);
-        mark(ui, nix.is_some_and(|n| n.actuation != s.actuation));
-
-        ui.label("Release");
-        ui.horizontal(|ui| {
-            let mut follows = s.release.is_none();
-            if ui.checkbox(&mut follows, "same as actuation").changed() {
-                s.release = (!follows).then_some(s.actuation);
-            }
-            if let Some(v) = &mut s.release {
-                mm(ui, v, 3.3);
-            }
-        });
-        mark(ui, nix.is_some_and(|n| n.release != s.release));
-
-        let rt = &mut s.rapid_trigger;
-        let nrt = nix.map(|n| &n.rapid_trigger);
-        ui.label("Rapid trigger");
-        ui.checkbox(&mut rt.enable, "");
-        mark(ui, nrt.is_some_and(|n| n.enable != rt.enable));
-
-        ui.label("RT press sensitivity");
-        opt(ui, &mut rt.press, |ui, v| mm(ui, v, 2.0));
-        mark(ui, differs(nrt.map(|n| &n.press), &rt.press));
-
-        ui.label("RT release sensitivity");
-        opt(ui, &mut rt.release, |ui, v| mm(ui, v, 2.0));
-        mark(ui, differs(nrt.map(|n| &n.release), &rt.release));
-
-        ui.label("Bottom dead zone");
-        opt(ui, &mut s.bottom_deadzone, |ui, v| mm(ui, v, 1.0));
-        mark(ui, differs(nix.map(|n| &n.bottom_deadzone), &s.bottom_deadzone));
-    });
-
-    ui.add_space(6.0);
-    ui.horizontal(|ui| {
-        ui.label("Per-key actuation");
-        if nix.is_some_and(|n| n.keys != s.keys) {
-            ui.label(RichText::new("Modified").small().color(CHANGED));
+        let widget = gtk::Box::new(Orientation::Horizontal, 8);
+        widget.append(&input);
+        if wired != cable {
+            let hint = gtk::Label::new(Some(if cable {
+                "used over cable"
+            } else {
+                "used over dongle"
+            }));
+            hint.add_css_class("dim-label");
+            widget.append(&hint);
         }
-    });
-    let mut remove = None;
-    for (name, o) in s.keys.iter_mut() {
-        ui.horizontal(|ui| {
-            ui.label(format!("{name:>12}"));
-            match &mut o.actuation {
-                Some(v) => mm(ui, v, 3.3),
-                None => {
-                    ui.label(RichText::new("—").weak());
-                }
-            }
-            if ui.small_button("✕").clicked() {
-                remove = Some(name.clone());
+        let modified = declared.is_some_and(|nix| {
+            if cable {
+                nix.polling_rate.wired != value
+            } else {
+                nix.polling_rate.wireless != value
             }
         });
+        row = add_row(&grid, row, name, &widget, modified);
     }
-    if let Some(name) = remove {
-        s.keys.remove(&name);
+
+    let lift_labels: Vec<String> = mchose::LiftOff::ALL
+        .iter()
+        .map(|value| value.name().to_string())
+        .collect();
+    let lift_at = mchose::LiftOff::ALL
+        .iter()
+        .position(|value| *value == current.lift_off)
+        .unwrap_or(0);
+    let lift = dropdown(&lift_labels, lift_at);
+    {
+        let state = state.clone();
+        let slot = slot.clone();
+        lift.connect_selected_notify(move |input| {
+            mutate_mouse(&state, index, |settings| {
+                settings.lift_off = mchose::LiftOff::ALL[input.selected() as usize]
+            });
+            changed(&state, &slot);
+        });
     }
-    let mut add = None;
-    ComboBox::from_id_salt("add-key").selected_text("Add a key…").show_ui(ui, |ui| {
-        for name in model.key_names().filter(|n| !s.keys.contains_key(*n)) {
-            if ui.selectable_label(false, name).clicked() {
-                add = Some(name);
-            }
-        }
-    });
-    if let Some(name) = add {
-        s.keys.insert(name.to_string(), rongyuan::KeyOverride { actuation: Some(s.actuation), release: None });
+    row = add_row(
+        &grid,
+        row,
+        "Lift-off distance",
+        &lift,
+        declared.is_some_and(|nix| nix.lift_off != current.lift_off),
+    );
+
+    for (name, value, field) in [
+        ("Motion sync", current.motion_sync, 0usize),
+        ("Ripple control", current.ripple, 1),
+        ("Angle snapping", current.angle_snap, 2),
+    ] {
+        let input = gtk::CheckButton::new();
+        input.set_active(value);
+        let state_clone = state.clone();
+        let slot_clone = slot.clone();
+        input.connect_toggled(move |input| {
+            mutate_mouse(&state_clone, index, |settings| match field {
+                0 => settings.motion_sync = input.is_active(),
+                1 => settings.ripple = input.is_active(),
+                _ => settings.angle_snap = input.is_active(),
+            });
+            changed(&state_clone, &slot_clone);
+        });
+        let modified = declared.is_some_and(|nix| match field {
+            0 => nix.motion_sync != value,
+            1 => nix.ripple != value,
+            _ => nix.angle_snap != value,
+        });
+        row = add_row(&grid, row, name, &input, modified);
     }
+
+    let (angle_widget, angle) = spin(current.angle_correction.into(), -30.0, 30.0, 1.0, 0, "°");
+    {
+        let state = state.clone();
+        let slot = slot.clone();
+        angle.connect_value_changed(move |input| {
+            mutate_mouse(&state, index, |settings| {
+                settings.angle_correction = input.value() as i8
+            });
+            changed(&state, &slot);
+        });
+    }
+    row = add_row(
+        &grid,
+        row,
+        "Angle correction",
+        &angle_widget,
+        declared.is_some_and(|nix| nix.angle_correction != current.angle_correction),
+    );
+
+    let mode_labels: Vec<String> = mchose::Mode::ALL
+        .iter()
+        .map(|value| value.name().to_string())
+        .collect();
+    let mode_at = mchose::Mode::ALL
+        .iter()
+        .position(|value| *value == current.performance_mode)
+        .unwrap_or(0);
+    let mode = dropdown(&mode_labels, mode_at);
+    {
+        let state = state.clone();
+        let slot = slot.clone();
+        mode.connect_selected_notify(move |input| {
+            mutate_mouse(&state, index, |settings| {
+                settings.performance_mode = mchose::Mode::ALL[input.selected() as usize]
+            });
+            changed(&state, &slot);
+        });
+    }
+    row = add_row(
+        &grid,
+        row,
+        "Performance mode",
+        &mode,
+        declared.is_some_and(|nix| nix.performance_mode != current.performance_mode),
+    );
+
+    let (debounce_widget, debounce) = spin(current.debounce_ms.into(), 0.0, 50.0, 1.0, 0, "ms");
+    {
+        let state = state.clone();
+        let slot = slot.clone();
+        debounce.connect_value_changed(move |input| {
+            mutate_mouse(&state, index, |settings| {
+                settings.debounce_ms = input.value() as u8
+            });
+            changed(&state, &slot);
+        });
+    }
+    row = add_row(
+        &grid,
+        row,
+        "Debounce",
+        &debounce_widget,
+        declared.is_some_and(|nix| nix.debounce_ms != current.debounce_ms),
+    );
+    row = section(&grid, row, "Power & lighting");
+
+    let (sleep_widget, sleep) = spin(current.sleep_minutes.into(), 0.0, 255.0, 1.0, 0, "min");
+    sleep.set_tooltip_text(Some("0 never sleeps"));
+    {
+        let state = state.clone();
+        let slot = slot.clone();
+        sleep.connect_value_changed(move |input| {
+            mutate_mouse(&state, index, |settings| {
+                settings.sleep_minutes = input.value() as u8
+            });
+            changed(&state, &slot);
+        });
+    }
+    row = add_row(
+        &grid,
+        row,
+        "Sleep after",
+        &sleep_widget,
+        declared.is_some_and(|nix| nix.sleep_minutes != current.sleep_minutes),
+    );
+    let lighting = gtk::CheckButton::new();
+    lighting.set_active(current.lighting);
+    {
+        let state = state.clone();
+        let slot = slot.clone();
+        lighting.connect_toggled(move |input| {
+            mutate_mouse(&state, index, |settings| {
+                settings.lighting = input.is_active()
+            });
+            changed(&state, &slot);
+        });
+    }
+    add_row(
+        &grid,
+        row,
+        "Lighting",
+        &lighting,
+        declared.is_some_and(|nix| nix.lighting != current.lighting),
+    );
+    grid
 }
 
-/// `periph-gui [--config <path>] [device]`; without --config, the copy home-manager
-/// puts in ~/.config/periph.
+fn button_assignments(
+    index: usize,
+    current: &mchose::Buttons,
+    declared: Option<&mchose::Buttons>,
+    state: &Shared,
+    slot: &UiSlot,
+) -> gtk::Box {
+    let root = gtk::Box::new(Orientation::Vertical, 10);
+    root.set_size_request(370, -1);
+    let title = gtk::Label::new(Some("Button assignments"));
+    title.add_css_class("heading");
+    title.set_halign(Align::Start);
+    root.append(&title);
+    let hint = gtk::Label::new(Some(
+        "Choose a named action, or enter a key:ctrl+c style binding.",
+    ));
+    hint.add_css_class("dim-label");
+    hint.set_wrap(true);
+    hint.set_halign(Align::Start);
+    root.append(&hint);
+    let grid = gtk::Grid::builder()
+        .column_spacing(10)
+        .row_spacing(8)
+        .build();
+    let names: Vec<String> = mchose_buttons::ACTIONS
+        .iter()
+        .map(|(name, ..)| (*name).to_string())
+        .collect();
+    for (button_slot, label) in BUTTON_LABELS.iter().enumerate() {
+        let name = gtk::Label::new(Some(label));
+        name.set_halign(Align::Start);
+        grid.attach(&name, 0, button_slot as i32, 1, 1);
+        let entry = gtk::Entry::new();
+        entry.set_hexpand(true);
+        entry.set_text(current.slots()[button_slot]);
+        grid.attach(&entry, 1, button_slot as i32, 1, 1);
+        let selected = names
+            .iter()
+            .position(|name| name == current.slots()[button_slot])
+            .unwrap_or(gtk::INVALID_LIST_POSITION as usize);
+        let choices = dropdown(&names, selected);
+        choices.set_tooltip_text(Some("Named actions"));
+        {
+            let state = state.clone();
+            let slot = slot.clone();
+            let entry = entry.clone();
+            choices.connect_selected_notify(move |input| {
+                let selected = input.selected() as usize;
+                if let Some((name, ..)) = mchose_buttons::ACTIONS.get(selected) {
+                    entry.set_text(name);
+                    mutate_mouse(&state, index, |settings| {
+                        *settings.buttons.slots_mut()[button_slot] = (*name).to_string()
+                    });
+                    changed(&state, &slot);
+                }
+            });
+        }
+        grid.attach(&choices, 2, button_slot as i32, 1, 1);
+        let set = gtk::Button::with_label("Set");
+        {
+            let state = state.clone();
+            let slot = slot.clone();
+            let entry = entry.clone();
+            set.connect_clicked(move |_| {
+                let value = entry.text().to_string();
+                if mchose_buttons::encode(&value, button_slot).is_some() {
+                    entry.remove_css_class("error");
+                    mutate_mouse(&state, index, |settings| {
+                        *settings.buttons.slots_mut()[button_slot] = value
+                    });
+                    changed(&state, &slot);
+                } else {
+                    entry.add_css_class("error");
+                    entry.set_tooltip_text(Some("Unknown action"));
+                }
+            });
+        }
+        grid.attach(&set, 3, button_slot as i32, 1, 1);
+        let modified =
+            declared.is_some_and(|nix| nix.slots()[button_slot] != current.slots()[button_slot]);
+        grid.attach(&marker(modified), 4, button_slot as i32, 1, 1);
+    }
+    root.append(&grid);
+    root
+}
+
+fn optional_dropdown<T: Copy + PartialEq + 'static>(
+    values: &'static [T],
+    labels: Vec<String>,
+    current: Option<T>,
+    update: impl Fn(T) + 'static,
+) -> gtk::Widget {
+    let Some(current) = current else {
+        return gtk::Label::new(Some("unknown")).upcast();
+    };
+    let selected = values
+        .iter()
+        .position(|value| *value == current)
+        .unwrap_or(0);
+    let input = dropdown(&labels, selected);
+    input.connect_selected_notify(move |input| update(values[input.selected() as usize]));
+    input.upcast()
+}
+
+fn optional_spin(
+    value: Option<f64>,
+    min: f64,
+    max: f64,
+    step: f64,
+    digits: u32,
+    suffix: &str,
+    update: impl Fn(f64) + 'static,
+) -> gtk::Widget {
+    let Some(value) = value else {
+        return gtk::Label::new(Some("unknown")).upcast();
+    };
+    let (widget, input) = spin(value, min, max, step, digits, suffix);
+    input.connect_value_changed(move |input| update(input.value()));
+    widget.upcast()
+}
+
+fn differs<T: PartialEq>(declared: Option<&Option<T>>, current: &Option<T>) -> bool {
+    declared.is_some_and(|value| value.is_some() && value != current)
+}
+
+fn keyboard_settings(
+    index: usize,
+    model: &'static rongyuan::Model,
+    current: &rongyuan::Settings,
+    declared: Option<&rongyuan::Settings>,
+    state: &Shared,
+    slot: &UiSlot,
+) -> gtk::Box {
+    let root = gtk::Box::new(Orientation::Vertical, 14);
+    let grid = gtk::Grid::builder()
+        .column_spacing(18)
+        .row_spacing(10)
+        .hexpand(true)
+        .build();
+    let mut row = section(&grid, 0, "Performance");
+
+    let rate = optional_dropdown(
+        &KB_RATES,
+        KB_RATES.iter().map(|value| format!("{value} Hz")).collect(),
+        current.polling_rate,
+        {
+            let state = state.clone();
+            let slot = slot.clone();
+            move |value| {
+                mutate_keyboard(&state, index, |settings| {
+                    settings.polling_rate = Some(value)
+                });
+                changed(&state, &slot);
+            }
+        },
+    );
+    row = add_row(
+        &grid,
+        row,
+        "Polling rate",
+        &rate,
+        differs(declared.map(|nix| &nix.polling_rate), &current.polling_rate),
+    );
+    let debounce = optional_spin(
+        current.debounce_ms.map(f64::from),
+        0.0,
+        50.0,
+        1.0,
+        0,
+        "ms",
+        {
+            let state = state.clone();
+            let slot = slot.clone();
+            move |value| {
+                mutate_keyboard(&state, index, |settings| {
+                    settings.debounce_ms = Some(value as u8)
+                });
+                changed(&state, &slot);
+            }
+        },
+    );
+    row = add_row(
+        &grid,
+        row,
+        "Debounce",
+        &debounce,
+        differs(declared.map(|nix| &nix.debounce_ms), &current.debounce_ms),
+    );
+    row = section(&grid, row, "Lighting");
+
+    let effects: Vec<String> = rongyuan::EFFECTS
+        .iter()
+        .map(|(name, _)| (*name).to_string())
+        .collect();
+    let effect_values: Vec<&str> = rongyuan::EFFECTS.iter().map(|(name, _)| *name).collect();
+    let effect: gtk::Widget = if let Some(value) = current.lighting.effect.as_deref() {
+        let input = dropdown(
+            &effects,
+            effect_values
+                .iter()
+                .position(|name| *name == value)
+                .unwrap_or(0),
+        );
+        let state = state.clone();
+        let slot = slot.clone();
+        input.connect_selected_notify(move |input| {
+            let value = rongyuan::EFFECTS[input.selected() as usize].0.to_string();
+            mutate_keyboard(&state, index, |settings| {
+                settings.lighting.effect = Some(value)
+            });
+            changed(&state, &slot);
+        });
+        input.upcast()
+    } else {
+        gtk::Label::new(Some("unknown")).upcast()
+    };
+    row = add_row(
+        &grid,
+        row,
+        "Lighting effect",
+        &effect,
+        differs(
+            declared.map(|nix| &nix.lighting.effect),
+            &current.lighting.effect,
+        ),
+    );
+
+    for (name, value, speed) in [
+        ("Brightness", current.lighting.brightness, false),
+        ("Effect speed", current.lighting.speed, true),
+    ] {
+        let widget = optional_spin(value.map(f64::from), 0.0, 4.0, 1.0, 0, "", {
+            let state = state.clone();
+            let slot = slot.clone();
+            move |value| {
+                mutate_keyboard(&state, index, |settings| {
+                    if speed {
+                        settings.lighting.speed = Some(value as u8)
+                    } else {
+                        settings.lighting.brightness = Some(value as u8)
+                    }
+                });
+                changed(&state, &slot);
+            }
+        });
+        let modified = if speed {
+            differs(declared.map(|nix| &nix.lighting.speed), &value)
+        } else {
+            differs(declared.map(|nix| &nix.lighting.brightness), &value)
+        };
+        row = add_row(&grid, row, name, &widget, modified);
+    }
+
+    let rainbow: gtk::Widget = if let Some(value) = current.lighting.rainbow {
+        let input = gtk::CheckButton::new();
+        input.set_active(value);
+        let state = state.clone();
+        let slot = slot.clone();
+        input.connect_toggled(move |input| {
+            mutate_keyboard(&state, index, |settings| {
+                settings.lighting.rainbow = Some(input.is_active())
+            });
+            changed(&state, &slot);
+        });
+        input.upcast()
+    } else {
+        gtk::Label::new(Some("unknown")).upcast()
+    };
+    row = add_row(
+        &grid,
+        row,
+        "Rainbow",
+        &rainbow,
+        differs(
+            declared.map(|nix| &nix.lighting.rainbow),
+            &current.lighting.rainbow,
+        ),
+    );
+
+    let color: gtk::Widget = if let Some(value) = current.lighting.color.as_deref() {
+        let dialog = gtk::ColorDialog::builder()
+            .title("Choose a colour")
+            .with_alpha(false)
+            .build();
+        let input = gtk::ColorDialogButton::new(Some(dialog));
+        if let Some(rgb) = rongyuan::parse_color(value) {
+            input.set_rgba(&gdk::RGBA::new(
+                rgb.r as f32 / 255.0,
+                rgb.g as f32 / 255.0,
+                rgb.b as f32 / 255.0,
+                1.0,
+            ));
+        }
+        let state = state.clone();
+        let slot = slot.clone();
+        input.connect_rgba_notify(move |input| {
+            let color = input.rgba();
+            let channel = |value: f32| (value * 255.0).round() as u8;
+            let value = format!(
+                "#{:02x}{:02x}{:02x}",
+                channel(color.red()),
+                channel(color.green()),
+                channel(color.blue())
+            );
+            mutate_keyboard(&state, index, |settings| {
+                settings.lighting.color = Some(value)
+            });
+            changed(&state, &slot);
+        });
+        input.upcast()
+    } else {
+        gtk::Label::new(Some("unknown")).upcast()
+    };
+    row = add_row(
+        &grid,
+        row,
+        "Colour",
+        &color,
+        differs(
+            declared.map(|nix| &nix.lighting.color),
+            &current.lighting.color,
+        ),
+    );
+    row = section(&grid, row, "Key behaviour");
+
+    const LAYERS: [u8; 2] = [0, 1];
+    let layer = optional_dropdown(&LAYERS, vec!["0".into(), "1".into()], current.fn_layer, {
+        let state = state.clone();
+        let slot = slot.clone();
+        move |value| {
+            mutate_keyboard(&state, index, |settings| settings.fn_layer = Some(value));
+            changed(&state, &slot);
+        }
+    });
+    row = add_row(
+        &grid,
+        row,
+        "Fn layer",
+        &layer,
+        differs(declared.map(|nix| &nix.fn_layer), &current.fn_layer),
+    );
+    let anti: gtk::Widget = if let Some(value) = current.anti_mistouch {
+        let input = gtk::CheckButton::new();
+        input.set_active(value);
+        let state = state.clone();
+        let slot = slot.clone();
+        input.connect_toggled(move |input| {
+            mutate_keyboard(&state, index, |settings| {
+                settings.anti_mistouch = Some(input.is_active())
+            });
+            changed(&state, &slot);
+        });
+        input.upcast()
+    } else {
+        gtk::Label::new(Some("unknown")).upcast()
+    };
+    row = add_row(
+        &grid,
+        row,
+        "Anti-mistouch",
+        &anti,
+        differs(
+            declared.map(|nix| &nix.anti_mistouch),
+            &current.anti_mistouch,
+        ),
+    );
+
+    const STABILITY: [u16; 6] = [0, 25, 50, 75, 100, 125];
+    let stability = optional_dropdown(
+        &STABILITY,
+        STABILITY
+            .iter()
+            .map(|value| format!("{value} ms"))
+            .collect(),
+        current.rt_stability_ms,
+        {
+            let state = state.clone();
+            let slot = slot.clone();
+            move |value| {
+                mutate_keyboard(&state, index, |settings| {
+                    settings.rt_stability_ms = Some(value)
+                });
+                changed(&state, &slot);
+            }
+        },
+    );
+    row = add_row(
+        &grid,
+        row,
+        "RT stability",
+        &stability,
+        differs(
+            declared.map(|nix| &nix.rt_stability_ms),
+            &current.rt_stability_ms,
+        ),
+    );
+    let swap = gtk::CheckButton::new();
+    swap.set_active(current.wasd_swap);
+    {
+        let state = state.clone();
+        let slot = slot.clone();
+        swap.connect_toggled(move |input| {
+            mutate_keyboard(&state, index, |settings| {
+                settings.wasd_swap = input.is_active()
+            });
+            changed(&state, &slot);
+        });
+    }
+    row = add_row(
+        &grid,
+        row,
+        "WASD/arrow swap",
+        &swap,
+        declared.is_some_and(|nix| nix.wasd_swap != current.wasd_swap),
+    );
+    row = section(&grid, row, "Actuation & rapid trigger");
+
+    let (actuation_widget, actuation) = spin(current.actuation, 0.1, 3.3, 0.01, 2, "mm");
+    {
+        let state = state.clone();
+        let slot = slot.clone();
+        actuation.connect_value_changed(move |input| {
+            mutate_keyboard(&state, index, |settings| settings.actuation = input.value());
+            changed(&state, &slot);
+        });
+    }
+    row = add_row(
+        &grid,
+        row,
+        "Actuation",
+        &actuation_widget,
+        declared.is_some_and(|nix| nix.actuation != current.actuation),
+    );
+
+    let release_row = gtk::Box::new(Orientation::Horizontal, 8);
+    let follows = gtk::CheckButton::with_label("same as actuation");
+    follows.set_active(current.release.is_none());
+    release_row.append(&follows);
+    if let Some(value) = current.release {
+        let (widget, input) = spin(value, 0.1, 3.3, 0.01, 2, "mm");
+        let state = state.clone();
+        let slot = slot.clone();
+        input.connect_value_changed(move |input| {
+            mutate_keyboard(&state, index, |settings| {
+                settings.release = Some(input.value())
+            });
+            changed(&state, &slot);
+        });
+        release_row.append(&widget);
+    }
+    {
+        let state = state.clone();
+        let slot = slot.clone();
+        follows.connect_toggled(move |input| {
+            mutate_keyboard(&state, index, |settings| {
+                settings.release = (!input.is_active()).then_some(settings.actuation)
+            });
+            rebuild_devices(&state, &slot);
+        });
+    }
+    row = add_row(
+        &grid,
+        row,
+        "Release",
+        &release_row,
+        declared.is_some_and(|nix| nix.release != current.release),
+    );
+
+    let rt = gtk::CheckButton::new();
+    rt.set_active(current.rapid_trigger.enable);
+    {
+        let state = state.clone();
+        let slot = slot.clone();
+        rt.connect_toggled(move |input| {
+            mutate_keyboard(&state, index, |settings| {
+                settings.rapid_trigger.enable = input.is_active()
+            });
+            changed(&state, &slot);
+        });
+    }
+    row = add_row(
+        &grid,
+        row,
+        "Rapid trigger",
+        &rt,
+        declared.is_some_and(|nix| nix.rapid_trigger.enable != current.rapid_trigger.enable),
+    );
+    for (name, value, press) in [
+        ("RT press sensitivity", current.rapid_trigger.press, true),
+        (
+            "RT release sensitivity",
+            current.rapid_trigger.release,
+            false,
+        ),
+    ] {
+        let widget = optional_spin(value, 0.01, 2.0, 0.01, 2, "mm", {
+            let state = state.clone();
+            let slot = slot.clone();
+            move |value| {
+                mutate_keyboard(&state, index, |settings| {
+                    if press {
+                        settings.rapid_trigger.press = Some(value)
+                    } else {
+                        settings.rapid_trigger.release = Some(value)
+                    }
+                });
+                changed(&state, &slot);
+            }
+        });
+        let modified = declared.is_some_and(|nix| {
+            if press {
+                differs(Some(&nix.rapid_trigger.press), &value)
+            } else {
+                differs(Some(&nix.rapid_trigger.release), &value)
+            }
+        });
+        row = add_row(&grid, row, name, &widget, modified);
+    }
+    let deadzone = optional_spin(current.bottom_deadzone, 0.0, 1.0, 0.01, 2, "mm", {
+        let state = state.clone();
+        let slot = slot.clone();
+        move |value| {
+            mutate_keyboard(&state, index, |settings| {
+                settings.bottom_deadzone = Some(value)
+            });
+            changed(&state, &slot);
+        }
+    });
+    add_row(
+        &grid,
+        row,
+        "Bottom dead zone",
+        &deadzone,
+        differs(
+            declared.map(|nix| &nix.bottom_deadzone),
+            &current.bottom_deadzone,
+        ),
+    );
+    root.append(&grid);
+
+    let keys_title = gtk::Label::new(Some("Per-key actuation"));
+    keys_title.add_css_class("heading");
+    keys_title.set_halign(Align::Start);
+    root.append(&keys_title);
+    let keys = gtk::Grid::builder()
+        .column_spacing(10)
+        .row_spacing(8)
+        .build();
+    for (key_row, (name, override_)) in current.keys.iter().enumerate() {
+        keys.attach(&gtk::Label::new(Some(name)), 0, key_row as i32, 1, 1);
+        if let Some(value) = override_.actuation {
+            let (widget, input) = spin(value, 0.1, 3.3, 0.01, 2, "mm");
+            let name = name.clone();
+            let state = state.clone();
+            let slot = slot.clone();
+            input.connect_value_changed(move |input| {
+                mutate_keyboard(&state, index, |settings| {
+                    if let Some(value) = settings.keys.get_mut(&name) {
+                        value.actuation = Some(input.value());
+                    }
+                });
+                changed(&state, &slot);
+            });
+            keys.attach(&widget, 1, key_row as i32, 1, 1);
+        }
+        let remove = gtk::Button::with_label("Remove");
+        let name = name.clone();
+        let state = state.clone();
+        let slot = slot.clone();
+        remove.connect_clicked(move |_| {
+            mutate_keyboard(&state, index, |settings| {
+                settings.keys.remove(&name);
+            });
+            rebuild_devices(&state, &slot);
+        });
+        keys.attach(&remove, 2, key_row as i32, 1, 1);
+    }
+    root.append(&keys);
+    let available: Vec<String> = model
+        .key_names()
+        .filter(|name| !current.keys.contains_key(*name))
+        .map(str::to_string)
+        .collect();
+    if !available.is_empty() {
+        let add_row = gtk::Box::new(Orientation::Horizontal, 8);
+        let choices = dropdown(&available, 0);
+        add_row.append(&choices);
+        let add = gtk::Button::with_label("Add key");
+        let state = state.clone();
+        let slot = slot.clone();
+        add.connect_clicked(move |_| {
+            let name = available[choices.selected() as usize].clone();
+            mutate_keyboard(&state, index, |settings| {
+                settings.keys.insert(
+                    name,
+                    rongyuan::KeyOverride {
+                        actuation: Some(settings.actuation),
+                        release: None,
+                    },
+                );
+            });
+            rebuild_devices(&state, &slot);
+        });
+        add_row.append(&add);
+        root.append(&add_row);
+    }
+    root
+}
+
+fn device_card(
+    index: usize,
+    device: &Device,
+    declared: Option<&Config>,
+    state: &Shared,
+    slot: &UiSlot,
+) -> (gtk::Frame, Option<DeviceActions>) {
+    let frame = gtk::Frame::new(None);
+    frame.set_margin_bottom(14);
+    let card = gtk::Box::new(Orientation::Vertical, 14);
+    card.set_margin_top(18);
+    card.set_margin_bottom(18);
+    card.set_margin_start(18);
+    card.set_margin_end(18);
+    match device {
+        Device::Unavailable { node, why } => {
+            let title = gtk::Label::new(Some(&format!(
+                "{} ({:04x}:{:04x})",
+                node.dev.display(),
+                node.vid,
+                node.pid
+            )));
+            title.add_css_class("title-2");
+            title.set_halign(Align::Start);
+            card.append(&title);
+            let error = gtk::Label::new(Some(why));
+            error.add_css_class("error");
+            error.set_halign(Align::Start);
+            error.set_wrap(true);
+            card.append(&error);
+            frame.set_child(Some(&card));
+            return (frame, None);
+        }
+        Device::Mouse {
+            id, wired, edit, ..
+        } => {
+            let title = gtk::Label::new(Some("MCHOSE M7 Ultra"));
+            title.add_css_class("title-2");
+            title.set_halign(Align::Start);
+            card.append(&title);
+            let charging = if id.charging { ", charging" } else { "" };
+            let details = gtk::Label::new(Some(&format!(
+                "Connected via {} · Battery {}%{charging}",
+                if *wired { "cable" } else { "dongle" },
+                id.battery
+            )));
+            details.add_css_class("dim-label");
+            details.set_halign(Align::Start);
+            card.append(&details);
+            let flow = gtk::FlowBox::builder()
+                .column_spacing(30)
+                .row_spacing(18)
+                .homogeneous(true)
+                .selection_mode(gtk::SelectionMode::None)
+                .max_children_per_line(2)
+                .min_children_per_line(1)
+                .build();
+            let nix = declared.and_then(|config| config.mchose_m7_ultra.as_ref());
+            let settings = mouse_settings(index, edit, nix, *wired, state, slot);
+            settings.set_size_request(470, -1);
+            flow.insert(&settings, -1);
+            flow.insert(
+                &button_assignments(
+                    index,
+                    &edit.buttons,
+                    nix.map(|settings| &settings.buttons),
+                    state,
+                    slot,
+                ),
+                -1,
+            );
+            card.append(&flow);
+        }
+        Device::Keyboard { model, edit, .. } => {
+            let title = gtk::Label::new(Some(model.name));
+            title.add_css_class("title-2");
+            title.set_halign(Align::Start);
+            card.append(&title);
+            card.append(&keyboard_settings(
+                index,
+                model,
+                edit,
+                declared.and_then(|config| config.boyi_h60pro.as_ref()),
+                state,
+                slot,
+            ));
+        }
+    }
+
+    let bar = gtk::ActionBar::new();
+    let apply = gtk::Button::with_label("Apply changes");
+    apply.add_css_class("suggested-action");
+    let revert = gtk::Button::with_label("Revert");
+    let reset = gtk::Button::with_label("Reset to Nix");
+    reset.set_tooltip_text(Some("Apply the declared Nix configuration now"));
+    let copy = gtk::Button::with_label("Copy as Nix");
+    bar.pack_start(&apply);
+    bar.pack_start(&revert);
+    bar.pack_start(&reset);
+    bar.pack_end(&copy);
+    card.append(&bar);
+    {
+        let state = state.clone();
+        let slot = slot.clone();
+        apply.connect_clicked(move |_| {
+            state.borrow_mut().apply(index);
+            if let Some(ui) = slot.borrow().as_ref() {
+                refresh(&state, ui);
+            }
+        });
+    }
+    {
+        let state = state.clone();
+        let slot = slot.clone();
+        revert.connect_clicked(move |_| {
+            match state.borrow_mut().devices.get_mut(index) {
+                Some(Device::Mouse { read, edit, .. }) => *edit = read.clone(),
+                Some(Device::Keyboard { read, edit, .. }) => *edit = read.clone(),
+                _ => return,
+            }
+            rebuild_devices(&state, &slot);
+        });
+    }
+    {
+        let state = state.clone();
+        let slot = slot.clone();
+        reset.connect_clicked(move |_| {
+            state.borrow_mut().reset_to_nix(index);
+            if let Some(ui) = slot.borrow().as_ref() {
+                refresh(&state, ui);
+            }
+        });
+    }
+    {
+        let state = state.clone();
+        let slot = slot.clone();
+        copy.connect_clicked(move |_| {
+            let text = match state.borrow().devices.get(index) {
+                Some(Device::Mouse { edit, .. }) => mchose::to_nix(edit, true),
+                Some(Device::Keyboard {
+                    edit, precision, ..
+                }) => rongyuan::to_nix(edit, *precision),
+                _ => return,
+            };
+            clipboard(text);
+            state.borrow_mut().status = "Copied as Nix".into();
+            if let Some(ui) = slot.borrow().as_ref() {
+                refresh(&state, ui);
+            }
+        });
+    }
+    frame.set_child(Some(&card));
+    (
+        frame,
+        Some(DeviceActions {
+            index,
+            apply,
+            revert,
+            reset,
+        }),
+    )
+}
+
+fn rebuild_devices(state: &Shared, slot: &UiSlot) {
+    let Some(ui) = slot.borrow().as_ref().cloned() else {
+        return;
+    };
+    clear_box(&ui.devices);
+    ui.actions.borrow_mut().clear();
+    let snapshot = state.borrow().devices.clone();
+    if snapshot.is_empty() && state.borrow().job.is_none() {
+        let empty = gtk::Box::new(Orientation::Vertical, 8);
+        empty.set_margin_top(36);
+        let title = gtk::Label::new(Some("Connect a supported mouse or keyboard"));
+        title.add_css_class("title-3");
+        empty.append(&title);
+        let hint = gtk::Label::new(Some("Wake the device, then select Reload to try again."));
+        hint.add_css_class("dim-label");
+        empty.append(&hint);
+        ui.devices.append(&empty);
+    }
+    let declared = state.borrow().declared.clone();
+    for (index, device) in snapshot.iter().enumerate() {
+        let (card, actions) = device_card(index, device, declared.as_ref(), state, slot);
+        ui.devices.append(&card);
+        if let Some(actions) = actions {
+            ui.actions.borrow_mut().push(actions);
+        }
+    }
+    let current = state.borrow();
+    if let Some(error) = &current.config_error {
+        let label = gtk::Label::new(Some(&format!("Nix config not loaded: {error}")));
+        label.add_css_class("error");
+        label.set_wrap(true);
+        label.set_halign(Align::Start);
+        ui.devices.prepend(&label);
+    }
+    if !current.log.is_empty() {
+        let log = gtk::Expander::builder()
+            .label("Changes applied")
+            .expanded(false)
+            .build();
+        let lines = gtk::Label::new(Some(&current.log.join("\n")));
+        lines.set_halign(Align::Start);
+        lines.set_selectable(true);
+        log.set_child(Some(&lines));
+        ui.devices.append(&log);
+    }
+    drop(current);
+    refresh(state, &ui);
+}
+
+fn build_ui(application: &gtk::Application, state: &Shared, slot: &UiSlot) -> Ui {
+    let window = gtk::ApplicationWindow::builder()
+        .application(application)
+        .title("Peripherals")
+        .default_width(920)
+        .default_height(900)
+        .build();
+    window.set_size_request(520, 420);
+    let header = gtk::HeaderBar::new();
+    let title = gtk::Label::new(Some("Peripherals"));
+    title.add_css_class("title");
+    header.set_title_widget(Some(&title));
+    let status = gtk::Label::new(None);
+    status.add_css_class("dim-label");
+    header.pack_start(&status);
+    let spinner = gtk::Spinner::new();
+    header.pack_end(&spinner);
+    let reload = gtk::Button::with_label("Reload");
+    header.pack_end(&reload);
+    window.set_titlebar(Some(&header));
+
+    let root = gtk::Box::new(Orientation::Vertical, 0);
+    let notice = gtk::Label::new(Some(
+        "Temporary settings · Reconnecting restores your Nix configuration.",
+    ));
+    notice.add_css_class("dim-label");
+    notice.set_halign(Align::Start);
+    notice.set_margin_top(12);
+    notice.set_margin_start(18);
+    notice.set_margin_end(18);
+    root.append(&notice);
+    let devices = gtk::Box::new(Orientation::Vertical, 0);
+    devices.set_margin_top(14);
+    devices.set_margin_bottom(18);
+    devices.set_margin_start(18);
+    devices.set_margin_end(18);
+    let scroll = gtk::ScrolledWindow::builder()
+        .hscrollbar_policy(gtk::PolicyType::Never)
+        .vexpand(true)
+        .child(&devices)
+        .build();
+    root.append(&scroll);
+    window.set_child(Some(&root));
+    let ui = Ui {
+        window,
+        status,
+        spinner,
+        reload,
+        devices,
+        actions: Rc::new(RefCell::new(Vec::new())),
+    };
+    {
+        let state = state.clone();
+        let slot = slot.clone();
+        ui.reload.connect_clicked(move |_| {
+            state.borrow_mut().reload();
+            if let Some(ui) = slot.borrow().as_ref() {
+                refresh(&state, ui);
+            }
+        });
+    }
+    ui
+}
+
 fn parse_args() -> (Option<PathBuf>, Option<String>) {
     let mut args = std::env::args().skip(1);
     let (mut path, mut only) = (None, None);
@@ -845,7 +1613,10 @@ fn parse_args() -> (Option<PathBuf>, Option<String>) {
         } else if DEVICE_NAMES.contains(&arg.as_str()) {
             only = Some(arg);
         } else {
-            eprintln!("usage: periph-gui [--config <path>] [{}]", DEVICE_NAMES.join("|"));
+            eprintln!(
+                "usage: periph-gui [--config <path>] [{}]",
+                DEVICE_NAMES.join("|")
+            );
             std::process::exit(2);
         }
     }
@@ -853,34 +1624,49 @@ fn parse_args() -> (Option<PathBuf>, Option<String>) {
         let base = std::env::var_os("XDG_CONFIG_HOME")
             .map(PathBuf::from)
             .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".config")))?;
-        Some(base.join("periph/config.json")).filter(|p| p.exists())
+        Some(base.join("periph/config.json")).filter(|file| file.exists())
     };
     (path.or_else(default), only)
 }
 
-fn main() -> eframe::Result {
+fn main() -> glib::ExitCode {
     let (path, only) = parse_args();
     let (declared, config_error) = match path.as_deref().map(config::load) {
-        Some(Ok(c)) => (Some(c), None),
-        Some(Err(e)) => (None, Some(e)),
+        Some(Ok(config)) => (Some(config), None),
+        Some(Err(error)) => (None, Some(error)),
         None => (None, None),
     };
-    // A per-device class lets window rules and popup toggles tell the windows apart.
-    let app_id = only.as_ref().map_or("periph".to_string(), |d| format!("periph-{d}"));
-    let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_inner_size([800.0, 1000.0])
-            .with_min_inner_size([680.0, 480.0])
-            .with_title("Peripherals")
-            .with_app_id(app_id),
-        ..Default::default()
-    };
-    eframe::run_native(
-        "periph",
-        options,
-        Box::new(move |cc| {
-            cc.egui_ctx.set_zoom_factor(1.25);
-            Ok(Box::new(App::new(&cc.egui_ctx, declared, config_error, only)))
-        }),
-    )
+    let application_id = only.as_ref().map_or_else(
+        || "dev.periph.Settings".to_string(),
+        |device| format!("dev.periph.{device}"),
+    );
+    let application = gtk::Application::builder()
+        .application_id(&application_id)
+        .build();
+    application.connect_activate(move |application| {
+        let state = Rc::new(RefCell::new(State {
+            declared: declared.clone(),
+            config_error: config_error.clone(),
+            only: only.clone(),
+            devices: Vec::new(),
+            job: None,
+            status: String::new(),
+            log: Vec::new(),
+        }));
+        let slot = Rc::new(RefCell::new(None));
+        let ui = build_ui(application, &state, &slot);
+        *slot.borrow_mut() = Some(ui.clone());
+        state.borrow_mut().reload();
+        refresh(&state, &ui);
+        let state_poll = state.clone();
+        let slot_poll = slot.clone();
+        glib::timeout_add_local(Duration::from_millis(50), move || {
+            if state_poll.borrow_mut().poll() {
+                rebuild_devices(&state_poll, &slot_poll);
+            }
+            ControlFlow::Continue
+        });
+        ui.window.present();
+    });
+    application.run()
 }

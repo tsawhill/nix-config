@@ -2,12 +2,9 @@
   lib,
   rustPlatform,
   pkg-config,
-  makeWrapper,
+  wrapGAppsHook4,
+  gtk4,
   udev,
-  libGL,
-  libxkbcommon,
-  wayland,
-  wl-clipboard,
 }:
 
 rustPlatform.buildRustPackage {
@@ -25,21 +22,12 @@ rustPlatform.buildRustPackage {
   # hidapi, under the keyboard libraries, links libudev.
   nativeBuildInputs = [
     pkg-config
-    makeWrapper
+    wrapGAppsHook4
   ];
-  buildInputs = [ udev ];
-
-  # egui loads GL and Wayland at runtime; wl-copy backs "Copy as Nix".
-  postFixup = ''
-    patchelf --add-rpath ${
-      lib.makeLibraryPath [
-        libGL
-        libxkbcommon
-        wayland
-      ]
-    } $out/bin/periph-gui
-    wrapProgram $out/bin/periph-gui --prefix PATH : ${lib.makeBinPath [ wl-clipboard ]}
-  '';
+  buildInputs = [
+    gtk4
+    udev
+  ];
 
   meta = {
     description = "Declarative settings for USB mice and keyboards";

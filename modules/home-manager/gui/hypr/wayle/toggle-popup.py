@@ -15,7 +15,7 @@ APPS = {
     "volume": (["pavucontrol"], {"org.pulseaudio.pavucontrol", "pavucontrol"}, 700, 700, False),
     "network": (["nm-connection-editor"], {"nm-connection-editor"}, 700, 700, False),
     "bluetooth": (["blueman-manager"], {".blueman-manager-wrapped", "blueman-manager"}, 700, 700, False),
-    "mouse": (["periph-gui", "mchose-m7-ultra"], {"periph-mchose-m7-ultra"}, 760, 1000, True),
+    "mouse": (["periph-gui", "mchose-m7-ultra"], {"dev.periph.mchose-m7-ultra"}, 1040, 1000, True),
 }
 
 
