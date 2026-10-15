@@ -45,53 +45,39 @@ let
     {
       name = "Sonarr";
       url = "https://son.tsawhill.org";
+      # Probe directly because Authentik protects the public endpoint.
+      checkUrl = "http://${networkTopology.lib.fqdn "arrs-nix"}:8989/ping";
       icon = "si:sonarr";
       group = "Arrs";
-      altStatus = [
-        401
-        403
-      ];
     }
     {
       name = "Radarr";
       url = "https://rad.tsawhill.org";
+      # Avoid the UI's login redirect; /ping reports health without authentication.
+      checkUrl = "https://rad.tsawhill.org/ping";
       icon = "si:radarr";
       group = "Arrs";
-      altStatus = [
-        401
-        403
-      ];
     }
     {
       name = "Lidarr";
       url = "https://lid.tsawhill.org";
+      checkUrl = "https://lid.tsawhill.org/ping";
       icon = "sh:lidarr";
       group = "Arrs";
-      altStatus = [
-        401
-        403
-      ];
     }
     {
       name = "Prowlarr";
       url = "https://pro.tsawhill.org";
+      checkUrl = "https://pro.tsawhill.org/ping";
       icon = "sh:prowlarr";
       group = "Arrs";
-      altStatus = [
-        401
-        403
-      ];
     }
     {
       name = "qui";
       url = "https://qbit.tsawhill.org";
+      checkUrl = "https://qbit.tsawhill.org/health";
       icon = "sh:qbittorrent";
       group = "Arrs";
-      altStatus = [
-        302
-        401
-        403
-      ];
     }
     {
       name = "Nextcloud";
@@ -251,6 +237,7 @@ let
       url = s.url;
       icon = s.icon or "";
     }
+    // lib.optionalAttrs (s ? checkUrl) { check-url = s.checkUrl; }
     // lib.optionalAttrs (s ? altStatus) { alt-status-codes = s.altStatus; };
 
   asMeasurement = measurement: expression: ''
