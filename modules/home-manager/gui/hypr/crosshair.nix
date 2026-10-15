@@ -125,14 +125,6 @@ in
 
     programs.tcross = {
       enable = true;
-      # Keep the UI styling and independent arm-length/gap behavior in this integration.
-      package = inputs.tcross.packages.${pkgs.stdenv.hostPlatform.system}.default.overrideAttrs (old: {
-        patches = (old.patches or [ ]) ++ [
-          ./tcross-ui.patch
-          ./tcross-gap.patch
-          ./tcross-crisp-arms.patch
-        ];
-      });
       # Empty means no fixed primary; let Hyprland place it.
       output = if fallbackMonitor == "" then null else fallbackMonitor;
       # offset = halfPixel;
