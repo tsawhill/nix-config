@@ -162,7 +162,8 @@ in
         {
           name = "Cyan Diamond";
           shape = "diamond";
-          ring.size = 3.0;
+          diamond.size = 3.0;
+          color = "#6bdfff";
           outline = {
             enable = true;
             feather = 1.0;
