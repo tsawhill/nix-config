@@ -12,29 +12,24 @@
     // lib.mapAttrsRecursive (_: lib.mkDefault) {
       pollingRate = 8000;
       debounceMs = 0;
-      lighting = {
-        # Effects, as qmk.top names them: off, always-on, dynamic-breathing, spectrum-cycle,
-        #   wave, ripple, starlight, stream, shadow, mountain-wave, sine-wave, color-spring,
-        #   flower-wave, kill-two-birds, circle-wave, colorful-cross, snow-fall, meteor, snow-trace.
-        # color is any "#rrggbb"; rainbow = true is qmk.top's "Dazzling" (multicolour).
-        effect = "mountain-wave";
-        rainbow = true;
-        color = "#802828";
-        brightness = 4;
-        speed = 1;
-      };
-      actuation = 1.0;
-      keys = {
-        W.actuation = 0.5;
-        A.actuation = 0.5;
-        S.actuation = 0.5;
-        D.actuation = 0.5;
-      };
-      rapidTrigger = {
-        enable = true;
-        press = 0.2;
-        release = 0.2;
-      };
+      lighting.effect = "snow-trace";
+      lighting.brightness = 4;
+      lighting.speed = 1;
+      lighting.color = "#802828";
+      lighting.rainbow = true;
+      fnLayer = 0;
+      antiMistouch = false;
+      rtStabilityMs = 0;
+      wasdSwap = false;
+      actuation = 2.100;
+      rapidTrigger.enable = true;
+      rapidTrigger.press = 0.200;
+      rapidTrigger.release = 0.200;
+      bottomDeadzone = 0.300;
+      keys."A".actuation = 0.100;
+      keys."D".actuation = 0.100;
+      keys."S".actuation = 0.100;
+      keys."W".actuation = 0.100;
     };
   };
 }
