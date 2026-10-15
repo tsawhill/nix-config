@@ -1,0 +1,98 @@
+--- a/src/render.rs
++++ b/src/render.rs
+@@ -11,7 +11,7 @@
+ pub fn extent(p: &Profile) -> f32 {
+     let o = if p.outline.enable { p.outline.size + p.outline.feather.ceil() } else { 0.0 };
+     let round = p.ring.size / 2.0 + p.ring.thickness / 2.0 + o;
+-    let arms = |a: &Arms| a.length.max(a.gap) + a.thickness / 2.0 + o;
++    let arms = |a: &Arms| (a.gap + a.length) + a.thickness / 2.0 + o;
+     // Mitred corners reach out along the diagonal.
+     let corners = |half: f32, l: &Loop| (half + l.thickness / 2.0 + o) * SQRT_2;
+     match p.shape {
+@@ -136,7 +136,7 @@
+     let dirs: &[(f32, f32)] =
+         if top { &[(-1.0, 0.0), (1.0, 0.0), (0.0, -1.0), (0.0, 1.0)] } else { &[(-1.0, 0.0), (1.0, 0.0), (0.0, 1.0)] };
+     for &(x, y) in dirs {
+-        pb.move_to(x * length, y * length);
++        pb.move_to(x * (gap + length), y * (gap + length));
+         pb.line_to(x * gap, y * gap);
+     }
+     pb.finish()
+@@ -283,6 +283,55 @@
+     }
+ 
+     #[test]
++    fn gap_translates_arms_without_changing_their_pixels() {
++        for shape in [Shape::Cross, Shape::Tee, Shape::Scope] {
++            let mut p = Profile { shape, ..Profile::default() };
++            p.ring.size = 0.0;
++            p.ring.thickness = 0.0;
++            for length in [2.0, 9.0] {
++                p.cross.length = length;
++                p.tee.length = length;
++                p.cross.gap = 4.0;
++                p.tee.gap = 4.0;
++                let before = render(&p, NONE, 96, 1.0);
++                p.cross.gap = 14.0;
++                p.tee.gap = 14.0;
++                let after = render(&p, NONE, 96, 1.0);
++                // Compare the whole right arm, including antialiased caps.
++                for y in 44..52 {
++                    for x in 50..70 {
++                        assert_eq!(alpha_at(&before, x, y), alpha_at(&after, x + 10, y),
++                            "{shape:?}, length {length}: arm changed at {x},{y}");
++                    }
++                }
++                assert!(painted(&after) > 0);
++            }
++        }
++    }
++
++    #[test]
++    fn large_gap_surface_contains_rotated_arms_and_outline() {
++        for shape in [Shape::Cross, Shape::Tee, Shape::Scope] {
++            for rotation in [0.0, 45.0] {
++                let mut p = Profile { shape, rotation, ..Profile::default() };
++                p.cross.length = 20.0;
++                p.tee.length = 20.0;
++                p.cross.gap = 30.0;
++                p.tee.gap = 30.0;
++                p.outline.enable = true;
++                p.outline.size = 3.0;
++                p.outline.feather = 2.0;
++                let side = surface_size(&p, NONE);
++                let actual = render(&p, NONE, side, 1.0);
++                let larger = render(&p, NONE, side + 40, 1.0);
++                // A larger canvas must not reveal pixels clipped by surface_size.
++                let alpha_sum = |pm: &Pixmap| pm.data().chunks_exact(4).map(|px| px[3] as u64).sum::<u64>();
++                assert_eq!(alpha_sum(&actual), alpha_sum(&larger), "{shape:?} at {rotation}° clipped");
++            }
++        }
++    }
++
++    #[test]
+     fn tee_has_no_top_arm() {
+         let mut p = Profile { shape: Shape::Tee, ..Profile::default() };
+         p.tee.gap = 3.0;
+--- a/src/config.rs
++++ b/src/config.rs
+@@ -171,7 +171,7 @@
+ #[serde(rename_all = "camelCase", deny_unknown_fields, default)]
+ pub struct Arms {
+     pub thickness: f32,
+-    /// From the centre to the end of each arm.
++    /// Length of each arm, independent of its distance from the centre.
+     pub length: f32,
+     /// From the centre to the start of each arm.
+     pub gap: f32,
+--- a/src/bin/tcross-gui.rs
++++ b/src/bin/tcross-gui.rs
+@@ -528,7 +528,7 @@
+     num(ui, &mut a.thickness, limits::THICKNESS, " px");
+     mark(ui, saved.is_some_and(|s| s.thickness != a.thickness));
+ 
+-    ui.label("Line length");
++    ui.label("Arm length").on_hover_text("Length of each arm; changing the gap moves it without shortening it");
+     num(ui, &mut a.length, limits::LENGTH, " px");
+     mark(ui, saved.is_some_and(|s| s.length != a.length));
+ 

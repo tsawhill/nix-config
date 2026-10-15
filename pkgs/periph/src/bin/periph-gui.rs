@@ -287,12 +287,20 @@ impl eframe::App for App {
             ui.add_space(16.0);
             egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
                 for (index, device) in self.devices.iter_mut().enumerate() {
-                    ui.push_id(index, |ui| {
-                        egui::Frame::group(ui.style()).inner_margin(16).corner_radius(10).show(ui, |ui| {
-                            ui.set_min_width(ui.available_width());
-                            if let Some(a) = device_ui(ui, index, device, self.declared.as_ref(), busy) {
-                                action = Some(a);
-                            }
+                    let available = ui.available_width();
+                    let card_width = available.min(1200.0);
+                    ui.horizontal(|ui| {
+                        ui.add_space((available - card_width) / 2.0);
+                        ui.vertical(|ui| {
+                            ui.set_width(card_width);
+                            ui.push_id(index, |ui| {
+                                egui::Frame::group(ui.style()).inner_margin(16).corner_radius(10).show(ui, |ui| {
+                                    ui.set_min_width(ui.available_width());
+                                    if let Some(a) = device_ui(ui, index, device, self.declared.as_ref(), busy) {
+                                        action = Some(a);
+                                    }
+                                });
+                            });
                         });
                     });
                     ui.add_space(12.0);
@@ -401,6 +409,19 @@ fn combo<T: PartialEq + Copy>(ui: &mut egui::Ui, id: &str, value: &mut T, option
 }
 
 fn mouse_ui(ui: &mut egui::Ui, s: &mut mchose::Settings, nix: Option<&mchose::Settings>, wired: bool) {
+    if ui.available_width() >= 900.0 {
+        ui.columns(2, |columns| {
+            mouse_settings_ui(&mut columns[0], s, nix, wired);
+            button_assignments_ui(&mut columns[1], &mut s.buttons, nix.map(|n| &n.buttons));
+        });
+    } else {
+        mouse_settings_ui(ui, s, nix, wired);
+        ui.add_space(12.0);
+        button_assignments_ui(ui, &mut s.buttons, nix.map(|n| &n.buttons));
+    }
+}
+
+fn mouse_settings_ui(ui: &mut egui::Ui, s: &mut mchose::Settings, nix: Option<&mchose::Settings>, wired: bool) {
     let rates: Vec<(u32, String)> = mchose::RATES.iter().map(|&hz| (hz, format!("{hz} Hz"))).collect();
     egui::Grid::new("mouse").num_columns(3).spacing([20.0, 10.0]).show(ui, |ui| {
         section_row(ui, "Sensitivity");
@@ -490,10 +511,12 @@ fn mouse_ui(ui: &mut egui::Ui, s: &mut mchose::Settings, nix: Option<&mchose::Se
         mark(ui, nix.is_some_and(|n| n.lighting != s.lighting));
 
     });
-    ui.add_space(8.0);
+}
+
+fn button_assignments_ui(ui: &mut egui::Ui, buttons: &mut mchose::Buttons, declared: Option<&mchose::Buttons>) {
     ui.strong("Button assignments");
     ui.label(RichText::new("Select a button on the mouse to change its action.").small().weak());
-    mouse_diagram(ui, &mut s.buttons, nix.map(|n| &n.buttons));
+    mouse_diagram(ui, buttons, declared);
 }
 
 const BUTTON_LABELS: [&str; 6] = ["Left", "Middle", "Right", "Forward", "Back", "DPI"];
@@ -518,7 +541,7 @@ fn button_editor(ui: &mut egui::Ui, slot: usize, action: &mut String) {
 fn mouse_diagram(ui: &mut egui::Ui, buttons: &mut mchose::Buttons, declared: Option<&mchose::Buttons>) {
     use egui::{pos2, vec2, Align2, CornerRadius, FontId, Pos2, Rect, Sense, Shape, Stroke, StrokeKind};
 
-    let size = vec2(ui.available_width().max(420.0), 330.0);
+    let size = vec2(ui.available_width(), 330.0);
     let (rect, response) = ui.allocate_exact_size(size, Sense::click());
     let painter = ui.painter_at(rect);
     let v = ui.visuals().clone();

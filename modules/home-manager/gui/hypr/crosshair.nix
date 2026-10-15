@@ -125,9 +125,13 @@ in
 
     programs.tcross = {
       enable = true;
-      # Keep the settings-window styling alongside the desktop integration.
+      # Keep the UI styling and independent arm-length/gap behavior in this integration.
       package = inputs.tcross.packages.${pkgs.stdenv.hostPlatform.system}.default.overrideAttrs (old: {
-        patches = (old.patches or [ ]) ++ [ ./tcross-ui.patch ];
+        patches = (old.patches or [ ]) ++ [
+          ./tcross-ui.patch
+          ./tcross-gap.patch
+          ./tcross-crisp-arms.patch
+        ];
       });
       # Empty means no fixed primary; let Hyprland place it.
       output = if fallbackMonitor == "" then null else fallbackMonitor;
@@ -166,13 +170,21 @@ in
         {
           name = "Cyan Diamond";
           shape = "diamond";
-          diamond.size = 3.0;
           color = "#6bdfff";
+          opacity = 1.0;
+          diamond = {
+            size = 4.5;
+            thickness = 3.0;
+          };
           outline = {
             enable = true;
+            size = 1.0;
             feather = 1.0;
+            color = "#000000";
           };
+          rotation = 0.0;
         }
+
       ];
     };
 
