@@ -150,32 +150,8 @@ in
           name = "Cyan Dot";
           shape = "dot";
           color = "#6bdfff";
-          dot.size = 3.0;
-          outline = {
-            enable = true;
-            feather = 1.0;
-          };
-        }
-        {
-          name = "Yellow Cross";
-          shape = "cross";
-          color = "#ffff00";
-          cross = {
-            thickness = 2.5;
-            length = 9.0;
-            gap = 5.0;
-          };
-          outline.enable = true;
-        }
-        {
-          name = "Cyan Diamond";
-          shape = "diamond";
-          color = "#6bdfff";
           opacity = 1.0;
-          diamond = {
-            size = 4.5;
-            thickness = 3.0;
-          };
+          dot.size = 2.0;
           outline = {
             enable = true;
             size = 1.0;
@@ -184,7 +160,61 @@ in
           };
           rotation = 0.0;
         }
-
+        {
+          name = "Yellow Cross";
+          shape = "cross";
+          color = "#ffff00";
+          opacity = 1.0;
+          cross = {
+            thickness = 1.0;
+            length = 3.0;
+            gap = 4.0;
+            centerDot = false;
+          };
+          outline = {
+            enable = true;
+            size = 1.0;
+            feather = 0.0;
+            color = "#000000";
+          };
+          rotation = 0.0;
+        }
+        {
+          name = "Cyan X";
+          shape = "cross";
+          color = "#6bdfff";
+          opacity = 1.0;
+          cross = {
+            thickness = 2.0;
+            length = 4.0;
+            gap = 3.0;
+            centerDot = false;
+          };
+          outline = {
+            enable = true;
+            size = 1.0;
+            feather = 0.0;
+            color = "#000000";
+          };
+          rotation = 45.0;
+        }
+        {
+          name = "Cyan Diamond";
+          shape = "diamond";
+          color = "#6bdfff";
+          opacity = 1.0;
+          diamond = {
+            size = 12.0;
+            thickness = 2.0;
+          };
+          outline = {
+            enable = true;
+            size = 1.0;
+            feather = 0.0;
+            color = "#000000";
+          };
+          rotation = 0.0;
+        }
       ];
     };
 
