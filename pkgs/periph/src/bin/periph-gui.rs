@@ -8,7 +8,7 @@ use gtk::{Align, Orientation};
 use periph::config::{self, Config};
 use periph::hidraw::{HidRaw, Node};
 use periph::{devices, mchose, mchose_buttons, rongyuan};
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::io;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -719,6 +719,251 @@ fn mouse_settings(
     grid
 }
 
+fn mouse_half_width(y: f64, top: f64, width: f64, height: f64) -> f64 {
+    let t = ((y - top) / height).clamp(0.0, 1.0);
+    let crown = (std::f64::consts::PI * t).sin().max(0.0).powf(0.55);
+    width * (0.27 + crown * 0.23 + t * 0.03)
+}
+
+fn mouse_button_at(width: f64, x: f64, y: f64) -> Option<usize> {
+    let (cx, top, body_width, body_height) = (width / 2.0, 18.0, 120.0, 280.0);
+    let split = top + body_height * 0.42;
+    let wheel = (cx - 8.0, top + body_height * 0.10, 16.0, 46.0);
+    let side = |fraction: f64| {
+        let y = top + body_height * fraction;
+        (
+            cx - mouse_half_width(y, top, body_width, body_height) - 6.0,
+            y - 16.0,
+            12.0,
+            32.0,
+        )
+    };
+    let inside = |point_x: f64, point_y: f64, rect: (f64, f64, f64, f64)| {
+        point_x >= rect.0
+            && point_x <= rect.0 + rect.2
+            && point_y >= rect.1
+            && point_y <= rect.1 + rect.3
+    };
+    if inside(x, y, wheel) {
+        return Some(1);
+    }
+    if inside(x, y, side(0.42)) {
+        return Some(3);
+    }
+    if inside(x, y, side(0.57)) {
+        return Some(4);
+    }
+    let dpi_y = top + body_height * 0.76;
+    if (x - cx).hypot(y - dpi_y) <= 12.0 {
+        return Some(5);
+    }
+    if y >= top && y <= split && (x - cx).abs() <= mouse_half_width(y, top, body_width, body_height)
+    {
+        return Some(if x < cx { 0 } else { 2 });
+    }
+    None
+}
+
+fn draw_mouse(
+    area: &gtk::DrawingArea,
+    context: &gtk::cairo::Context,
+    width: i32,
+    actions: &[String; 6],
+    declared: Option<&mchose::Buttons>,
+    selected: usize,
+) {
+    let (width, cx, top, body_width, body_height) =
+        (width as f64, width as f64 / 2.0, 18.0, 120.0, 280.0);
+    let split = top + body_height * 0.42;
+    let foreground = area.color();
+    let fg = (
+        foreground.red() as f64,
+        foreground.green() as f64,
+        foreground.blue() as f64,
+    );
+    let differs =
+        |button: usize| declared.is_some_and(|nix| nix.slots()[button] != &actions[button]);
+    let source = |context: &gtk::cairo::Context, button: usize, alpha: f64| {
+        if differs(button) {
+            context.set_source_rgba(0.95, 0.55, 0.18, alpha);
+        } else {
+            context.set_source_rgba(fg.0, fg.1, fg.2, alpha);
+        }
+    };
+    let body_path = |context: &gtk::cairo::Context| {
+        context.move_to(cx, top);
+        context.curve_to(cx - 43.0, top, cx - 61.0, top + 34.0, cx - 63.0, top + 86.0);
+        context.curve_to(
+            cx - 66.0,
+            top + 152.0,
+            cx - 60.0,
+            top + 230.0,
+            cx - 41.0,
+            top + 266.0,
+        );
+        context.curve_to(
+            cx - 27.0,
+            top + 286.0,
+            cx + 27.0,
+            top + 286.0,
+            cx + 41.0,
+            top + 266.0,
+        );
+        context.curve_to(
+            cx + 60.0,
+            top + 230.0,
+            cx + 66.0,
+            top + 152.0,
+            cx + 63.0,
+            top + 86.0,
+        );
+        context.curve_to(cx + 61.0, top + 34.0, cx + 43.0, top, cx, top);
+        context.close_path();
+    };
+
+    body_path(context);
+    context.set_source_rgba(fg.0, fg.1, fg.2, 0.07);
+    let _ = context.fill_preserve();
+    context.set_source_rgba(fg.0, fg.1, fg.2, 0.65);
+    context.set_line_width(1.5);
+    let _ = context.stroke();
+
+    for button in [0usize, 2] {
+        context.save().ok();
+        body_path(context);
+        context.clip();
+        context.rectangle(
+            if button == 0 { cx - body_width } else { cx },
+            top,
+            body_width,
+            split - top,
+        );
+        source(
+            context,
+            button,
+            if button == selected { 0.32 } else { 0.11 },
+        );
+        let _ = context.fill();
+        context.restore().ok();
+    }
+    context.set_source_rgba(fg.0, fg.1, fg.2, 0.55);
+    context.move_to(cx, top);
+    context.line_to(cx, split);
+    context.move_to(
+        cx - mouse_half_width(split, top, body_width, body_height),
+        split,
+    );
+    context.line_to(
+        cx + mouse_half_width(split, top, body_width, body_height),
+        split,
+    );
+    let _ = context.stroke();
+
+    let wheel = (cx - 8.0, top + body_height * 0.10, 16.0, 46.0);
+    source(context, 1, if selected == 1 { 0.45 } else { 0.18 });
+    context.rectangle(wheel.0, wheel.1, wheel.2, wheel.3);
+    let _ = context.fill_preserve();
+    source(context, 1, 0.8);
+    let _ = context.stroke();
+    for line in 1..5 {
+        let y = wheel.1 + wheel.3 * line as f64 / 5.0;
+        context.move_to(wheel.0 + 3.0, y);
+        context.line_to(wheel.0 + wheel.2 - 3.0, y);
+    }
+    let _ = context.stroke();
+
+    for (button, fraction) in [(3usize, 0.42), (4, 0.57)] {
+        let y = top + body_height * fraction;
+        let x = cx - mouse_half_width(y, top, body_width, body_height) - 6.0;
+        source(
+            context,
+            button,
+            if selected == button { 0.45 } else { 0.18 },
+        );
+        context.rectangle(x, y - 16.0, 12.0, 32.0);
+        let _ = context.fill_preserve();
+        source(context, button, 0.8);
+        let _ = context.stroke();
+    }
+    let dpi_y = top + body_height * 0.76;
+    source(context, 5, if selected == 5 { 0.45 } else { 0.18 });
+    context.arc(cx, dpi_y, 9.0, 0.0, std::f64::consts::TAU);
+    let _ = context.fill_preserve();
+    source(context, 5, 0.8);
+    let _ = context.stroke();
+
+    let left = cx - body_width / 2.0 - 28.0;
+    let right = cx + body_width / 2.0 + 28.0;
+    let labels = [
+        (0usize, left - 80.0, top + 42.0),
+        (1, right, top + 20.0),
+        (2, right, top + 72.0),
+        (3, left - 80.0, top + 122.0),
+        (4, left - 80.0, top + 172.0),
+        (5, right, top + 220.0),
+    ];
+    let anchors = [
+        (cx - 29.0, top + 62.0),
+        (cx + 8.0, wheel.1 + 10.0),
+        (cx + 29.0, top + 72.0),
+        (
+            cx - mouse_half_width(top + body_height * 0.42, top, body_width, body_height) - 5.0,
+            top + body_height * 0.42,
+        ),
+        (
+            cx - mouse_half_width(top + body_height * 0.57, top, body_width, body_height) - 5.0,
+            top + body_height * 0.57,
+        ),
+        (cx + 9.0, dpi_y),
+    ];
+    for (button, x, y) in labels {
+        let right_side = x > cx;
+        let line_end = if right_side {
+            (x - 8.0, y - 5.0)
+        } else {
+            (x + 72.0, y - 5.0)
+        };
+        source(context, button, if selected == button { 0.8 } else { 0.35 });
+        context.set_line_width(if selected == button { 1.5 } else { 1.0 });
+        context.move_to(anchors[button].0, anchors[button].1);
+        context.line_to(line_end.0, line_end.1);
+        let _ = context.stroke();
+        context.arc(
+            anchors[button].0,
+            anchors[button].1,
+            2.5,
+            0.0,
+            std::f64::consts::TAU,
+        );
+        let _ = context.fill();
+        source(context, button, if selected == button { 1.0 } else { 0.75 });
+        context.select_font_face(
+            "sans",
+            gtk::cairo::FontSlant::Normal,
+            if selected == button {
+                gtk::cairo::FontWeight::Bold
+            } else {
+                gtk::cairo::FontWeight::Normal
+            },
+        );
+        context.set_font_size(14.0);
+        context.move_to(x, y);
+        let _ = context.show_text(BUTTON_LABELS[button]);
+        context.set_font_size(11.0);
+        context.move_to(x, y + 16.0);
+        let _ = context.show_text(&actions[button]);
+    }
+}
+
+fn update_button_marker(label: &gtk::Label, modified: bool) {
+    label.set_label(if modified { "Modified" } else { "" });
+    if modified {
+        label.add_css_class("warning");
+    } else {
+        label.remove_css_class("warning");
+    }
+}
+
 fn button_assignments(
     index: usize,
     current: &mchose::Buttons,
@@ -733,75 +978,169 @@ fn button_assignments(
     title.set_halign(Align::Start);
     root.append(&title);
     let hint = gtk::Label::new(Some(
-        "Choose a named action, or enter a key:ctrl+c style binding.",
+        "Select a button on the mouse, then choose an action or enter a key:ctrl+c binding.",
     ));
     hint.add_css_class("dim-label");
     hint.set_wrap(true);
     hint.set_halign(Align::Start);
     root.append(&hint);
-    let grid = gtk::Grid::builder()
-        .column_spacing(10)
-        .row_spacing(8)
+    let selected = Rc::new(Cell::new(5usize));
+    let declared = declared.cloned();
+    let diagram = gtk::DrawingArea::new();
+    diagram.set_content_width(370);
+    diagram.set_content_height(315);
+    diagram.set_hexpand(true);
+    diagram.set_cursor_from_name(Some("pointer"));
+    {
+        let state = state.clone();
+        let selected = selected.clone();
+        let declared = declared.clone();
+        diagram.set_draw_func(move |area, context, width, _| {
+            let actions: [String; 6] = match state.borrow().devices.get(index) {
+                Some(Device::Mouse { edit, .. }) => {
+                    std::array::from_fn(|button| edit.buttons.slots()[button].clone())
+                }
+                _ => return,
+            };
+            draw_mouse(
+                area,
+                context,
+                width,
+                &actions,
+                declared.as_ref(),
+                selected.get(),
+            );
+        });
+    }
+    root.append(&diagram);
+
+    let editor = gtk::Grid::builder()
+        .column_spacing(8)
+        .row_spacing(6)
         .build();
+    let selected_label = gtk::Label::new(Some("DPI button"));
+    selected_label.add_css_class("heading");
+    selected_label.set_halign(Align::Start);
+    editor.attach(&selected_label, 0, 0, 2, 1);
+    let entry = gtk::Entry::new();
+    entry.set_hexpand(true);
+    entry.set_text(current.slots()[selected.get()]);
+    editor.attach(&entry, 0, 1, 1, 1);
     let names: Vec<String> = mchose_buttons::ACTIONS
         .iter()
         .map(|(name, ..)| (*name).to_string())
         .collect();
-    for (button_slot, label) in BUTTON_LABELS.iter().enumerate() {
-        let name = gtk::Label::new(Some(label));
-        name.set_halign(Align::Start);
-        grid.attach(&name, 0, button_slot as i32, 1, 1);
-        let entry = gtk::Entry::new();
-        entry.set_hexpand(true);
-        entry.set_text(current.slots()[button_slot]);
-        grid.attach(&entry, 1, button_slot as i32, 1, 1);
-        let selected = names
-            .iter()
-            .position(|name| name == current.slots()[button_slot])
-            .unwrap_or(gtk::INVALID_LIST_POSITION as usize);
-        let choices = dropdown(&names, selected);
-        choices.set_tooltip_text(Some("Named actions"));
-        {
-            let state = state.clone();
-            let slot = slot.clone();
-            let entry = entry.clone();
-            choices.connect_selected_notify(move |input| {
-                let selected = input.selected() as usize;
-                if let Some((name, ..)) = mchose_buttons::ACTIONS.get(selected) {
-                    entry.set_text(name);
-                    mutate_mouse(&state, index, |settings| {
-                        *settings.buttons.slots_mut()[button_slot] = (*name).to_string()
-                    });
-                    changed(&state, &slot);
-                }
-            });
-        }
-        grid.attach(&choices, 2, button_slot as i32, 1, 1);
-        let set = gtk::Button::with_label("Set");
-        {
-            let state = state.clone();
-            let slot = slot.clone();
-            let entry = entry.clone();
-            set.connect_clicked(move |_| {
-                let value = entry.text().to_string();
-                if mchose_buttons::encode(&value, button_slot).is_some() {
-                    entry.remove_css_class("error");
-                    mutate_mouse(&state, index, |settings| {
-                        *settings.buttons.slots_mut()[button_slot] = value
-                    });
-                    changed(&state, &slot);
-                } else {
-                    entry.add_css_class("error");
-                    entry.set_tooltip_text(Some("Unknown action"));
-                }
-            });
-        }
-        grid.attach(&set, 3, button_slot as i32, 1, 1);
-        let modified =
-            declared.is_some_and(|nix| nix.slots()[button_slot] != current.slots()[button_slot]);
-        grid.attach(&marker(modified), 4, button_slot as i32, 1, 1);
+    let choice_at = names
+        .iter()
+        .position(|name| name == current.slots()[selected.get()])
+        .unwrap_or(gtk::INVALID_LIST_POSITION as usize);
+    let choices = dropdown(&names, choice_at);
+    choices.set_tooltip_text(Some("Named actions"));
+    editor.attach(&choices, 1, 1, 1, 1);
+    let set = gtk::Button::with_label("Set");
+    editor.attach(&set, 2, 1, 1, 1);
+    let modified = marker(
+        declared
+            .as_ref()
+            .is_some_and(|nix| nix.slots()[selected.get()] != current.slots()[selected.get()]),
+    );
+    modified.set_halign(Align::End);
+    editor.attach(&modified, 2, 0, 1, 1);
+    root.append(&editor);
+
+    {
+        let state = state.clone();
+        let slot = slot.clone();
+        let entry = entry.clone();
+        let diagram = diagram.clone();
+        let selected = selected.clone();
+        let modified = modified.clone();
+        let declared = declared.clone();
+        choices.connect_selected_notify(move |input| {
+            let choice = input.selected() as usize;
+            if let Some((name, ..)) = mchose_buttons::ACTIONS.get(choice) {
+                let button = selected.get();
+                entry.set_text(name);
+                mutate_mouse(&state, index, |settings| {
+                    *settings.buttons.slots_mut()[button] = (*name).to_string()
+                });
+                update_button_marker(
+                    &modified,
+                    declared
+                        .as_ref()
+                        .is_some_and(|nix| nix.slots()[button] != name),
+                );
+                diagram.queue_draw();
+                changed(&state, &slot);
+            }
+        });
     }
-    root.append(&grid);
+    {
+        let state = state.clone();
+        let slot = slot.clone();
+        let entry = entry.clone();
+        let diagram = diagram.clone();
+        let selected = selected.clone();
+        let modified = modified.clone();
+        let declared = declared.clone();
+        set.connect_clicked(move |_| {
+            let button = selected.get();
+            let value = entry.text().to_string();
+            if mchose_buttons::encode(&value, button).is_some() {
+                entry.remove_css_class("error");
+                mutate_mouse(&state, index, |settings| {
+                    *settings.buttons.slots_mut()[button] = value.clone()
+                });
+                update_button_marker(
+                    &modified,
+                    declared
+                        .as_ref()
+                        .is_some_and(|nix| nix.slots()[button] != &value),
+                );
+                diagram.queue_draw();
+                changed(&state, &slot);
+            } else {
+                entry.add_css_class("error");
+                entry.set_tooltip_text(Some("Unknown action"));
+            }
+        });
+    }
+    let gesture = gtk::GestureClick::new();
+    {
+        let state = state.clone();
+        let diagram = diagram.clone();
+        let selected = selected.clone();
+        let selected_label = selected_label.clone();
+        let entry = entry.clone();
+        let choices = choices.clone();
+        let modified = modified.clone();
+        let declared = declared.clone();
+        gesture.connect_pressed(move |_, _, x, y| {
+            let Some(button) = mouse_button_at(diagram.width() as f64, x, y) else {
+                return;
+            };
+            selected.set(button);
+            selected_label.set_label(&format!("{} button", BUTTON_LABELS[button]));
+            let value = match state.borrow().devices.get(index) {
+                Some(Device::Mouse { edit, .. }) => edit.buttons.slots()[button].clone(),
+                _ => return,
+            };
+            entry.set_text(&value);
+            let choice = mchose_buttons::ACTIONS
+                .iter()
+                .position(|(name, ..)| *name == value)
+                .map_or(gtk::INVALID_LIST_POSITION, |at| at as u32);
+            choices.set_selected(choice);
+            update_button_marker(
+                &modified,
+                declared
+                    .as_ref()
+                    .is_some_and(|nix| nix.slots()[button] != &value),
+            );
+            diagram.queue_draw();
+        });
+    }
+    diagram.add_controller(gesture);
     root
 }
 
