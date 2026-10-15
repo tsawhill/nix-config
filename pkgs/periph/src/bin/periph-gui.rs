@@ -152,6 +152,13 @@ struct App {
 
 impl App {
     fn new(ctx: &egui::Context, declared: Option<Config>, config_error: Option<String>, only: Option<String>) -> Self {
+        ctx.all_styles_mut(|style| {
+            style.spacing.item_spacing = egui::vec2(10.0, 8.0);
+            style.spacing.button_padding = egui::vec2(12.0, 7.0);
+            style.spacing.interact_size.y = 30.0;
+            style.spacing.combo_width = 160.0;
+            style.spacing.slider_width = 180.0;
+        });
         let mut app = Self {
             declared,
             config_error,
@@ -257,31 +264,43 @@ impl eframe::App for App {
         let ctx = ui.ctx().clone();
         let busy = self.job.is_some();
         let mut action = None;
-        egui::CentralPanel::default().show(ui, |ui| {
+        egui::CentralPanel::default().frame(egui::Frame::central_panel(ui.style()).inner_margin(20)).show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.heading("Peripherals");
+                ui.heading(RichText::new("Peripherals").size(26.0));
                 if ui.add_enabled(!busy, Button::new("Reload")).clicked() {
                     action = Some(Action::Reload);
                 }
                 if busy {
                     ui.spinner();
                 }
-                ui.label(RichText::new(&self.status).weak());
             });
+            ui.label(RichText::new(&self.status).weak());
+            ui.add_space(4.0);
             ui.label(
-                RichText::new("Changes here last until the device is plugged in again; then the service restores your Nix config.")
+                RichText::new("Temporary settings · Reconnecting restores your Nix configuration.")
                     .small()
                     .weak(),
             );
             if let Some(e) = &self.config_error {
                 ui.colored_label(Color32::LIGHT_RED, format!("Nix config not loaded: {e}"));
             }
+            ui.add_space(16.0);
             egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
                 for (index, device) in self.devices.iter_mut().enumerate() {
-                    ui.separator();
-                    if let Some(a) = device_ui(ui, index, device, self.declared.as_ref(), busy) {
-                        action = Some(a);
-                    }
+                    ui.push_id(index, |ui| {
+                        egui::Frame::group(ui.style()).inner_margin(16).corner_radius(10).show(ui, |ui| {
+                            ui.set_min_width(ui.available_width());
+                            if let Some(a) = device_ui(ui, index, device, self.declared.as_ref(), busy) {
+                                action = Some(a);
+                            }
+                        });
+                    });
+                    ui.add_space(12.0);
+                }
+                if self.devices.is_empty() && !busy {
+                    ui.add_space(24.0);
+                    ui.strong("Connect a supported mouse or keyboard");
+                    ui.label(RichText::new("Wake your device, then select Reload to try again.").weak());
                 }
                 if !self.log.is_empty() {
                     ui.separator();
@@ -310,24 +329,29 @@ fn device_ui(ui: &mut egui::Ui, index: usize, device: &mut Device, declared: Opt
         Device::Mouse { id, wired, read, edit, .. } => {
             let link = if *wired { "cable" } else { "dongle" };
             let charging = if id.charging { ", charging" } else { "" };
-            ui.strong(format!("MCHOSE M7 Ultra — {link}, battery {}%{charging}", id.battery));
+            ui.heading("MCHOSE M7 Ultra");
+            ui.label(RichText::new(format!("Connected via {link} · Battery {}%{charging}", id.battery)).weak());
+            ui.add_space(12.0);
             let nix = declared.and_then(|c| c.mchose_m7_ultra.as_ref());
             mouse_ui(ui, edit, nix, *wired);
             (read != edit, nix.is_some(), mchose::to_nix(edit, true))
         }
         Device::Keyboard { model, precision, read, edit, .. } => {
-            ui.strong(model.name);
+            ui.heading(model.name);
+            ui.add_space(12.0);
             let nix = declared.and_then(|c| c.boyi_h60pro.as_ref());
             keyboard_ui(ui, model, edit, nix);
             (read != edit, nix.is_some(), rongyuan::to_nix(edit, *precision))
         }
     };
     let mut action = None;
-    ui.horizontal(|ui| {
-        if ui.add_enabled(dirty && !busy, Button::new("Apply")).clicked() {
+    ui.add_space(16.0);
+    ui.separator();
+    ui.horizontal_wrapped(|ui| {
+        if ui.add_enabled(dirty && !busy, Button::new("Apply changes").fill(ui.visuals().selection.bg_fill)).clicked() {
             action = Some(Action::Apply(index));
         }
-        if ui.add_enabled(dirty, Button::new("Revert")).clicked() {
+        if ui.add_enabled(dirty && !busy, Button::new("Revert")).clicked() {
             match device {
                 Device::Mouse { read, edit, .. } => *edit = read.clone(),
                 Device::Keyboard { read, edit, .. } => *edit = read.clone(),
@@ -345,10 +369,21 @@ fn device_ui(ui: &mut egui::Ui, index: usize, device: &mut Device, declared: Opt
     action
 }
 
+/// A full-width visual break within a three-column settings grid.
+fn section_row(ui: &mut egui::Ui, title: &str) {
+    ui.vertical(|ui| {
+        ui.add_space(8.0);
+        ui.strong(title);
+    });
+    ui.label("");
+    ui.label("");
+    ui.end_row();
+}
+
 /// Finish a grid row: flag values that differ from the Nix config.
 fn mark(ui: &mut egui::Ui, differs: bool) {
     if differs {
-        ui.label(RichText::new("≠ nix").color(CHANGED))
+        ui.label(RichText::new("Modified").small().color(CHANGED))
             .on_hover_text("Differs from your Nix config; the next plug-in restores the Nix value");
     } else {
         ui.label("");
@@ -367,7 +402,8 @@ fn combo<T: PartialEq + Copy>(ui: &mut egui::Ui, id: &str, value: &mut T, option
 
 fn mouse_ui(ui: &mut egui::Ui, s: &mut mchose::Settings, nix: Option<&mchose::Settings>, wired: bool) {
     let rates: Vec<(u32, String)> = mchose::RATES.iter().map(|&hz| (hz, format!("{hz} Hz"))).collect();
-    egui::Grid::new("mouse").num_columns(3).spacing([14.0, 6.0]).show(ui, |ui| {
+    egui::Grid::new("mouse").num_columns(3).spacing([20.0, 10.0]).show(ui, |ui| {
+        section_row(ui, "Sensitivity");
         ui.label("DPI stages");
         ui.horizontal(|ui| {
             let count = s.dpi_stages.len();
@@ -394,6 +430,7 @@ fn mouse_ui(ui: &mut egui::Ui, s: &mut mchose::Settings, nix: Option<&mchose::Se
         combo(ui, "stage", &mut s.active_stage, &stages);
         mark(ui, nix.is_some_and(|n| n.active_stage != s.active_stage));
 
+        section_row(ui, "Tracking & performance");
         ui.label("Polling rate (cable)");
         ui.horizontal(|ui| {
             combo(ui, "wired", &mut s.polling_rate.wired, &rates);
@@ -442,6 +479,7 @@ fn mouse_ui(ui: &mut egui::Ui, s: &mut mchose::Settings, nix: Option<&mchose::Se
         ui.add(DragValue::new(&mut s.debounce_ms).range(0..=50).suffix(" ms"));
         mark(ui, nix.is_some_and(|n| n.debounce_ms != s.debounce_ms));
 
+        section_row(ui, "Power & lighting");
         ui.label("Sleep after");
         ui.add(DragValue::new(&mut s.sleep_minutes).range(0..=255).suffix(" min"))
             .on_hover_text("0 never sleeps");
@@ -453,6 +491,8 @@ fn mouse_ui(ui: &mut egui::Ui, s: &mut mchose::Settings, nix: Option<&mchose::Se
 
     });
     ui.add_space(8.0);
+    ui.strong("Button assignments");
+    ui.label(RichText::new("Select a button on the mouse to change its action.").small().weak());
     mouse_diagram(ui, &mut s.buttons, nix.map(|n| &n.buttons));
 }
 
@@ -598,7 +638,7 @@ fn mouse_diagram(ui: &mut egui::Ui, buttons: &mut mchose::Buttons, declared: Opt
         ui.label(RichText::new(format!("{} button", BUTTON_LABELS[selected])).strong());
         button_editor(ui, selected, buttons.slots_mut()[selected]);
         if changed {
-            ui.label(RichText::new("≠ nix").color(CHANGED));
+            ui.label(RichText::new("Modified").small().color(CHANGED));
         }
     });
 }
@@ -623,7 +663,8 @@ fn mm(ui: &mut egui::Ui, value: &mut f64, max: f64) {
 }
 
 fn keyboard_ui(ui: &mut egui::Ui, model: &rongyuan::Model, s: &mut rongyuan::Settings, nix: Option<&rongyuan::Settings>) {
-    egui::Grid::new("keyboard").num_columns(3).spacing([14.0, 6.0]).show(ui, |ui| {
+    egui::Grid::new("keyboard").num_columns(3).spacing([20.0, 10.0]).show(ui, |ui| {
+        section_row(ui, "Performance");
         ui.label("Polling rate");
         let rates: Vec<(u16, String)> = KB_RATES.iter().map(|&hz| (hz, format!("{hz} Hz"))).collect();
         opt(ui, &mut s.polling_rate, |ui, v| combo(ui, "kb-rate", v, &rates));
@@ -637,6 +678,7 @@ fn keyboard_ui(ui: &mut egui::Ui, model: &rongyuan::Model, s: &mut rongyuan::Set
 
         let l = &mut s.lighting;
         let nl = nix.map(|n| &n.lighting);
+        section_row(ui, "Lighting");
         ui.label("Lighting effect");
         opt(ui, &mut l.effect, |ui, v| {
             ComboBox::from_id_salt("effect").selected_text(v.as_str()).show_ui(ui, |ui| {
@@ -674,6 +716,7 @@ fn keyboard_ui(ui: &mut egui::Ui, model: &rongyuan::Model, s: &mut rongyuan::Set
         });
         mark(ui, differs(nl.map(|n| &n.color), &l.color));
 
+        section_row(ui, "Key behavior");
         ui.label("Fn layer");
         let layers = [(0u8, "0".to_string()), (1, "1".to_string())];
         opt(ui, &mut s.fn_layer, |ui, v| combo(ui, "fn-layer", v, &layers));
@@ -694,6 +737,7 @@ fn keyboard_ui(ui: &mut egui::Ui, model: &rongyuan::Model, s: &mut rongyuan::Set
         ui.checkbox(&mut s.wasd_swap, "");
         mark(ui, nix.is_some_and(|n| n.wasd_swap != s.wasd_swap));
 
+        section_row(ui, "Actuation & rapid trigger");
         ui.label("Actuation");
         mm(ui, &mut s.actuation, 3.3);
         mark(ui, nix.is_some_and(|n| n.actuation != s.actuation));
@@ -733,7 +777,7 @@ fn keyboard_ui(ui: &mut egui::Ui, model: &rongyuan::Model, s: &mut rongyuan::Set
     ui.horizontal(|ui| {
         ui.label("Per-key actuation");
         if nix.is_some_and(|n| n.keys != s.keys) {
-            ui.label(RichText::new("≠ nix").color(CHANGED));
+            ui.label(RichText::new("Modified").small().color(CHANGED));
         }
     });
     let mut remove = None;
@@ -802,7 +846,8 @@ fn main() -> eframe::Result {
     let app_id = only.as_ref().map_or("periph".to_string(), |d| format!("periph-{d}"));
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([720.0, 1000.0])
+            .with_inner_size([800.0, 1000.0])
+            .with_min_inner_size([680.0, 480.0])
             .with_title("Peripherals")
             .with_app_id(app_id),
         ..Default::default()
