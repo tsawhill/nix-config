@@ -39,6 +39,7 @@ vaultwarden-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMJNRlm9BNGfCskJ12r3/67D
 
 # Monthly services
 authentik-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIM1Lom/Uff/bDkqpczNSRIbbYGZPfWPxE4xxCNgStZWi
+gopeed-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJ9gif7OGjQWkAsSSartvJ1aBK8dp/4PIuoTke7lQjxU root@nixos
 homeassistant-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHZj+SJ8TMem8ycuqBvEonw/bwgLu8bQf5Fnw+UwBm04 root@nixos
 immich-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIK49kNa9HxbdBSKHvOhN3CtHFJiYr8wX1nv5Gv6b/gpC
 palworld-nix.lan ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGqCKfGRm25Dt77hMIGRPnm4h1Ge6Cj6POxsIXnMZQe7 root@accepted-shark

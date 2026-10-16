@@ -39,6 +39,7 @@ keys:
 
   # Monthly services
   - &authentik-nix age1l266y2z6cu7rg6p3tf5hfgyh5zr09f4e9eake67cgadx3uez55hsf2at7d
+  - &gopeed-nix age1gj3j2lrhadkq6gy4lex5a4p60awljzu03xllm77wxu6yzt55vugsql4lem
   - &homeassistant-nix age1vawems25dkyh6hxhecd54jqjglwhn2kpj5mfquulz3ftrx7f4f5qclg3zw
   - &immich-nix age1n0hjc0p648e8klkcjds7ffa6mztjpfpzjwvflrcweaagm7m2yvusrlq0wa
   - &palworld-nix age1x3gwq4n5uk6cxqna88t5h69yhk7hjy098m0vtpunulkfmnk37akse4y759
