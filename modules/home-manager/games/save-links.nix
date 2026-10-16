@@ -118,6 +118,11 @@ in
         path = lib.mkDefault "${config.xdg.dataHome}/bolt-launcher/.runelite";
         sharePath = lib.mkDefault "runelite";
       };
+      # Both channels (release/, nightly/) with their profiles, scores and settings.
+      YARG = {
+        path = lib.mkDefault "${config.xdg.configHome}/unity3d/YARC/YARG";
+        sharePath = lib.mkDefault "YARG";
+      };
       # DS: no stock PC path yet -> set my.gameSaveLinks.links.DS.{path,sharePath} per host to enable.
     };
 

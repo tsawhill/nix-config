@@ -130,6 +130,15 @@ in
         "Emulators/Ryujinx/games" # per-title PPTC + shader caches, GPU-bound
         "Emulators/Ryujinx/Logs" # logs
         "Emulators/Ryujinx/screenshots" # screenshots
+        # YARG: profiles, scores, replays and settings sync; Unity and scan state don't.
+        "YARG/Player*.log" # Unity logs
+        "YARG/prefs" # Unity window/resolution state, per display
+        "YARG/com.unity.addressables" # remote content catalog cache
+        "YARG/*/logs" # logs
+        "YARG/*/songcache.bin" # per-host song scan cache
+        "YARG/*/badsongs.txt" # per-host song scan results
+        "YARG/*/currentSong.*" # now-playing output for stream overlays
+        "YARG/*/scores/*-journal" # in-flight SQLite transaction
       ];
     };
   };
