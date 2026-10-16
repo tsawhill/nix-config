@@ -35,7 +35,6 @@
       home.stateVersion = "26.05";
       my.nixvim.full = true;
       my.shell.starshipTheme = "personal";
-      my.yarg.enable = true;
 
       my.hypr = {
         monitors.primary = "DP-1";

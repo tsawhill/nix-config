@@ -38,7 +38,6 @@
       home.stateVersion = "26.05";
       my.nixvim.full = true;
       my.shell.starshipTheme = "personal";
-      my.yarg.enable = true;
       my.hypr.layout = "laptop";
       my.hypr.monitors.framework16.enable = true;
       my.hypr.gpuRecorder.enable = false;

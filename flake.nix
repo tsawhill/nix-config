@@ -163,7 +163,8 @@
 
       packages.x86_64-linux = {
         ultimate-vocal-remover = pkgs.callPackage ./pkgs/ultimate-vocal-remover/package.nix { };
-        yarc-launcher = pkgs.callPackage ./pkgs/yarc-launcher.nix { };
+        yarg = pkgs.callPackage ./pkgs/games/yarg.nix { };
+        yarg-nightly = pkgs.callPackage ./pkgs/games/yarg.nix { channel = "nightly"; };
         hyprcrosshair = pkgs.callPackage ./pkgs/hyprcrosshair/package.nix { };
         santroller-configurator = pkgs.callPackage ./pkgs/santroller-configurator/package.nix { };
         jellium-desktop = pkgs.callPackage ./pkgs/jellium-desktop.nix { };

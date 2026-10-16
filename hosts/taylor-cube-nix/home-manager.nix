@@ -41,7 +41,6 @@
       home.stateVersion = "26.05";
       my.nixvim.full = true;
       my.shell.starshipTheme = "personal";
-      my.yarg.enable = true;
 
       my.hypr = {
         # The cube has exactly one DisplayPort and one HDMI, so the desktop's
