@@ -63,6 +63,11 @@
     enable = true;
     domain = "qbit.tsawhill.org";
   };
+  # Gopeed's own basic auth guards it; no Authentik.
+  proxy.gopeed = {
+    enable = true;
+    domain = "dl.tsawhill.org";
+  };
   proxy.homeassistant = {
     enable = true;
     domain = "ha.tsawhill.org";

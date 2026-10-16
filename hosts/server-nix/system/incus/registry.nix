@@ -171,6 +171,10 @@ let
       profiles = [ "ffsync-mount" ];
       rootSize = "4GiB";
     };
+    gopeed-nix.profiles = [
+      "downloadHDD-mount"
+      "downloadSSD-mount"
+    ];
     homeassistant-nix = {
       config = {
         "limits.cpu" = "2";

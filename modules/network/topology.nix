@@ -11,6 +11,7 @@ let
     "build-nix"
     "ca-nix"
     "ffsync-nix"
+    "gopeed-nix"
     "gotify-nix"
     "homeassistant-nix"
     "homepage-nix"
@@ -201,6 +202,14 @@ let
       lan = {
         ip = "10.73.73.24";
         mac = "02:5f:6e:64:81:18";
+      };
+      dns.enable = true;
+      monitoring.enable = true;
+    };
+    gopeed-nix = {
+      lan = {
+        ip = "10.73.73.25";
+        mac = "02:5f:6e:64:81:19";
       };
       dns.enable = true;
       monitoring.enable = true;

@@ -194,6 +194,8 @@ in
     "qbit-lts-nix" = mkHost null "qbit-lts-nix" "${self}/hosts/server-nix/LXCs/qbit-lts.nix";
     "qui-nix" = mkHost null "qui-nix" "${self}/hosts/server-nix/LXCs/qui.nix";
     "pyload-nix" = mkHost "monthly" "pyload-nix" "${self}/hosts/server-nix/LXCs/pyload.nix";
+    # Manual-only until the container and its SOPS key are provisioned.
+    "gopeed-nix" = mkHost null "gopeed-nix" "${self}/hosts/server-nix/LXCs/gopeed.nix";
     "authentik-nix" = mkHost "monthly" "authentik-nix" "${self}/hosts/server-nix/LXCs/authentik.nix";
     "syncthing-nix" = mkHost "monthly" "syncthing-nix" "${self}/hosts/server-nix/LXCs/syncthing.nix";
 
