@@ -1,7 +1,7 @@
 { self, ... }:
 let
   # Gopeed serves the UI unauthenticated without its password, so both follow it.
-  secretsProvisioned = false;
+  secretsProvisioned = true;
 in
 {
   imports = [

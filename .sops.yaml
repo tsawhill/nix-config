@@ -479,3 +479,8 @@ creation_rules:
       - age:
         - *build-nix
         - *qui-nix
+  - path_regex: modules/secrets/server/LXCs/gopeed_env\.yaml$
+    key_groups:
+      - age:
+        - *build-nix
+        - *gopeed-nix
