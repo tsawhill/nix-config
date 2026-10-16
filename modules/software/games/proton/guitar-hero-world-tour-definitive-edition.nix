@@ -14,6 +14,10 @@
         "vblank_mode=0"
       ];
       basePath = "pc/GHWTDE";
+      songs = {
+        library = "ghwtde";
+        mountPath = "DATA/MODS/Songs";
+      };
       runner.umu = {
         exe = "GHWT_Definitive.exe";
       };

@@ -3,6 +3,7 @@
   writeShellApplication,
   makeDesktopItem,
   symlinkJoin,
+  bubblewrap,
   coreutils,
   gamescope,
   util-linux,
@@ -21,6 +22,7 @@
   lsfgVkEnable ? false,
   lsfgVkProcess ? name,
   networkEnable ? false,
+  bindMounts ? [ ],
 }:
 let
   envExports = lib.concatStringsSep "\n" (
@@ -51,8 +53,19 @@ let
   ]
   ++ lib.optional lsfgVkEnable "DISABLE_LSFG";
 
+  # The mounts exist only in the game's own namespace, never on the host. A
+  # missing source (e.g. library offline) skips the mount instead of failing.
+  bindPrefix = lib.optionalString (bindMounts != [ ]) (
+    "${lib.getExe' bubblewrap "bwrap"} --dev-bind / / "
+    + lib.concatMapStrings (
+      m: "--bind-try ${lib.escapeShellArg m.source} ${lib.escapeShellArg m.target} "
+    ) bindMounts
+    + "-- "
+  );
+
   gameCommand =
     "${lib.getExe' coreutils "env"} ${lib.concatMapStringsSep " " (v: "-u ${v}") unsetForGame} "
+    + bindPrefix
     + runnerCommand;
 
   # Games are offline by default. A user namespace lets an unprivileged caller

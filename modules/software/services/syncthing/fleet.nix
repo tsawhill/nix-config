@@ -139,6 +139,14 @@ in
         "YARG/*/badsongs.txt" # per-host song scan results
         "YARG/*/currentSong.*" # now-playing output for stream overlays
         "YARG/*/scores/*-journal" # in-flight SQLite transaction
+        # Clone Hero: same idea; songs belong in the roms song libraries.
+        "CloneHero/*/Player*.log" # Unity logs
+        "CloneHero/*/prefs" # Unity window/resolution state, per display
+        "CloneHero/*/songcache.bin" # per-host song scan cache
+        "CloneHero/*/badsongs.txt" # per-host song scan results
+        "CloneHero/*/currentsong.txt" # now-playing output for stream overlays
+        "CloneHero/*/Songs" # default song folder; keeps songs out of gamesaves
+        "CloneHero/*/Screenshots" # screenshots
       ];
     };
   };

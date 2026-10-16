@@ -182,6 +182,10 @@ let
   # gaming host so a game's basePath resolves identically everywhere.
   cifsRoot = "/mnt/zpool/roms";
 
+  # Per-host links to each song library. Games keep song folders in their own
+  # (synced) settings, so the path must not change with the sync selection.
+  songsLinkRoot = "/home/taylor/Games/songs";
+
   # A basePath under the roms root is relative; absolute paths (/, ~, $HOME) are
   # one-off launchers that never sync and always launch from where they point.
   isRelative = p: !(lib.hasPrefix "/" p || lib.hasPrefix "~" p || lib.hasPrefix "$HOME" p);
@@ -257,6 +261,10 @@ let
         [ "WINEDLLOVERRIDES=xinput1_3=n,b" ]
         ++ lib.optional (guitarShimConfig != "") "GUITAR_SHIM_CONFIG=${guitarShimConfig}"
       );
+      bindMounts = lib.optional (entryCfg.songs != null) {
+        source = "${songsLinkRoot}/${entryCfg.songs.library}";
+        target = "${baseDir id entryCfg}/${entryCfg.songs.mountPath}";
+      };
     in
     {
       package = mkGameLauncher {
@@ -287,6 +295,7 @@ let
         name = entryCfg.command;
         networkEnable = entryCfg.network.enable;
         inherit
+          bindMounts
           gamescopeResolutions
           lsfgVkConfig
           lsfgVkEnable
@@ -374,10 +383,24 @@ let
     ) cfg.syncGames
   );
 
+  # Song libraries this host keeps locally; they sync like individual games.
+  selectedSongPaths = map (name: cfg.songLibraries.${name}) (
+    lib.filter (name: cfg.songLibraries ? ${name}) cfg.syncSongs
+  );
+  selectedPaths = selectedGamePaths ++ selectedSongPaths;
+
   # Whole platforms selected (excluding the "*" sync-all wildcard).
   wholePlatforms = lib.filter (p: p != "*") cfg.syncPlatforms;
   coveredByPlatform = p: lib.elem (lib.head (lib.splitString "/" p)) wholePlatforms;
-  specificGamePaths = lib.unique (lib.filter (p: !(coveredByPlatform p)) selectedGamePaths);
+  specificGamePaths = lib.unique (lib.filter (p: !(coveredByPlatform p)) selectedPaths);
+
+  songLinkTarget =
+    name: path:
+    let
+      local = syncAll || lib.elem name cfg.syncSongs || coveredByPlatform path;
+    in
+    "${if local then cfg.syncRoot else cifsRoot}/${path}";
+
   ancestorsOf =
     p:
     let
@@ -409,7 +432,7 @@ let
     );
 
   # Top-level roots this host manages under syncRoot (for the prune manifest).
-  managedPaths = lib.unique (wholePlatforms ++ selectedGamePaths);
+  managedPaths = lib.unique (wholePlatforms ++ selectedPaths);
 
   # .stignore lines for the roms share: whitelist the selected platforms/games,
   # exclude everything else. Empty (no restriction, full sync) when "*" is set.
@@ -434,7 +457,7 @@ let
       ++ lib.concatMap ancestorRules (byDepthDesc excludeDirs)
       ++ [ "*" ];
 
-  hasSelection = cfg.syncGames != [ ] || cfg.syncPlatforms != [ ];
+  hasSelection = cfg.syncGames != [ ] || cfg.syncPlatforms != [ ] || cfg.syncSongs != [ ];
 
   # Manifest of currently-managed roots; the prune diffs the previous run against
   # this to delete de-selected local copies.
@@ -481,6 +504,31 @@ in
       Whole platforms (first path segment of a basePath, e.g. "ps3", "pc") to keep
       on this host's local disk, or [ "*" ] to sync the entire library. Combined
       (union) with software.games.syncGames.
+    '';
+  };
+
+  options.software.games.songLibraries = lib.mkOption {
+    type = lib.types.attrsOf lib.types.str;
+    default = { };
+    example = {
+      clone-hero = "songs/clone-hero";
+    };
+    description = ''
+      Song libraries by name, each a path under the roms library root. Every
+      host gets a link at ${songsLinkRoot}/<name> pointing at the local synced
+      copy when selected in software.games.syncSongs, otherwise at the CIFS
+      library mount. Point games' song-folder settings at that link.
+    '';
+  };
+
+  options.software.games.syncSongs = lib.mkOption {
+    type = lib.types.listOf lib.types.str;
+    default = [ ];
+    example = [ "clone-hero" ];
+    description = ''
+      Song libraries (software.games.songLibraries names) to keep on this host's
+      local disk via the roms Syncthing share. De-selecting one and rebuilding
+      deletes its local copy.
     '';
   };
 
@@ -598,6 +646,32 @@ in
           '';
 
           network.enable = lib.mkEnableOption "network access for this game";
+
+          songs = lib.mkOption {
+            type = lib.types.nullOr (
+              lib.types.submodule {
+                options = {
+                  library = lib.mkOption {
+                    type = lib.types.str;
+                    example = "ghwtde";
+                    description = "software.games.songLibraries entry to mount.";
+                  };
+
+                  mountPath = lib.mkOption {
+                    type = lib.types.str;
+                    example = "DATA/MODS/Songs";
+                    description = "Folder under the entry's basePath the library is mounted over.";
+                  };
+                };
+              }
+            );
+            default = null;
+            description = ''
+              Bind-mount a song library over a folder inside the game while it
+              runs, for games that only read songs from their own install. Games
+              with a song-folder setting should point it at the library's link.
+            '';
+          };
 
           runner.umu = lib.mkOption {
             type = lib.types.nullOr (
@@ -741,9 +815,27 @@ in
                 assertion = !entryCfg.guitarShim.enable || entryCfg.runner.umu != null;
                 message = "software.games.entries.${entryName}.guitarShim.enable needs a umu runner (the DLL is installed beside the Windows executable).";
               }
+              {
+                assertion =
+                  entryCfg.songs == null
+                  || (
+                    cfg.songLibraries ? ${entryCfg.songs.library}
+                    && entryCfg.basePath != null
+                    && !(lib.hasPrefix "~" entryCfg.basePath || lib.hasPrefix "$HOME" entryCfg.basePath)
+                  );
+                message = "software.games.entries.${entryName}.songs needs a defined song library and a basePath without ~ or $HOME.";
+              }
             ]
           ) cfg.entries
         )
+        ++ map (name: {
+          assertion = cfg.songLibraries ? ${name};
+          message = "software.games.syncSongs entry \"${name}\" must exist in software.games.songLibraries.";
+        }) cfg.syncSongs
+        ++ lib.mapAttrsToList (name: path: {
+          assertion = isRelative path;
+          message = "software.games.songLibraries.${name} must be a path relative to the roms library root.";
+        }) cfg.songLibraries
         ++ map (
           id:
           let
@@ -761,6 +853,16 @@ in
         (map (entryPackage: entryPackage.package) entryPackages)
         ++ lib.flatten (map (entryPackage: entryPackage.extraPackages) entryPackages);
     }
+
+    # L+ re-points each link when this host's sync selection changes.
+    (lib.mkIf (cfg.songLibraries != { }) {
+      systemd.tmpfiles.rules = [
+        "d ${songsLinkRoot} 0755 taylor users -"
+      ]
+      ++ lib.mapAttrsToList (
+        name: path: "L+ ${songsLinkRoot}/${name} - - - - ${songLinkTarget name path}"
+      ) cfg.songLibraries;
+    })
 
     # The game-level master switch also installs the layer and establishes the
     # disabled-by-default session environment. Individual launchers selectively

@@ -24,14 +24,14 @@ let
 
   # Point src at target, but never clobber an existing real directory - that
   # would be the user's un-migrated data. Refresh a stale symlink in place.
+  # The target is created too, so the link works before Syncthing pulls it.
   linkScript = l: ''
     src=${lib.escapeShellArg l.src}
     target=${lib.escapeShellArg l.target}
     run mkdir -p "$(dirname "$src")"
-    if [ -L "$src" ]; then
+    if [ -L "$src" ] || [ ! -e "$src" ]; then
+      run mkdir -p "$target"
       run ln -sfn "$target" "$src"
-    elif [ ! -e "$src" ]; then
-      run ln -s "$target" "$src"
     else
       echo "game-save-links: $src exists and is not a symlink; leaving it alone (move its contents into $target to sync them)" >&2
     fi
@@ -122,6 +122,15 @@ in
       YARG = {
         path = lib.mkDefault "${config.xdg.configHome}/unity3d/YARC/YARG";
         sharePath = lib.mkDefault "YARG";
+      };
+      # Clone Hero keeps settings/custom content and scores in separate dirs.
+      CloneHero = {
+        path = lib.mkDefault "${config.home.homeDirectory}/.clonehero";
+        sharePath = lib.mkDefault "CloneHero/data";
+      };
+      CloneHeroUnity = {
+        path = lib.mkDefault "${config.xdg.configHome}/unity3d/srylain Inc_/Clone Hero";
+        sharePath = lib.mkDefault "CloneHero/unity3d";
       };
       # DS: no stock PC path yet -> set my.gameSaveLinks.links.DS.{path,sharePath} per host to enable.
     };
