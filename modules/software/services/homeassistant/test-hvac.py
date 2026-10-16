@@ -115,6 +115,11 @@ class Templates(unittest.TestCase):
                 if "${baseModeTemplate}" in text
                 else ""
             ),
+            "effectiveModeTemplate": (
+                self.expand(raw_template("effectiveModeTemplate"))
+                if "${effectiveModeTemplate}" in text
+                else ""
+            ),
             "preemptedTemplate room": (
                 self.expand(raw_template("preemptedTemplate"))
                 if "${preemptedTemplate room}" in text
@@ -440,6 +445,7 @@ class Templates(unittest.TestCase):
             phase="watching",
             mode="cool",
             desired="cool",
+            last_run="unknown",
             fresh=True,
             checkpoint=100,
             elapsed=300,
@@ -696,6 +702,33 @@ class Templates(unittest.TestCase):
         self.values["timer.hvac_max_bedroom"] = "idle"
         self.assertEqual(self.render("effectiveModeTemplate"), "cool")
         self.assertEqual(self.render("desiredTemplate"), "cool")
+
+    def test_max_press_waits_for_effective_mode_sensor(self):
+        # Replay 2026-10-16 05:36: max heat from cool sent cool 64 before the sensor caught up.
+        self.values["timer.hvac_max_office"] = "active"
+        self.values["input_select.hvac_max_mode"] = "heat"
+        self.assertEqual(self.render("desiredTemplate"), "cool")
+        self.assertEqual(self.render("settledTemplate"), "False")
+        self.values["sensor.hvac_effective_mode"] = "heat"
+        self.assertEqual(self.render("settledTemplate"), "True")
+        self.assertEqual(self.render("desiredTemplate"), "heat")
+        self.values["timer.hvac_max_office"] = "idle"
+        self.assertEqual(self.render("settledTemplate"), "False")
+        self.values["sensor.hvac_effective_mode"] = "cool"
+        self.assertEqual(self.render("settledTemplate"), "True")
+
+    def test_off_ladder_skips_room_restarting_in_same_mode(self):
+        # Replay 2026-10-16 05:59: max heat re-pressed, off retry landed 4s before heat.
+        args = dict(mode="off", desired="heat", last_run="heat", elapsed=120)
+        self.assertEqual(self.watch(phase="off_pending", **args), "wait")
+        for phase in ["off_check", "off_final", "off_failed"]:
+            self.assertEqual(
+                self.watch(phase=phase, **(args | dict(elapsed=600, off_drift=3, off_overshoot=True))),
+                "wait",
+            )
+        # Switching sides still needs the old mode confirmed stopped.
+        self.assertEqual(self.watch(phase="off_pending", **(args | {"last_run": "cool"})), "off_retry")
+        self.assertEqual(self.watch(phase="off_pending", **(args | {"desired": "off"})), "off_retry")
 
     def test_max_script_accepts_room_lists_or_one_room(self):
         expr = re.search(r'selected = "(.*?)";', SOURCE).group(1)

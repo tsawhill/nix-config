@@ -331,6 +331,11 @@ let
       ${baseModeTemplate}
     {%- endif -%}'';
 
+  # False while the sensor lags its inputs, e.g. the instant a max timer starts.
+  settledTemplate = ''
+    {%- set live -%}${effectiveModeTemplate}{%- endset -%}
+    {{ live | trim == states('${effectiveMode}') }}'';
+
   # Rooms left out of a max run stay off so the chosen ones get the whole unit.
   preemptedTemplate = room: ''
     {%- set preempted = (${anyMaxActive}) and not is_state('${maxTimer room}', 'active') -%}'';
@@ -489,7 +494,7 @@ let
     current_airflow = "{{ state_attr('${climateEntity room}', 'swing_mode') }}";
     fan = "{{ states('${fanSensor room}') }}";
     current_fan = "{{ state_attr('${climateEntity room}', 'fan_mode') }}";
-
+    settled = settledTemplate;
   };
 
   offAction = room: {
@@ -542,6 +547,11 @@ let
       }
       {
         trigger = "state";
+        entity_id = "script.hvac_mode_handoff";
+        to = "off";
+      }
+      {
+        trigger = "state";
         entity_id = enableToggle room;
       }
       {
@@ -588,7 +598,7 @@ let
               {
                 condition = "template";
                 value_template = ''
-                  {{ desired != 'off'
+                  {{ desired != 'off' and settled
                      and (current_mode != desired
                           or (trigger.id | default("") == 'target' and (state_attr('${climateEntity room}', 'temperature') | float(0)) != setpoint))
                      and (current_mode != 'off' or not min_off_active or maxed)
@@ -613,7 +623,7 @@ let
               {
                 condition = "template";
                 value_template = ''
-                  {{ desired != 'off' and current_mode == desired
+                  {{ desired != 'off' and settled and current_mode == desired
                      and fan not in ['unknown', 'unavailable'] and fan != current_fan }}'';
               }
             ];
@@ -632,7 +642,7 @@ let
               {
                 condition = "template";
                 value_template = ''
-                  {{ desired != 'off' and current_mode == desired
+                  {{ desired != 'off' and settled and current_mode == desired
                      and airflow != current_airflow }}'';
               }
             ];
@@ -811,8 +821,10 @@ let
   # Starts get two blind resends before temperature can show anything.
   # A dark sensor cannot confirm a stop, and it rides the same blaster that
   # drops, so the off ladder walks blind rather than stalling on stale data.
+  # A missed off is harmless when the room is about to restart in that mode.
   watchDecision = ''
-    {%- if phase == 'off_pending' -%}
+    {%- if mode == 'off' and phase in ['off_pending', 'off_check', 'off_final', 'off_failed'] and desired == last_run -%}wait
+    {%- elif phase == 'off_pending' -%}
       {{ 'off_retry' if mode == 'off' and elapsed >= 120 else 'wait' }}
     {%- elif mode == 'off' and phase in ['off_check', 'off_final', 'off_failed'] and fresh -%}
       {%- if stop_boundary <= -40 -%}off_rebase
@@ -1846,25 +1858,42 @@ in
     ];
 
     script = {
-      hvac_mode_handoff = {
-        alias = "Stop all heads before changing system mode";
-        mode = "restart";
-        sequence = [
-          {
-            repeat = {
-              count = 2;
-              sequence = (map (room: (offAction room) // { continue_on_error = true; }) roomNames) ++ [
-                { delay.seconds = 2; }
-              ];
-            };
-          }
-        ]
-        ++ (map (room: {
-          action = "timer.start";
-          target.entity_id = minOffTimer room;
-          data.duration = tuning.minOffMinutes * 60;
-        }) roomNames);
-      };
+      # A room on max is about to be sent the new mode, so stopping it first is just noise.
+      hvac_mode_handoff =
+        let
+          unlessMaxed = room: action: {
+            choose = [
+              {
+                conditions = "{{ not is_state('${maxTimer room}', 'active') }}";
+                sequence = [ action ];
+              }
+            ];
+          };
+        in
+        {
+          alias = "Stop all heads before changing system mode";
+          mode = "restart";
+          sequence = [
+            {
+              repeat = {
+                count = 2;
+                sequence =
+                  (map (room: unlessMaxed room ((offAction room) // { continue_on_error = true; })) roomNames)
+                  ++ [
+                    { delay.seconds = 2; }
+                  ];
+              };
+            }
+          ]
+          ++ (map (
+            room:
+            unlessMaxed room {
+              action = "timer.start";
+              target.entity_id = minOffTimer room;
+              data.duration = tuning.minOffMinutes * 60;
+            }
+          ) roomNames);
+        };
 
       # All commits are serialized. The room controller waits until this script
       # finishes, so it never acts on a partly copied set of pending values.
