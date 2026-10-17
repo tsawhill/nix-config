@@ -14,7 +14,7 @@ in
   # Dispatchers are hl.dsp.* closures — NOT strings.
   wayland.windowManager.hyprland.extraConfig = ''
     -- Apps / actions
-    hl.bind(mainMod .. " + B",      hl.dsp.exec_cmd("zen"))
+    hl.bind(mainMod .. " + B",      hl.dsp.exec_cmd("zen-beta"))
     hl.bind(mainMod .. " + Return", hl.dsp.exec_cmd("foot"))
     hl.bind(mainMod .. " + Next",   hl.dsp.exec_cmd([[
       ${pkgs.systemd}/bin/systemctl --user --quiet is-active gpu-recorder.service \

@@ -47,8 +47,9 @@
       inputs.nixpkgs.follows = "nixpkgs-stable";
     };
     zen-browser-stable = {
-      url = "github:youwen5/zen-browser-flake";
+      url = "github:0xc000022070/zen-browser-flake";
       inputs.nixpkgs.follows = "nixpkgs-stable";
+      inputs.home-manager.follows = "home-manager-stable";
     };
     nix-vscode-extensions-stable = {
       url = "github:nix-community/nix-vscode-extensions";
@@ -71,8 +72,9 @@
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
     zen-browser-unstable = {
-      url = "github:youwen5/zen-browser-flake";
+      url = "github:0xc000022070/zen-browser-flake";
       inputs.nixpkgs.follows = "nixpkgs-unstable";
+      inputs.home-manager.follows = "home-manager-unstable";
     };
     nix-vscode-extensions-unstable = {
       url = "github:nix-community/nix-vscode-extensions";

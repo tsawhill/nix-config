@@ -1,7 +1,7 @@
 { lib, pkgs, ... }:
 let
   defaults = {
-    "zen.desktop" = [
+    "zen-beta.desktop" = [
       "text/html"
       "application/xhtml+xml"
       "x-scheme-handler/http"
@@ -85,5 +85,5 @@ in
       '') defaults
     )
   );
-  home.sessionVariables.BROWSER = "zen";
+  home.sessionVariables.BROWSER = "zen-beta";
 }
