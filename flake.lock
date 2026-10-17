@@ -271,11 +271,11 @@
         "vpkmerge": "vpkmerge"
       },
       "locked": {
-        "lastModified": 1792202400,
-        "narHash": "sha256-YIsDccqWeHKipckUiE0lFnC8X6AuJDRxeeN+e3wfbig=",
+        "lastModified": 1792225083,
+        "narHash": "sha256-ePxN+q8/STC75ujOX+d8gswY2oMwmqFg3kqaDeR5VRA=",
         "owner": "Slush97",
         "repo": "grimoire",
-        "rev": "829ed5bd1d73a1edaba9e1d4f0bb3524d1431db2",
+        "rev": "897100a11dafc0af97631b5637873b4b0614475c",
         "type": "github"
       },
       "original": {
