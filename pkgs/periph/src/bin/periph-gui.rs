@@ -2090,5 +2090,6 @@ fn main() -> glib::ExitCode {
         });
         ui.window.present();
     });
-    application.run()
+    // GApplication would treat our arguments as files to open.
+    application.run_with_args(&std::env::args().take(1).collect::<Vec<_>>())
 }

@@ -13,3 +13,6 @@ __pycache__/
 # Wallpaper videos stay on build-nix; only the name -> hash manifest is tracked.
 /wallpapers/*
 !/wallpapers/manifest.json
+
+# Cargo build output.
+target/
