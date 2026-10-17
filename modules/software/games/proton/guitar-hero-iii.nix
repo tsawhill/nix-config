@@ -4,6 +4,7 @@
     desktopName = "Guitar Hero III";
     category = "Guitar Hero";
     guitarShim.enable = true;
+    dsoal.enable = true;
     lowLatency = {
       enable = true;
       pulseLatencyMs = 8;

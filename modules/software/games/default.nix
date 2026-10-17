@@ -120,19 +120,33 @@ let
 
   guitarDll = pkgs.callPackage ../../../pkgs/games/xinput-guitar-dll.nix { };
   guitarShimConfig = config.software.apps.gaming.guitarShimConfig or "";
+  dsoal = pkgs.callPackage ../../../pkgs/games/dsoal.nix { };
 
-  # Wine only loads a native xinput1_3 from beside the executable, so the game
+  # Wine only loads a native DLL from beside the executable, so the game
   # directory has to hold a copy. Refreshing it per launch keeps it in step with
   # the store instead of a hand-copied DLL that silently goes stale. The compare
   # avoids rewriting a file inside the Syncthing-shared library every launch,
   # and a read-only library mount warns rather than blocking the game.
-  guitarShimSetup = ''
-    shim_dll=${lib.escapeShellArg "${guitarDll}/share/games/xinput-guitar-dll/xinput1_3.dll"}
-    if ! ${lib.getExe' pkgs.diffutils "cmp"} -s "$shim_dll" "$game_dir/xinput1_3.dll"; then
-      ${lib.getExe' pkgs.coreutils "install"} -m0644 "$shim_dll" "$game_dir/xinput1_3.dll" \
-        || echo "guitar shim: could not refresh $game_dir/xinput1_3.dll" >&2
-    fi
-  '';
+  installBesideExe =
+    label: files:
+    lib.concatMapStrings (file: ''
+      src_file=${lib.escapeShellArg file}
+      dst_file="$game_dir/${baseNameOf file}"
+      if ! ${lib.getExe' pkgs.diffutils "cmp"} -s "$src_file" "$dst_file"; then
+        ${lib.getExe' pkgs.coreutils "install"} -m0644 "$src_file" "$dst_file" \
+          || echo "${label}: could not refresh $dst_file" >&2
+      fi
+    '') files;
+
+  guitarShimSetup = installBesideExe "guitar shim" [
+    "${guitarDll}/share/games/xinput-guitar-dll/xinput1_3.dll"
+  ];
+
+  dsoalSetup = installBesideExe "dsoal" [
+    "${dsoal}/share/games/dsoal/dsound.dll"
+    "${dsoal}/share/games/dsoal/dsoal-aldrv.dll"
+    "${dsoal}/share/games/dsoal/alsoft.ini"
+  ];
 
   lsfgToml = pkgs.formats.toml { };
 
@@ -257,10 +271,15 @@ let
         else
           entryCfg.command;
       lsfgVkConfig = lsfgConfig;
-      guitarShimEnv = lib.optionals entryCfg.guitarShim.enable (
-        [ "WINEDLLOVERRIDES=xinput1_3=n,b" ]
-        ++ lib.optional (guitarShimConfig != "") "GUITAR_SHIM_CONFIG=${guitarShimConfig}"
-      );
+      nativeDlls =
+        lib.optional entryCfg.guitarShim.enable "xinput1_3=n,b"
+        ++ lib.optional entryCfg.dsoal.enable "dsound=n,b";
+      nativeDllEnv = lib.optional (
+        nativeDlls != [ ]
+      ) "WINEDLLOVERRIDES=${lib.concatStringsSep ";" nativeDlls}";
+      guitarShimEnv = lib.optional (
+        entryCfg.guitarShim.enable && guitarShimConfig != ""
+      ) "GUITAR_SHIM_CONFIG=${guitarShimConfig}";
       bindMounts = lib.optional (entryCfg.songs != null) {
         source = "${songsLinkRoot}/${entryCfg.songs.library}";
         target = "${baseDir id entryCfg}/${entryCfg.songs.mountPath}";
@@ -288,9 +307,12 @@ let
             "PULSE_PROP=nix.game-audio=true"
           ]
           ++ entryCfg.env
+          ++ nativeDllEnv
           ++ guitarShimEnv;
         setupScript =
-          (runner.setupScript or "") + lib.optionalString entryCfg.guitarShim.enable guitarShimSetup;
+          (runner.setupScript or "")
+          + lib.optionalString entryCfg.guitarShim.enable guitarShimSetup
+          + lib.optionalString entryCfg.dsoal.enable dsoalSetup;
         launchPrefix = runner.launchPrefix or "";
         name = entryCfg.command;
         networkEnable = entryCfg.network.enable;
@@ -645,6 +667,13 @@ in
             the guitar profiles it reads. umu entries only
           '';
 
+          dsoal.enable = lib.mkEnableOption ''
+            DSOAL in place of Wine's dsound for this game, refreshing its DLLs
+            and alsoft.ini beside the executable on each launch. Wine's dsound
+            hides about 60 ms of queued audio from the game's play cursor. umu
+            entries with 32-bit executables only
+          '';
+
           network.enable = lib.mkEnableOption "network access for this game";
 
           songs = lib.mkOption {
@@ -814,6 +843,10 @@ in
               {
                 assertion = !entryCfg.guitarShim.enable || entryCfg.runner.umu != null;
                 message = "software.games.entries.${entryName}.guitarShim.enable needs a umu runner (the DLL is installed beside the Windows executable).";
+              }
+              {
+                assertion = !entryCfg.dsoal.enable || entryCfg.runner.umu != null;
+                message = "software.games.entries.${entryName}.dsoal.enable needs a umu runner (the DLLs are installed beside the Windows executable).";
               }
               {
                 assertion =
