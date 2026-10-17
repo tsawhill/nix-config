@@ -333,11 +333,14 @@ fn add_row(
     grid: &gtk::Grid,
     row: i32,
     name: &str,
+    help: &str,
     widget: &impl IsA<gtk::Widget>,
     modified: bool,
 ) -> i32 {
     let label = gtk::Label::new(Some(name));
     label.set_halign(Align::Start);
+    label.set_tooltip_text(Some(help));
+    widget.set_tooltip_text(Some(help));
     grid.attach(&label, 0, row, 1, 1);
     grid.attach(widget, 1, row, 1, 1);
     grid.attach(&marker(modified), 2, row, 1, 1);
@@ -479,6 +482,8 @@ fn mouse_settings(
         &grid,
         row,
         "DPI stages",
+        "Sensitivities the DPI button cycles through. Higher DPI moves the cursor further \
+         per inch.",
         &stages,
         declared.is_some_and(|nix| nix.dpi_stages != current.dpi_stages),
     );
@@ -504,6 +509,7 @@ fn mouse_settings(
         &grid,
         row,
         "Active stage",
+        "The DPI stage in use right now.",
         &stage,
         declared.is_some_and(|nix| nix.active_stage != current.active_stage),
     );
@@ -557,7 +563,15 @@ fn mouse_settings(
                 nix.polling_rate.wireless != value
             }
         });
-        row = add_row(&grid, row, name, &widget, modified);
+        row = add_row(
+            &grid,
+            row,
+            name,
+            "How often the mouse reports to the PC. Higher means less latency and smoother \
+             motion, but more CPU load and, over the dongle, more battery drain.",
+            &widget,
+            modified,
+        );
     }
 
     let lift_labels: Vec<String> = mchose::LiftOff::ALL
@@ -583,14 +597,32 @@ fn mouse_settings(
         &grid,
         row,
         "Lift-off distance",
+        "How high the mouse can be lifted before the sensor stops tracking. Lower stops the \
+         cursor drifting while you reposition the mouse.",
         &lift,
         declared.is_some_and(|nix| nix.lift_off != current.lift_off),
     );
 
-    for (name, value, field) in [
-        ("Motion sync", current.motion_sync, 0usize),
-        ("Ripple control", current.ripple, 1),
-        ("Angle snapping", current.angle_snap, 2),
+    for (name, help, value, field) in [
+        (
+            "Motion sync",
+            "Times sensor reads to line up with USB polls, for more even motion at a \
+             slight latency cost.",
+            current.motion_sync,
+            0usize,
+        ),
+        (
+            "Ripple control",
+            "Smooths sensor jitter, mostly noticeable at high DPI, at a slight latency cost.",
+            current.ripple,
+            1,
+        ),
+        (
+            "Angle snapping",
+            "Straightens near-horizontal and near-vertical movement into straight lines.",
+            current.angle_snap,
+            2,
+        ),
     ] {
         let input = gtk::CheckButton::new();
         input.set_active(value);
@@ -609,7 +641,7 @@ fn mouse_settings(
             1 => nix.ripple != value,
             _ => nix.angle_snap != value,
         });
-        row = add_row(&grid, row, name, &input, modified);
+        row = add_row(&grid, row, name, help, &input, modified);
     }
 
     let (angle_widget, angle) = spin(current.angle_correction.into(), -30.0, 30.0, 1.0, 0, "°");
@@ -627,6 +659,7 @@ fn mouse_settings(
         &grid,
         row,
         "Angle correction",
+        "Rotates the sensor's axes, in degrees, to make up for how you hold the mouse.",
         &angle_widget,
         declared.is_some_and(|nix| nix.angle_correction != current.angle_correction),
     );
@@ -654,6 +687,8 @@ fn mouse_settings(
         &grid,
         row,
         "Performance mode",
+        "Sensor and controller power mode. Faster modes respond quicker but drain the \
+         battery sooner.",
         &mode,
         declared.is_some_and(|nix| nix.performance_mode != current.performance_mode),
     );
@@ -673,13 +708,14 @@ fn mouse_settings(
         &grid,
         row,
         "Debounce",
+        "After a click registers, switch bounce is ignored for this long. Raise it if a \
+         button double-clicks on its own.",
         &debounce_widget,
         declared.is_some_and(|nix| nix.debounce_ms != current.debounce_ms),
     );
     row = section(&grid, row, "Power & lighting");
 
     let (sleep_widget, sleep) = spin(current.sleep_minutes.into(), 0.0, 255.0, 1.0, 0, "min");
-    sleep.set_tooltip_text(Some("0 never sleeps"));
     {
         let state = state.clone();
         let slot = slot.clone();
@@ -694,6 +730,7 @@ fn mouse_settings(
         &grid,
         row,
         "Sleep after",
+        "Idle minutes before the mouse sleeps to save battery. 0 never sleeps.",
         &sleep_widget,
         declared.is_some_and(|nix| nix.sleep_minutes != current.sleep_minutes),
     );
@@ -713,6 +750,7 @@ fn mouse_settings(
         &grid,
         row,
         "Lighting",
+        "Turns the mouse's LEDs on or off.",
         &lighting,
         declared.is_some_and(|nix| nix.lighting != current.lighting),
     );
@@ -1218,6 +1256,8 @@ fn keyboard_settings(
         &grid,
         row,
         "Polling rate",
+        "How often the keyboard reports to the PC. Higher means less input latency but more \
+         CPU and USB load.",
         &rate,
         differs(declared.map(|nix| &nix.polling_rate), &current.polling_rate),
     );
@@ -1243,6 +1283,8 @@ fn keyboard_settings(
         &grid,
         row,
         "Debounce",
+        "After a key changes state, further changes are ignored for this long. 0 is fastest \
+         but filters nothing; a few ms stops chatter that shows up as double presses.",
         &debounce,
         differs(declared.map(|nix| &nix.debounce_ms), &current.debounce_ms),
     );
@@ -1278,6 +1320,7 @@ fn keyboard_settings(
         &grid,
         row,
         "Lighting effect",
+        "The LED animation.",
         &effect,
         differs(
             declared.map(|nix| &nix.lighting.effect),
@@ -1285,9 +1328,19 @@ fn keyboard_settings(
         ),
     );
 
-    for (name, value, speed) in [
-        ("Brightness", current.lighting.brightness, false),
-        ("Effect speed", current.lighting.speed, true),
+    for (name, help, value, speed) in [
+        (
+            "Brightness",
+            "LED brightness, 0 to 4 (brightest).",
+            current.lighting.brightness,
+            false,
+        ),
+        (
+            "Effect speed",
+            "Animation speed, 0 (slow) to 4 (fast).",
+            current.lighting.speed,
+            true,
+        ),
     ] {
         let widget = optional_spin(value.map(f64::from), 0.0, 4.0, 1.0, 0, "", {
             let state = state.clone();
@@ -1308,7 +1361,7 @@ fn keyboard_settings(
         } else {
             differs(declared.map(|nix| &nix.lighting.brightness), &value)
         };
-        row = add_row(&grid, row, name, &widget, modified);
+        row = add_row(&grid, row, name, help, &widget, modified);
     }
 
     let rainbow: gtk::Widget = if let Some(value) = current.lighting.rainbow {
@@ -1330,6 +1383,7 @@ fn keyboard_settings(
         &grid,
         row,
         "Rainbow",
+        "Cycles rainbow colours instead of using the single colour below.",
         &rainbow,
         differs(
             declared.map(|nix| &nix.lighting.rainbow),
@@ -1375,6 +1429,7 @@ fn keyboard_settings(
         &grid,
         row,
         "Colour",
+        "The effect's colour when rainbow is off.",
         &color,
         differs(
             declared.map(|nix| &nix.lighting.color),
@@ -1396,6 +1451,7 @@ fn keyboard_settings(
         &grid,
         row,
         "Fn layer",
+        "Which of the keyboard's two Fn layouts is active.",
         &layer,
         differs(declared.map(|nix| &nix.fn_layer), &current.fn_layer),
     );
@@ -1418,6 +1474,8 @@ fn keyboard_settings(
         &grid,
         row,
         "Anti-mistouch",
+        "The vendor's guard against accidental presses. What exactly it filters isn't \
+         documented.",
         &anti,
         differs(
             declared.map(|nix| &nix.anti_mistouch),
@@ -1448,6 +1506,8 @@ fn keyboard_settings(
         &grid,
         row,
         "RT stability",
+        "Rapid trigger chatter filter: a stability window, in ms, before a key can flip \
+         again. 0 is off. Raise it if rapid trigger gives you double presses.",
         &stability,
         differs(
             declared.map(|nix| &nix.rt_stability_ms),
@@ -1470,6 +1530,7 @@ fn keyboard_settings(
         &grid,
         row,
         "WASD/arrow swap",
+        "Swaps WASD and the arrow keys, like Fn+W.",
         &swap,
         declared.is_some_and(|nix| nix.wasd_swap != current.wasd_swap),
     );
@@ -1488,6 +1549,8 @@ fn keyboard_settings(
         &grid,
         row,
         "Actuation",
+        "How far down (mm) a key goes before it registers. Lower is faster but easier to \
+         trigger by accident; values near 0.1 sit close to sensor noise.",
         &actuation_widget,
         declared.is_some_and(|nix| nix.actuation != current.actuation),
     );
@@ -1522,6 +1585,8 @@ fn keyboard_settings(
         &grid,
         row,
         "Release",
+        "Depth (mm) a held key must rise above to let go. Shallower than actuation adds \
+         hysteresis, so a key resting near the actuation point doesn't chatter.",
         &release_row,
         declared.is_some_and(|nix| nix.release != current.release),
     );
@@ -1542,13 +1607,26 @@ fn keyboard_settings(
         &grid,
         row,
         "Rapid trigger",
+        "Past the actuation point, a key releases as soon as it moves up by the release \
+         sensitivity and presses again once it moves down by the press sensitivity, \
+         instead of waiting for fixed points.",
         &rt,
         declared.is_some_and(|nix| nix.rapid_trigger.enable != current.rapid_trigger.enable),
     );
-    for (name, value, press) in [
-        ("RT press sensitivity", current.rapid_trigger.press, true),
+    for (name, help, value, press) in [
+        (
+            "RT press sensitivity",
+            "With rapid trigger, how far (mm) a released key must move back down to press \
+             again. Smaller re-presses faster, but finger wobble or switch bounce can then \
+             register as a second press.",
+            current.rapid_trigger.press,
+            true,
+        ),
         (
             "RT release sensitivity",
+            "With rapid trigger, how far (mm) a held key must move up to release. Smaller \
+             releases sooner, but a slight lift while holding can then count as a release \
+             followed by a new press.",
             current.rapid_trigger.release,
             false,
         ),
@@ -1574,7 +1652,7 @@ fn keyboard_settings(
                 differs(Some(&nix.rapid_trigger.release), &value)
             }
         });
-        row = add_row(&grid, row, name, &widget, modified);
+        row = add_row(&grid, row, name, help, &widget, modified);
     }
     let deadzone = optional_spin(current.bottom_deadzone, 0.0, 1.0, 0.01, 2, "mm", {
         let state = state.clone();
@@ -1590,6 +1668,8 @@ fn keyboard_settings(
         &grid,
         row,
         "Bottom dead zone",
+        "The last stretch of travel (mm) above bottom-out where a key can't release, so the \
+         rebound from bottoming out isn't read as a release and re-press.",
         &deadzone,
         differs(
             declared.map(|nix| &nix.bottom_deadzone),
@@ -1601,6 +1681,9 @@ fn keyboard_settings(
     let keys_title = gtk::Label::new(Some("Per-key actuation"));
     keys_title.add_css_class("heading");
     keys_title.set_halign(Align::Start);
+    keys_title.set_tooltip_text(Some(
+        "Actuation points for individual keys; every other key uses the global actuation.",
+    ));
     root.append(&keys_title);
     let keys = gtk::Grid::builder()
         .column_spacing(10)

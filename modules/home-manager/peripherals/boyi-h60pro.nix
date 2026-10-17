@@ -23,13 +23,13 @@
       wasdSwap = false;
       actuation = 2.100;
       rapidTrigger.enable = true;
-      rapidTrigger.press = 0.200;
-      rapidTrigger.release = 0.200;
+      rapidTrigger.press = 0.400;
+      rapidTrigger.release = 0.400;
       bottomDeadzone = 0.300;
-      keys."A".actuation = 0.100;
-      keys."D".actuation = 0.100;
-      keys."S".actuation = 0.100;
-      keys."W".actuation = 0.100;
+      keys."A".actuation = 0.200;
+      keys."D".actuation = 0.200;
+      keys."S".actuation = 0.200;
+      keys."W".actuation = 0.200;
     };
   };
 }
