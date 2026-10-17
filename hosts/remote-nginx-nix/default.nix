@@ -42,12 +42,15 @@
     # Nginx
     "${self}/modules/software/services/nginx/nginx.nix"
     "${self}/modules/software/services/nginx/streams/palworld.nix"
+    "${self}/modules/software/services/nginx/public-edge.nix"
 
   ];
   my.users.root = {
     enable = true;
   };
   software.headless.enable = true;
+  # Covering for pi-backup-nix while it is offline.
+  my.nginx.publicEdge.enable = true;
   users.users.nginx = {
     # This tells NixOS not to use the 'nologin' shell
     shell = pkgs.bashInteractive;

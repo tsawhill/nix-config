@@ -31,7 +31,6 @@
     ./system/disks.nix
     ./system/networking.nix
     "${self}/modules/network/networkmanager/wireguard/wg-remote.nix"
-    ./system/cloudflare-ddns.nix
     ./system/zfs-backup-target.nix
     # Locale
     "${self}/modules/locale/enUS-pacific.nix"
@@ -57,7 +56,7 @@
 
     # Nginx
     "${self}/modules/software/services/nginx/nginx.nix"
-    "${self}/modules/software/services/nginx/proxies"
+    "${self}/modules/software/services/nginx/public-edge.nix"
 
     # fail2ban
     "${self}/modules/software/services/fail2ban"
@@ -118,15 +117,8 @@
   ];
   networking.firewall.allowedUDPPorts = [ 27017 ];
 
-  my.nginx.geoblock.enable = true;
-  # Names given to `mtls-ca issue`; per-proxy extras go in mTLSClients.
-  my.nginx.mtls.defaultClients = [
-    "taylor-desktop-nix"
-    "taylor-laptop-nix"
-    "taylor-cube-nix"
-    "taylor-deck-nix"
-    "taylor-phone"
-  ];
+  # remote-nginx-nix has these while the pi is offline.
+  my.nginx.publicEdge.enable = false;
 
   my.secrets.wireguard.pi-backup-nix.enable = true;
   my.secrets.wireguard.pi-backup-nix.wg-remote.enable = true;
@@ -181,82 +173,5 @@
       ];
       gid = 1004;
     };
-  };
-
-  proxy.authentik = {
-    enable = true;
-    domain = "auth.tsawhill.org";
-  };
-
-  proxy.vaultwarden = {
-    enable = true;
-    domain = "vault.tsawhill.org";
-  };
-  proxy.immich = {
-    enable = true;
-    domain = "immich.tsawhill.org";
-  };
-  proxy.jellyfin = {
-    enable = true;
-    domain = "jelly.tsawhill.org";
-  };
-  proxy.nextcloud = {
-    enable = true;
-    domain = "nc.tsawhill.org";
-  };
-  proxy.open-webui = {
-    enable = true;
-    domain = "llm.tsawhill.org";
-    mTLSCert = "mTLS-CA";
-  };
-  proxy.gotify = {
-    enable = true;
-    domain = "gotify.tsawhill.org";
-    mTLSCert = "mTLS-CA";
-  };
-  proxy.radarr = {
-    enable = true;
-    domain = "rad.tsawhill.org";
-    mTLSCert = "mTLS-CA";
-  };
-  proxy.sonarr = {
-    enable = true;
-    domain = "son.tsawhill.org";
-    # mTLSCert = "mTLS-CA";
-    enableAuthentik = true;
-  };
-  proxy.lidarr = {
-    enable = true;
-    domain = "lid.tsawhill.org";
-    mTLSCert = "mTLS-CA";
-  };
-  proxy.prowlarr = {
-    enable = true;
-    domain = "pro.tsawhill.org";
-    mTLSCert = "mTLS-CA";
-  };
-  proxy.qui = {
-    enable = true;
-    domain = "qbit.tsawhill.org";
-    mTLSCert = "mTLS-CA";
-  };
-  proxy.seerr = {
-    enable = true;
-    domain = "request.tsawhill.org";
-  };
-  proxy.unifi = {
-    enable = true;
-    domain = "unifi.tsawhill.org";
-    mTLSCert = "mTLS-CA";
-  };
-  proxy.searx = {
-    enable = true;
-    domain = "searx.tsawhill.org";
-    mTLSCert = "mTLS-CA";
-  };
-  proxy.homepage = {
-    enable = true;
-    domain = "home.tsawhill.org";
-    mTLSCert = "mTLS-CA";
   };
 }

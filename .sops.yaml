@@ -182,6 +182,7 @@ creation_rules:
         - *build-nix
         - *pi-backup-nix
         - *networking-ddns-nix
+        - *remote-nginx-nix
   # Switch SNMPv3 credentials for the router's port shaping
   - path_regex: modules/secrets/server/LXCs/networking-router-nix\.yaml$
     key_groups:
