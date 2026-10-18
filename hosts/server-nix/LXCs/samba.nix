@@ -25,6 +25,7 @@
           "download"
           "gameservers"
           "code"
+          "documents"
           "games"
         ];
       };
@@ -37,6 +38,7 @@
           "download"
           "gameservers"
           "code"
+          "documents"
           "games"
         ];
       };
@@ -49,6 +51,7 @@
           "download"
           "gameservers"
           "code"
+          "documents"
           "games"
         ];
       };
@@ -61,6 +64,7 @@
           "download"
           "gameservers"
           "code"
+          "documents"
           "games"
         ];
       };
@@ -126,6 +130,11 @@
       enable = true;
       members = [ "root" ];
       gid = 1003;
+    };
+    documents = {
+      enable = true;
+      members = [ "root" ];
+      gid = 1004;
     };
     games = {
       enable = true;

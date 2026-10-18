@@ -1,9 +1,69 @@
 {
   config,
+  lib,
   pkgs,
   ...
 }:
 let
+  # Group that keeps write access to each shared dataset; appdata/* is single-service.
+  sharedDatasets = {
+    "zpool/media" = "media";
+    "zpool/games/roms" = "games";
+    "zpool/games/saves" = "games";
+    "zpool/taylor/clips" = "documents";
+    "zpool/taylor/documents" = "documents";
+    "zpool/taylor/work" = "documents";
+    "zpool/taylor/code/nix-config" = "code";
+    downloadHDD = "download";
+    downloadSSD = "download";
+  };
+
+  # Default ACLs miss cp -p/tar/rsync -a modes; run without --root-only to repair a tree.
+  sharedDatasetPerms = pkgs.writeShellApplication {
+    name = "shared-dataset-perms";
+    runtimeInputs = [
+      config.boot.zfs.package
+      pkgs.acl
+      pkgs.coreutils
+      pkgs.findutils
+    ];
+    text = ''
+      # Usage: shared-dataset-perms [--root-only] [dataset...]  (default: all)
+      declare -A groups=(${
+        lib.concatStrings (lib.mapAttrsToList (ds: group: " [${ds}]=${group}") sharedDatasets)
+      } )
+      root_only=false
+      if [ "''${1:-}" = --root-only ]; then
+        root_only=true
+        shift
+      fi
+      targets=("$@")
+      [ "''${#targets[@]}" -gt 0 ] || targets=("''${!groups[@]}")
+
+      for ds in "''${targets[@]}"; do
+        group=''${groups[$ds]:?"$ds is not in sharedDatasets"}
+        if [ "$(zfs get -H -o value mounted "$ds" 2>/dev/null)" != yes ]; then
+          echo "skipping $ds: not mounted" >&2
+          continue
+        fi
+        [ "$(zfs get -H -o value acltype "$ds")" = posix ] || zfs set acltype=posix "$ds"
+        dir=$(zfs get -H -o value mountpoint "$ds")
+        acl="d:u::rwx,d:g::rwx,d:g:$group:rwx,d:m::rwx,d:o::rx"
+
+        if $root_only; then
+          chgrp "$group" "$dir"
+          chmod g+rwxs "$dir"
+          setfacl -m "$acl" "$dir"
+        else
+          echo "$ds ($dir) -> $group"
+          chgrp -R "$group" "$dir"
+          chmod -R g+rwX "$dir"
+          find "$dir" -type d -exec chmod g+s {} + -exec setfacl -m "$acl" {} +
+        fi
+      done
+    '';
+  };
+
   # The JBOD's HBA brings its disks up one by one, ~4.5 s apart, so the last one
   # appears ~55 s into boot: right at the end of NixOS's ~60 s import wait. Wait
   # (up to 3 min) for the whole pool first so it never imports degraded or not at all.
@@ -48,10 +108,16 @@ in
     restartIfChanged = false;
   };
 
+  environment.systemPackages = [ sharedDatasetPerms ];
+
   systemd.services.configure-zfs-datasets = {
-    description = "Ensure ZFS datasets have correct mountpoints";
+    description = "Ensure ZFS dataset mountpoints and shared-dataset ACLs";
     wantedBy = [ "zfs.target" ];
-    after = [ "zfs-import.target" ];
+    # zfs-mount: the shared-dataset ACLs go on mounted dataset roots.
+    after = [
+      "zfs-import.target"
+      "zfs-mount.service"
+    ];
     # The Incus tier pools are created under these parents.
     before = [ "incus-declarative-apply.service" ];
     serviceConfig.Type = "oneshot";
@@ -87,6 +153,8 @@ in
       for parent in rpool rpool/lxc rpool/lxc/incus scratchSSD scratchSSD/lxc scratchSSD/lxc/incus; do
         ensure_dataset "zpool/backups/$parent" -o canmount=off
       done
+
+      ${lib.getExe sharedDatasetPerms} --root-only
     '';
   };
   boot.zfs.forceImportRoot = true; # Import root even if booting from the mirrored boot drive.
