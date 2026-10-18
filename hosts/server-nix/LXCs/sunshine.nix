@@ -224,7 +224,7 @@ let
         missing=0
         for node in /dev/input/event*; do
           sys=/sys/class/input/''${node##*/}
-          [ ${sunshineInputId} = beef:dead ] || continue
+          ${isSunshineInput} || continue
           [ -e "/run/udev/data/c$(cat "$sys/dev" 2>/dev/null)" ] || missing=1
         done
         [ "$missing" -eq 0 ] && return
@@ -275,7 +275,8 @@ let
     esac
   '';
 
-  sunshineInputId = ''"$(cat "$sys/device/id/vendor" 2>/dev/null):$(cat "$sys/device/id/product" 2>/dev/null)"'';
+  # Sunshine's uinput devices; the host labels them beef:dead for Incus.
+  isSunshineInput = ''[[ "$(cat "$sys/device/name" 2>/dev/null)" == "libvirtualhid "* ]]'';
 
   # Incus hotplugs Sunshine's uinput event nodes, but an unprivileged LXC
   # cannot synthesize the corresponding udev events. Mirror the host's udev
@@ -288,7 +289,7 @@ let
     install -d -m 0755 /run/udev/data
     for node in /dev/input/event*; do
       sys=/sys/class/input/''${node##*/}
-      [ ${sunshineInputId} = beef:dead ] || continue
+      ${isSunshineInput} || continue
       record=c$(cat "$sys/dev" 2>/dev/null) || continue
       [ -r "/opt/host-udev-data/$record" ] || continue
       ln -sfnT "/opt/host-udev-data/$record" "/run/udev/data/$record"
@@ -306,7 +307,7 @@ let
         sys=/sys/class/input/''${node##*/}
         # Device gone, node not yet removed by Incus.
         [ -e "$sys" ] || return 0
-        [ ${sunshineInputId} = beef:dead ] && return 0
+        ${isSunshineInput} && return 0
       done
       return 1
     }

@@ -14,8 +14,9 @@
   # Sunshine creates its keyboard and mouse through /dev/uinput. Label only
   # those synthetic event devices so Incus's unix-hotplug matcher can pass
   # their device nodes and uevents into sunshine-nix for libinput.
+  # beef:dead is just the label Incus matches; libvirtualhid's real IDs are 1209:000x.
   services.udev.extraRules = ''
-    SUBSYSTEM=="input", KERNEL=="event*", ATTRS{id/vendor}=="beef", ATTRS{id/product}=="dead", ENV{ID_VENDOR_ID}="beef", ENV{ID_MODEL_ID}="dead"
+    SUBSYSTEM=="input", KERNEL=="event*", ATTRS{id/vendor}=="1209", ATTRS{name}=="libvirtualhid *", ENV{ID_VENDOR_ID}="beef", ENV{ID_MODEL_ID}="dead"
 
     # usb_id never runs on a vhci import's input children, so Incus cannot match them.
     SUBSYSTEM=="input", DEVPATH=="/devices/platform/vhci_hcd.*", ENV{ID_VENDOR_ID}=="", ATTRS{idVendor}=="?*", ENV{ID_VENDOR_ID}="$attr{idVendor}", ENV{ID_MODEL_ID}="$attr{idProduct}"
