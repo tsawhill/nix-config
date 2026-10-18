@@ -128,8 +128,8 @@ in
       # Empty means no fixed primary; let Hyprland place it.
       output = if fallbackMonitor == "" then null else fallbackMonitor;
       offset = {
-        x = -1.0;
-        y = -1.0;
+        x = 1.0;
+        y = 1.0;
       };
       profiles = [
         # {
