@@ -415,7 +415,7 @@ let
 
     # The repo is bind-mounted from server-nix into build-nix, so local edits
     # here are immediately visible to both hosts.
-    NIX_CONFIG="/mnt/zpool/code/nix-config"
+    NIX_CONFIG="/mnt/zpool/taylor/code/nix-config"
     REGISTRY_JSON="${factoryRegistryJson}"
     COLMENA_NIX="$NIX_CONFIG/flake-outputs/colmena.nix"
     TOPOLOGY_NIX="$NIX_CONFIG/modules/network/topology.nix"

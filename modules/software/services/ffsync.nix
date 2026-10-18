@@ -12,7 +12,7 @@ in
 
   # Keep sync data on its own zpool dataset so it is snapshotted and replicated
   # independently of the container root.
-  services.mysql.dataDir = "/mnt/zpool/ffsync";
+  services.mysql.dataDir = "/mnt/zpool/appdata/ffsync";
 
   # On an empty database, firefox-syncserver-setup runs *after* the server (it
   # needs the schema first), so the server caches an unregistered node and 500s

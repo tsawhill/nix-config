@@ -119,18 +119,18 @@ let
 
     downloadHDD-mount = dirMount "/mnt/downloadHDD";
     downloadSSD-mount = dirMount "/mnt/downloadSSD";
-    ffsync-mount = dirMount "/mnt/zpool/ffsync";
-    gamesaves-mount = dirMount "/mnt/zpool/gamesaves";
+    ffsync-mount = dirMount "/mnt/zpool/appdata/ffsync";
+    gamesaves-mount = dirMount "/mnt/zpool/games/saves";
     gameserver-mount = mountProfile "Disk passthrough for gameserver directory" [
-      "/mnt/zpool/gameservers"
+      "/mnt/zpool/appdata/gameservers"
     ];
-    immich-mount = dirMount "/mnt/zpool/immich";
+    immich-mount = dirMount "/mnt/zpool/appdata/immich";
     media-mount = dirMount "/mnt/zpool/media";
-    nextcloud-mount = dirMount "/mnt/zpool/nextcloud";
+    nextcloud-mount = dirMount "/mnt/zpool/appdata/nextcloud";
     nix-config-mount = mountProfile "Disk passthrough for nixos config directory" [
-      "/mnt/zpool/code/nix-config"
+      "/mnt/zpool/taylor/code/nix-config"
     ];
-    roms-mount = dirMount "/mnt/zpool/roms";
+    roms-mount = dirMount "/mnt/zpool/games/roms";
     taylor-mount = mountProfile "Disk passthrough for Taylor's datasets" [
       "/mnt/zpool/taylor/clips"
       "/mnt/zpool/taylor/documents"
@@ -348,7 +348,7 @@ let
         };
         gamesaves = {
           type = "disk";
-          source = "/mnt/zpool/gamesaves";
+          source = "/mnt/zpool/games/saves";
           path = "/mnt/gamesaves";
           shift = "true";
         };

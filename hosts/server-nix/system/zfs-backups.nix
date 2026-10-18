@@ -10,7 +10,7 @@ let
   piBackupFqdn = networkTopology.lib.fqdn "pi-backup-nix";
 
   # Source roots to protect. Syncoid receives each source under the same path
-  # beneath the Pi's `backup` pool, e.g. `zpool/code` -> `backup/zpool/code`.
+  # beneath the Pi's `backup` pool, e.g. `zpool/taylor` -> `backup/zpool/taylor`.
   #
   # `rpool` is intentionally split into children. The bare `backup/rpool`
   # dataset is just a container on the target, and trying to replicate the empty
@@ -23,11 +23,8 @@ let
     "downloadSSD"
     "rpool/home"
     "rpool/root"
-    "zpool/ffsync"
-    "zpool/gamesaves"
-    "zpool/immich"
-    "zpool/nextcloud"
-    "zpool/code"
+    "zpool/appdata"
+    "zpool/games/saves" # not zpool/games: roms are too big and re-obtainable
     "zpool/taylor"
   ];
 

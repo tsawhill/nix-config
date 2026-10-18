@@ -14,7 +14,7 @@ let
     # jq filters reference $vars inside single quotes on purpose.
     excludeShellChecks = [ "SC2016" ];
     text = ''
-      dir=''${1:-/mnt/zpool/code/nix-config/wallpapers}
+      dir=''${1:-/mnt/zpool/taylor/code/nix-config/wallpapers}
       manifest=$dir/manifest.json
       roots=$dir/.gcroots
       mkdir -p "$roots"

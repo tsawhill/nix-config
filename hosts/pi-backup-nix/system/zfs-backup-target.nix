@@ -39,7 +39,8 @@ in
     ];
     script = ''
       if zfs list backup >/dev/null 2>&1; then
-        for dataset in backup/downloadHDD backup/downloadSSD backup/rpool backup/zpool; do
+        # backup/zpool/games: parent for zpool/games/saves, whose own parent isn't replicated.
+        for dataset in backup/downloadHDD backup/downloadSSD backup/rpool backup/zpool backup/zpool/games; do
           if zfs list "$dataset" >/dev/null 2>&1; then
             zfs set -u mountpoint=none "$dataset"
           else

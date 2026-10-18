@@ -14,7 +14,7 @@ let
     SSH="${pkgs.openssh}/bin/ssh"
     SOPS="${pkgs.sops}/bin/sops"
 
-    NIX_CONFIG="/mnt/zpool/code/nix-config"
+    NIX_CONFIG="/mnt/zpool/taylor/code/nix-config"
     CERT_DIR="modules/software/services/nginx/proxies/mTLS-Certs"
     CA_CRT="$NIX_CONFIG/$CERT_DIR/mTLS-CA.crt"
     CA_CRL="$NIX_CONFIG/$CERT_DIR/mTLS-CA.crl"

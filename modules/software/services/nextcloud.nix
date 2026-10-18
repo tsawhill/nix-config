@@ -15,7 +15,7 @@ in
   services.nextcloud = {
     enable = true;
     hostName = nextcloudFqdn;
-    home = "/mnt/zpool/nextcloud";
+    home = "/mnt/zpool/appdata/nextcloud";
     settings = {
       trusted_domains = [
         "nc.tsawhill.org"

@@ -6,7 +6,7 @@
   services.immich = {
     enable = true;
     accelerationDevices = null;
-    mediaLocation = "/mnt/zpool/immich";
+    mediaLocation = "/mnt/zpool/appdata/immich";
     host = "0.0.0.0";
   };
 

@@ -129,7 +129,7 @@
   #   software.games.syncGames = [ "guitarHero3" ];
   #   software.games.syncPlatforms = [ "ps3" ];
   # They sync into software.games.syncRoot and launch locally; everything else
-  # launches from the /mnt/zpool/roms CIFS mount.
+  # launches from the /mnt/zpool/games/roms CIFS mount.
 
   # ---------------------------------------------------------------------------
   # User + secrets

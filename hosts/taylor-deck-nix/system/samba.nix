@@ -60,7 +60,7 @@ in
     options = [ mountOptions ];
   };
 
-  fileSystems."/mnt/zpool/roms" = {
+  fileSystems."/mnt/zpool/games/roms" = {
     device = "//${sambaHost}/roms/";
     fsType = "cifs";
     options = [ mountOptions ];

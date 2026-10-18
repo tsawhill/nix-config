@@ -7,7 +7,7 @@
 }:
 
 let
-  repoPath = "/mnt/zpool/code/nix-config";
+  repoPath = "/mnt/zpool/taylor/code/nix-config";
   flakePath = "git+file://${repoPath}";
   deployLockPath = "/run/lock/colmena-deploy.lock";
   retryStateDir = "/var/lib/colmena-deploy-retries";

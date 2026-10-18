@@ -194,7 +194,7 @@ let
 
   # CIFS mount of the full library, mounted at the server's own path on every
   # gaming host so a game's basePath resolves identically everywhere.
-  cifsRoot = "/mnt/zpool/roms";
+  cifsRoot = "/mnt/zpool/games/roms";
 
   # Per-host links to each song library. Games keep song folders in their own
   # (synced) settings, so the path must not change with the sync selection.
