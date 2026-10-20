@@ -34,9 +34,11 @@ let
   ];
 
   tuning = {
-    # Degrees below the threshold before a room stops. Without this a room
+    # Degrees past the threshold before a room stops. Without this a room
     # chatters on and off around a single number.
-    hysteresis = 2;
+    coolHysteresis = 2;
+    # Short heat runs warm the air, not the room, and it sags straight back.
+    heatHysteresis = 3;
     # The head is told to aim below the threshold, never at it: its own sensor
     # reads ceiling air and runs warm, so a setpoint at the threshold would let
     # it satisfy itself early and quit while the room is still warm.
@@ -55,6 +57,10 @@ let
     # Weather is advisory; local control works when it is unavailable.
     outdoorEntity = "weather.forecast_home";
     progressDegrees = 0.3;
+    # The head holds its fan until the coil warms, so heat starts show late.
+    heatStartMinutes = 10;
+    # A max run stops checking for progress once this close to its setpoint.
+    maxCloseDegrees = 3;
     boostMinutes = 10;
     stallMinutes = 20;
     # Scale escalation waits from 1x to 2x across a 0–35°F outdoor/room gap.
@@ -88,8 +94,8 @@ let
     rooms = blockRooms;
   };
 
-  # heatBelow applies in heat and auto. Apart from the bedroom overnight these
-  # are still placeholders to be revisited before winter.
+  # heatBelow applies in heat and auto. The office and the bedroom overnight
+  # are tuned; the rest are still placeholders.
 
   # Fan is a preference, not a throttle. The setpoint already scales output and
   # the unit's own auto varies the fan with information we do not have, so this
@@ -124,7 +130,7 @@ let
   working = {
     office = {
       coolAbove = 76;
-      heatBelow = 68;
+      heatBelow = 71;
       priority = 10;
       fan = "auto";
       airflow = "comfort";
@@ -158,7 +164,7 @@ let
     };
     office = {
       coolAbove = 76;
-      heatBelow = 68;
+      heatBelow = 71;
       priority = 5;
       fan = "auto";
       airflow = "comfort";
@@ -431,9 +437,9 @@ let
     {%- if is_state('${maxTimer room}', 'active') and sys in ['cool', 'heat'] -%}{{ sys }}
     {%- elif blocked -%}off
     {%- elif sys == 'cool' -%}
-      {{ 'cool' if r > ct else ('off' if r <= ct - ${toString tuning.hysteresis} else (cur if cur == 'cool' else 'off')) }}
+      {{ 'cool' if r > ct else ('off' if r <= ct - ${toString tuning.coolHysteresis} else (cur if cur == 'cool' else 'off')) }}
     {%- elif sys == 'heat' -%}
-      {{ 'heat' if r < ht else ('off' if r >= ht + ${toString tuning.hysteresis} else (cur if cur == 'heat' else 'off')) }}
+      {{ 'heat' if r < ht else ('off' if r >= ht + ${toString tuning.heatHysteresis} else (cur if cur == 'heat' else 'off')) }}
     {%- else -%}off
     {%- endif -%}'';
 
@@ -816,6 +822,13 @@ let
       {{ 1 + [[(outside - sample) / ${toString tuning.deltaForDoubleWait}, 0] | max, 1] | min }}
     {%- endif -%}'';
 
+  # Max ignores thresholds, so it is short until the room nears its setpoint.
+  unmetTemplate = room: ''
+    {%- set sp = state_attr('${climateEntity room}', 'temperature') | float(sample) -%}
+    {{ (mode == 'cool' and sample > (states('${targetSensor room}') | float(999)))
+       or (mode == 'heat' and sample < (states('${heatTargetSensor room}') | float(-999)))
+       or (is_state('${maxTimer room}', 'active') and (sp - sample) * (1 if mode == 'heat' else -1) >= ${toString tuning.maxCloseDegrees}) }}'';
+
   # Pure decision template, exercised by the offline regression suite. Progress
   # refreshes the observation window, never the per-cycle retry budget.
   # Starts get two blind resends before temperature can show anything.
@@ -838,8 +851,8 @@ let
       {{ 'wait' if elapsed < 300 else ('off_correct' if phase == 'off_check' else 'off_failed') }}
     {%- elif mode not in ['cool', 'heat'] or desired != mode or not fresh -%}wait
     {%- elif phase == 'idle' or checkpoint <= 0 -%}initialize
-    {%- elif phase == 'starting' and elapsed < 300 -%}
-      {{ 'confirm' if elapsed >= 60 and recovery_elapsed >= 110 else 'wait' }}
+    {%- elif phase == 'starting' and elapsed < (${toString (tuning.heatStartMinutes * 60)} if mode == 'heat' else 300) -%}
+      {{ 'confirm' if elapsed >= 60 and elapsed < 300 and recovery_elapsed >= 110 else 'wait' }}
     {%- elif elapsed < 300 -%}wait
     {%- elif progress >= ${toString tuning.progressDegrees} -%}progress
     {%- elif not unmet -%}progress
@@ -872,7 +885,7 @@ let
       captureBoundary = {
         action = "input_number.set_value";
         target.entity_id = "input_number.hvac_stop_boundary_${room}";
-        data.value = "{{ (states('${targetSensor room}') | float(75)) - ${toString tuning.hysteresis} if mode == 'cool' or (mode == 'off' and last_run == 'cool') else (states('${heatTargetSensor room}') | float(68)) + ${toString tuning.hysteresis} }}";
+        data.value = "{{ (states('${targetSensor room}') | float(75)) - ${toString tuning.coolHysteresis} if mode == 'cool' or (mode == 'off' and last_run == 'cool') else (states('${heatTargetSensor room}') | float(68)) + ${toString tuning.heatHysteresis} }}";
       };
       dismissWarning = {
         action = "persistent_notification.dismiss";
@@ -943,7 +956,7 @@ let
             progress = "{{ ((states('${baselineEntity}') | float(sample)) - sample) * (1 if mode == 'cool' else -1) }}";
             patience = patienceTemplate;
             recovery_elapsed = "{{ as_timestamp(now()) - (states('input_number.hvac_last_recovery_${room}') | float(0)) }}";
-            unmet = "{{ (mode == 'cool' and sample > (states('${targetSensor room}') | float(999))) or (mode == 'heat' and sample < (states('${heatTargetSensor room}') | float(-999))) }}";
+            unmet = unmetTemplate room;
             off_drift = "{{ ((states('${baselineEntity}') | float(sample)) - sample) * (1 if last_run == 'cool' else -1) }}";
             off_overshoot = "{{ (last_run == 'cool' and sample < stop_boundary - 1) or (last_run == 'heat' and sample > stop_boundary + 1) }}";
           };

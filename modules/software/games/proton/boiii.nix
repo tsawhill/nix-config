@@ -4,6 +4,7 @@
       command = "boiii";
       desktopName = "BOIII";
       basePath = "pc/Call of Duty/boiii";
+      network.enable = true;
       runner.umu = {
         exe = "boiii.exe";
       };

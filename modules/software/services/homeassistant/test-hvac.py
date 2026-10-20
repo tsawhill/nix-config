@@ -89,7 +89,9 @@ class Templates(unittest.TestCase):
             "airflowFollowsSchedule": "schedule",
             "toString tuning.staleMinutes * 60": "900",
             "toString (tuning.staleMinutes * 60)": "900",
-            "toString tuning.hysteresis": "2",
+            "toString tuning.coolHysteresis": "2",
+            "toString tuning.heatHysteresis": "3",
+            "toString tuning.maxCloseDegrees": "3",
             "anyOverrideActive": " or ".join(
                 f"is_state('timer.hvac_override_{r}', 'active')" for r in ROOMS
             ),
@@ -441,6 +443,7 @@ class Templates(unittest.TestCase):
             "stallMinutes": 20,
         }.items():
             text = text.replace("${toString tuning." + key + "}", str(value))
+        text = text.replace("${toString (tuning.heatStartMinutes * 60)}", "600")
         args = dict(
             phase="watching",
             mode="cool",
@@ -488,6 +491,61 @@ class Templates(unittest.TestCase):
         self.assertIn(
             "('watching' if phase == 'starting' else phase)", SOURCE
         )
+
+    def test_heat_start_waits_for_the_coil(self):
+        # Heat starts that worked rose under 0.3F by 5 min, past it by 10.
+        heat = dict(phase="starting", mode="heat", desired="heat")
+        sends = []
+        last = None
+        for elapsed in range(0, 600, 60):
+            recovery = 10**9 if last is None else elapsed - last
+            decision = self.watch(**heat, elapsed=elapsed, recovery_elapsed=recovery)
+            self.assertIn(decision, ["confirm", "wait"])
+            if decision == "confirm":
+                sends.append(elapsed)
+                last = elapsed
+        self.assertEqual(sends, [60, 180])
+        self.assertEqual(self.watch(**heat, elapsed=600), "retry")
+        self.assertEqual(self.watch(**heat, elapsed=600, progress=0.4), "progress")
+        # Only the start is slow; later heat windows stay five minutes.
+        self.assertEqual(self.watch(mode="heat", desired="heat"), "retry")
+
+    def test_max_run_is_unmet_until_near_its_setpoint(self):
+        # Replay 2026-10-20 05:39: max heat at 86, office flat at 66.74, schedule 60.
+        setpoint = {"value": 86}
+        self.env.globals["state_attr"] = lambda entity, attribute: (
+            setpoint["value"] if (entity, attribute) == ("climate.office_ac", "temperature") else None
+        )
+        self.values["sensor.hvac_heat_target_office"] = "60"
+        template = self.env.from_string(self.expand(raw_template("unmetTemplate")))
+
+        def unmet(mode, sample):
+            return template.render(mode=mode, sample=sample).strip()
+
+        self.assertEqual(unmet("heat", 66.74), "False")
+        self.values["timer.hvac_max_office"] = "active"
+        self.assertEqual(unmet("heat", 66.74), "True")
+        self.assertEqual(unmet("heat", 84), "False")
+        setpoint["value"] = 64
+        self.assertEqual(unmet("cool", 70), "True")
+        # Bedtime max cool that has arrived must not beep every few minutes.
+        self.assertEqual(unmet("cool", 66.5), "False")
+        setpoint["value"] = None
+        self.assertEqual(unmet("heat", 66.74), "False")
+
+    def test_heat_runs_further_past_threshold_than_cool(self):
+        self.values["sensor.hvac_effective_mode"] = "heat"
+        self.values["climate.office_ac"] = "heat"
+        self.values["sensor.ac_controller_office_temperature"] = "70.5"
+        self.assertEqual(self.render("desiredTemplate"), "heat")
+        self.values["sensor.ac_controller_office_temperature"] = "71"
+        self.assertEqual(self.render("desiredTemplate"), "off")
+        self.values["sensor.hvac_effective_mode"] = "cool"
+        self.values["climate.office_ac"] = "cool"
+        self.values["sensor.ac_controller_office_temperature"] = "74.5"
+        self.assertEqual(self.render("desiredTemplate"), "cool")
+        self.values["sensor.ac_controller_office_temperature"] = "74"
+        self.assertEqual(self.render("desiredTemplate"), "off")
 
     def test_shutdown_keeps_monitoring_after_first_retry(self):
         # Replay the incident: HA said off at 71.58F, bedroom kept cooling.
