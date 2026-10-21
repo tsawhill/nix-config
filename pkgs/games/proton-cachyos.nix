@@ -15,12 +15,12 @@ let
   # CachyOS's repo only keeps the current build; older ones 404. Version and
   # sha256 come from the %VERSION%/%SHA256SUM% entries in its cachyos.db.
   latestVersion = {
-    packageVersion = "11.0.20261005-1";
-    sha256 = "ae7207af056fcd6c1dd17e3a40dc7b3a6761db464b6569c91459eceb0522848d";
+    packageVersion = "11.0.20261015-1";
+    sha256 = "68415114f2bd452b7d99ca58d663203a9c944db09ec4d1ffbfc7a7d0aab12fda";
   };
   knownVersions = {
     latest = latestVersion;
-    "11.0.20261005-1" = latestVersion;
+    "11.0.20261015-1" = latestVersion;
   };
   selectedVersion =
     knownVersions.${version} or (throw "Unsupported proton-cachyos version: ${version}");
