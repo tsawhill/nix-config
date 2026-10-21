@@ -84,7 +84,7 @@
     # TEMP: testing Steam Machine support before upstreaming. Revert to
     # github:Jovian-Experiments/Jovian-NixOS once the PR lands.
     jovian = {
-      url = "github:tsawhill/Jovian-NixOS/steammachine-support";
+      url = "github:tsawhill/Jovian-NixOS/steammachine-support-2026-10";
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
   };

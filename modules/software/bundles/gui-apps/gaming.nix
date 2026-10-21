@@ -51,20 +51,23 @@ in
   config = lib.mkIf cfg.enable {
     programs.steam = {
       enable = true;
-      package = pkgs.steam.override {
-        # Inherited by Steam's native and Proton games. Only playback is routed
-        # by WirePlumber; this does not opt games into low-latency buffering.
-        extraEnv = {
-          PIPEWIRE_PROPS = "nix.game-audio=true";
-          PULSE_PROP = "nix.game-audio=true";
+      # Forced: on Jovian hosts this wraps Jovian's Steam, which its module also sets
+      package = lib.mkForce (
+        (pkgs.jovianPackages.steam or pkgs.steam).override {
+          # Inherited by Steam's native and Proton games. Only playback is routed
+          # by WirePlumber; this does not opt games into low-latency buffering.
+          extraEnv = {
+            PIPEWIRE_PROPS = "nix.game-audio=true";
+            PULSE_PROP = "nix.game-audio=true";
+          }
+          // lib.optionalAttrs (cfg.steamIgnoredGuitarDevices != [ ]) {
+            # mk-game-launcher removes this filter so launched games see guitars.
+            SDL_GAMECONTROLLER_IGNORE_DEVICES = lib.concatStringsSep "," (
+              lib.unique cfg.steamIgnoredGuitarDevices
+            );
+          };
         }
-        // lib.optionalAttrs (cfg.steamIgnoredGuitarDevices != [ ]) {
-          # mk-game-launcher removes this filter so launched games see guitars.
-          SDL_GAMECONTROLLER_IGNORE_DEVICES = lib.concatStringsSep "," (
-            lib.unique cfg.steamIgnoredGuitarDevices
-          );
-        };
-      };
+      );
       remotePlay.openFirewall = true;
       dedicatedServer.openFirewall = true;
       localNetworkGameTransfers.openFirewall = true;

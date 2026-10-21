@@ -2,7 +2,6 @@
   self,
   inputs,
   lib,
-  pkgs,
   ...
 }:
 
@@ -97,21 +96,7 @@
       enable = true; # deck hardware: APU, controls, fan, backlight
       enableFwupdBiosUpdates = false;
     };
-    decky-loader = {
-      enable = true; # plugin loader
-      # TEMPORARY: our Jovian fork predates upstream's structuredAttrs fix (083389179fe1)
-      package = pkgs.decky-loader.overridePythonAttrs (_: {
-        makeWrapperArgs = [
-          "--prefix"
-          "PATH"
-          ":"
-          (lib.makeBinPath [
-            pkgs.coreutils
-            pkgs.psmisc
-          ])
-        ];
-      });
-    };
+    decky-loader.enable = true; # plugin loader
     # jovian.steamos.useSteamOSConfig defaults to jovian.steam.enable (true).
   };
   desktop.kde.enable = true;

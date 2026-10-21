@@ -110,21 +110,7 @@
       # autoStart and warns at eval time if it is set without it. Restore
       # `desktopSession = "hyprland-uwsm"` together with autoStart = true.
     };
-    decky-loader = {
-      enable = true; # plugin loader
-      # TEMPORARY: our Jovian fork predates upstream's structuredAttrs fix (083389179fe1)
-      package = pkgs.decky-loader.overridePythonAttrs (_: {
-        makeWrapperArgs = [
-          "--prefix"
-          "PATH"
-          ":"
-          (lib.makeBinPath [
-            pkgs.coreutils
-            pkgs.psmisc
-          ])
-        ];
-      });
-    };
+    decky-loader.enable = true; # plugin loader
 
     # Steam Machine (Fremont) profile: the jovian kernel, HID preloads, initrd
     # storage modules, valve-leds permissions and brightness slider, and — the
@@ -166,13 +152,17 @@
   # the HDR Alienware panels, which are now cabled here. XWayland keeps the
   # brightness stable.
   nixpkgs.overlays = [
-    (final: prev: {
+    (_final: prev: {
       # Jovian's forced Deck mode leaves desktop Store/Community disabled when
       # device setup is incomplete. Keep those flags confined to Game Mode.
-      steam = prev.steam.override { platformArgs = ""; };
-      gamescope-session = prev.gamescope-session.override {
-        steam = final.steam.override { platformArgs = "-steamdeck -pipewire"; };
-      };
+      jovianPackages = prev.jovianPackages.overrideScope (
+        jfinal: jprev: {
+          steam = jprev.steam.override { platformArgs = ""; };
+          gamescope-session = jprev.gamescope-session.override {
+            steam = jfinal.steam.override { platformArgs = "-steamdeck -pipewire"; };
+          };
+        }
+      );
     })
     (_final: prev: {
       moonlight-qt = prev.moonlight-qt.overrideAttrs (old: {
