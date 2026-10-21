@@ -110,7 +110,21 @@
       # autoStart and warns at eval time if it is set without it. Restore
       # `desktopSession = "hyprland-uwsm"` together with autoStart = true.
     };
-    decky-loader.enable = true; # plugin loader
+    decky-loader = {
+      enable = true; # plugin loader
+      # TEMPORARY: our Jovian fork predates upstream's structuredAttrs fix (083389179fe1)
+      package = pkgs.decky-loader.overridePythonAttrs (_: {
+        makeWrapperArgs = [
+          "--prefix"
+          "PATH"
+          ":"
+          (lib.makeBinPath [
+            pkgs.coreutils
+            pkgs.psmisc
+          ])
+        ];
+      });
+    };
 
     # Steam Machine (Fremont) profile: the jovian kernel, HID preloads, initrd
     # storage modules, valve-leds permissions and brightness slider, and — the
