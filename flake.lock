@@ -369,16 +369,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1789328329,
-        "narHash": "sha256-1APRBavkQh8igX1bnBFI5h0uSPWAyCppWh9mKOnGMNk=",
+        "lastModified": 1792554477,
+        "narHash": "sha256-fGMRdug/PrNO0pnx0GmobrmQFBhPwtLiwe+9xXDVvrc=",
         "owner": "tsawhill",
         "repo": "Jovian-NixOS",
-        "rev": "5b58847426852558fcffb761c141a977c231368b",
+        "rev": "f9f781b4a36c1edeea6b21ffee015f3f3d9b3ea8",
         "type": "github"
       },
       "original": {
         "owner": "tsawhill",
-        "ref": "steammachine-support",
+        "ref": "steammachine-support-2026-10",
         "repo": "Jovian-NixOS",
         "type": "github"
       }
@@ -432,16 +432,15 @@
         ]
       },
       "locked": {
-        "lastModified": 1729697500,
-        "narHash": "sha256-VFTWrbzDlZyFHHb1AlKRiD/qqCJIripXKiCSFS8fAOY=",
-        "owner": "zhaofengli",
+        "lastModified": 1737420293,
+        "narHash": "sha256-F1G5ifvqTpJq7fdkT34e/Jy9VCyzd5XfJ9TO8fHhJWE=",
+        "owner": "nix-community",
         "repo": "nix-github-actions",
-        "rev": "e418aeb728b6aa5ca8c5c71974e7159c2df1d8cf",
+        "rev": "f4158fa080ef4503c8f4c820967d946c2af31ec9",
         "type": "github"
       },
       "original": {
-        "owner": "zhaofengli",
-        "ref": "matrix-name",
+        "owner": "nix-community",
         "repo": "nix-github-actions",
         "type": "github"
       }
